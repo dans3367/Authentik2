@@ -1164,9 +1164,20 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
       return res.status(400).json({ message: 'Newsletter is pending reviewer approval and cannot be sent yet' });
     }
 
-    // Check if reviewer approval is required but not yet obtained
+    // Check if reviewer approval is required but not yet obtained (per-newsletter flag)
     if (newsletter.requiresReviewerApproval && newsletter.reviewStatus !== 'approved') {
       return res.status(400).json({ message: 'Newsletter requires reviewer approval before it can be sent' });
+    }
+
+    // Check tenant-level reviewer settings: when enabled, ALL unsent newsletters must be reviewed
+    const reviewerSettings = await db.query.newsletterReviewerSettings.findFirst({
+      where: eq(newsletterReviewerSettings.tenantId, req.user.tenantId),
+    });
+    if (reviewerSettings?.enabled && newsletter.reviewStatus !== 'approved') {
+      return res.status(400).json({
+        message: 'Newsletter reviewer approval is required. Please submit this newsletter for review before sending.',
+        requiresReview: true,
+      });
     }
 
     // If test email is provided, send test email
@@ -1758,6 +1769,9 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
       return res.status(400).json({ message: 'Newsletter reviewer is not configured for this organization' });
     }
 
+    // Generate a random 5-digit numeric approval code
+    const approvalCode = String(Math.floor(10000 + Math.random() * 90000));
+
     // Update newsletter status
     const [updated] = await db.update(newsletters)
       .set({
@@ -1767,6 +1781,7 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
         reviewStatus: 'pending',
         reviewedAt: null,
         reviewNotes: null,
+        reviewerApprovalCode: approvalCode,
         updatedAt: new Date(),
       })
       .where(eq(newsletters.id, id))
@@ -1785,6 +1800,39 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
       req,
     });
 
+    // Trigger review notification email to the reviewer
+    try {
+      // Fetch reviewer details
+      const reviewer = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.id, settings.reviewerId),
+        columns: { id: true, email: true, firstName: true, lastName: true, name: true },
+      });
+
+      if (reviewer?.email) {
+        const submitterName = [req.user.firstName, req.user.lastName].filter(Boolean).join(' ') || req.user.name || req.user.email;
+        const reviewerName = [reviewer.firstName, reviewer.lastName].filter(Boolean).join(' ') || reviewer.name || reviewer.email;
+
+        const { sendReviewNotificationTask } = await import('../../src/trigger/newsletterReviewNotification');
+        await sendReviewNotificationTask.trigger({
+          newsletterId: id,
+          newsletterTitle: newsletter.title,
+          newsletterSubject: newsletter.subject,
+          newsletterContent: newsletter.content,
+          tenantId,
+          submitterName,
+          submitterEmail: req.user.email,
+          reviewerEmail: reviewer.email,
+          reviewerName,
+          submittedAt: new Date().toISOString(),
+          approvalCode,
+        });
+        console.log(`[Newsletter] Review notification triggered for reviewer ${reviewer.email}`);
+      }
+    } catch (notifError) {
+      // Non-fatal: don't block the submission if notification fails
+      console.error('[Newsletter] Failed to trigger review notification:', notifError);
+    }
+
     res.json({ message: 'Newsletter submitted for review', newsletter: updated });
   } catch (error) {
     console.error('Submit for review error:', error);
@@ -1792,11 +1840,11 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
   }
 });
 
-// Approve newsletter
+// Approve newsletter (requires 5-digit approval code verification)
 newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { notes } = req.body;
+    const { notes, approvalCode } = req.body;
     const tenantId = req.user.tenantId;
 
     const newsletter = await db.query.newsletters.findFirst({
@@ -1816,12 +1864,18 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
       return res.status(403).json({ message: 'Only the assigned reviewer can approve this newsletter' });
     }
 
+    // Verify the 5-digit approval code
+    if (!approvalCode || String(approvalCode).trim() !== String(newsletter.reviewerApprovalCode)) {
+      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
+    }
+
     const [updated] = await db.update(newsletters)
       .set({
         status: 'ready_to_send',
         reviewStatus: 'approved',
         reviewedAt: new Date(),
         reviewNotes: notes || null,
+        reviewerApprovalCode: null, // Clear the code after use
         updatedAt: new Date(),
       })
       .where(eq(newsletters.id, id))
@@ -1835,7 +1889,7 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
       entityId: id,
       entityName: newsletter.title,
       activityType: 'updated',
-      description: `Approved newsletter "${newsletter.title}"`,
+      description: `Approved newsletter "${newsletter.title}" with approval code`,
       metadata: { reviewStatus: 'approved', reviewNotes: notes },
       req,
     });
@@ -1844,6 +1898,67 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
   } catch (error) {
     console.error('Approve newsletter error:', error);
     res.status(500).json({ message: 'Failed to approve newsletter' });
+  }
+});
+
+// Approve & Send newsletter in one step (reviewer enters code via email link)
+newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { approvalCode } = req.body;
+    const tenantId = req.user.tenantId;
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${tenantId} AND ${newsletters.deletedAt} IS NULL`,
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    if (newsletter.status !== 'pending_review') {
+      return res.status(400).json({ message: 'Newsletter is not pending review' });
+    }
+
+    // Check that the current user is the assigned reviewer
+    if (newsletter.reviewerId !== req.user.id) {
+      return res.status(403).json({ message: 'Only the assigned reviewer can approve this newsletter' });
+    }
+
+    // Verify the 5-digit approval code
+    if (!approvalCode || String(approvalCode).trim() !== String(newsletter.reviewerApprovalCode)) {
+      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
+    }
+
+    // Approve the newsletter
+    const [updated] = await db.update(newsletters)
+      .set({
+        status: 'ready_to_send',
+        reviewStatus: 'approved',
+        reviewedAt: new Date(),
+        reviewerApprovalCode: null, // Clear the code after use
+        updatedAt: new Date(),
+      })
+      .where(eq(newsletters.id, id))
+      .returning();
+
+    // Log activity
+    await logActivity({
+      tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'updated',
+      description: `Approved and initiated send for newsletter "${newsletter.title}" with approval code`,
+      metadata: { reviewStatus: 'approved' },
+      req,
+    });
+
+    res.json({ message: 'Newsletter approved and ready to send', newsletter: updated, sendReady: true });
+  } catch (error) {
+    console.error('Approve and send newsletter error:', error);
+    res.status(500).json({ message: 'Failed to approve and send newsletter' });
   }
 });
 
@@ -1881,6 +1996,7 @@ newsletterRoutes.post("/:id/reject", authenticateToken, requireTenant, async (re
         reviewStatus: 'rejected',
         reviewedAt: new Date(),
         reviewNotes: notes,
+        reviewerApprovalCode: null, // Invalidate the code on rejection
         updatedAt: new Date(),
       })
       .where(eq(newsletters.id, id))

@@ -31,7 +31,9 @@ import {
   X,
   ShieldCheck,
   ClipboardCheck,
-  MessageSquare
+  MessageSquare,
+  KeyRound,
+  Hash
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -88,6 +90,20 @@ export default function NewsletterViewPage() {
   // Reviewer workflow state
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectNotes, setRejectNotes] = useState("");
+  const [approvalCode, setApprovalCode] = useState("");
+  const [approvalCodeError, setApprovalCodeError] = useState("");
+
+  // Detect if reviewer arrived via email link with code in URL
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const isReviewerFromEmail = urlParams.get('reviewer') === 'true';
+  const emailApprovalCode = urlParams.get('code') || '';
+
+  // Pre-fill approval code from URL if present
+  useEffect(() => {
+    if (emailApprovalCode && emailApprovalCode.length === 5) {
+      setApprovalCode(emailApprovalCode);
+    }
+  }, [emailApprovalCode]);
 
   const liveStats = useNewsletterStats(id);
 
@@ -132,10 +148,10 @@ export default function NewsletterViewPage() {
     },
   });
 
-  // Approve newsletter mutation
+  // Approve newsletter mutation (with code verification)
   const approveMutation = useMutation({
-    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
-      const response = await apiRequest('POST', `/api/newsletters/${id}/approve`, { notes });
+    mutationFn: async ({ id, notes, approvalCode }: { id: string; notes?: string; approvalCode: string }) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/approve`, { notes, approvalCode });
       return response.json();
     },
     onSuccess: (data: any) => {
@@ -147,6 +163,36 @@ export default function NewsletterViewPage() {
       });
     },
     onError: (error: any) => {
+      setApprovalCodeError(error.message || "Invalid approval code");
+      toast({
+        title: "Approval Failed",
+        description: error.message || "Failed to approve newsletter",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Approve & Send mutation (one-step from email link)
+  const approveAndSendMutation = useMutation({
+    mutationFn: async ({ id, approvalCode }: { id: string; approvalCode: string }) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/approve-and-send`, { approvalCode });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      setApprovalCodeError("");
+      // After approval, auto-trigger the send
+      if (data.sendReady && id) {
+        sendNowMutation.mutate(id);
+      }
+      toast({
+        title: "Newsletter Approved & Sending",
+        description: "The newsletter has been approved and is now being sent.",
+      });
+    },
+    onError: (error: any) => {
+      setApprovalCodeError(error.message || "Invalid approval code");
       toast({
         title: "Approval Failed",
         description: error.message || "Failed to approve newsletter",
@@ -770,7 +816,7 @@ export default function NewsletterViewPage() {
         {/* Reviewer Workflow Banner */}
         {newsletter.status === 'pending_review' && (
           <div className="rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/20 dark:border-orange-800/40 p-5 shadow-sm">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex flex-col gap-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center shrink-0">
                   <ShieldCheck className="w-5 h-5 text-orange-600 dark:text-orange-400" />
@@ -778,31 +824,109 @@ export default function NewsletterViewPage() {
                 <div>
                   <h3 className="font-semibold text-orange-900 dark:text-orange-100">Awaiting Reviewer Approval</h3>
                   <p className="text-sm text-orange-700 dark:text-orange-300 mt-0.5">
-                    This newsletter has been submitted for review and is waiting for the designated reviewer to approve or reject it.
+                    This newsletter has been submitted for review. {(newsletter as any).reviewerId === currentUserId ? 'Enter the 5-digit approval code to approve and send.' : 'Waiting for the designated reviewer to approve or reject it.'}
                   </p>
                 </div>
               </div>
+
+              {/* Reviewer Actions - Only show to the assigned reviewer */}
               {(newsletter as any).reviewerId === currentUserId && (
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <Button
-                    onClick={() => approveMutation.mutate({ id: newsletter.id })}
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none"
-                    disabled={approveMutation.isPending}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                    {approveMutation.isPending ? "Approving..." : "Approve"}
-                  </Button>
-                  <Button
-                    onClick={() => setShowRejectDialog(true)}
-                    size="sm"
-                    variant="outline"
-                    className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20 flex-1 sm:flex-none"
-                    disabled={rejectMutation.isPending}
-                  >
-                    <XCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                    Reject
-                  </Button>
+                <div className="space-y-4">
+                  {/* Approval Code Section */}
+                  <div className="rounded-lg border border-amber-200 bg-amber-50/80 dark:bg-amber-950/30 dark:border-amber-800/40 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <KeyRound className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                        {isReviewerFromEmail ? 'Approval Code (from email)' : 'Enter Approval Code'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <div className="relative flex-1 max-w-xs">
+                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-500" />
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={5}
+                          value={approvalCode}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 5);
+                            setApprovalCode(val);
+                            setApprovalCodeError('');
+                          }}
+                          placeholder="00000"
+                          className={`pl-9 text-center text-xl font-bold tracking-[0.3em] font-mono h-12 border-2 ${approvalCodeError
+                              ? 'border-red-400 focus-visible:ring-red-400'
+                              : approvalCode.length === 5
+                                ? 'border-emerald-400 focus-visible:ring-emerald-400'
+                                : 'border-amber-300 focus-visible:ring-amber-400'
+                            }`}
+                          data-testid="input-approval-code"
+                        />
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (approvalCode.length !== 5) {
+                            setApprovalCodeError('Please enter a valid 5-digit code');
+                            return;
+                          }
+                          approveAndSendMutation.mutate({ id: newsletter.id, approvalCode });
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white h-12 px-6"
+                        disabled={approvalCode.length !== 5 || approveAndSendMutation.isPending || approveMutation.isPending}
+                        data-testid="button-approve-and-send"
+                      >
+                        {approveAndSendMutation.isPending ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Approving...</>
+                        ) : (
+                          <><Send className="h-4 w-4 mr-2" strokeWidth={1.5} /> Approve & Send</>
+                        )}
+                      </Button>
+                    </div>
+                    {approvalCodeError && (
+                      <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {approvalCodeError}
+                      </p>
+                    )}
+                    {!isReviewerFromEmail && (
+                      <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                        Check your email for the 5-digit code that was sent when this newsletter was submitted for review.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Secondary Actions */}
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={() => {
+                        if (approvalCode.length !== 5) {
+                          setApprovalCodeError('Please enter a valid 5-digit code');
+                          return;
+                        }
+                        approveMutation.mutate({ id: newsletter.id, approvalCode });
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                      disabled={approvalCode.length !== 5 || approveMutation.isPending}
+                      data-testid="button-approve-only"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                      {approveMutation.isPending ? 'Approving...' : 'Approve Only'}
+                    </Button>
+                    <Button
+                      onClick={() => setShowRejectDialog(true)}
+                      size="sm"
+                      variant="outline"
+                      className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20"
+                      disabled={rejectMutation.isPending}
+                      data-testid="button-reject"
+                    >
+                      <XCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                      Reject
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

@@ -511,6 +511,7 @@ export const newsletters = pgTable("newsletters", {
   reviewStatus: text("review_status").default('pending'), // pending, approved, rejected
   reviewedAt: timestamp("reviewed_at"),
   reviewNotes: text("review_notes"),
+  reviewerApprovalCode: varchar("reviewer_approval_code", { length: 5 }), // Random 5-digit code for reviewer to confirm approval
   deletedAt: timestamp("deleted_at"), // Soft delete: when set, newsletter is hidden from UI but preserved for analytics
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
