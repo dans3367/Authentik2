@@ -3,7 +3,6 @@ import { Resend } from "resend";
 import { z } from "zod";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 import { sendAhaEmail } from "./ahasend";
-import { wrapInEmailDesign } from "./emailWrapper";
 
 // Initialize Resend for email sending
 const resend = new Resend(process.env.RESEND_API_KEY || "re_placeholder");
@@ -146,8 +145,28 @@ export const sendReviewNotificationTask = task({
       </div>
     `;
 
-    // Wrap in the tenant's email design
-    const fullHtml = await wrapInEmailDesign(data.tenantId, notificationBody);
+    // Wrap in a simple standalone HTML document (no tenant email design needed for internal reviewer emails)
+    const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Newsletter Review Request</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f1f5f9;">
+    <tr>
+      <td align="center" style="padding: 32px 16px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 640px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+          <tr>
+            <td>${notificationBody}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 
     const fromEmail = process.env.EMAIL_FROM || "admin@zendwise.com";
     const subject = `📋 Review Requested: "${data.newsletterTitle}"`;
