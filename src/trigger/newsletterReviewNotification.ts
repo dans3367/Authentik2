@@ -120,22 +120,6 @@ export const sendReviewNotificationTask = task({
           <p style="margin: 8px 0 0 0; font-size: 12px; color: #b45309;">Enter this code on the review page to approve and send the newsletter.</p>
         </div>
 
-        <!-- Newsletter Content Preview -->
-        <div style="margin-bottom: 20px;">
-          <h3 style="font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">📧 Newsletter Preview</h3>
-          <div style="border: 2px solid #e2e8f0; border-radius: 10px; overflow: hidden; background-color: #ffffff;">
-            <div style="background-color: #f1f5f9; padding: 8px 16px; border-bottom: 1px solid #e2e8f0;">
-              <span style="font-size: 12px; color: #64748b; font-weight: 500;">Subject: ${escapeHtml(data.newsletterSubject)}</span>
-            </div>
-            <div style="padding: 20px; max-height: 600px; overflow: hidden;">
-              ${data.newsletterContent}
-            </div>
-            <div style="background-color: #f1f5f9; padding: 10px 16px; border-top: 1px solid #e2e8f0; text-align: center;">
-              <a href="${reviewLink}" style="font-size: 13px; color: #3b82f6; text-decoration: none; font-weight: 500;">View full newsletter in browser →</a>
-            </div>
-          </div>
-        </div>
-
         <!-- Footer note -->
         <div style="text-align: center; padding: 16px 0; border-top: 1px solid #f1f5f9;">
           <p style="font-size: 12px; color: #94a3b8; margin: 0;">

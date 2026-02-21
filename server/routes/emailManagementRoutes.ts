@@ -2876,7 +2876,7 @@ emailManagementRoutes.put("/e-card-settings", authenticateToken, requireTenant, 
 });
 
 // Get master email design settings
-emailManagementRoutes.get("/master-email-design", authenticateToken, requireTenant, requirePermission('emails.manage_design'), async (req: any, res) => {
+emailManagementRoutes.get("/master-email-design", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const design = await db.query.masterEmailDesign.findFirst({
       where: sql`${masterEmailDesign.tenantId} = ${req.user.tenantId}`,
