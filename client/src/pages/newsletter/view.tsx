@@ -28,7 +28,12 @@ import {
   History,
   Loader2,
   Search,
-  X
+  X,
+  ShieldCheck,
+  ClipboardCheck,
+  MessageSquare,
+  KeyRound,
+  Hash
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +43,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useReduxAuth } from "@/hooks/useReduxAuth";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +84,26 @@ export default function NewsletterViewPage() {
   const [selectedTrajectory, setSelectedTrajectory] = useState<any>(null);
   const tasksInitializedRef = useRef(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { user } = useReduxAuth();
+  const currentUserId = (user as any)?.id;
+
+  // Reviewer workflow state
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectNotes, setRejectNotes] = useState("");
+  const [approvalCode, setApprovalCode] = useState("");
+  const [approvalCodeError, setApprovalCodeError] = useState("");
+
+  // Detect if reviewer arrived via email link with code in URL
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const isReviewerFromEmail = urlParams.get('reviewer') === 'true';
+  const emailApprovalCode = urlParams.get('code') || '';
+
+  // Pre-fill approval code from URL if present
+  useEffect(() => {
+    if (emailApprovalCode && emailApprovalCode.length === 5) {
+      setApprovalCode(emailApprovalCode);
+    }
+  }, [emailApprovalCode]);
 
   const liveStats = useNewsletterStats(id);
 
@@ -120,6 +147,118 @@ export default function NewsletterViewPage() {
       });
     },
   });
+
+  // Approve newsletter mutation (with code verification)
+  const approveMutation = useMutation({
+    mutationFn: async ({ id, notes, approvalCode }: { id: string; notes?: string; approvalCode: string }) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/approve`, { notes, approvalCode });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: "Newsletter Approved",
+        description: data.message || "The newsletter has been approved and is ready to send.",
+      });
+    },
+    onError: (error: any) => {
+      setApprovalCodeError(error.message || "Invalid approval code");
+      toast({
+        title: "Approval Failed",
+        description: error.message || "Failed to approve newsletter",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Approve & Send mutation (one-step from email link)
+  const approveAndSendMutation = useMutation({
+    mutationFn: async ({ id, approvalCode }: { id: string; approvalCode: string }) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/approve-and-send`, { approvalCode });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      setApprovalCodeError("");
+      // After approval, auto-trigger the send
+      if (data.sendReady && id) {
+        sendNowMutation.mutate(id);
+      }
+      toast({
+        title: "Newsletter Approved & Sending",
+        description: "The newsletter has been approved and is now being sent.",
+      });
+    },
+    onError: (error: any) => {
+      setApprovalCodeError(error.message || "Invalid approval code");
+      toast({
+        title: "Approval Failed",
+        description: error.message || "Failed to approve newsletter",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reject newsletter mutation
+  const rejectMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/reject`, { notes });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      setShowRejectDialog(false);
+      setRejectNotes("");
+      toast({
+        title: "Newsletter Rejected",
+        description: data.message || "The newsletter has been returned to draft with your feedback.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Rejection Failed",
+        description: error.message || "Failed to reject newsletter",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Submit for review mutation
+  const submitForReviewMutation = useMutation({
+    mutationFn: async (newsletterId: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${newsletterId}/submit-for-review`);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: "Submitted for Review",
+        description: data.message || "Newsletter has been submitted for reviewer approval.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Submission Failed",
+        description: error.message || "Failed to submit newsletter for review",
+        variant: "destructive"
+      });
+    },
+  });
+
+  // Fetch reviewer settings
+  const { data: reviewerSettings } = useQuery<{ enabled: boolean; reviewerId: string | null; reviewer: any }>({
+    queryKey: ['/api/newsletters/reviewer-settings'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/newsletters/reviewer-settings');
+      return response.json();
+    },
+  });
+
+  const reviewerEnabled = reviewerSettings?.enabled ?? false;
 
   const { data: recipientsData, isLoading: recipientsLoading } = useQuery<{ recipients: Array<{ id: string; email: string; firstName: string; lastName: string; status: string }>; total: number }>({
     queryKey: ['/api/newsletters', id, 'recipients'],
@@ -410,6 +549,7 @@ export default function NewsletterViewPage() {
     const statusConfig = {
       draft: { label: 'Draft', variant: 'secondary' as const, icon: Edit },
       ready_to_send: { label: 'Ready to Send', variant: 'outline' as const, icon: Send, className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800' },
+      pending_review: { label: 'Pending Review', variant: 'outline' as const, icon: ShieldCheck, className: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800' },
       scheduled: { label: 'Scheduled', variant: 'outline' as const, icon: Clock },
       sending: { label: 'Sending', variant: 'outline' as const, icon: Send },
       sent: { label: 'Sent', variant: 'default' as const, icon: CheckCircle },
@@ -574,14 +714,59 @@ export default function NewsletterViewPage() {
 
   if (!newsletter) {
     return (
-      <div className="p-6">
-        <div className="text-center py-8">
-          <Newspaper className="mx-auto h-12 w-12 text-muted-foreground mb-4" strokeWidth={1.5} />
-          <h2 className="text-2xl font-semibold mb-2">Newsletter not found</h2>
-          <p className="text-muted-foreground mb-4">The newsletter you're looking for doesn't exist.</p>
-          <Button onClick={() => navigate('/newsletter')}>
-            Back to Newsletters
-          </Button>
+      <div className="min-h-[80vh] flex items-center justify-center p-6">
+        <div className="relative max-w-lg w-full">
+          {/* Decorative background elements */}
+          <div className="absolute -top-20 -left-20 w-72 h-72 bg-gradient-to-br from-blue-400/20 to-purple-400/20 dark:from-blue-500/10 dark:to-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-20 -right-20 w-72 h-72 bg-gradient-to-br from-orange-400/15 to-pink-400/15 dark:from-orange-500/8 dark:to-pink-500/8 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Main card */}
+          <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border border-gray-200/60 dark:border-gray-700/40 rounded-2xl shadow-xl overflow-hidden">
+            {/* Top gradient accent bar */}
+            <div className="h-1.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
+
+            <div className="p-8 sm:p-10 text-center">
+              {/* Animated icon container */}
+              <div className="relative mx-auto w-20 h-20 mb-6">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 dark:from-blue-400/15 dark:to-purple-400/15 rounded-2xl rotate-6 transition-transform" />
+                <div className="absolute inset-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-850 rounded-2xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 flex items-center justify-center">
+                  <Newspaper className="h-9 w-9 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
+                </div>
+              </div>
+
+              {/* Title */}
+              <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-gray-100 dark:to-gray-400 bg-clip-text text-transparent mb-3">
+                Newsletter Not Found
+              </h2>
+
+              {/* Description */}
+              <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base leading-relaxed max-w-sm mx-auto mb-2">
+                The newsletter you're looking for may have been deleted or doesn't exist.
+              </p>
+              <p className="text-gray-400 dark:text-gray-500 text-xs mb-8">
+                Please check the URL or head back to your newsletter dashboard.
+              </p>
+
+              {/* Action buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Button
+                  onClick={() => navigate('/newsletter')}
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 transition-all duration-300 px-6"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                  Back to Newsletters
+                </Button>
+                <Button
+                  onClick={() => navigate('/newsletters/create')}
+                  variant="outline"
+                  className="w-full sm:w-auto border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-300 px-6"
+                >
+                  <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                  Create New
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -601,8 +786,8 @@ export default function NewsletterViewPage() {
     <div className="w-full">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
-          <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
             <Button
               variant="ghost"
               size="icon"
@@ -613,28 +798,11 @@ export default function NewsletterViewPage() {
               <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
             </Button>
             <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 mb-2">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate sm:flex-1">
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate">
                   {newsletter.title}
                 </h1>
-                <div className="sm:flex-shrink-0 flex flex-col items-start sm:items-end gap-1.5">
-                  {getStatusBadge(newsletter.status)}
-                  {newsletter.status === 'ready_to_send' && (
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        sendNowMutation.mutate(newsletter.id);
-                      }}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white border-green-700"
-                      disabled={sendNowMutation.isPending}
-                      data-testid="button-send-now"
-                    >
-                      <Send className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                      {sendNowMutation.isPending ? "Sending..." : "Send Now"}
-                    </Button>
-                  )}
-                </div>
+                {getStatusBadge(newsletter.status)}
               </div>
               <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
                 Subject: {newsletter.subject}
@@ -642,21 +810,208 @@ export default function NewsletterViewPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap lg:justify-end">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:justify-end shrink-0 pl-0 sm:pl-4">
             {newsletter.status === 'draft' && (
               <Button
                 onClick={() => navigate(`/newsletters/${newsletter.id}/edit`)}
                 variant="outline"
                 size="sm"
-                className="w-full sm:w-auto"
                 data-testid="button-edit"
               >
                 <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                <span className="sm:inline">Edit</span>
+                Edit
+              </Button>
+            )}
+            {reviewerEnabled && (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  submitForReviewMutation.mutate(newsletter.id);
+                }}
+                size="sm"
+                variant="outline"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900/20"
+                disabled={submitForReviewMutation.isPending}
+              >
+                <ClipboardCheck className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                {submitForReviewMutation.isPending ? "Submitting..." : "Submit for Review"}
+              </Button>
+            )}
+            {newsletter.status === 'ready_to_send' && (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sendNowMutation.mutate(newsletter.id);
+                }}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white border-green-700"
+                disabled={sendNowMutation.isPending}
+                data-testid="button-send-now"
+              >
+                <Send className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                {sendNowMutation.isPending ? "Sending..." : "Send Now"}
               </Button>
             )}
           </div>
         </div>
+
+        {/* Reviewer Workflow Banner */}
+        {newsletter.status === 'pending_review' && (
+          <div className="rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/20 dark:border-orange-800/40 p-5 shadow-sm">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-orange-900 dark:text-orange-100">Awaiting Reviewer Approval</h3>
+                  <p className="text-sm text-orange-700 dark:text-orange-300 mt-0.5">
+                    This newsletter has been submitted for review. {(newsletter as any).reviewerId === currentUserId ? 'Enter the 5-digit approval code to approve and send.' : 'Waiting for the designated reviewer to approve or reject it.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Reviewer Actions - Only show to the assigned reviewer */}
+              {(newsletter as any).reviewerId === currentUserId && (
+                <div className="space-y-4">
+                  {/* Approval Code Section */}
+                  <div className="rounded-lg border border-amber-200 bg-amber-50/80 dark:bg-amber-950/30 dark:border-amber-800/40 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <KeyRound className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                        {isReviewerFromEmail ? 'Approval Code (from email)' : 'Enter Approval Code'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <div className="relative flex-1 max-w-xs">
+                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-500" />
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={5}
+                          value={approvalCode}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 5);
+                            setApprovalCode(val);
+                            setApprovalCodeError('');
+                          }}
+                          placeholder="00000"
+                          className={`pl-9 text-center text-xl font-bold tracking-[0.3em] font-mono h-12 border-2 ${approvalCodeError
+                            ? 'border-red-400 focus-visible:ring-red-400'
+                            : approvalCode.length === 5
+                              ? 'border-emerald-400 focus-visible:ring-emerald-400'
+                              : 'border-amber-300 focus-visible:ring-amber-400'
+                            }`}
+                          data-testid="input-approval-code"
+                        />
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (approvalCode.length !== 5) {
+                            setApprovalCodeError('Please enter a valid 5-digit code');
+                            return;
+                          }
+                          approveAndSendMutation.mutate({ id: newsletter.id, approvalCode });
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white h-12 px-6"
+                        disabled={approvalCode.length !== 5 || approveAndSendMutation.isPending || approveMutation.isPending}
+                        data-testid="button-approve-and-send"
+                      >
+                        {approveAndSendMutation.isPending ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Approving...</>
+                        ) : (
+                          <><Send className="h-4 w-4 mr-2" strokeWidth={1.5} /> Approve & Send</>
+                        )}
+                      </Button>
+                    </div>
+                    {approvalCodeError && (
+                      <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {approvalCodeError}
+                      </p>
+                    )}
+                    {!isReviewerFromEmail && (
+                      <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                        Check your email for the 5-digit code that was sent when this newsletter was submitted for review.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Secondary Actions */}
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={() => {
+                        if (approvalCode.length !== 5) {
+                          setApprovalCodeError('Please enter a valid 5-digit code');
+                          return;
+                        }
+                        approveMutation.mutate({ id: newsletter.id, approvalCode });
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                      disabled={approvalCode.length !== 5 || approveMutation.isPending}
+                      data-testid="button-approve-only"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                      {approveMutation.isPending ? 'Approving...' : 'Approve Only'}
+                    </Button>
+                    <Button
+                      onClick={() => setShowRejectDialog(true)}
+                      size="sm"
+                      variant="outline"
+                      className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20"
+                      disabled={rejectMutation.isPending}
+                      data-testid="button-reject"
+                    >
+                      <XCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Review status info (for approved/rejected newsletters) */}
+        {(newsletter as any).reviewStatus === 'approved' && (newsletter as any).reviewedAt && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800/40 p-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Approved by reviewer</p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                  {format(new Date((newsletter as any).reviewedAt), 'PPP p')}
+                  {(newsletter as any).reviewNotes && ` — "${(newsletter as any).reviewNotes}"`}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(newsletter as any).reviewStatus === 'rejected' && (newsletter as any).reviewedAt && (
+          <div className="rounded-xl border border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-800/40 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-900 dark:text-red-100">Rejected by reviewer</p>
+                <p className="text-xs text-red-700 dark:text-red-300">
+                  {format(new Date((newsletter as any).reviewedAt), 'PPP p')}
+                </p>
+                {(newsletter as any).reviewNotes && (
+                  <div className="mt-2 p-2 rounded-md bg-red-100/50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30">
+                    <div className="flex items-start gap-2">
+                      <MessageSquare className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-red-800 dark:text-red-200 italic">"{(newsletter as any).reviewNotes}"</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
@@ -760,7 +1115,7 @@ export default function NewsletterViewPage() {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 lg:space-y-8">
           <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-6 min-w-max">
+            <TabsList className="grid w-full grid-cols-5 min-w-max">
               <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-overview">Overview</TabsTrigger>
               <TabsTrigger value="live-tracking" className="text-xs sm:text-sm" data-testid="tab-live-tracking">
                 <Activity className="h-3 w-3 mr-1" />
@@ -768,7 +1123,6 @@ export default function NewsletterViewPage() {
               </TabsTrigger>
               <TabsTrigger value="content" className="text-xs sm:text-sm" data-testid="tab-content">Content</TabsTrigger>
               <TabsTrigger value="status" className="text-xs sm:text-sm" data-testid="tab-status">Task Status</TabsTrigger>
-              <TabsTrigger value="analytics" className="text-xs sm:text-sm" data-testid="tab-analytics">Analytics</TabsTrigger>
               <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm" data-testid="tab-detailed-stats">Detailed Stats</TabsTrigger>
             </TabsList>
           </div>
@@ -1008,12 +1362,12 @@ export default function NewsletterViewPage() {
                           )}
                           <div className="flex flex-col items-center text-center min-w-0">
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium transition-colors mb-2 ${isCompleted
-                                ? 'bg-green-500 text-white'
-                                : isActive
-                                  ? 'bg-blue-500 text-white'
-                                  : isPending
-                                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                              ? 'bg-green-500 text-white'
+                              : isActive
+                                ? 'bg-blue-500 text-white'
+                                : isPending
+                                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                                  : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
                               }`}>
                               {isCompleted ? (
                                 <CheckCircle className="w-6 h-6" strokeWidth={1.5} />
@@ -1025,8 +1379,8 @@ export default function NewsletterViewPage() {
                             </div>
                             <div className="max-w-[120px]">
                               <p className={`text-sm font-medium mb-1 ${isActive
-                                  ? 'text-gray-900 dark:text-gray-100'
-                                  : 'text-gray-600 dark:text-gray-400'
+                                ? 'text-gray-900 dark:text-gray-100'
+                                : 'text-gray-600 dark:text-gray-400'
                                 }`}>
                                 {item.title}
                               </p>
@@ -1151,285 +1505,462 @@ export default function NewsletterViewPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="analytics" className="space-y-6 lg:space-y-8">
-            <div className="grid gap-4 lg:gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" strokeWidth={1.5} />
-                    Engagement Metrics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Unique Open Rate</span>
-                      <span className="text-sm font-bold">{uniqueOpenRate}%</span>
-                    </div>
-                    <Progress value={parseFloat(uniqueOpenRate)} className="h-2" />
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Click-through Rate</span>
-                      <span className="text-sm font-bold">{clickThroughRate}%</span>
-                    </div>
-                    <Progress value={parseFloat(clickThroughRate)} className="h-2" />
-
-                    <div className="pt-4 border-t">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4 text-center">
-                        <div>
-                          <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                            {newsletter.opens || 0}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Unique Opens</p>
-                          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-                            ({newsletter.totalOpens || 0} total)
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                            {newsletter.clickCount}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Total Clicks</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Performance Insights</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {(newsletter.opens === 0 || !newsletter.opens) && newsletter.status === 'sent' && (
-                      <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                        <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5" strokeWidth={1.5} />
-                        <div>
-                          <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                            No unique opens yet
-                          </p>
-                          <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                            It may take time for recipients to open emails
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {parseFloat(uniqueOpenRate) > 25 && (
-                      <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                        <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5" strokeWidth={1.5} />
-                        <div>
-                          <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                            Excellent unique engagement!
-                          </p>
-                          <p className="text-xs text-green-700 dark:text-green-300">
-                            Your unique open rate is above industry average ({uniqueOpenRate}%)
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {newsletter.status === 'draft' && (
-                      <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" strokeWidth={1.5} />
-                        <div>
-                          <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                            Ready to send
-                          </p>
-                          <p className="text-xs text-blue-700 dark:text-blue-300">
-                            Schedule or send this newsletter to start collecting analytics
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
           <TabsContent value="detailed-stats" className="space-y-6 lg:space-y-8">
+            {/* Analytics Collection Status Banner */}
+            {newsletter?.status === 'sent' && getTaskStepStatus('analytics') === 'running' && (
+              <div className="rounded-xl border border-blue-200 dark:border-blue-800/50 bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-blue-950/40 p-5 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-md">
+                    <RefreshCw className="w-5 h-5 text-white animate-spin" strokeWidth={1.5} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-100">Analytics Collection In Progress</h3>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-0.5">
+                      Engagement data is being gathered for 24 hours after sending. Stats below will continue to update in real-time.
+                    </p>
+                    {newsletter.sentAt && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <div className="flex-1 bg-blue-200/50 dark:bg-blue-800/30 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-1000"
+                            style={{ width: `${Math.min(100, ((Date.now() - new Date(newsletter.sentAt).getTime()) / (24 * 60 * 60 * 1000)) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
+                          {getAnalyticsTimeRemaining()} remaining
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {newsletter?.status === 'sent' && getTaskStepStatus('analytics') === 'completed' && (
+              <div className="rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-gradient-to-r from-emerald-50 via-green-50 to-emerald-50 dark:from-emerald-950/40 dark:via-green-950/30 dark:to-emerald-950/40 p-5 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shrink-0 shadow-md">
+                    <CheckCircle className="w-5 h-5 text-white" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-emerald-900 dark:text-emerald-100">Analytics Collection Complete</h3>
+                    <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-0.5">
+                      All engagement data has been gathered. The statistics below reflect the final results.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Aggregate Engagement Metrics */}
+            {newsletter?.status === 'sent' && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4">
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20">
+                  <CardContent className="p-4 text-center">
+                    <div className="w-9 h-9 rounded-lg bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center mx-auto mb-2">
+                      <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{liveStats?.delivered ?? 0}</p>
+                    <p className="text-xs font-medium text-blue-600/80 dark:text-blue-400/80 mt-0.5">Delivered</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/40 dark:to-emerald-900/20">
+                  <CardContent className="p-4 text-center">
+                    <div className="w-9 h-9 rounded-lg bg-green-500/10 dark:bg-green-400/10 flex items-center justify-center mx-auto mb-2">
+                      <Eye className="h-4 w-4 text-green-600 dark:text-green-400" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-2xl font-bold text-green-700 dark:text-green-300">{newsletter.opens || 0}</p>
+                    <p className="text-xs font-medium text-green-600/80 dark:text-green-400/80 mt-0.5">Unique Opens</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-violet-100/50 dark:from-purple-950/40 dark:to-violet-900/20">
+                  <CardContent className="p-4 text-center">
+                    <div className="w-9 h-9 rounded-lg bg-purple-500/10 dark:bg-purple-400/10 flex items-center justify-center mx-auto mb-2">
+                      <MousePointer className="h-4 w-4 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{newsletter.clickCount || 0}</p>
+                    <p className="text-xs font-medium text-purple-600/80 dark:text-purple-400/80 mt-0.5">Clicks</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-rose-100/50 dark:from-red-950/40 dark:to-rose-900/20">
+                  <CardContent className="p-4 text-center">
+                    <div className="w-9 h-9 rounded-lg bg-red-500/10 dark:bg-red-400/10 flex items-center justify-center mx-auto mb-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-2xl font-bold text-red-700 dark:text-red-300">{liveStats?.bounced ?? 0}</p>
+                    <p className="text-xs font-medium text-red-600/80 dark:text-red-400/80 mt-0.5">Bounced</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/40 dark:to-amber-900/20">
+                  <CardContent className="p-4 text-center">
+                    <div className="w-9 h-9 rounded-lg bg-orange-500/10 dark:bg-orange-400/10 flex items-center justify-center mx-auto mb-2">
+                      <ShieldOff className="h-4 w-4 text-orange-600 dark:text-orange-400" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{liveStats?.complained ?? 0}</p>
+                    <p className="text-xs font-medium text-orange-600/80 dark:text-orange-400/80 mt-0.5">Complaints</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-sm bg-gradient-to-br from-yellow-50 to-amber-100/50 dark:from-yellow-950/40 dark:to-amber-900/20">
+                  <CardContent className="p-4 text-center">
+                    <div className="w-9 h-9 rounded-lg bg-yellow-500/10 dark:bg-yellow-400/10 flex items-center justify-center mx-auto mb-2">
+                      <XCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" strokeWidth={1.5} />
+                    </div>
+                    <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">{liveStats?.suppressed ?? 0}</p>
+                    <p className="text-xs font-medium text-yellow-600/80 dark:text-yellow-400/80 mt-0.5">Suppressed</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Engagement Rates & Insights */}
+            {newsletter?.status === 'sent' && (
+              <div className="grid gap-4 lg:gap-6 md:grid-cols-2">
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <BarChart3 className="h-5 w-5 text-indigo-500" strokeWidth={1.5} />
+                      Engagement Rates
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
+                    {/* Open Rate */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Eye className="h-4 w-4 text-green-500" strokeWidth={1.5} />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Unique Open Rate</span>
+                        </div>
+                        <span className="text-lg font-bold text-green-600 dark:text-green-400">{uniqueOpenRate}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all duration-700"
+                          style={{ width: `${Math.min(100, parseFloat(uniqueOpenRate))}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-1.5">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{newsletter.opens || 0} unique / {newsletter.recipientCount || 0} sent</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">({(newsletter as any).totalOpens || 0} total opens)</span>
+                      </div>
+                    </div>
+
+                    {/* Click-through Rate */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <MousePointer className="h-4 w-4 text-purple-500" strokeWidth={1.5} />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Click-through Rate</span>
+                        </div>
+                        <span className="text-lg font-bold text-purple-600 dark:text-purple-400">{clickThroughRate}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-400 to-violet-500 rounded-full transition-all duration-700"
+                          style={{ width: `${Math.min(100, parseFloat(clickThroughRate))}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-1.5">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{newsletter.clickCount || 0} clicks / {newsletter.opens || 0} unique opens</span>
+                      </div>
+                    </div>
+
+                    {/* Delivery Rate */}
+                    {(() => {
+                      const deliveryRate = (newsletter.recipientCount || 0) > 0
+                        ? (((liveStats?.delivered ?? 0) / (newsletter.recipientCount || 1)) * 100).toFixed(1)
+                        : '0';
+                      return (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Send className="h-4 w-4 text-blue-500" strokeWidth={1.5} />
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Delivery Rate</span>
+                            </div>
+                            <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{deliveryRate}%</span>
+                          </div>
+                          <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full transition-all duration-700"
+                              style={{ width: `${Math.min(100, parseFloat(deliveryRate))}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between mt-1.5">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">{liveStats?.delivered ?? 0} delivered / {newsletter.recipientCount || 0} sent</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <TrendingUp className="h-5 w-5 text-emerald-500" strokeWidth={1.5} />
+                      Performance Insights
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {parseFloat(uniqueOpenRate) > 25 && (
+                      <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800/50 rounded-xl">
+                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 shrink-0" strokeWidth={1.5} />
+                        <div>
+                          <p className="text-sm font-semibold text-green-800 dark:text-green-200">Excellent Engagement</p>
+                          <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
+                            Your {uniqueOpenRate}% unique open rate is above the industry average of ~21%.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {parseFloat(uniqueOpenRate) <= 25 && parseFloat(uniqueOpenRate) > 0 && (
+                      <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl">
+                        <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" strokeWidth={1.5} />
+                        <div>
+                          <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Average Engagement</p>
+                          <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                            Your {uniqueOpenRate}% open rate can be improved. Try more compelling subject lines.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {(newsletter.opens === 0 || !newsletter.opens) && (
+                      <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-900/20 dark:to-gray-900/20 border border-gray-200 dark:border-gray-700/50 rounded-xl">
+                        <Clock className="h-5 w-5 text-gray-400 mt-0.5 shrink-0" strokeWidth={1.5} />
+                        <div>
+                          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Awaiting Opens</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                            No unique opens recorded yet. Opens usually trickle in over 24-48 hours.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {parseFloat(clickThroughRate) > 3 && (
+                      <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 border border-purple-200 dark:border-purple-800/50 rounded-xl">
+                        <MousePointer className="h-5 w-5 text-purple-500 mt-0.5 shrink-0" strokeWidth={1.5} />
+                        <div>
+                          <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">Great Click Rate</p>
+                          <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
+                            Your {clickThroughRate}% CTR shows strong content relevance.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {(liveStats?.bounced ?? 0) > 0 && (
+                      <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200 dark:border-red-800/50 rounded-xl">
+                        <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" strokeWidth={1.5} />
+                        <div>
+                          <p className="text-sm font-semibold text-red-800 dark:text-red-200">Bounces Detected</p>
+                          <p className="text-xs text-red-700 dark:text-red-300 mt-0.5">
+                            {liveStats?.bounced} email(s) bounced. Consider cleaning your contact list.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {(liveStats?.bounced ?? 0) === 0 && (newsletter.opens || 0) > 0 && parseFloat(clickThroughRate) <= 3 && parseFloat(uniqueOpenRate) > 25 && (
+                      <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl">
+                        <TrendingUp className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" strokeWidth={1.5} />
+                        <div>
+                          <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">Healthy Delivery</p>
+                          <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
+                            Zero bounces with good opens. Your sender reputation is in great shape.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Per-Recipient Stats Table */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <List className="h-5 w-5" strokeWidth={1.5} />
-                  Detailed Email Statistics
+                  Per-Recipient Email Activity
                 </CardTitle>
                 <CardDescription>
-                  Individual email delivery status and engagement activity for each recipient
+                  Individual delivery status and engagement activity for each recipient
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {newsletter?.status !== 'sent' ? (
-                  <div className="text-center py-8">
-                    <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" strokeWidth={1.5} />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center mx-auto mb-4">
+                      <Mail className="h-8 w-8 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
                       Newsletter Not Sent Yet
                     </h3>
-                    <p className="text-gray-500 dark:text-gray-400">
-                      Detailed email statistics will be available after the newsletter is sent.
+                    <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+                      Per-recipient statistics will appear here after the newsletter is sent. You'll see individual open, click, bounce, and complaint data for each email.
                     </p>
                   </div>
                 ) : isDetailedStatsLoading ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {[...Array(5)].map((_, i) => (
-                      <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
-                        <Skeleton className="h-10 w-10 rounded-full" />
+                      <div key={i} className="flex items-center gap-4 p-4 border rounded-xl">
+                        <Skeleton className="h-10 w-10 rounded-xl" />
                         <div className="space-y-2 flex-1">
                           <Skeleton className="h-4 w-[250px]" />
-                          <Skeleton className="h-4 w-[200px]" />
+                          <Skeleton className="h-3 w-[180px]" />
                         </div>
-                        <Skeleton className="h-6 w-16" />
+                        <Skeleton className="h-7 w-20 rounded-full" />
                       </div>
                     ))}
                   </div>
                 ) : detailedStatsData?.emails?.length ? (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-gray-100 dark:border-gray-800">
                       <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Showing {detailedStatsData.emails.length} of {detailedStatsData.totalEmails} emails
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {detailedStatsData.emails.length} of {detailedStatsData.totalEmails} recipients
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                          * Numbers below show total activity per recipient (including repeat opens/clicks)
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          Activity counts include repeat opens and clicks per recipient
                         </p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="w-full sm:w-auto">
-                        <RefreshCw className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                      <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="shrink-0">
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
                         Refresh
                       </Button>
                     </div>
 
-                    <div className="space-y-3 lg:space-y-4">
+                    <div className="space-y-2">
                       {detailedStatsData.emails.map((email, index) => {
                         const getStatusColor = (status: string) => {
                           switch (status) {
-                            case 'clicked': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-                            case 'opened': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-                            case 'bounced': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-                            case 'complained': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
-                            case 'suppressed': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-                            default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+                            case 'clicked': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300';
+                            case 'opened': return 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300';
+                            case 'bounced': return 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300';
+                            case 'complained': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300';
+                            case 'suppressed': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300';
+                            default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+                          }
+                        };
+
+                        const getStatusIcon = (status: string) => {
+                          switch (status) {
+                            case 'clicked': return <MousePointer className="h-3.5 w-3.5" strokeWidth={1.5} />;
+                            case 'opened': return <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />;
+                            case 'bounced': return <AlertTriangle className="h-3.5 w-3.5" strokeWidth={1.5} />;
+                            case 'complained': return <ShieldOff className="h-3.5 w-3.5" strokeWidth={1.5} />;
+                            case 'suppressed': return <XCircle className="h-3.5 w-3.5" strokeWidth={1.5} />;
+                            default: return <Mail className="h-3.5 w-3.5" strokeWidth={1.5} />;
                           }
                         };
 
                         return (
-                          <div key={email.emailId || index} className="border rounded-lg p-4 hover-elevate transition-colors">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                                  <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
-                                </div>
-                                <div>
-                                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                          <div key={email.emailId || index} className="group border rounded-xl p-4 hover:border-blue-200 dark:hover:border-blue-800/50 hover:shadow-sm transition-all duration-200">
+                            <div className="flex items-center gap-4">
+                              {/* Avatar */}
+                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 flex items-center justify-center shrink-0">
+                                <span className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase">
+                                  {email.recipient.charAt(0)}
+                                </span>
+                              </div>
+
+                              {/* Email & Status */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                                     {email.recipient}
                                   </p>
-                                  {email.resendId && (
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                      ID: {email.resendId}
-                                    </p>
+                                  <Badge className={`text-[10px] px-1.5 py-0 h-5 gap-1 ${getStatusColor(email.status)}`}>
+                                    {getStatusIcon(email.status)}
+                                    {email.status.charAt(0).toUpperCase() + email.status.slice(1)}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-3 mt-1">
+                                  {email.opens > 0 && (
+                                    <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                                      <Eye className="h-3 w-3" strokeWidth={1.5} />
+                                      {email.opens} {email.opens === 1 ? 'open' : 'opens'}
+                                    </span>
+                                  )}
+                                  {email.clicks > 0 && (
+                                    <span className="inline-flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400">
+                                      <MousePointer className="h-3 w-3" strokeWidth={1.5} />
+                                      {email.clicks} {email.clicks === 1 ? 'click' : 'clicks'}
+                                    </span>
+                                  )}
+                                  {email.lastActivity && (
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                                      {formatDistanceToNow(new Date(email.lastActivity + 'Z'), { addSuffix: true })}
+                                    </span>
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Badge className={getStatusColor(email.status)}>
-                                  {email.status.charAt(0).toUpperCase() + email.status.slice(1)}
-                                </Badge>
-                                <div className="flex items-center gap-1">
-                                  {/* History button opens Activity Timeline Modal */}
-                                  <EmailActivityTimelineModal
-                                    contactEmail={email.recipient}
-                                    trigger={
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        title="View Email Activity Timeline"
-                                      >
-                                        <History className="h-3 w-3" strokeWidth={1.5} />
-                                      </Button>
-                                    }
-                                  />
 
-                                  {/* User button navigates to contact profile page */}
+                              {/* Actions */}
+                              <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                <EmailActivityTimelineModal
+                                  contactEmail={email.recipient}
+                                  trigger={
+                                    <Button variant="ghost" size="sm" title="View Email Activity Timeline" className="h-8 w-8 p-0">
+                                      <History className="h-3.5 w-3.5" strokeWidth={1.5} />
+                                    </Button>
+                                  }
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={async () => {
+                                    try {
+                                      const response = await apiRequest('GET', `/api/email-contacts?search=${encodeURIComponent(email.recipient)}&limit=1`);
+                                      const data = await response.json();
+                                      if (data.contacts && data.contacts.length > 0) {
+                                        navigate(`/email-contacts/view/${data.contacts[0].id}`);
+                                      } else {
+                                        toast({ title: "Contact Not Found", description: "This email was not found in your contacts.", variant: "destructive" });
+                                      }
+                                    } catch {
+                                      toast({ title: "Error", description: "Failed to find contact.", variant: "destructive" });
+                                    }
+                                  }}
+                                  title="View Contact Profile Page"
+                                >
+                                  <User className="h-3.5 w-3.5" strokeWidth={1.5} />
+                                </Button>
+                                {email.resendId && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={async () => {
-                                      try {
-                                        // Find contact by email
-                                        const response = await apiRequest('GET', `/api/email-contacts?search=${encodeURIComponent(email.recipient)}&limit=1`);
-                                        const data = await response.json();
-
-                                        if (data.contacts && data.contacts.length > 0) {
-                                          const contact = data.contacts[0];
-                                          navigate(`/email-contacts/view/${contact.id}`);
-                                        } else {
-                                          toast({
-                                            title: "Contact Not Found",
-                                            description: "This email address was not found in your contacts list.",
-                                            variant: "destructive",
-                                          });
-                                        }
-                                      } catch (error) {
-                                        toast({
-                                          title: "Error",
-                                          description: "Failed to find contact information.",
-                                          variant: "destructive",
-                                        });
-                                      }
-                                    }}
-                                    title="View Contact Profile Page"
+                                    className="h-8 w-8 p-0"
+                                    onClick={() => window.open(`https://resend.com/emails/${email.resendId}`, '_blank')}
+                                    title="View in Resend Dashboard"
                                   >
-                                    <User className="h-3 w-3" strokeWidth={1.5} />
+                                    <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
                                   </Button>
-
-                                  {email.resendId && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => window.open(`https://resend.com/emails/${email.resendId}`, '_blank')}
-                                      title="View in Resend Dashboard"
-                                    >
-                                      <ExternalLink className="h-3 w-3" strokeWidth={1.5} />
-                                    </Button>
-                                  )}
-
-                                </div>
+                                )}
                               </div>
                             </div>
-
-                            <div className="grid grid-cols-2 gap-2 lg:gap-4 mb-3">
-                              <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded">
-                                <p className="text-lg font-semibold text-green-600 dark:text-green-400">{email.opens}</p>
-                                <p className="text-xs text-green-600 dark:text-green-400">Total Opens</p>
-                              </div>
-                              <div className="text-center p-2 bg-purple-50 dark:bg-purple-900/20 rounded">
-                                <p className="text-lg font-semibold text-purple-600 dark:text-purple-400">{email.clicks}</p>
-                                <p className="text-xs text-purple-600 dark:text-purple-400">Clicks</p>
-                              </div>
-                            </div>
-
-                            {email.lastActivity && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                Last activity: {formatDistanceToNow(new Date(email.lastActivity + 'Z'), { addSuffix: true })}
-                              </p>
-                            )}
-
                           </div>
                         );
                       })}
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" strokeWidth={1.5} />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      No Email Data Available
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center mx-auto mb-4">
+                      <Activity className="h-8 w-8 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                      No Email Data Available Yet
                     </h3>
-                    <p className="text-gray-500 dark:text-gray-400">
-                      Email tracking data is not yet available. This may take a few minutes after sending.
+                    <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+                      Email tracking data is being collected. This typically takes a few minutes after sending begins.
                     </p>
                   </div>
                 )}
@@ -1583,13 +2114,13 @@ export default function NewsletterViewPage() {
                         {selectedTrajectory.events.map((event: any, index: number) => (
                           <div key={`${event.type}-${index}`} className="flex items-start gap-3 pb-4 border-b last:border-b-0">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${event.type === 'sent' ? 'bg-blue-100 dark:bg-blue-900' :
-                                event.type === 'delivered' ? 'bg-green-100 dark:bg-green-900' :
-                                  event.type === 'opened' ? 'bg-purple-100 dark:bg-purple-900' :
-                                    event.type === 'clicked' ? 'bg-orange-100 dark:bg-orange-900' :
-                                      event.type === 'bounced' ? 'bg-red-100 dark:bg-red-900' :
-                                        event.type === 'complained' ? 'bg-yellow-100 dark:bg-yellow-900' :
-                                          event.type === 'suppressed' ? 'bg-yellow-100 dark:bg-yellow-900' :
-                                            'bg-gray-100 dark:bg-gray-800'
+                              event.type === 'delivered' ? 'bg-green-100 dark:bg-green-900' :
+                                event.type === 'opened' ? 'bg-purple-100 dark:bg-purple-900' :
+                                  event.type === 'clicked' ? 'bg-orange-100 dark:bg-orange-900' :
+                                    event.type === 'bounced' ? 'bg-red-100 dark:bg-red-900' :
+                                      event.type === 'complained' ? 'bg-yellow-100 dark:bg-yellow-900' :
+                                        event.type === 'suppressed' ? 'bg-yellow-100 dark:bg-yellow-900' :
+                                          'bg-gray-100 dark:bg-gray-800'
                               }`}>
                               {event.type === 'sent' && <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
                               {event.type === 'delivered' && <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />}
@@ -1804,9 +2335,9 @@ export default function NewsletterViewPage() {
                         <Badge
                           variant="outline"
                           className={`text-xs shrink-0 ${recipient.status === 'suppressed' ? 'border-orange-500 text-orange-600' :
-                              recipient.status === 'bounced' ? 'border-red-500 text-red-600' :
-                                recipient.status === 'unsubscribed' ? 'border-gray-500 text-gray-600' :
-                                  'border-muted-foreground text-muted-foreground'
+                            recipient.status === 'bounced' ? 'border-red-500 text-red-600' :
+                              recipient.status === 'unsubscribed' ? 'border-gray-500 text-gray-600' :
+                                'border-muted-foreground text-muted-foreground'
                             }`}
                         >
                           {recipient.status}
@@ -1816,6 +2347,44 @@ export default function NewsletterViewPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </DialogContent>
+        </Dialog>
+        {/* Reject Newsletter Dialog */}
+        <Dialog open={showRejectDialog} onOpenChange={(open) => { if (!open) { setShowRejectDialog(false); setRejectNotes(""); } }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <XCircle className="h-5 w-5 text-red-500" />
+                Reject Newsletter
+              </DialogTitle>
+              <DialogDescription>
+                Please provide feedback explaining why this newsletter is being rejected. The creator will see your notes and can make adjustments.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Rejection Notes <span className="text-red-500">*</span></label>
+                <Textarea
+                  placeholder="Explain what needs to change before this newsletter can be approved..."
+                  value={rejectNotes}
+                  onChange={(e) => setRejectNotes(e.target.value)}
+                  rows={4}
+                  className="resize-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => { setShowRejectDialog(false); setRejectNotes(""); }}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => rejectMutation.mutate({ id: newsletter.id, notes: rejectNotes })}
+                  disabled={!rejectNotes.trim() || rejectMutation.isPending}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {rejectMutation.isPending ? "Rejecting..." : "Reject Newsletter"}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

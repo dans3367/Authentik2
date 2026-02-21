@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail } from "lucide-react";
+import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ import type { SegmentList } from "@shared/schema";
 interface SendNewsletterWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
   newsletterId: string | null;
   newsletterTitle: string;
   onSegmentSelected: (data: {
@@ -44,6 +45,7 @@ interface SegmentListWithCount extends SegmentList {
 export function SendNewsletterWizardModal({
   isOpen,
   onClose,
+  onSuccess,
   newsletterId,
   newsletterTitle,
   onSegmentSelected,
@@ -89,6 +91,17 @@ export function SendNewsletterWizardModal({
     },
     enabled: isOpen && selectionMode === "custom" && customRecipientType === "tags",
   });
+
+  const { data: reviewerSettings } = useQuery<{ enabled: boolean; reviewerId: string | null; reviewer: any }>({
+    queryKey: ['/api/newsletters/reviewer-settings'],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/newsletters/reviewer-settings");
+      return response.json();
+    },
+    enabled: isOpen,
+  });
+
+  const requiresReview = reviewerSettings?.enabled ?? false;
 
   const segmentLists: SegmentListWithCount[] = Array.isArray(segmentListsData)
     ? segmentListsData
@@ -188,6 +201,7 @@ export function SendNewsletterWizardModal({
         description: "Your newsletter is ready to send. You can send it anytime from the newsletter list.",
       });
       onClose();
+      onSuccess?.();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -264,7 +278,7 @@ export function SendNewsletterWizardModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="max-w-2xl p-8"
+        className="max-w-3xl w-[95vw] p-4 sm:p-6 md:p-8"
         style={{
           display: 'flex',
           flexDirection: 'column',
@@ -729,12 +743,19 @@ export function SendNewsletterWizardModal({
 
               <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10 p-4">
                 <div className="flex items-start gap-3">
-                  <Send className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  {requiresReview ? (
+                    <ShieldCheck className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  ) : (
+                    <Send className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  )}
                   <div>
-                    <p className="text-sm font-medium text-foreground">Ready to send</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {requiresReview ? "Reviewer approval required" : "Ready to send"}
+                    </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Once sent, the newsletter will be delivered to all selected recipients. This action cannot be undone.
-                      You can also save it for later and send it from the newsletter list.
+                      {requiresReview
+                        ? "This newsletter requires approval from a reviewer before it can be sent. It will be submitted for review and you'll be notified once approved."
+                        : "Once sent, the newsletter will be delivered to all selected recipients. This action cannot be undone. You can also save it for later and send it from the newsletter list."}
                     </p>
                   </div>
                 </div>
@@ -779,8 +800,13 @@ export function SendNewsletterWizardModal({
                   {isSending ? (
                     <span className="flex items-center gap-1.5">
                       <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      Sending...
+                      {requiresReview ? "Submitting..." : "Sending..."}
                     </span>
+                  ) : requiresReview ? (
+                    <>
+                      <ShieldCheck className="h-4 w-4 mr-1.5" />
+                      Submit for Review
+                    </>
                   ) : (
                     <>
                       <Send className="h-4 w-4 mr-1.5" />

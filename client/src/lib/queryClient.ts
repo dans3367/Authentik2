@@ -5,6 +5,16 @@ import { triggerGlobalAuthError } from "@/hooks/useAuthErrorHandler";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+    let errorMessage = text;
+
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === "object" && typeof parsed.message === "string") {
+        errorMessage = parsed.message;
+      }
+    } catch {
+      // Non-JSON response body; keep raw text/status text as fallback
+    }
     
     // Handle 401 authentication errors globally
     if (res.status === 401) {
@@ -19,7 +29,7 @@ async function throwIfResNotOk(res: Response) {
       }, 100);
     }
     
-    throw new Error(`${res.status}: ${text}`);
+    throw new Error(errorMessage);
   }
 }
 

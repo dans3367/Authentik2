@@ -13,7 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { 
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import {
   ArrowLeft,
   UserPlus,
   Mail,
@@ -21,7 +25,8 @@ import {
   Tag,
   List,
   Loader2,
-  ShieldAlert
+  ShieldAlert,
+  CalendarIcon
 } from "lucide-react";
 import {
   Form,
@@ -56,6 +61,7 @@ const addContactSchema = z.object({
   zipCode: z.string().optional(),
   country: z.string().optional(),
   phoneNumber: z.string().optional(),
+  dateOfBirth: z.date().optional().nullable(),
 });
 
 type AddContactForm = z.infer<typeof addContactSchema>;
@@ -97,6 +103,7 @@ export default function NewEmailContact() {
       zipCode: "",
       country: "",
       phoneNumber: "",
+      dateOfBirth: undefined,
     },
   });
 
@@ -128,8 +135,9 @@ export default function NewEmailContact() {
         ...data,
         tags: selectedTags,
         lists: selectedLists,
-        consentIpAddress: window.location.hostname, // Get IP-like info from client
+        consentIpAddress: window.location.hostname,
         consentUserAgent: navigator.userAgent,
+        dateOfBirth: data.dateOfBirth ? format(data.dateOfBirth, 'yyyy-MM-dd') : undefined,
       };
       const response = await apiRequest('POST', '/api/email-contacts', payload);
       return response.json();
@@ -201,8 +209,8 @@ export default function NewEmailContact() {
     onSuccess: (data, variables) => {
       toast({
         title: t('emailContacts.toasts.success'),
-        description: t('emailContacts.newContact.toasts.createSuccess', { 
-          name: variables.firstName || variables.lastName || variables.email.split('@')[0] 
+        description: t('emailContacts.newContact.toasts.createSuccess', {
+          name: variables.firstName || variables.lastName || variables.email.split('@')[0]
         }),
         duration: 3000,
       });
@@ -223,16 +231,16 @@ export default function NewEmailContact() {
   };
 
   const toggleTag = (tagId: string) => {
-    setSelectedTags(prev => 
-      prev.includes(tagId) 
+    setSelectedTags(prev =>
+      prev.includes(tagId)
         ? prev.filter(id => id !== tagId)
         : [...prev, tagId]
     );
   };
 
   const toggleList = (listId: string) => {
-    setSelectedLists(prev => 
-      prev.includes(listId) 
+    setSelectedLists(prev =>
+      prev.includes(listId)
         ? prev.filter(id => id !== listId)
         : [...prev, listId]
     );
@@ -282,9 +290,9 @@ export default function NewEmailContact() {
                           {t('emailContacts.newContact.form.firstNameLabel')}
                         </FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder={t('emailContacts.newContact.form.firstNamePlaceholder')} 
-                            {...field} 
+                          <Input
+                            placeholder={t('emailContacts.newContact.form.firstNamePlaceholder')}
+                            {...field}
                             className="bg-white dark:bg-gray-800"
                           />
                         </FormControl>
@@ -303,9 +311,9 @@ export default function NewEmailContact() {
                           {t('emailContacts.newContact.form.lastNameLabel')}
                         </FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder={t('emailContacts.newContact.form.lastNamePlaceholder')} 
-                            {...field} 
+                          <Input
+                            placeholder={t('emailContacts.newContact.form.lastNamePlaceholder')}
+                            {...field}
                             className="bg-white dark:bg-gray-800"
                           />
                         </FormControl>
@@ -324,9 +332,9 @@ export default function NewEmailContact() {
                           {t('emailContacts.newContact.form.emailLabel')} *
                         </FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder={t('emailContacts.newContact.form.emailPlaceholder')} 
-                            {...field} 
+                          <Input
+                            placeholder={t('emailContacts.newContact.form.emailPlaceholder')}
+                            {...field}
                             className="bg-white dark:bg-gray-800"
                           />
                         </FormControl>
@@ -339,7 +347,7 @@ export default function NewEmailContact() {
                 {/* Address Fields */}
                 <div className="space-y-4 border-t pt-6">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white">Address Information (Optional)</h3>
-                  
+
                   <FormField
                     control={form.control}
                     name="address"
@@ -347,9 +355,9 @@ export default function NewEmailContact() {
                       <FormItem>
                         <FormLabel>Street Address</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="123 Main St" 
-                            {...field} 
+                          <Input
+                            placeholder="123 Main St"
+                            {...field}
                             className="bg-white dark:bg-gray-800"
                           />
                         </FormControl>
@@ -366,9 +374,9 @@ export default function NewEmailContact() {
                         <FormItem>
                           <FormLabel>City</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="New York" 
-                              {...field} 
+                            <Input
+                              placeholder="New York"
+                              {...field}
                               className="bg-white dark:bg-gray-800"
                             />
                           </FormControl>
@@ -384,9 +392,9 @@ export default function NewEmailContact() {
                         <FormItem>
                           <FormLabel>State/Province</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="NY" 
-                              {...field} 
+                            <Input
+                              placeholder="NY"
+                              {...field}
                               className="bg-white dark:bg-gray-800"
                             />
                           </FormControl>
@@ -404,9 +412,9 @@ export default function NewEmailContact() {
                         <FormItem>
                           <FormLabel>Zip/Postal Code</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="10001" 
-                              {...field} 
+                            <Input
+                              placeholder="10001"
+                              {...field}
                               className="bg-white dark:bg-gray-800"
                             />
                           </FormControl>
@@ -422,9 +430,9 @@ export default function NewEmailContact() {
                         <FormItem>
                           <FormLabel>Country</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="United States" 
-                              {...field} 
+                            <Input
+                              placeholder="United States"
+                              {...field}
                               className="bg-white dark:bg-gray-800"
                             />
                           </FormControl>
@@ -434,23 +442,65 @@ export default function NewEmailContact() {
                     />
                   </div>
 
-                  <FormField
-                    control={form.control}
-                    name="phoneNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="+1 (555) 123-4567" 
-                            {...field} 
-                            className="bg-white dark:bg-gray-800"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="phoneNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="+1 (555) 123-4567"
+                              {...field}
+                              className="bg-white dark:bg-gray-800"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="dateOfBirth"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Customer's Date of Birth</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full pl-3 text-left font-normal bg-white dark:bg-gray-800",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  {field.value ? (
+                                    format(field.value, "PPP")
+                                  ) : (
+                                    <span>Select date of birth</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                selected={field.value ?? undefined}
+                                onSelect={field.onChange}
+                                disabled={{ after: new Date(), before: new Date("1900-01-01") }}
+                                fromYear={1920}
+                                toYear={new Date().getFullYear()}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
 
                 {/* Status Field */}

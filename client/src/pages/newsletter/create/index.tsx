@@ -3,7 +3,7 @@ import { Puck } from "@puckeditor/core";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import config, { initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
-import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X } from "lucide-react";
+import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X, Rocket } from "lucide-react";
 import { SendPreviewDialog } from "@/components/SendPreviewDialog";
 import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
 import { extractPuckEmailHtml } from "@/utils/puck-to-email-html";
@@ -709,7 +709,30 @@ export default function NewsletterCreatePage() {
         >
           Preview
         </button>
-        {children}
+        {/* Replace default Puck Publish button with custom "Ready" button */}
+        <button
+          onClick={() => handlePublish(dataRef.current)}
+          style={{
+            padding: "4px 16px",
+            background: "#2563eb",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            fontSize: "14px",
+            fontWeight: 600,
+            height: "32px",
+            boxSizing: "border-box",
+            whiteSpace: "nowrap",
+          }}
+          data-testid="button-ready"
+        >
+          <Rocket size={16} />
+          Ready
+        </button>
       </>
     ),
   }), [emailDesign, viewport, zoom, handleZoomIn, handleZoomOut, handleZoomReset, justSaved, title, subject, hasUnsavedChanges, isSaving, handleSaveDraft]);
@@ -848,6 +871,7 @@ export default function NewsletterCreatePage() {
         <SendNewsletterWizardModal
           isOpen={showSendWizard}
           onClose={() => setShowSendWizard(false)}
+          onSuccess={() => { setHasUnsavedChanges(false); setLocation('/newsletter'); }}
           newsletterId={newsletterId}
           newsletterTitle={title || "Untitled Newsletter"}
           onSegmentSelected={handleSegmentSelected}
@@ -977,6 +1001,7 @@ export default function NewsletterCreatePage() {
     <SendNewsletterWizardModal
       isOpen={showSendWizard}
       onClose={() => setShowSendWizard(false)}
+      onSuccess={() => { setHasUnsavedChanges(false); setLocation('/newsletter'); }}
       newsletterId={newsletterId}
       newsletterTitle={title || "Untitled Newsletter"}
       onSegmentSelected={handleSegmentSelected}

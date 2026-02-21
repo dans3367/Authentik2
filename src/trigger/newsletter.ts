@@ -840,6 +840,23 @@ export const sendNewsletterTask = task({
       total: validRecipients.length,
     });
 
+    // Schedule analytics collection completion in 24 hours
+    try {
+      const analyticsHandle = await completeAnalyticsCollectionTask.trigger({
+        newsletterId: data.newsletterId,
+        tenantId: data.tenantId,
+      });
+      logger.info("Analytics completion task scheduled (24h delay)", {
+        runId: analyticsHandle.id,
+        newsletterId: data.newsletterId,
+      });
+    } catch (analyticsErr) {
+      // Non-fatal: analytics task failure shouldn't affect send result
+      logger.warn("Failed to schedule analytics completion task (non-fatal)", {
+        error: analyticsErr instanceof Error ? analyticsErr.message : String(analyticsErr),
+      });
+    }
+
     return {
       success: true,
       jobId: data.jobId,
@@ -898,5 +915,94 @@ export const scheduleNewsletterTask = task({
     }
 
     throw new Error(`Newsletter send failed: ${result.error}`);
+  },
+});
+
+/**
+ * Complete analytics collection 24 hours after newsletter send.
+ * This task waits 24 hours, then updates the newsletter_task_status row
+ * for the 'analytics' task type to 'completed'.
+ */
+export const completeAnalyticsCollectionTask = task({
+  id: "complete-analytics-collection",
+  maxDuration: 90000, // 25 hours max (24h wait + buffer)
+  retry: DB_RETRY_CONFIG,
+  catchError: dbConnectionCatchError,
+  run: async (payload: {
+    newsletterId: string;
+    tenantId: string;
+  }) => {
+    const { newsletterId, tenantId } = payload;
+
+    logger.info("Analytics collection task started — waiting 24 hours", {
+      newsletterId,
+      tenantId,
+    });
+
+    metadata.set("status", "waiting");
+    metadata.set("newsletterId", newsletterId);
+
+    // Wait 24 hours for analytics data (opens, clicks, bounces) to accumulate
+    await wait.for({ hours: 24 });
+
+    logger.info("24-hour wait complete — marking analytics collection as completed", {
+      newsletterId,
+      tenantId,
+    });
+
+    metadata.set("status", "completing");
+
+    // Update the newsletter_task_status via authenticated internal endpoint
+    const apiUrl = process.env.API_URL;
+    const secret = process.env.INTERNAL_SERVICE_SECRET;
+
+    // Use web.zendwise.work when API_URL points to localhost
+    const baseUrl = (!apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1"))
+      ? "https://web.zendwise.work"
+      : apiUrl;
+
+    if (!secret) {
+      logger.warn("INTERNAL_SERVICE_SECRET not configured, skipping analytics status update");
+      return { success: false, error: "INTERNAL_SERVICE_SECRET not configured" };
+    }
+
+    const timestamp = Date.now();
+    const body = {
+      newsletterId,
+      tenantId,
+      taskType: "analytics",
+      status: "completed",
+      progress: 100,
+      completedAt: new Date().toISOString(),
+    };
+    const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
+    const signature = createHmac("sha256", secret).update(signaturePayload).digest("hex");
+
+    try {
+      const response = await fetch(`${baseUrl}/api/newsletters/internal/${newsletterId}/complete-analytics`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-service": "trigger.dev",
+          "x-internal-timestamp": timestamp.toString(),
+          "x-internal-signature": signature,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        logger.warn(`Failed to update analytics status: ${response.status}`, { body: errText });
+        return { success: false, error: `HTTP ${response.status}: ${errText}` };
+      }
+
+      logger.info("Analytics collection marked as completed", { newsletterId });
+      metadata.set("status", "completed");
+      return { success: true, newsletterId, completedAt: new Date().toISOString() };
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.error("Error updating analytics collection status", { error: errMsg });
+      return { success: false, error: errMsg };
+    }
   },
 });
