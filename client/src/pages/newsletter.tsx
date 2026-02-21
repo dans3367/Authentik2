@@ -19,7 +19,8 @@ import {
   Loader2,
   UserCog,
   ShieldCheck,
-  ClipboardCheck
+  ClipboardCheck,
+  CalendarClock
 } from "lucide-react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
@@ -173,6 +174,28 @@ export default function NewsletterPage() {
       toast({
         title: "Deploy Failed",
         description: error.message || "Failed to deploy newsletter",
+        variant: "destructive"
+      });
+    },
+  });
+
+  // Cancel schedule mutation
+  const cancelScheduleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/cancel-schedule`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: "Schedule Cancelled",
+        description: "The scheduled send has been cancelled. Newsletter reverted to draft."
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Cancel Failed",
+        description: error.message || "Failed to cancel scheduled send",
         variant: "destructive"
       });
     },
@@ -448,11 +471,13 @@ export default function NewsletterPage() {
               const isSent = newsletter.status === 'sent';
               const isReadyToSend = newsletter.status === 'ready_to_send';
               const isPendingReview = newsletter.status === 'pending_review';
+              const isScheduled = newsletter.status === 'scheduled';
               const isCurrentUserReviewer = newsletter.reviewerId === currentUserId;
 
               const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
               const isDeploying = deployMutation.isPending && deployMutation.variables === newsletter.id;
               const isSubmittingForReview = submitForReviewMutation.isPending && submitForReviewMutation.variables === newsletter.id;
+              const isCancellingSchedule = cancelScheduleMutation.isPending && cancelScheduleMutation.variables === newsletter.id;
 
               if (isDeleting) {
                 return (
@@ -546,7 +571,20 @@ export default function NewsletterPage() {
                                   {isDeploying ? "Sending..." : "Send Now"}
                                 </DropdownMenuItem>
                               )}
-                              {reviewerEnabled && (isDraft || isReadyToSend) && !isPendingReview && (
+                              {isScheduled && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    cancelScheduleMutation.mutate(newsletter.id);
+                                  }}
+                                  disabled={isCancellingSchedule}
+                                  className="text-orange-600 focus:text-orange-600 focus:bg-orange-50 dark:focus:bg-orange-950/50"
+                                >
+                                  <CalendarClock className="h-4 w-4 mr-2" />
+                                  {isCancellingSchedule ? "Cancelling..." : "Cancel Schedule"}
+                                </DropdownMenuItem>
+                              )}
+                              {reviewerEnabled && (isDraft || isReadyToSend) && !isPendingReview && newsletter.reviewStatus !== 'approved' && (
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -687,6 +725,7 @@ export default function NewsletterPage() {
         onClose={() => setEditRecipientsNewsletter(null)}
         newsletterId={editRecipientsNewsletter?.id || null}
         newsletterTitle={editRecipientsNewsletter?.title || ""}
+        newsletterReviewStatus={(editRecipientsNewsletter as any)?.reviewStatus}
         onSegmentSelected={handleEditRecipientsSegmentSelected}
         initialRecipientType={editRecipientsNewsletter?.recipientType as "all" | "selected" | "tags" | undefined}
         initialSelectedContactIds={editRecipientsNewsletter?.selectedContactIds || []}

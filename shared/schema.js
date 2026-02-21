@@ -372,6 +372,7 @@ export const newsletters = pgTable("newsletters", {
     openCount: integer("open_count").default(0),
     uniqueOpenCount: integer("unique_open_count").default(0),
     clickCount: integer("click_count").default(0),
+    triggerRunId: text("trigger_run_id"), // Trigger.dev run ID for scheduled sends (used for cancellation)
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
 });

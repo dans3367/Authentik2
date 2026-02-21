@@ -2,7 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CakeIcon, CheckCircle, XCircle, ChevronRight, AlertTriangle } from "lucide-react";
+import {
+  CakeIcon,
+  CheckCircle,
+  XCircle,
+  ChevronRight,
+  AlertTriangle,
+  PartyPopper,
+  Gift,
+} from "lucide-react";
 import { useLocation } from "wouter";
 
 interface Contact {
@@ -16,88 +24,99 @@ interface Contact {
   birthdayUnsubscribedAt?: Date | null;
 }
 
+function getInitials(contact: Contact): string {
+  if (contact.firstName && contact.lastName) {
+    return `${contact.firstName[0]}${contact.lastName[0]}`.toUpperCase();
+  }
+  if (contact.firstName) return contact.firstName[0].toUpperCase();
+  if (contact.lastName) return contact.lastName[0].toUpperCase();
+  return contact.email[0].toUpperCase();
+}
+
+const avatarColors = [
+  "from-pink-400 to-rose-500",
+  "from-violet-400 to-purple-500",
+  "from-blue-400 to-indigo-500",
+  "from-teal-400 to-cyan-500",
+  "from-amber-400 to-orange-500",
+];
+
 export function UpcomingBirthdaysCard() {
   const [, setLocation] = useLocation();
 
-  // Fetch contacts from the existing email-contacts endpoint
   const { data: contactsData, isLoading } = useQuery({
-    queryKey: ['/api/email-contacts'],
+    queryKey: ["/api/email-contacts"],
     queryFn: async () => {
-      const response = await apiRequest('GET', `/api/email-contacts?limit=1000`);
+      const response = await apiRequest("GET", `/api/email-contacts?limit=1000`);
       return response.json();
     },
-    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+    staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
-  // Extract contacts array from response data
   const contacts: Contact[] = contactsData?.contacts || [];
+  const customersWithBirthdays = contacts.filter((contact) => contact.birthday);
 
-  // Filter contacts who have birthdays for birthday-specific features
-  const customersWithBirthdays = contacts.filter(contact => contact.birthday);
-
-  const upcomingBirthdays = customersWithBirthdays.filter(contact => {
-    if (!contact.birthday) return false;
-    // Parse the stored birthday to get month and day
-    const [, month, day] = contact.birthday.split('-').map(Number);
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
-
-    // Create birthday date for this year
-    const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
-    thisYearBirthday.setHours(0, 0, 0, 0);
-
-    // If birthday already passed this year, use next year
-    const nextBirthday = thisYearBirthday < today
-      ? new Date(today.getFullYear() + 1, month - 1, day)
-      : thisYearBirthday;
-    nextBirthday.setHours(0, 0, 0, 0);
-
-    const daysUntilBirthday = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    return daysUntilBirthday >= 0 && daysUntilBirthday <= 30;
-  }).sort((a, b) => {
-    // Sort by days until birthday (closest first)
-    const getDaysUntil = (birthday: string) => {
-      const [, month, day] = birthday.split('-').map(Number);
+  const upcomingBirthdays = customersWithBirthdays
+    .filter((contact) => {
+      if (!contact.birthday) return false;
+      const [, month, day] = contact.birthday.split("-").map(Number);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
       thisYearBirthday.setHours(0, 0, 0, 0);
-      const nextBirthday = thisYearBirthday < today
-        ? new Date(today.getFullYear() + 1, month - 1, day)
-        : thisYearBirthday;
+      const nextBirthday =
+        thisYearBirthday < today
+          ? new Date(today.getFullYear() + 1, month - 1, day)
+          : thisYearBirthday;
       nextBirthday.setHours(0, 0, 0, 0);
-      return Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    };
-    return getDaysUntil(a.birthday!) - getDaysUntil(b.birthday!);
-  }).slice(0, 5);
+      const daysUntilBirthday = Math.ceil(
+        (nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      return daysUntilBirthday >= 0 && daysUntilBirthday <= 30;
+    })
+    .sort((a, b) => {
+      const getDaysUntil = (birthday: string) => {
+        const [, month, day] = birthday.split("-").map(Number);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
+        thisYearBirthday.setHours(0, 0, 0, 0);
+        const nextBirthday =
+          thisYearBirthday < today
+            ? new Date(today.getFullYear() + 1, month - 1, day)
+            : thisYearBirthday;
+        nextBirthday.setHours(0, 0, 0, 0);
+        return Math.ceil(
+          (nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        );
+      };
+      return getDaysUntil(a.birthday!) - getDaysUntil(b.birthday!);
+    })
+    .slice(0, 5);
 
   const getContactName = (contact: Contact) => {
-    if (contact.firstName && contact.lastName) {
+    if (contact.firstName && contact.lastName)
       return `${contact.firstName} ${contact.lastName}`;
-    } else if (contact.firstName) {
-      return contact.firstName;
-    } else if (contact.lastName) {
-      return contact.lastName;
-    }
+    if (contact.firstName) return contact.firstName;
+    if (contact.lastName) return contact.lastName;
     return contact.email;
   };
 
   if (isLoading) {
     return (
       <Card className="h-full">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-xl font-bold flex items-center gap-2">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-pink-50 dark:bg-pink-900/30">
-              <CakeIcon className="h-5 w-5 text-pink-500" />
-            </span>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
+              <CakeIcon className="h-4 w-4 text-pink-500" />
+            </div>
             Upcoming Birthdays
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-4">
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-pink-200 border-t-pink-500" />
           </div>
         </CardContent>
       </Card>
@@ -106,93 +125,148 @@ export function UpcomingBirthdaysCard() {
 
   return (
     <Card className="h-full">
-      <CardHeader className="pb-4">
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-xl font-bold flex items-center gap-2">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-pink-50 dark:bg-pink-900/30">
-              <CakeIcon className="h-5 w-5 text-pink-500" />
-            </span>
+          <CardTitle className="text-lg font-bold flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
+              <CakeIcon className="h-4 w-4 text-pink-500" />
+            </div>
             Upcoming Birthdays
           </CardTitle>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setLocation('/birthdays')}
-            className="text-sm rounded-full"
+            onClick={() => setLocation("/birthdays")}
+            className="text-xs rounded-full text-muted-foreground hover:text-primary"
             data-testid="button-view-all-birthdays"
           >
             View All
-            <ChevronRight className="h-4 w-4 ml-1" />
+            <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="pt-6">
+      <CardContent className="pt-2">
         {upcomingBirthdays.length === 0 ? (
-          <div className="text-center py-8">
-            <CakeIcon className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground mb-2">
-              No birthdays in the next 30 days
-            </p>
+          <div className="text-center py-10 space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center mx-auto">
+              <Gift className="h-7 w-7 text-pink-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground mb-1">
+                No birthdays coming up
+              </p>
+              <p className="text-xs text-muted-foreground">
+                No birthdays in the next 30 days
+              </p>
+            </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setLocation('/birthdays')}
-              className="text-xs"
+              onClick={() => setLocation("/birthdays")}
+              className="text-xs rounded-full mt-2"
             >
               Manage Birthdays
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
-              <span>{upcomingBirthdays.length} upcoming</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+              <span className="font-medium">
+                {upcomingBirthdays.length} upcoming
+              </span>
               <span>Next 30 days</span>
             </div>
-            <div className="space-y-3">
-              {upcomingBirthdays.map((contact) => {
+            <div className="space-y-2">
+              {upcomingBirthdays.map((contact, index) => {
                 const getDaysUntil = (birthday: string) => {
-                  const [, month, day] = birthday.split('-').map(Number);
+                  const [, month, day] = birthday.split("-").map(Number);
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
-                  const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
+                  const thisYearBirthday = new Date(
+                    today.getFullYear(),
+                    month - 1,
+                    day
+                  );
                   thisYearBirthday.setHours(0, 0, 0, 0);
-                  const nextBirthday = thisYearBirthday < today
-                    ? new Date(today.getFullYear() + 1, month - 1, day)
-                    : thisYearBirthday;
+                  const nextBirthday =
+                    thisYearBirthday < today
+                      ? new Date(today.getFullYear() + 1, month - 1, day)
+                      : thisYearBirthday;
                   nextBirthday.setHours(0, 0, 0, 0);
-                  return Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                  return Math.ceil(
+                    (nextBirthday.getTime() - today.getTime()) /
+                    (1000 * 60 * 60 * 24)
+                  );
                 };
-                const daysUntil = contact.birthday ? getDaysUntil(contact.birthday) : 0;
+                const daysUntil = contact.birthday
+                  ? getDaysUntil(contact.birthday)
+                  : 0;
+                const isToday = daysUntil === 0;
 
                 return (
                   <div
                     key={contact.id}
-                    onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
-                    className="flex items-center justify-between p-3 bg-muted/40 rounded-xl cursor-pointer hover:bg-muted transition-colors"
+                    onClick={() =>
+                      setLocation(`/email-contacts/view/${contact.id}`)
+                    }
+                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 ${isToday
+                        ? "bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20 border border-pink-200/50 dark:border-pink-500/20 hover:shadow-md"
+                        : "bg-muted/30 hover:bg-muted/60"
+                      }`}
                   >
-                    <div className="flex-1">
-                      <p className="font-medium text-foreground">
-                        {getContactName(contact)}
-                      </p>
+                    {/* Avatar with initials */}
+                    <div
+                      className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarColors[index % avatarColors.length]
+                        } flex items-center justify-center flex-shrink-0 shadow-sm`}
+                    >
+                      <span className="text-white text-sm font-bold">
+                        {getInitials(contact)}
+                      </span>
+                    </div>
+
+                    {/* Name & Date */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm text-foreground truncate">
+                          {getContactName(contact)}
+                        </p>
+                        {isToday && (
+                          <PartyPopper className="w-3.5 h-3.5 text-pink-500 flex-shrink-0" />
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        {contact.birthday && (() => {
-                          // Parse date to display month/day
-                          const [, month, day] = contact.birthday.split('-').map(Number);
-                          const displayDate = new Date(2000, month - 1, day);
-                          const dateStr = displayDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                          const dayText = daysUntil === 0 ? 'Today!' : daysUntil === 1 ? 'Tomorrow' : `in ${daysUntil} days`;
-                          return `${dateStr} • ${dayText}`;
-                        })()}
+                        {contact.birthday &&
+                          (() => {
+                            const [, month, day] = contact.birthday
+                              .split("-")
+                              .map(Number);
+                            const displayDate = new Date(2000, month - 1, day);
+                            const dateStr = displayDate.toLocaleDateString(
+                              undefined,
+                              {
+                                month: "short",
+                                day: "numeric",
+                              }
+                            );
+                            const dayText = isToday
+                              ? "🎉 Today!"
+                              : daysUntil === 1
+                                ? "Tomorrow"
+                                : `in ${daysUntil} days`;
+                            return `${dateStr} • ${dayText}`;
+                          })()}
                       </p>
                     </div>
+
+                    {/* Status indicator */}
                     {contact.birthdayUnsubscribedAt ? (
                       <span title="Unsubscribed from birthday emails">
-                        <AlertTriangle className="h-4 w-4 text-orange-500 ml-2" />
+                        <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />
                       </span>
                     ) : contact.birthdayEmailEnabled ? (
-                      <CheckCircle className="h-4 w-4 text-green-500 ml-2" />
+                      <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
                     ) : (
-                      <XCircle className="h-4 w-4 text-destructive ml-2" />
+                      <XCircle className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />
                     )}
                   </div>
                 );
@@ -201,8 +275,8 @@ export function UpcomingBirthdaysCard() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setLocation('/birthdays')}
-              className="w-full mt-4"
+              onClick={() => setLocation("/birthdays")}
+              className="w-full mt-2 rounded-lg text-xs"
             >
               Manage Birthday Settings
             </Button>

@@ -15,6 +15,72 @@ import crypto from 'crypto';
 
 export const newsletterRoutes = Router();
 
+// Rate limiting for approval code attempts
+const approvalCodeRateLimit = new Map<string, { count: number; resetAt: number; nextAllowedAt: number }>();
+
+// Clean up expired rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  const entries = Array.from(approvalCodeRateLimit.entries());
+  for (const [key, data] of entries) {
+    if (data.resetAt < now) {
+      approvalCodeRateLimit.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+/**
+ * Check rate limiting for approval code attempts
+ * Key format: "userId:newsletterId"
+ */
+function checkApprovalCodeRateLimit(userId: string, newsletterId: string): { allowed: boolean; retryAfter?: number; nextAllowedAt?: Date } {
+  const key = `${userId}:${newsletterId}`;
+  const now = Date.now();
+  const rateLimitData = approvalCodeRateLimit.get(key);
+
+  if (rateLimitData) {
+    // Check if we're still in cooldown period
+    if (now < rateLimitData.nextAllowedAt) {
+      const retryAfterMinutes = Math.ceil((rateLimitData.nextAllowedAt - now) / 60000);
+      return {
+        allowed: false,
+        retryAfter: retryAfterMinutes,
+        nextAllowedAt: new Date(rateLimitData.nextAllowedAt)
+      };
+    }
+
+    // Reset counter if past reset time
+    if (now >= rateLimitData.resetAt) {
+      approvalCodeRateLimit.delete(key);
+    }
+  }
+
+  return { allowed: true };
+}
+
+/**
+ * Record a failed approval code attempt
+ */
+function recordFailedApprovalCodeAttempt(userId: string, newsletterId: string): void {
+  const key = `${userId}:${newsletterId}`;
+  const now = Date.now();
+  const currentData = approvalCodeRateLimit.get(key);
+  
+  approvalCodeRateLimit.set(key, {
+    count: (currentData?.count || 0) + 1,
+    resetAt: now + (15 * 60 * 1000), // 15 minutes window
+    nextAllowedAt: now + (2 * 60 * 1000), // 2 minutes cooldown after failed attempt
+  });
+}
+
+/**
+ * Clear rate limit after successful approval
+ */
+function clearApprovalCodeRateLimit(userId: string, newsletterId: string): void {
+  const key = `${userId}:${newsletterId}`;
+  approvalCodeRateLimit.delete(key);
+}
+
 /**
  * Fetch tenant-scoped complaint suppressions + global bounce suppressions.
  * Returns a Map of lowercased email -> bounceType.
@@ -437,11 +503,19 @@ newsletterRoutes.put("/reviewer-settings", authenticateToken, requireTenant, asy
       return res.status(403).json({ message: 'Only owners and administrators can manage reviewer settings' });
     }
 
+    // Get existing settings to compute effective reviewerId
+    const existing = await db.query.newsletterReviewerSettings.findFirst({
+      where: eq(newsletterReviewerSettings.tenantId, tenantId),
+    });
+
+    // Compute effective reviewerId (use incoming if provided, otherwise existing)
+    const effectiveReviewerId = reviewerId !== undefined ? (reviewerId || null) : (existing?.reviewerId || null);
+
     // If enabling, validate reviewer exists and belongs to tenant
-    if (enabled && reviewerId) {
+    if (enabled && effectiveReviewerId) {
       const reviewerUser = await db.query.betterAuthUser.findFirst({
         where: and(
-          eq(betterAuthUser.id, reviewerId),
+          eq(betterAuthUser.id, effectiveReviewerId),
           eq(betterAuthUser.tenantId, tenantId)
         ),
       });
@@ -451,11 +525,12 @@ newsletterRoutes.put("/reviewer-settings", authenticateToken, requireTenant, asy
       }
     }
 
-    // Upsert settings
-    const existing = await db.query.newsletterReviewerSettings.findFirst({
-      where: eq(newsletterReviewerSettings.tenantId, tenantId),
-    });
+    // If enabling without a valid reviewerId, reject the request
+    if (enabled && !effectiveReviewerId) {
+      return res.status(400).json({ message: 'Cannot enable reviewer settings without selecting a valid reviewer' });
+    }
 
+    // Upsert settings
     let result;
     if (existing) {
       const [updated] = await db.update(newsletterReviewerSettings)
@@ -500,8 +575,8 @@ newsletterRoutes.put("/reviewer-settings", authenticateToken, requireTenant, asy
     await logActivity({
       tenantId,
       userId: req.user.id,
-      entityType: 'newsletter',
-      entityId: result.id,
+      entityType: 'newsletter_reviewer_settings',
+      entityId: tenantId,
       entityName: 'Newsletter Reviewer Settings',
       activityType: 'updated',
       description: `${enabled ? 'Enabled' : 'Disabled'} newsletter reviewer approval${reviewer ? ` with reviewer ${reviewer.email}` : ''}`,
@@ -1588,6 +1663,275 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
   }
 });
 
+// Schedule newsletter for future sending
+newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { scheduledAt } = req.body;
+
+    if (!scheduledAt) {
+      return res.status(400).json({ message: 'scheduledAt is required' });
+    }
+
+    const scheduledDate = new Date(scheduledAt);
+    if (isNaN(scheduledDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid scheduledAt date' });
+    }
+
+    if (scheduledDate <= new Date()) {
+      return res.status(400).json({ message: 'Scheduled time must be in the future' });
+    }
+
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication verification failed' });
+    }
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: and(
+        eq(newsletters.id, id),
+        eq(newsletters.tenantId, req.user.tenantId)
+      ),
+      with: { user: true }
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    if (newsletter.status === 'sent') {
+      return res.status(400).json({ message: 'Newsletter has already been sent' });
+    }
+
+    if (newsletter.status === 'sending') {
+      return res.status(400).json({ message: 'Newsletter is currently being sent' });
+    }
+
+    if (newsletter.status === 'pending_review') {
+      return res.status(400).json({ message: 'Newsletter is pending reviewer approval and cannot be scheduled yet' });
+    }
+
+    // Check reviewer approval requirements
+    if (newsletter.requiresReviewerApproval && newsletter.reviewStatus !== 'approved') {
+      return res.status(400).json({ message: 'Newsletter requires reviewer approval before it can be scheduled' });
+    }
+
+    const reviewerSettings = await db.query.newsletterReviewerSettings.findFirst({
+      where: eq(newsletterReviewerSettings.tenantId, req.user.tenantId),
+    });
+    if (reviewerSettings?.enabled && newsletter.reviewStatus !== 'approved') {
+      return res.status(400).json({
+        message: 'Newsletter reviewer approval is required. Please submit this newsletter for review before scheduling.',
+        requiresReview: true,
+      });
+    }
+
+    // Get recipients and apply suppression filter (same as send)
+    const recipients = await getNewsletterRecipients(newsletter, req.user.tenantId);
+    const suppressedMap = await getSuppressionMap(req.user.tenantId);
+
+    const dedupedRecipients = Array.from(new Map(recipients.map((r: any) => [String(r.email).toLowerCase().trim(), r])).values());
+    const allowedRecipients = dedupedRecipients.filter((r: any) => !suppressedMap.has(String(r.email).toLowerCase().trim()) && r.prefNewsletters !== false);
+    const blockedRecipients = dedupedRecipients.filter((r: any) => suppressedMap.has(String(r.email).toLowerCase().trim()));
+
+    if (recipients.length === 0) {
+      return res.status(400).json({
+        message: 'No recipients found for newsletter. Please check your segmentation settings or add email contacts.'
+      });
+    }
+
+    if (allowedRecipients.length === 0) {
+      return res.status(400).json({ message: 'All recipients are suppressed (bounces or tenant-level complaints). No emails will be sent.' });
+    }
+
+    // Generate unique group UUID for tracking
+    const groupUUID = crypto.randomUUID();
+    console.log(`[Newsletter] Scheduling newsletter ${id} for ${scheduledDate.toISOString()} with groupUUID: ${groupUUID}`);
+
+    // Also fetch contacts excluded at the DB level (status != 'active')
+    const locallySuppressedContacts = await getSuppressedNewsletterContacts(newsletter, req.user.tenantId);
+    const allSuppressedForTracking = [
+      ...blockedRecipients.map((r: any) => ({
+        id: r.id,
+        email: String(r.email),
+        reason: `bouncedEmails: ${suppressedMap.get(String(r.email).toLowerCase().trim()) || 'unknown'}`,
+      })),
+      ...locallySuppressedContacts.map((c) => ({
+        id: c.id,
+        email: c.email,
+        reason: `contact status: ${c.status}`,
+      })),
+    ];
+
+    console.log(`[Newsletter] Schedule: ${allowedRecipients.length} allowed, ${allSuppressedForTracking.length} suppressed`);
+
+    // Initialize Convex tracking
+    const totalForTracking = allowedRecipients.length + allSuppressedForTracking.length;
+    try {
+      await initNewsletterTracking({
+        tenantId: req.user.tenantId,
+        newsletterId: id,
+        totalRecipients: totalForTracking,
+      });
+
+      if (allSuppressedForTracking.length > 0) {
+        await Promise.allSettled(allSuppressedForTracking.map(suppressed =>
+          trackNewsletterEmailSend({
+            tenantId: req.user.tenantId,
+            newsletterId: id,
+            groupUUID,
+            recipientEmail: suppressed.email,
+            recipientId: suppressed.id,
+            status: 'suppressed',
+            error: `Suppressed: ${suppressed.reason}`,
+          })
+        ));
+      }
+    } catch (convexErr) {
+      console.warn('[Newsletter] Failed to init Convex tracking for scheduled send (non-fatal):', convexErr);
+    }
+
+    // Wrap newsletter content
+    const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
+
+    // Trigger the schedule task via Trigger.dev
+    const { scheduleNewsletterTask } = await import('../../src/trigger/newsletter');
+
+    const handle = await scheduleNewsletterTask.trigger({
+      jobId: `newsletter-${newsletter.id}-${Date.now()}`,
+      newsletterId: newsletter.id,
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      groupUUID,
+      subject: newsletter.subject,
+      content: wrappedContent,
+      recipients: allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
+        id: contact.id,
+        email: contact.email,
+        firstName: contact.firstName || '',
+        lastName: contact.lastName || ''
+      })),
+      batchSize: 25,
+      priority: 'normal' as const,
+      scheduledFor: scheduledDate.toISOString(),
+    });
+
+    console.log(`[Newsletter] Schedule task triggered:`, {
+      runId: handle.id,
+      newsletterId: newsletter.id,
+      scheduledFor: scheduledDate.toISOString(),
+      recipientCount: allowedRecipients.length,
+    });
+
+    // Update newsletter status to 'scheduled' and store the run ID
+    await db.update(newsletters)
+      .set({
+        status: 'scheduled',
+        scheduledAt: scheduledDate,
+        triggerRunId: handle.id,
+        recipientCount: allowedRecipients.length,
+        updatedAt: new Date(),
+      })
+      .where(eq(newsletters.id, id));
+
+    // Log activity
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'scheduled',
+      description: `Scheduled newsletter "${newsletter.title}" for ${scheduledDate.toISOString()}`,
+      metadata: {
+        scheduledAt: scheduledDate.toISOString(),
+        recipientCount: allowedRecipients.length,
+        runId: handle.id,
+      },
+      req,
+    });
+
+    res.json({
+      message: 'Newsletter scheduled successfully',
+      newsletterId: newsletter.id,
+      scheduledAt: scheduledDate.toISOString(),
+      recipientCount: allowedRecipients.length,
+      runId: handle.id,
+      groupUUID,
+    });
+  } catch (error) {
+    console.error('Schedule newsletter error:', error);
+    res.status(500).json({ message: 'Failed to schedule newsletter' });
+  }
+});
+
+// Cancel a scheduled newsletter
+newsletterRoutes.post("/:id/cancel-schedule", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: and(
+        eq(newsletters.id, id),
+        eq(newsletters.tenantId, req.user.tenantId)
+      ),
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    if (newsletter.status !== 'scheduled') {
+      return res.status(400).json({ message: 'Newsletter is not currently scheduled' });
+    }
+
+    // Cancel the Trigger.dev run if we have a run ID
+    if (newsletter.triggerRunId) {
+      try {
+        const { runs } = await import('@trigger.dev/sdk/v3');
+        await runs.cancel(newsletter.triggerRunId);
+        console.log(`[Newsletter] Cancelled Trigger.dev run ${newsletter.triggerRunId} for newsletter ${id}`);
+      } catch (cancelErr) {
+        console.warn(`[Newsletter] Failed to cancel Trigger.dev run ${newsletter.triggerRunId} (may have already started):`, cancelErr);
+      }
+    }
+
+    // Revert newsletter status to draft
+    await db.update(newsletters)
+      .set({
+        status: 'draft',
+        scheduledAt: null,
+        triggerRunId: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(newsletters.id, id));
+
+    // Log activity
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'schedule_cancelled',
+      description: `Cancelled scheduled send for newsletter "${newsletter.title}"`,
+      metadata: {
+        previousScheduledAt: newsletter.scheduledAt?.toISOString(),
+        cancelledRunId: newsletter.triggerRunId,
+      },
+      req,
+    });
+
+    res.json({
+      message: 'Scheduled send cancelled successfully',
+      newsletterId: id,
+      status: 'draft',
+    });
+  } catch (error) {
+    console.error('Cancel schedule error:', error);
+    res.status(500).json({ message: 'Failed to cancel scheduled send' });
+  }
+});
+
 // Internal endpoint: Complete analytics collection (called by Trigger.dev completeAnalyticsCollectionTask)
 newsletterRoutes.put('/internal/:id/complete-analytics', authenticateInternalService, async (req: any, res) => {
   try {
@@ -1808,8 +2152,13 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
       return res.status(400).json({ message: 'Newsletter reviewer is not configured for this organization' });
     }
 
+    // Prevent users from submitting themselves as the reviewer
+    if (settings.reviewerId === req.user.id) {
+      return res.status(400).json({ message: 'You cannot submit a newsletter for review when you are the designated reviewer. This would allow self-approval and bypass the review workflow.' });
+    }
+
     // Generate a random 5-digit numeric approval code
-    const approvalCode = String(Math.floor(10000 + Math.random() * 90000));
+    const approvalCode = String(crypto.randomInt(10000, 100000));
 
     // Update newsletter status
     const [updated] = await db.update(newsletters)
@@ -1903,10 +2252,34 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
       return res.status(403).json({ message: 'Only the assigned reviewer can approve this newsletter' });
     }
 
-    // Verify the 5-digit approval code
-    if (!approvalCode || String(approvalCode).trim() !== String(newsletter.reviewerApprovalCode)) {
+    // Check rate limiting for approval code attempts
+    const rateLimitCheck = checkApprovalCodeRateLimit(req.user.id, id);
+    if (!rateLimitCheck.allowed) {
+      return res.status(429).json({
+        message: `Too many incorrect approval code attempts. Please wait ${rateLimitCheck.retryAfter || 1} minute${(rateLimitCheck.retryAfter || 1) > 1 ? 's' : ''} before trying again.`,
+        retryAfter: rateLimitCheck.retryAfter,
+        nextAllowedAt: rateLimitCheck.nextAllowedAt?.toISOString()
+      });
+    }
+
+    // Verify the 5-digit approval code using constant-time comparison
+    if (!approvalCode) {
+      recordFailedApprovalCodeAttempt(req.user.id, id);
       return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
     }
+
+    const providedCode = Buffer.from(String(approvalCode).trim(), 'utf8');
+    const expectedCode = Buffer.from(String(newsletter.reviewerApprovalCode), 'utf8');
+    
+    // Use constant-time comparison to prevent timing attacks
+    if (providedCode.length !== expectedCode.length || !crypto.timingSafeEqual(providedCode, expectedCode)) {
+      // Record failed attempt for rate limiting
+      recordFailedApprovalCodeAttempt(req.user.id, id);
+      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
+    }
+
+    // Clear rate limit after successful approval
+    clearApprovalCodeRateLimit(req.user.id, id);
 
     const [updated] = await db.update(newsletters)
       .set({
@@ -1964,10 +2337,34 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
       return res.status(403).json({ message: 'Only the assigned reviewer can approve this newsletter' });
     }
 
-    // Verify the 5-digit approval code
-    if (!approvalCode || String(approvalCode).trim() !== String(newsletter.reviewerApprovalCode)) {
+    // Check rate limiting for approval code attempts
+    const rateLimitCheck = checkApprovalCodeRateLimit(req.user.id, id);
+    if (!rateLimitCheck.allowed) {
+      return res.status(429).json({
+        message: `Too many incorrect approval code attempts. Please wait ${rateLimitCheck.retryAfter || 1} minute${(rateLimitCheck.retryAfter || 1) > 1 ? 's' : ''} before trying again.`,
+        retryAfter: rateLimitCheck.retryAfter,
+        nextAllowedAt: rateLimitCheck.nextAllowedAt?.toISOString()
+      });
+    }
+
+    // Verify the 5-digit approval code using constant-time comparison
+    if (!approvalCode) {
+      recordFailedApprovalCodeAttempt(req.user.id, id);
       return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
     }
+
+    const providedCode = Buffer.from(String(approvalCode).trim(), 'utf8');
+    const expectedCode = Buffer.from(String(newsletter.reviewerApprovalCode), 'utf8');
+    
+    // Use constant-time comparison to prevent timing attacks
+    if (providedCode.length !== expectedCode.length || !crypto.timingSafeEqual(providedCode, expectedCode)) {
+      // Record failed attempt for rate limiting
+      recordFailedApprovalCodeAttempt(req.user.id, id);
+      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
+    }
+
+    // Clear rate limit after successful approval
+    clearApprovalCodeRateLimit(req.user.id, id);
 
     // Approve the newsletter
     const [updated] = await db.update(newsletters)
@@ -1988,8 +2385,8 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
       entityType: 'newsletter',
       entityId: id,
       entityName: newsletter.title,
-      activityType: 'approved_and_sent',
-      description: `Approved and initiated send for newsletter "${newsletter.title}"`,
+      activityType: 'approved',
+      description: `Approved newsletter "${newsletter.title}"`,
       metadata: { reviewStatus: 'approved' },
       req,
     });

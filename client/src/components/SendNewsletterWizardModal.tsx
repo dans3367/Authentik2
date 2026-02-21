@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck } from "lucide-react";
+import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck, CalendarClock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ interface SendNewsletterWizardModalProps {
   onSuccess?: () => void;
   newsletterId: string | null;
   newsletterTitle: string;
+  newsletterReviewStatus?: string | null;
   onSegmentSelected: (data: {
     segmentListId: string | null;
     recipientType: "all" | "selected" | "tags";
@@ -48,6 +49,7 @@ export function SendNewsletterWizardModal({
   onSuccess,
   newsletterId,
   newsletterTitle,
+  newsletterReviewStatus,
   onSegmentSelected,
   initialRecipientType,
   initialSelectedContactIds,
@@ -63,6 +65,10 @@ export function SendNewsletterWizardModal({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isSavingLater, setIsSavingLater] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
   const prevIsOpen = useRef(isOpen);
 
   const { data: segmentListsData, isLoading: segmentListsLoading } = useQuery({
@@ -101,7 +107,7 @@ export function SendNewsletterWizardModal({
     enabled: isOpen,
   });
 
-  const requiresReview = reviewerSettings?.enabled ?? false;
+  const requiresReview = (reviewerSettings?.enabled ?? false) && newsletterReviewStatus !== 'approved';
 
   const segmentLists: SegmentListWithCount[] = Array.isArray(segmentListsData)
     ? segmentListsData
@@ -125,6 +131,10 @@ export function SendNewsletterWizardModal({
       setSelectedTagIds(initialSelectedTagIds || []);
       setIsSending(false);
       setIsSavingLater(false);
+      setIsScheduling(false);
+      setShowSchedulePicker(false);
+      setScheduleDate("");
+      setScheduleTime("");
     }
     prevIsOpen.current = isOpen;
   }, [isOpen, initialRecipientType]);
@@ -181,6 +191,68 @@ export function SendNewsletterWizardModal({
   const handleSendNow = () => {
     setIsSending(true);
     onSegmentSelected(getSegmentData());
+  };
+
+  const handleScheduleSend = async () => {
+    if (!newsletterId || !scheduleDate || !scheduleTime) return;
+    setIsScheduling(true);
+    try {
+      const segmentData = getSegmentData();
+      // First save recipients
+      await apiRequest('PUT', `/api/newsletters/${newsletterId}`, {
+        recipientType: segmentData.recipientType,
+        selectedContactIds: segmentData.selectedContactIds,
+        selectedTagIds: segmentData.selectedTagIds,
+      });
+
+      // Then schedule the send
+      const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`).toISOString();
+      const response = await apiRequest('POST', `/api/newsletters/${newsletterId}/schedule`, {
+        scheduledAt,
+      });
+      const result = await response.json();
+
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+      toast({
+        title: "Newsletter Scheduled",
+        description: `Your newsletter will be sent on ${new Date(scheduledAt).toLocaleString()}.`,
+      });
+      onClose();
+      onSuccess?.();
+    } catch (error: any) {
+      toast({
+        title: "Scheduling Failed",
+        description: error.message || "Failed to schedule newsletter",
+        variant: "destructive",
+      });
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
+  const getMinDate = () => {
+    const now = new Date();
+    return now.toISOString().split('T')[0];
+  };
+
+  const getMinTime = () => {
+    if (!scheduleDate) return "";
+    const now = new Date();
+    const selectedDate = new Date(scheduleDate);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (selectedDate.getTime() === today.getTime()) {
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes() + 5).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+    return "00:00";
+  };
+
+  const isScheduleValid = () => {
+    if (!scheduleDate || !scheduleTime) return false;
+    const scheduled = new Date(`${scheduleDate}T${scheduleTime}`);
+    return scheduled > new Date();
   };
 
   const handleSendLater = async () => {
@@ -741,6 +813,61 @@ export function SendNewsletterWizardModal({
                 </div>
               </div>
 
+              {/* Schedule picker */}
+              {showSchedulePicker && !requiresReview && (
+                <div className="rounded-lg border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <CalendarClock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <p className="text-sm font-medium text-foreground">Schedule Send</p>
+                    </div>
+                    <button
+                      onClick={() => setShowSchedulePicker(false)}
+                      className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Choose when this newsletter should be sent. The time is in your local timezone.
+                  </p>
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Date</label>
+                      <Input
+                        type="date"
+                        value={scheduleDate}
+                        onChange={(e) => setScheduleDate(e.target.value)}
+                        min={getMinDate()}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Time</label>
+                      <Input
+                        type="time"
+                        value={scheduleTime}
+                        onChange={(e) => setScheduleTime(e.target.value)}
+                        min={getMinTime()}
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                  {scheduleDate && scheduleTime && (
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                      Will be sent on {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString(undefined, {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10 p-4">
                 <div className="flex items-start gap-3">
                   {requiresReview ? (
@@ -755,7 +882,7 @@ export function SendNewsletterWizardModal({
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {requiresReview
                         ? "This newsletter requires approval from a reviewer before it can be sent. It will be submitted for review and you'll be notified once approved."
-                        : "Once sent, the newsletter will be delivered to all selected recipients. This action cannot be undone. You can also save it for later and send it from the newsletter list."}
+                        : "Once sent, the newsletter will be delivered to all selected recipients. This action cannot be undone. You can also schedule it for later or save as draft."}
                     </p>
                   </div>
                 </div>
@@ -774,46 +901,62 @@ export function SendNewsletterWizardModal({
                 Back
               </Button>
               <div className="flex gap-2 flex-shrink-0">
-                <Button
-                  variant="outline"
-                  onClick={handleSendLater}
-                  disabled={isSavingLater || isSending}
-                  data-testid="button-send-later"
-                >
-                  {isSavingLater ? (
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      Saving...
-                    </span>
+                {!requiresReview && (
+                  showSchedulePicker ? (
+                    <Button
+                      onClick={handleScheduleSend}
+                      disabled={isScheduling || !isScheduleValid()}
+                      className="bg-blue-600 hover:bg-blue-700"
+                      data-testid="button-confirm-schedule"
+                    >
+                      {isScheduling ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          Scheduling...
+                        </span>
+                      ) : (
+                        <>
+                          <CalendarClock className="h-4 w-4 mr-1.5" />
+                          Confirm Schedule
+                        </>
+                      )}
+                    </Button>
                   ) : (
-                    <>
-                      <Clock className="h-4 w-4 mr-1.5" />
-                      Send Later
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={handleSendNow}
-                  disabled={isSending || isSavingLater}
-                  data-testid="button-send-now"
-                >
-                  {isSending ? (
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      {requiresReview ? "Submitting..." : "Sending..."}
-                    </span>
-                  ) : requiresReview ? (
-                    <>
-                      <ShieldCheck className="h-4 w-4 mr-1.5" />
-                      Submit for Review
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-1.5" />
-                      Send Now
-                    </>
-                  )}
-                </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowSchedulePicker(true)}
+                      disabled={isSavingLater || isSending}
+                      data-testid="button-schedule-send"
+                    >
+                      <CalendarClock className="h-4 w-4 mr-1.5" />
+                      Schedule Send
+                    </Button>
+                  )
+                )}
+                {!showSchedulePicker && (
+                  <Button
+                    onClick={handleSendNow}
+                    disabled={isSending || isSavingLater || isScheduling}
+                    data-testid="button-send-now"
+                  >
+                    {isSending ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        {requiresReview ? "Submitting..." : "Sending..."}
+                      </span>
+                    ) : requiresReview ? (
+                      <>
+                        <ShieldCheck className="h-4 w-4 mr-1.5" />
+                        Submit for Review
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-1.5" />
+                        Send Now
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             </DialogFooter>
           </>

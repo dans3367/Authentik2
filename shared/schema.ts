@@ -512,6 +512,7 @@ export const newsletters = pgTable("newsletters", {
   reviewedAt: timestamp("reviewed_at"),
   reviewNotes: text("review_notes"),
   reviewerApprovalCode: varchar("reviewer_approval_code", { length: 5 }), // Random 5-digit code for reviewer to confirm approval
+  triggerRunId: text("trigger_run_id"), // Trigger.dev run ID for scheduled sends (used for cancellation)
   deletedAt: timestamp("deleted_at"), // Soft delete: when set, newsletter is hidden from UI but preserved for analytics
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -1431,6 +1432,7 @@ export const createEmailContactSchema = z.object({
   tags: z.array(z.string()).optional(),
   lists: z.array(z.string()).optional(),
   birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Birthday must be in YYYY-MM-DD format").optional(),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be in YYYY-MM-DD format").nullable().optional(),
   birthdayEmailEnabled: z.boolean().default(false),
   consentGiven: z.boolean().refine(val => val === true, {
     message: "You must acknowledge consent before adding this contact"
@@ -1454,6 +1456,7 @@ export const updateEmailContactSchema = z.object({
   emailsOpened: z.number().optional(),
   lastActivity: z.date().optional(),
   birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Birthday must be in YYYY-MM-DD format").optional(),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be in YYYY-MM-DD format").nullable().optional(),
   birthdayEmailEnabled: z.boolean().optional(),
   // Address fields
   address: z.string().optional(),
@@ -1679,7 +1682,7 @@ export const createNewsletterSchema = z.object({
   content: z.string().min(1, "Content is required"),
   puckData: z.string().optional(),
   status: z.enum(['draft', 'ready_to_send', 'pending_review', 'scheduled']).default('draft'),
-  scheduledAt: z.date().optional(),
+  scheduledAt: z.union([z.string(), z.date()]).optional().nullable(),
   recipientType: z.enum(['all', 'selected', 'tags']).default('all'),
   selectedContactIds: z.array(z.string()).optional(),
   selectedTagIds: z.array(z.string()).optional(),
@@ -1693,8 +1696,8 @@ export const updateNewsletterSchema = z.object({
   content: z.string().min(1, "Content is required").optional(),
   puckData: z.string().optional(),
   status: z.enum(['draft', 'ready_to_send', 'pending_review', 'scheduled', 'sending', 'sent']).optional(),
-  scheduledAt: z.date().optional(),
-  sentAt: z.date().optional(),
+  scheduledAt: z.union([z.string(), z.date()]).optional().nullable(),
+  sentAt: z.union([z.string(), z.date()]).optional(),
   recipientType: z.enum(['all', 'selected', 'tags']).optional(),
   selectedContactIds: z.array(z.string()).optional(),
   selectedTagIds: z.array(z.string()).optional(),

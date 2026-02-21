@@ -23,6 +23,33 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { updateNewsletterSchema, type UpdateNewsletterData, type NewsletterWithUser } from "@shared/schema";
 
+// Helper function to format Date as local datetime-local input value
+const formatLocalDateTime = (date: Date | string | undefined | null): string => {
+  if (!date) return "";
+  
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+// Helper function to parse datetime-local input to Date
+const parseLocalDateTime = (value: string): Date => {
+  // Parse "YYYY-MM-DDTHH:mm" as local time
+  const [datePart, timePart] = value.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes] = timePart.split(':').map(Number);
+  
+  // Create Date using local components (months are 0-indexed)
+  return new Date(year, month - 1, day, hours, minutes);
+};
+
 export default function NewsletterEditPage() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
@@ -618,10 +645,10 @@ export default function NewsletterEditPage() {
                       id="scheduledAt"
                       type="datetime-local"
                       className="mt-1"
-                      value={form.watch("scheduledAt") ? new Date(form.watch("scheduledAt")!).toISOString().slice(0, 16) : ""}
+                      value={formatLocalDateTime(form.watch("scheduledAt"))}
                       onChange={(e) => {
                         if (e.target.value) {
-                          form.setValue("scheduledAt", new Date(e.target.value));
+                          form.setValue("scheduledAt", parseLocalDateTime(e.target.value));
                         } else {
                           form.setValue("scheduledAt", undefined);
                         }

@@ -131,3 +131,124 @@ export async function dbConnectionCatchError({
 
   return { retryAt };
 }
+
+// Patterns that indicate email service transient failures worth retrying
+const EMAIL_RETRYABLE_PATTERNS = [
+  "rate limit",
+  "rate limited",
+  "too many requests",
+  "429",
+  "timeout",
+  "timed out",
+  "network",
+  "connection",
+  "fetch failed",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "ETIMEDOUT",
+  "service unavailable",
+  "503",
+  "502",
+  "504",
+  "temporary failure",
+  "try again later",
+];
+
+function isEmailRetryableError(error: unknown): boolean {
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error).toLowerCase();
+
+  return EMAIL_RETRYABLE_PATTERNS.some((pattern) =>
+    message.includes(pattern.toLowerCase())
+  );
+}
+
+/**
+ * Retry delays for email service failures (more aggressive than DB retries).
+ * Attempts 1-2: 1 minute
+ * Attempts 3-4: 5 minutes  
+ * Attempts 5-6: 15 minutes
+ * Attempt 7:    1 hour
+ */
+function getEmailRetryDelayMs(attemptNumber: number): number | null {
+  if (attemptNumber >= 1 && attemptNumber <= 2) {
+    return 1 * 60 * 1000; // 1 minute
+  }
+  if (attemptNumber >= 3 && attemptNumber <= 4) {
+    return 5 * 60 * 1000; // 5 minutes
+  }
+  if (attemptNumber >= 5 && attemptNumber <= 6) {
+    return 15 * 60 * 1000; // 15 minutes
+  }
+  if (attemptNumber === 7) {
+    return 60 * 60 * 1000; // 1 hour
+  }
+  return null; // No more retries
+}
+
+/**
+ * Email retry config — set maxAttempts to 8 so Trigger.dev allows up to 7 retries
+ * (first run + 7 retries = 8 total attempts).
+ */
+export const EMAIL_RETRY_CONFIG = {
+  maxAttempts: 8,
+};
+
+/**
+ * catchError handler that implements email service retry schedule.
+ * Non-transient email errors use default behavior.
+ */
+export async function emailSendCatchError({
+  error,
+  ctx,
+}: {
+  error: unknown;
+  ctx: { run: { id: string }; attempt: { number: number } };
+  payload?: unknown;
+  retryAt?: Date;
+}) {
+  const attemptNumber = ctx.attempt.number;
+
+  if (!isEmailRetryableError(error)) {
+    // Not a transient email error — let default retry logic handle it
+    logger.warn("Non-retryable email error encountered, using default retry behavior", {
+      attemptNumber,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
+
+  const delayMs = getEmailRetryDelayMs(attemptNumber);
+
+  if (delayMs === null) {
+    // Exhausted all retries
+    logger.error("All retry attempts exhausted for email service error", {
+      attemptNumber,
+      runId: ctx.run.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { skipRetrying: true };
+  }
+
+  const retryAt = new Date(Date.now() + delayMs);
+  const delayLabel =
+    delayMs < 60000
+      ? `${delayMs / 1000}s`
+      : delayMs < 3600000
+        ? `${delayMs / 60000}m`
+        : `${delayMs / 3600000}h`;
+
+  logger.warn(
+    `Email service error on attempt ${attemptNumber}, retrying in ${delayLabel}`,
+    {
+      attemptNumber,
+      retryAt: retryAt.toISOString(),
+      runId: ctx.run.id,
+      error: error instanceof Error ? error.message : String(error),
+    }
+  );
+
+  return { retryAt };
+}

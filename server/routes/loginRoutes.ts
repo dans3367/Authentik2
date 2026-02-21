@@ -167,7 +167,7 @@ loginRoutes.post('/verify-login', async (req, res) => {
     } catch (authError: any) {
       console.error('❌ [Verify Login] Better Auth error:', authError);
       console.error('❌ [Verify Login] Auth error details:', authError?.message);
-      return res.status(500).json({ message: 'Authentication service error: ' + authError.message });
+      return res.status(500).json({ message: 'Authentication service error' });
     }
 
     // Check if authentication was successful

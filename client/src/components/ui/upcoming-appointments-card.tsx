@@ -4,8 +4,24 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { CalendarClock, Calendar, Clock, MapPin, User, Mail, Timer } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
+  CalendarClock,
+  Calendar,
+  Clock,
+  MapPin,
+  User,
+  Mail,
+  Timer,
+  CalendarPlus,
+  CalendarDays,
+} from "lucide-react";
 import { useLocation } from "wouter";
 
 interface AppointmentCustomer {
@@ -30,10 +46,13 @@ interface Appointment {
 
 export function UpcomingAppointmentsCard() {
   const [, setLocation] = useLocation();
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [selectedAppointment, setSelectedAppointment] =
+    useState<Appointment | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  const { data: appointmentsData, isLoading } = useQuery<{ appointments: Appointment[] }>({
+  const { data: appointmentsData, isLoading } = useQuery<{
+    appointments: Appointment[];
+  }>({
     queryKey: ["/api/appointments/upcoming-dashboard"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/appointments");
@@ -49,61 +68,79 @@ export function UpcomingAppointmentsCard() {
     .filter((appointment) => {
       const appointmentDate = new Date(appointment.appointmentDate);
       const now = new Date();
-      const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const sevenDaysFromNow = new Date(
+        now.getTime() + 7 * 24 * 60 * 60 * 1000
+      );
       return appointmentDate >= now && appointmentDate <= sevenDaysFromNow;
     })
-    .sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime())
+    .sort(
+      (a, b) =>
+        new Date(a.appointmentDate).getTime() -
+        new Date(b.appointmentDate).getTime()
+    )
     .slice(0, 5);
 
   const getCustomerName = (customer?: AppointmentCustomer) => {
     if (!customer) return "Unknown Customer";
-    if (customer.firstName && customer.lastName) {
+    if (customer.firstName && customer.lastName)
       return `${customer.firstName} ${customer.lastName}`;
-    }
-    if (customer.firstName) {
-      return customer.firstName;
-    }
-    if (customer.lastName) {
-      return customer.lastName;
-    }
+    if (customer.firstName) return customer.firstName;
+    if (customer.lastName) return customer.lastName;
     return customer.email;
   };
 
-  const getStatusColor = (status: Appointment["status"]) => {
+  const getStatusConfig = (status: Appointment["status"]) => {
     switch (status) {
       case "scheduled":
-        return "bg-blue-100 text-blue-800";
+        return {
+          color: "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+          dot: "bg-blue-500",
+        };
       case "confirmed":
-        return "bg-green-100 text-green-800";
+        return {
+          color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+          dot: "bg-emerald-500",
+        };
       case "cancelled":
-        return "bg-red-100 text-red-800";
+        return {
+          color: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+          dot: "bg-red-500",
+        };
       case "completed":
-        return "bg-gray-100 text-gray-800";
+        return {
+          color: "bg-gray-50 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
+          dot: "bg-gray-500",
+        };
       case "no_show":
-        return "bg-yellow-100 text-yellow-800";
+        return {
+          color: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+          dot: "bg-amber-500",
+        };
       default:
-        return "bg-gray-100 text-gray-800";
+        return {
+          color: "bg-gray-50 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
+          dot: "bg-gray-500",
+        };
     }
   };
 
-  const getMonthName = (date: Date) => {
-    return new Intl.DateTimeFormat("en-US", { month: "short" }).format(new Date(date)).toUpperCase();
-  };
+  const getMonthName = (date: Date) =>
+    new Intl.DateTimeFormat("en-US", { month: "short" })
+      .format(new Date(date))
+      .toUpperCase();
 
-  const getDayNumber = (date: Date) => {
-    return new Intl.DateTimeFormat("en-US", { day: "2-digit" }).format(new Date(date));
-  };
+  const getDayNumber = (date: Date) =>
+    new Intl.DateTimeFormat("en-US", { day: "2-digit" }).format(new Date(date));
 
-  const formatTime = (date: Date) => {
-    return new Intl.DateTimeFormat("en-US", {
+  const formatTime = (date: Date) =>
+    new Intl.DateTimeFormat("en-US", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
     }).format(new Date(date));
-  };
 
-  const formatFullDateTime = (date: Date) => {
-    return new Intl.DateTimeFormat("en-US", {
+  const formatFullDateTime = (date: Date) =>
+    new Intl.DateTimeFormat("en-US", {
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -112,6 +149,19 @@ export function UpcomingAppointmentsCard() {
       minute: "2-digit",
       hour12: true,
     }).format(new Date(date));
+
+  const getDayLabel = (date: Date) => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const appointmentDate = new Date(date);
+
+    if (appointmentDate.toDateString() === today.toDateString()) return "Today";
+    if (appointmentDate.toDateString() === tomorrow.toDateString())
+      return "Tomorrow";
+    return new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(
+      appointmentDate
+    );
   };
 
   const handleViewAppointment = (appointment: Appointment) => {
@@ -122,15 +172,17 @@ export function UpcomingAppointmentsCard() {
   if (isLoading) {
     return (
       <Card className="h-full">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-xl font-bold flex items-center gap-3">
-            <Calendar className="h-6 w-6 text-primary" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <CalendarDays className="h-4 w-4 text-primary" />
+            </div>
             Upcoming Schedule
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary/20 border-t-primary" />
           </div>
         </CardContent>
       </Card>
@@ -139,80 +191,114 @@ export function UpcomingAppointmentsCard() {
 
   return (
     <Card className="h-full">
-      <CardHeader className="pb-4">
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-xl font-bold flex items-center gap-3">
-            <Calendar className="h-6 w-6 text-primary" />
+          <CardTitle className="text-lg font-bold flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <CalendarDays className="h-4 w-4 text-primary" />
+            </div>
             Upcoming Schedule
           </CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="p-6">
+      <CardContent className="pt-2">
         {upcomingAppointments.length === 0 ? (
-          <div className="text-center py-8">
-            <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground mb-6">
-              No appointments scheduled for the next 7 days
-            </p>
+          <div className="text-center py-10 space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-primary/5 flex items-center justify-center mx-auto">
+              <Calendar className="h-7 w-7 text-primary/40" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground mb-1">
+                Schedule is clear
+              </p>
+              <p className="text-xs text-muted-foreground">
+                No appointments for the next 7 days
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="space-y-6">
-              {upcomingAppointments.map((appointment) => (
+          <div className="space-y-2">
+            {upcomingAppointments.map((appointment) => {
+              const statusConfig = getStatusConfig(appointment.status);
+              const dayLabel = getDayLabel(appointment.appointmentDate);
+              const isToday = dayLabel === "Today";
+
+              return (
                 <button
                   key={appointment.id}
                   type="button"
-                  className="flex items-center gap-4 cursor-pointer group w-full text-left"
+                  className={`flex items-center gap-3 cursor-pointer group w-full text-left p-3 rounded-xl transition-all duration-200 ${isToday
+                      ? "bg-gradient-to-r from-primary/5 to-blue-500/5 dark:from-primary/10 dark:to-blue-500/10 border border-primary/10 hover:shadow-md"
+                      : "bg-muted/30 hover:bg-muted/60"
+                    }`}
                   aria-label={`View appointment: ${appointment.title}`}
                   onClick={() => handleViewAppointment(appointment)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleViewAppointment(appointment);
-                    }
-                  }}
                 >
                   {/* Date Box */}
-                  <div className="flex flex-col items-center justify-center w-16 h-16 bg-muted/40 rounded-xl border border-border group-hover:border-primary/50 transition-colors">
-                    <span className="text-[10px] font-bold text-destructive uppercase tracking-wide leading-none mb-1">
+                  <div
+                    className={`flex flex-col items-center justify-center w-12 h-14 rounded-xl flex-shrink-0 ${isToday
+                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/30"
+                        : "bg-muted/80 border border-border/50"
+                      }`}
+                  >
+                    <span
+                      className={`text-[9px] font-bold uppercase tracking-wider leading-none mb-0.5 ${isToday ? "text-primary-foreground/80" : "text-destructive"
+                        }`}
+                    >
                       {getMonthName(appointment.appointmentDate)}
                     </span>
-                    <span className="text-2xl font-bold text-foreground leading-none">
+                    <span
+                      className={`text-lg font-bold leading-none ${isToday ? "text-primary-foreground" : "text-foreground"
+                        }`}
+                    >
                       {getDayNumber(appointment.appointmentDate)}
                     </span>
                   </div>
 
                   {/* Details */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3 mb-1">
-                      <h3 className="text-base font-bold text-foreground truncate group-hover:text-primary transition-colors">
+                    <div className="flex items-start justify-between gap-2 mb-0.5">
+                      <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                         {appointment.title}
                       </h3>
-                      <Badge className={`${getStatusColor(appointment.status)} text-xs px-2 py-0.5 rounded-full capitalize whitespace-nowrap border-0`}>
-                        {appointment.status.replace('_', ' ')}
-                      </Badge>
                     </div>
-                    <div className="flex items-center text-sm text-muted-foreground truncate">
-                      <Clock className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-                      {formatTime(appointment.appointmentDate)}
-                      <span className="mx-2 flex-shrink-0">•</span>
-                      <User className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-                      <span className="truncate">{getCustomerName(appointment.customer)}</span>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatTime(appointment.appointmentDate)}
+                      </span>
+                      <span className="text-border">•</span>
+                      <span className="truncate">
+                        {getCustomerName(appointment.customer)}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <Badge
+                        className={`${statusConfig.color} text-[10px] px-2 py-0 h-5 rounded-md capitalize border-0 font-medium`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot} mr-1`}
+                        />
+                        {appointment.status.replace("_", " ")}
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground font-medium">
+                        {dayLabel}
+                      </span>
                     </div>
                   </div>
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
 
         <Button
           variant="outline"
-          className="w-full mt-8 border-2 border-dashed border-border py-6 h-auto text-base font-medium rounded-md"
+          className="w-full mt-4 border-dashed border-border/80 py-5 h-auto text-sm font-medium rounded-xl hover:bg-muted/50 transition-colors"
           onClick={() => setLocation("/reminders")}
           data-testid="button-schedule-appointment"
         >
-          <CalendarClock className="h-5 w-5 mr-2" />
+          <CalendarPlus className="h-4 w-4 mr-2 text-primary" />
           Schedule New Appointment
         </Button>
       </CardContent>
@@ -224,31 +310,37 @@ export function UpcomingAppointmentsCard() {
             <>
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Calendar className="h-4 w-4 text-primary" />
+                  </div>
                   Appointment Details
                 </SheetTitle>
-                <SheetDescription>
-                  View appointment information
-                </SheetDescription>
+                <SheetDescription>View appointment information</SheetDescription>
               </SheetHeader>
 
-              <div className="mt-6 space-y-6">
+              <div className="mt-6 space-y-5">
                 {/* Customer Information */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <User className="h-4 w-4" />
+                <div className="space-y-2.5">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5" />
                     Customer
                   </h3>
-                  <div className="bg-muted/40 p-4 rounded-lg space-y-2">
+                  <div className="bg-muted/40 p-4 rounded-xl space-y-2.5">
                     <div>
-                      <p className="text-xs text-muted-foreground">Name</p>
-                      <p className="font-medium text-foreground">{getCustomerName(selectedAppointment.customer)}</p>
+                      <p className="text-[11px] text-muted-foreground mb-0.5">
+                        Name
+                      </p>
+                      <p className="font-semibold text-sm text-foreground">
+                        {getCustomerName(selectedAppointment.customer)}
+                      </p>
                     </div>
                     {selectedAppointment.customer?.email && (
                       <div>
-                        <p className="text-xs text-muted-foreground">Email</p>
-                        <p className="text-sm flex items-center gap-1 text-foreground">
-                          <Mail className="h-3 w-3" />
+                        <p className="text-[11px] text-muted-foreground mb-0.5">
+                          Email
+                        </p>
+                        <p className="text-sm flex items-center gap-1.5 text-foreground">
+                          <Mail className="h-3 w-3 text-muted-foreground" />
                           {selectedAppointment.customer.email}
                         </p>
                       </div>
@@ -257,51 +349,73 @@ export function UpcomingAppointmentsCard() {
                 </div>
 
                 {/* Appointment Details */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
+                <div className="space-y-2.5">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
                     Details
                   </h3>
-                  <div className="bg-muted/40 p-4 rounded-lg space-y-3">
+                  <div className="bg-muted/40 p-4 rounded-xl space-y-3">
                     <div>
-                      <p className="text-xs text-muted-foreground">Title</p>
-                      <p className="font-medium text-foreground">{selectedAppointment.title}</p>
+                      <p className="text-[11px] text-muted-foreground mb-0.5">
+                        Title
+                      </p>
+                      <p className="font-semibold text-sm text-foreground">
+                        {selectedAppointment.title}
+                      </p>
                     </div>
                     {selectedAppointment.description && (
                       <div>
-                        <p className="text-xs text-muted-foreground">Description</p>
-                        <p className="text-sm text-foreground">{selectedAppointment.description}</p>
+                        <p className="text-[11px] text-muted-foreground mb-0.5">
+                          Description
+                        </p>
+                        <p className="text-sm text-foreground">
+                          {selectedAppointment.description}
+                        </p>
                       </div>
                     )}
                     <div>
-                      <p className="text-xs text-muted-foreground">Date & Time</p>
-                      <p className="text-sm font-medium flex items-center gap-1 text-foreground">
-                        <Clock className="h-3 w-3" />
-                        {formatFullDateTime(selectedAppointment.appointmentDate)}
+                      <p className="text-[11px] text-muted-foreground mb-0.5">
+                        Date & Time
+                      </p>
+                      <p className="text-sm font-medium flex items-center gap-1.5 text-foreground">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        {formatFullDateTime(
+                          selectedAppointment.appointmentDate
+                        )}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       {selectedAppointment.duration && (
                         <div>
-                          <p className="text-xs text-muted-foreground">Duration</p>
-                          <p className="text-sm flex items-center gap-1 text-foreground">
-                            <Timer className="h-3 w-3" />
+                          <p className="text-[11px] text-muted-foreground mb-0.5">
+                            Duration
+                          </p>
+                          <p className="text-sm flex items-center gap-1.5 text-foreground">
+                            <Timer className="h-3 w-3 text-muted-foreground" />
                             {selectedAppointment.duration} min
                           </p>
                         </div>
                       )}
                       <div>
-                        <p className="text-xs text-muted-foreground">Status</p>
-                        <Badge className={getStatusColor(selectedAppointment.status)}>
-                          {selectedAppointment.status.replace('_', ' ')}
+                        <p className="text-[11px] text-muted-foreground mb-0.5">
+                          Status
+                        </p>
+                        <Badge
+                          className={
+                            getStatusConfig(selectedAppointment.status).color
+                          }
+                        >
+                          {selectedAppointment.status.replace("_", " ")}
                         </Badge>
                       </div>
                     </div>
                     {selectedAppointment.location && (
                       <div>
-                        <p className="text-xs text-muted-foreground">Location</p>
-                        <p className="text-sm flex items-center gap-1 text-foreground">
-                          <MapPin className="h-3 w-3" />
+                        <p className="text-[11px] text-muted-foreground mb-0.5">
+                          Location
+                        </p>
+                        <p className="text-sm flex items-center gap-1.5 text-foreground">
+                          <MapPin className="h-3 w-3 text-muted-foreground" />
                           {selectedAppointment.location}
                         </p>
                       </div>

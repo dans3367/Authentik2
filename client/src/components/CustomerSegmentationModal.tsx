@@ -176,7 +176,7 @@ export function CustomerSegmentationModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col space-y-4 px-3 sm:px-4 pb-2">
+        <div className="flex-1 min-h-0 flex flex-col space-y-4 px-3 sm:px-4 pb-2">
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <TabsList className="grid w-full grid-cols-3 bg-muted/50">
               <TabsTrigger value="all" className="flex items-center gap-2 text-sm">

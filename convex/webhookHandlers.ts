@@ -380,7 +380,7 @@ export const resendWebhook = httpAction(async (ctx, request) => {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
-    secretBytes as ArrayBuffer,
+    secretBytes,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],

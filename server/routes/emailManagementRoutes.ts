@@ -828,6 +828,21 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
     const sanitizedZipCode = zipCode ? sanitizeString(zipCode) : null;
     const sanitizedCountry = country ? sanitizeString(country) : null;
     const sanitizedPhoneNumber = phoneNumber ? sanitizeString(phoneNumber) : null;
+    
+    // Validate dateOfBirth format if provided
+    let validatedDateOfBirth = null;
+    if (dateOfBirth) {
+      const isValidDob = typeof dateOfBirth === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth);
+      if (!isValidDob) {
+        return res.status(400).json({ message: 'Date of birth must be in YYYY-MM-DD format' });
+      }
+      // Verify it's a valid date
+      const parsedDate = new Date(dateOfBirth);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ message: 'Date of birth is not a valid date' });
+      }
+      validatedDateOfBirth = dateOfBirth;
+    }
 
     // Check if contact already exists
     const existingContact = await db.query.emailContacts.findFirst({
@@ -896,7 +911,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
         zipCode: sanitizedZipCode,
         country: sanitizedCountry,
         phoneNumber: sanitizedPhoneNumber,
-        dateOfBirth: dateOfBirth || null,
+        dateOfBirth: validatedDateOfBirth,
         createdAt: now,
         updatedAt: now,
       }).returning();
@@ -1042,6 +1057,11 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
         const isValidDob = typeof dateOfBirth === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth);
         if (!isValidDob) {
           return res.status(400).json({ message: 'Date of birth must be in YYYY-MM-DD format' });
+        }
+        // Verify it's a valid date
+        const parsedDate = new Date(dateOfBirth);
+        if (isNaN(parsedDate.getTime())) {
+          return res.status(400).json({ message: 'Date of birth is not a valid date' });
         }
         updateData.dateOfBirth = dateOfBirth;
       } else {

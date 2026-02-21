@@ -874,6 +874,7 @@ export default function NewsletterCreatePage() {
           onSuccess={() => { setHasUnsavedChanges(false); setLocation('/newsletter'); }}
           newsletterId={newsletterId}
           newsletterTitle={title || "Untitled Newsletter"}
+          newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
           onSegmentSelected={handleSegmentSelected}
         />
         {exitDialog}
@@ -1004,6 +1005,7 @@ export default function NewsletterCreatePage() {
       onSuccess={() => { setHasUnsavedChanges(false); setLocation('/newsletter'); }}
       newsletterId={newsletterId}
       newsletterTitle={title || "Untitled Newsletter"}
+      newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
       onSegmentSelected={handleSegmentSelected}
     />
     {exitDialog}

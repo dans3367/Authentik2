@@ -154,13 +154,21 @@ userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']),
 
     // Handle PostgreSQL duplicate key error (including Drizzle-wrapped errors)
     const dbError = error?.cause ?? error;
-    if (dbError?.code === '23505' && dbError?.constraint_name === 'better_auth_user_email_unique') {
+    if (dbError?.code === '23505' && dbError?.constraint === 'better_auth_user_email_unique') {
       return res.status(400).json({ 
         message: "User's email is already registered" 
       });
     }
     
-    res.status(500).json({ message: error.message || 'Failed to create user' });
+    // Log detailed error for server-side debugging
+    console.error('Create user failed:', {
+      error: error.message,
+      stack: error.stack,
+      body: req.body,
+      tenantId: req.user.tenantId
+    });
+    
+    res.status(500).json({ message: 'Failed to create user' });
   }
 });
 

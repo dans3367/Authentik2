@@ -1,7 +1,7 @@
 import { task, logger } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { z } from "zod";
-import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
+import { EMAIL_RETRY_CONFIG, emailSendCatchError } from "./retryStrategy";
 import { sendAhaEmail } from "./ahasend";
 
 // Initialize Resend for email sending
@@ -36,8 +36,8 @@ export type ReviewNotificationPayload = z.infer<typeof reviewNotificationSchema>
 export const sendReviewNotificationTask = task({
   id: "send-newsletter-review-notification",
   maxDuration: 60,
-  retry: DB_RETRY_CONFIG,
-  catchError: dbConnectionCatchError,
+  retry: EMAIL_RETRY_CONFIG,
+  catchError: emailSendCatchError,
   run: async (payload: ReviewNotificationPayload) => {
     const data = reviewNotificationSchema.parse(payload);
 

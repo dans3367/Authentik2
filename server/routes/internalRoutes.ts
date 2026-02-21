@@ -414,7 +414,7 @@ router.get(
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('❌ [Internal API] Error fetching email design:', errorMessage);
-      return res.status(500).json({ success: false, error: errorMessage });
+      return res.status(500).json({ success: false, error: 'Failed to fetch email design' });
     }
   }
 );
@@ -482,7 +482,7 @@ router.post(
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('❌ [Internal API] Error logging email activity:', errorMessage);
-      return res.status(500).json({ success: false, error: errorMessage });
+      return res.status(500).json({ success: false, error: 'Failed to log email activity' });
     }
   }
 );

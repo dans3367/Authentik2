@@ -102,6 +102,8 @@ export default function NewsletterViewPage() {
   useEffect(() => {
     if (emailApprovalCode && emailApprovalCode.length === 5) {
       setApprovalCode(emailApprovalCode);
+      // Clear the URL parameters to prevent approval code from being stored in browser history
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, [emailApprovalCode]);
 
@@ -822,7 +824,7 @@ export default function NewsletterViewPage() {
                 Edit
               </Button>
             )}
-            {reviewerEnabled && (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && (
+            {reviewerEnabled && (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && (newsletter as any).reviewStatus !== 'approved' && (
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -951,7 +953,7 @@ export default function NewsletterViewPage() {
                       size="sm"
                       variant="outline"
                       className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
-                      disabled={approvalCode.length !== 5 || approveMutation.isPending}
+                      disabled={approvalCode.length !== 5 || approveMutation.isPending || approveAndSendMutation.isPending}
                       data-testid="button-approve-only"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
@@ -962,7 +964,7 @@ export default function NewsletterViewPage() {
                       size="sm"
                       variant="outline"
                       className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20"
-                      disabled={rejectMutation.isPending}
+                      disabled={rejectMutation.isPending || approveAndSendMutation.isPending}
                       data-testid="button-reject"
                     >
                       <XCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />

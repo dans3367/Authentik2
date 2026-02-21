@@ -167,7 +167,7 @@ export default function ManagementNewsletterReviewer() {
 
     // Get all users except the current user (can't review your own)
     const availableReviewers = (usersData?.users || []).filter(
-        (u: ReviewerUser) => ["Owner", "Administrator", "Manager"].includes(u.role)
+        (u: ReviewerUser) => ["Owner", "Administrator", "Manager"].includes(u.role) && u.id !== currentUser?.id
     );
 
     const selectedReviewer = availableReviewers.find((u: ReviewerUser) => u.id === selectedReviewerId);

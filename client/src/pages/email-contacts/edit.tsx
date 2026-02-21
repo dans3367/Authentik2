@@ -56,6 +56,27 @@ const editContactSchema = z.object({
 
 type EditContactForm = z.infer<typeof editContactSchema>;
 
+// Interface that matches the API expectations
+interface UpdateContactRequest {
+  email?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  status?: string;
+  tags?: string[];
+  lists?: string[];
+  consentGiven?: boolean;
+  consentMethod?: string | null;
+  consentIpAddress?: string | null;
+  consentDate?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
+  phoneNumber?: string | null;
+  dateOfBirth?: string | null;
+}
+
 export default function EditEmailContact() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute("/email-contacts/edit/:id");
@@ -144,7 +165,7 @@ export default function EditEmailContact() {
         zipCode: contact.zipCode || "",
         country: contact.country || "",
         phoneNumber: contact.phoneNumber || "",
-        dateOfBirth: contact.dateOfBirth ? new Date(contact.dateOfBirth + 'T00:00:00') : undefined,
+        dateOfBirth: contact.dateOfBirth ? new Date(contact.dateOfBirth) : undefined,
       });
       setSelectedTags(contact.tags?.map((tag: any) => tag.id) || []);
       setSelectedLists(contact.lists?.map((list: any) => list.id) || []);
@@ -152,7 +173,7 @@ export default function EditEmailContact() {
   }, [contactData, form]);
 
   const updateContactMutation = useMutation({
-    mutationFn: async (data: EditContactForm) => {
+    mutationFn: async (data: UpdateContactRequest) => {
       const response = await apiRequest("PUT", `/api/email-contacts/${contactId}`, data);
       return response.json();
     },
@@ -178,15 +199,27 @@ export default function EditEmailContact() {
   });
 
   const onSubmit = (data: EditContactForm) => {
-    const formData = {
-      ...data,
+    const formData: UpdateContactRequest = {
+      email: data.email,
+      firstName: data.firstName || null,
+      lastName: data.lastName || null,
+      status: data.status,
       tags: selectedTags,
       lists: selectedLists,
+      consentGiven: data.consentGiven,
+      consentMethod: data.consentMethod || null,
+      consentIpAddress: data.consentIpAddress || null,
       // Convert Date object to ISO string for API
-      consentDate: data.consentDate ? data.consentDate.toISOString() : undefined,
+      consentDate: data.consentDate ? data.consentDate.toISOString() : null,
+      address: data.address || null,
+      city: data.city || null,
+      state: data.state || null,
+      zipCode: data.zipCode || null,
+      country: data.country || null,
+      phoneNumber: data.phoneNumber || null,
       dateOfBirth: data.dateOfBirth ? format(data.dateOfBirth, 'yyyy-MM-dd') : null,
     };
-    updateContactMutation.mutate(formData as any);
+    updateContactMutation.mutate(formData);
   };
 
   const toggleTag = (tagId: string) => {
