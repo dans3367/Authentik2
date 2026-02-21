@@ -786,8 +786,8 @@ export default function NewsletterViewPage() {
     <div className="w-full">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
-          <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
             <Button
               variant="ghost"
               size="icon"
@@ -798,43 +798,11 @@ export default function NewsletterViewPage() {
               <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
             </Button>
             <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 mb-2">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate sm:flex-1">
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 truncate">
                   {newsletter.title}
                 </h1>
-                <div className="sm:flex-shrink-0 flex flex-col items-start sm:items-end gap-1.5">
-                  {getStatusBadge(newsletter.status)}
-                  {newsletter.status === 'ready_to_send' && (
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        sendNowMutation.mutate(newsletter.id);
-                      }}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white border-green-700"
-                      disabled={sendNowMutation.isPending}
-                      data-testid="button-send-now"
-                    >
-                      <Send className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                      {sendNowMutation.isPending ? "Sending..." : "Send Now"}
-                    </Button>
-                  )}
-                  {reviewerEnabled && (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && (
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        submitForReviewMutation.mutate(newsletter.id);
-                      }}
-                      size="sm"
-                      variant="outline"
-                      className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900/20"
-                      disabled={submitForReviewMutation.isPending}
-                    >
-                      <ClipboardCheck className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                      {submitForReviewMutation.isPending ? "Submitting..." : "Submit for Review"}
-                    </Button>
-                  )}
-                </div>
+                {getStatusBadge(newsletter.status)}
               </div>
               <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
                 Subject: {newsletter.subject}
@@ -842,17 +810,46 @@ export default function NewsletterViewPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap lg:justify-end">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:justify-end shrink-0 pl-0 sm:pl-4">
             {newsletter.status === 'draft' && (
               <Button
                 onClick={() => navigate(`/newsletters/${newsletter.id}/edit`)}
                 variant="outline"
                 size="sm"
-                className="w-full sm:w-auto"
                 data-testid="button-edit"
               >
                 <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                <span className="sm:inline">Edit</span>
+                Edit
+              </Button>
+            )}
+            {reviewerEnabled && (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  submitForReviewMutation.mutate(newsletter.id);
+                }}
+                size="sm"
+                variant="outline"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900/20"
+                disabled={submitForReviewMutation.isPending}
+              >
+                <ClipboardCheck className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                {submitForReviewMutation.isPending ? "Submitting..." : "Submit for Review"}
+              </Button>
+            )}
+            {newsletter.status === 'ready_to_send' && (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sendNowMutation.mutate(newsletter.id);
+                }}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white border-green-700"
+                disabled={sendNowMutation.isPending}
+                data-testid="button-send-now"
+              >
+                <Send className="h-4 w-4 mr-2" strokeWidth={1.5} />
+                {sendNowMutation.isPending ? "Sending..." : "Send Now"}
               </Button>
             )}
           </div>

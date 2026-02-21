@@ -278,6 +278,18 @@ newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (
 
     console.log(`[Newsletter Preview] Triggered send-newsletter-preview task (run: ${handle.id}) to ${to}`);
 
+    // Log activity: preview email sent
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityName: subject,
+      activityType: 'preview_sent',
+      description: `Sent preview email to ${normalizedTo}`,
+      metadata: { to: normalizedTo, subject, runId: handle.id },
+      req,
+    });
+
     res.json({
       message: 'Preview email queued successfully',
       to,
@@ -946,6 +958,18 @@ newsletterRoutes.put("/:id/status", authenticateInternalService, async (req: any
     }
 
     console.log(`[Newsletter] Successfully updated newsletter ${id} status to: ${status}`);
+
+    // Log activity: internal status update
+    await logActivity({
+      tenantId: updatedNewsletter[0].tenantId,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: updatedNewsletter[0].title,
+      activityType: 'status_changed',
+      description: `Newsletter "${updatedNewsletter[0].title}" status changed to ${status} (internal)`,
+      metadata: { status, source: 'internal_service', ...(metadata || {}) },
+    });
+
     res.json({
       message: 'Newsletter status updated successfully',
       newsletter: updatedNewsletter[0]
@@ -970,8 +994,23 @@ newsletterRoutes.post("/:id/log", authenticateInternalService, async (req: any, 
       source: 'temporal-server'
     });
 
-    // Here you could store activity logs in a separate table if needed
-    // For now, we just log to console and return success
+    // Fetch the newsletter to get tenantId and title
+    const newsletter = await db.query.newsletters.findFirst({
+      where: eq(newsletters.id, id),
+      columns: { tenantId: true, title: true },
+    });
+
+    if (newsletter) {
+      await logActivity({
+        tenantId: newsletter.tenantId,
+        entityType: 'newsletter',
+        entityId: id,
+        entityName: newsletter.title,
+        activityType: activity,
+        description: `${activity} — ${newsletter.title}`,
+        metadata: { details, source: 'temporal-server', timestamp },
+      });
+    }
 
     res.json({
       message: 'Newsletter activity logged successfully',
@@ -1794,7 +1833,7 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
       entityType: 'newsletter',
       entityId: id,
       entityName: newsletter.title,
-      activityType: 'updated',
+      activityType: 'submitted_for_review',
       description: `Submitted newsletter "${newsletter.title}" for review`,
       metadata: { reviewerId: settings.reviewerId },
       req,
@@ -1888,8 +1927,8 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
       entityType: 'newsletter',
       entityId: id,
       entityName: newsletter.title,
-      activityType: 'updated',
-      description: `Approved newsletter "${newsletter.title}" with approval code`,
+      activityType: 'approved',
+      description: `Approved newsletter "${newsletter.title}"`,
       metadata: { reviewStatus: 'approved', reviewNotes: notes },
       req,
     });
@@ -1949,8 +1988,8 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
       entityType: 'newsletter',
       entityId: id,
       entityName: newsletter.title,
-      activityType: 'updated',
-      description: `Approved and initiated send for newsletter "${newsletter.title}" with approval code`,
+      activityType: 'approved_and_sent',
+      description: `Approved and initiated send for newsletter "${newsletter.title}"`,
       metadata: { reviewStatus: 'approved' },
       req,
     });
@@ -2009,7 +2048,7 @@ newsletterRoutes.post("/:id/reject", authenticateToken, requireTenant, async (re
       entityType: 'newsletter',
       entityId: id,
       entityName: newsletter.title,
-      activityType: 'updated',
+      activityType: 'rejected',
       description: `Rejected newsletter "${newsletter.title}"`,
       metadata: { reviewStatus: 'rejected', reviewNotes: notes },
       req,
