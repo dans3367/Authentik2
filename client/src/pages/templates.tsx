@@ -275,6 +275,23 @@ function hasContent(html: string): boolean {
   return text.length > 0;
 }
 
+/**
+ * Validates that a URL uses a safe scheme (http or https only).
+ * Rejects javascript:, data:, vbscript:, and other potentially dangerous schemes.
+ */
+function isSafeUrl(url: string | undefined): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) return false;
+  try {
+    const parsed = new URL(trimmedUrl);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    const lowerUrl = trimmedUrl.toLowerCase();
+    return lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://');
+  }
+}
+
 const TEMPLATE_VARIABLES = [
   { key: 'first_name', icon: User, labelKey: 'ecards.editor.firstName' },
   { key: 'last_name', icon: User, labelKey: 'ecards.editor.lastName' },
@@ -536,31 +553,80 @@ function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, o
                     </div>
 
                     {/* Hero header from email design */}
-                    <div
-                      className="p-8 text-center"
-                      style={{ backgroundColor: masterDesign?.primaryColor || "#3B82F6", color: "#ffffff" }}
-                    >
-                      {masterDesign?.logoUrl ? (
+                    {(masterDesign?.headerMode || 'logo') === 'banner' && masterDesign?.bannerUrl ? (
+                      <div>
                         <img
-                          src={masterDesign.logoUrl}
-                          alt="Logo"
-                          className="h-12 mx-auto mb-4 object-contain"
+                          src={masterDesign.bannerUrl}
+                          alt="Email banner"
+                          style={{ display: 'block', width: '100%', height: 'auto' }}
                           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                         />
-                      ) : (
-                        <div className="h-12 w-12 bg-white/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                          <span className="text-xl font-bold opacity-80">{masterDesign?.companyName?.charAt(0) || "C"}</span>
-                        </div>
-                      )}
-                      <h1 className="text-2xl font-bold mb-2 tracking-tight">
-                        {masterDesign?.companyName || "Your Company"}
-                      </h1>
-                      {masterDesign?.headerText && (
-                        <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">
-                          {masterDesign.headerText}
-                        </p>
-                      )}
-                    </div>
+                        {((masterDesign?.showCompanyName ?? 'true') === 'true' || masterDesign?.headerText) && (
+                          <div
+                            className="px-8 py-4 text-center"
+                            style={{ backgroundColor: masterDesign?.primaryColor || "#3B82F6", color: "#ffffff" }}
+                          >
+                            {(masterDesign?.showCompanyName ?? 'true') === 'true' && (
+                              <h1 className="text-2xl font-bold mb-1 tracking-tight">
+                                {masterDesign?.companyName || "Your Company"}
+                              </h1>
+                            )}
+                            {masterDesign?.headerText && (
+                              <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">
+                                {masterDesign.headerText}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div
+                        className="p-8"
+                        style={{
+                          backgroundColor: masterDesign?.primaryColor || "#3B82F6",
+                          color: "#ffffff",
+                          textAlign: (masterDesign?.logoAlignment as 'left' | 'center' | 'right') || 'center',
+                        }}
+                      >
+                        {masterDesign?.logoUrl ? (
+                          <img
+                            src={masterDesign.logoUrl}
+                            alt="Logo"
+                            className="mb-4 object-contain"
+                            style={{
+                              height: ({ small: '64px', medium: '96px', large: '128px', xlarge: '160px' } as Record<string, string>)[masterDesign?.logoSize || 'medium'] || '96px',
+                              display: 'block',
+                              marginLeft: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? 'auto' : '0'),
+                              marginRight: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? '0' : 'auto'),
+                            }}
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          />
+                        ) : (
+                          <div
+                            className="h-12 w-12 bg-white/20 rounded-full mb-4 flex items-center justify-center"
+                            style={{
+                              marginLeft: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? 'auto' : '0'),
+                              marginRight: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? '0' : 'auto'),
+                            }}
+                          >
+                            <span className="text-xl font-bold opacity-80">{masterDesign?.companyName?.charAt(0) || "C"}</span>
+                          </div>
+                        )}
+                        {(masterDesign?.showCompanyName ?? 'true') === 'true' && (
+                          <h1 className="text-2xl font-bold mb-2 tracking-tight">
+                            {masterDesign?.companyName || "Your Company"}
+                          </h1>
+                        )}
+                        {masterDesign?.headerText && (
+                          <p className="text-base opacity-95 max-w-sm leading-normal" style={{
+                            marginLeft: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? 'auto' : '0'),
+                            marginRight: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? '0' : 'auto'),
+                          }}>
+                            {masterDesign.headerText}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Template body content */}
                     <div className="p-8 flex-1">
@@ -572,22 +638,20 @@ function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, o
 
                     {/* Footer from email design */}
                     <div className="bg-slate-100 p-8 text-center border-t border-slate-200">
-                      {(masterDesign?.socialLinks?.facebook || masterDesign?.socialLinks?.twitter || masterDesign?.socialLinks?.instagram || masterDesign?.socialLinks?.linkedin) && (
-                        <div className="flex justify-center gap-6 mb-6">
-                          {masterDesign?.socialLinks?.facebook && (
-                            <span className="text-slate-400 text-sm">Facebook</span>
-                          )}
-                          {masterDesign?.socialLinks?.twitter && (
-                            <span className="text-slate-400 text-sm">Twitter</span>
-                          )}
-                          {masterDesign?.socialLinks?.instagram && (
-                            <span className="text-slate-400 text-sm">Instagram</span>
-                          )}
-                          {masterDesign?.socialLinks?.linkedin && (
-                            <span className="text-slate-400 text-sm">LinkedIn</span>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex justify-center gap-6 mb-6">
+                        {isSafeUrl(masterDesign?.socialLinks?.facebook) && (
+                          <a href={masterDesign!.socialLinks!.facebook} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-600 transition-colors text-sm">Facebook</a>
+                        )}
+                        {isSafeUrl(masterDesign?.socialLinks?.twitter) && (
+                          <a href={masterDesign!.socialLinks!.twitter} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-sky-500 transition-colors text-sm">Twitter</a>
+                        )}
+                        {isSafeUrl(masterDesign?.socialLinks?.instagram) && (
+                          <a href={masterDesign!.socialLinks!.instagram} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-pink-600 transition-colors text-sm">Instagram</a>
+                        )}
+                        {isSafeUrl(masterDesign?.socialLinks?.linkedin) && (
+                          <a href={masterDesign!.socialLinks!.linkedin} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-700 transition-colors text-sm">LinkedIn</a>
+                        )}
+                      </div>
                       <div className="text-xs text-slate-500 space-y-2 max-w-xs mx-auto">
                         <p>{masterDesign?.footerText || "© 2025 All rights reserved."}</p>
                         <p className="text-slate-400">
@@ -1017,31 +1081,80 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
                 </div>
 
                 {/* Hero header from email design */}
-                <div
-                  className="p-8 text-center"
-                  style={{ backgroundColor: masterDesign?.primaryColor || "#3B82F6", color: "#ffffff" }}
-                >
-                  {masterDesign?.logoUrl ? (
+                {(masterDesign?.headerMode || 'logo') === 'banner' && masterDesign?.bannerUrl ? (
+                  <div>
                     <img
-                      src={masterDesign.logoUrl}
-                      alt="Logo"
-                      className="h-12 mx-auto mb-4 object-contain"
+                      src={masterDesign.bannerUrl}
+                      alt="Email banner"
+                      style={{ display: 'block', width: '100%', height: 'auto' }}
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
-                  ) : (
-                    <div className="h-12 w-12 bg-white/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                      <span className="text-xl font-bold opacity-80">{masterDesign?.companyName?.charAt(0) || "C"}</span>
-                    </div>
-                  )}
-                  <h1 className="text-2xl font-bold mb-2 tracking-tight">
-                    {masterDesign?.companyName || "Your Company"}
-                  </h1>
-                  {masterDesign?.headerText && (
-                    <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">
-                      {masterDesign.headerText}
-                    </p>
-                  )}
-                </div>
+                    {((masterDesign?.showCompanyName ?? 'true') === 'true' || masterDesign?.headerText) && (
+                      <div
+                        className="px-8 py-4 text-center"
+                        style={{ backgroundColor: masterDesign?.primaryColor || "#3B82F6", color: "#ffffff" }}
+                      >
+                        {(masterDesign?.showCompanyName ?? 'true') === 'true' && (
+                          <h1 className="text-2xl font-bold mb-1 tracking-tight">
+                            {masterDesign?.companyName || "Your Company"}
+                          </h1>
+                        )}
+                        {masterDesign?.headerText && (
+                          <p className="text-base opacity-95 max-w-sm mx-auto leading-normal">
+                            {masterDesign.headerText}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    className="p-8"
+                    style={{
+                      backgroundColor: masterDesign?.primaryColor || "#3B82F6",
+                      color: "#ffffff",
+                      textAlign: (masterDesign?.logoAlignment as 'left' | 'center' | 'right') || 'center',
+                    }}
+                  >
+                    {masterDesign?.logoUrl ? (
+                      <img
+                        src={masterDesign.logoUrl}
+                        alt="Logo"
+                        className="mb-4 object-contain"
+                        style={{
+                          height: ({ small: '64px', medium: '96px', large: '128px', xlarge: '160px' } as Record<string, string>)[masterDesign?.logoSize || 'medium'] || '96px',
+                          display: 'block',
+                          marginLeft: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? 'auto' : '0'),
+                          marginRight: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? '0' : 'auto'),
+                        }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                    ) : (
+                      <div
+                        className="h-12 w-12 bg-white/20 rounded-full mb-4 flex items-center justify-center"
+                        style={{
+                          marginLeft: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? 'auto' : '0'),
+                          marginRight: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? '0' : 'auto'),
+                        }}
+                      >
+                        <span className="text-xl font-bold opacity-80">{masterDesign?.companyName?.charAt(0) || "C"}</span>
+                      </div>
+                    )}
+                    {(masterDesign?.showCompanyName ?? 'true') === 'true' && (
+                      <h1 className="text-2xl font-bold mb-2 tracking-tight">
+                        {masterDesign?.companyName || "Your Company"}
+                      </h1>
+                    )}
+                    {masterDesign?.headerText && (
+                      <p className="text-base opacity-95 max-w-sm leading-normal" style={{
+                        marginLeft: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? 'auto' : '0'),
+                        marginRight: (masterDesign?.logoAlignment || 'center') === 'center' ? 'auto' : (masterDesign?.logoAlignment === 'right' ? '0' : 'auto'),
+                      }}>
+                        {masterDesign.headerText}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Template body content */}
                 <div className="p-8 flex-1">
@@ -1053,22 +1166,20 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
 
                 {/* Footer from email design */}
                 <div className="bg-slate-100 p-8 text-center border-t border-slate-200">
-                  {(masterDesign?.socialLinks?.facebook || masterDesign?.socialLinks?.twitter || masterDesign?.socialLinks?.instagram || masterDesign?.socialLinks?.linkedin) && (
-                    <div className="flex justify-center gap-6 mb-6">
-                      {masterDesign?.socialLinks?.facebook && (
-                        <span className="text-slate-400 text-sm">Facebook</span>
-                      )}
-                      {masterDesign?.socialLinks?.twitter && (
-                        <span className="text-slate-400 text-sm">Twitter</span>
-                      )}
-                      {masterDesign?.socialLinks?.instagram && (
-                        <span className="text-slate-400 text-sm">Instagram</span>
-                      )}
-                      {masterDesign?.socialLinks?.linkedin && (
-                        <span className="text-slate-400 text-sm">LinkedIn</span>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex justify-center gap-6 mb-6">
+                    {isSafeUrl(masterDesign?.socialLinks?.facebook) && (
+                      <a href={masterDesign!.socialLinks!.facebook} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-600 transition-colors text-sm">Facebook</a>
+                    )}
+                    {isSafeUrl(masterDesign?.socialLinks?.twitter) && (
+                      <a href={masterDesign!.socialLinks!.twitter} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-sky-500 transition-colors text-sm">Twitter</a>
+                    )}
+                    {isSafeUrl(masterDesign?.socialLinks?.instagram) && (
+                      <a href={masterDesign!.socialLinks!.instagram} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-pink-600 transition-colors text-sm">Instagram</a>
+                    )}
+                    {isSafeUrl(masterDesign?.socialLinks?.linkedin) && (
+                      <a href={masterDesign!.socialLinks!.linkedin} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-700 transition-colors text-sm">LinkedIn</a>
+                    )}
+                  </div>
                   <div className="text-xs text-slate-500 space-y-2 max-w-xs mx-auto">
                     <p>{masterDesign?.footerText || "© 2025 All rights reserved."}</p>
                     <p className="text-slate-400">

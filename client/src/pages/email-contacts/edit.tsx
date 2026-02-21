@@ -51,6 +51,7 @@ const editContactSchema = z.object({
   zipCode: z.string().optional(),
   country: z.string().optional(),
   phoneNumber: z.string().optional(),
+  dateOfBirth: z.date().optional().nullable(),
 });
 
 type EditContactForm = z.infer<typeof editContactSchema>;
@@ -60,7 +61,7 @@ export default function EditEmailContact() {
   const [match, params] = useRoute("/email-contacts/edit/:id");
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedLists, setSelectedLists] = useState<string[]>([]);
 
@@ -118,6 +119,7 @@ export default function EditEmailContact() {
       zipCode: "",
       country: "",
       phoneNumber: "",
+      dateOfBirth: undefined,
     },
   });
 
@@ -142,6 +144,7 @@ export default function EditEmailContact() {
         zipCode: contact.zipCode || "",
         country: contact.country || "",
         phoneNumber: contact.phoneNumber || "",
+        dateOfBirth: contact.dateOfBirth ? new Date(contact.dateOfBirth + 'T00:00:00') : undefined,
       });
       setSelectedTags(contact.tags?.map((tag: any) => tag.id) || []);
       setSelectedLists(contact.lists?.map((list: any) => list.id) || []);
@@ -181,21 +184,22 @@ export default function EditEmailContact() {
       lists: selectedLists,
       // Convert Date object to ISO string for API
       consentDate: data.consentDate ? data.consentDate.toISOString() : undefined,
+      dateOfBirth: data.dateOfBirth ? format(data.dateOfBirth, 'yyyy-MM-dd') : null,
     };
-    updateContactMutation.mutate(formData);
+    updateContactMutation.mutate(formData as any);
   };
 
   const toggleTag = (tagId: string) => {
-    setSelectedTags(prev => 
-      prev.includes(tagId) 
+    setSelectedTags(prev =>
+      prev.includes(tagId)
         ? prev.filter(id => id !== tagId)
         : [...prev, tagId]
     );
   };
 
   const toggleList = (listId: string) => {
-    setSelectedLists(prev => 
-      prev.includes(listId) 
+    setSelectedLists(prev =>
+      prev.includes(listId)
         ? prev.filter(id => id !== listId)
         : [...prev, listId]
     );
@@ -260,38 +264,38 @@ export default function EditEmailContact() {
 
   return (
     <div className="max-w-6xl mx-auto p-4">
-        {/* Header */}
-        <div className="mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => setLocation("/email-contacts")}
-            className="mb-6 group hover:bg-white/60 dark:hover:bg-slate-800/60 backdrop-blur-sm border border-white/20 dark:border-slate-700/50"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-0.5" />
-            Back to Contacts
-          </Button>
-          
-          <div className="space-y-2">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-900 via-blue-800 to-indigo-800 dark:from-slate-100 dark:via-blue-200 dark:to-indigo-200 bg-clip-text text-transparent">
-              Edit Contact
-            </h1>
-            <p className="text-lg text-slate-600 dark:text-slate-400">
-              Update contact information and manage their subscription status
-            </p>
-          </div>
-        </div>
+      {/* Header */}
+      <div className="mb-8">
+        <Button
+          variant="ghost"
+          onClick={() => setLocation("/email-contacts")}
+          className="mb-6 group hover:bg-white/60 dark:hover:bg-slate-800/60 backdrop-blur-sm border border-white/20 dark:border-slate-700/50"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-0.5" />
+          Back to Contacts
+        </Button>
 
-        <div className="grid gap-8 lg:grid-cols-3">
-          {/* Main Form */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
-              <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
-                <CardTitle className="text-xl font-semibold text-slate-800 dark:text-slate-200">Contact Information</CardTitle>
-                <CardDescription className="text-slate-600 dark:text-slate-400">
-                  Update the contact's details and subscription status
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-900 via-blue-800 to-indigo-800 dark:from-slate-100 dark:via-blue-200 dark:to-indigo-200 bg-clip-text text-transparent">
+            Edit Contact
+          </h1>
+          <p className="text-lg text-slate-600 dark:text-slate-400">
+            Update contact information and manage their subscription status
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* Main Form */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
+            <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
+              <CardTitle className="text-xl font-semibold text-slate-800 dark:text-slate-200">Contact Information</CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Update the contact's details and subscription status
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   {/* Email */}
@@ -343,7 +347,7 @@ export default function EditEmailContact() {
                   {/* Address Fields */}
                   <div className="space-y-4 border-t pt-6">
                     <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">Address Information (Optional)</h3>
-                    
+
                     <FormField
                       control={form.control}
                       name="address"
@@ -418,19 +422,61 @@ export default function EditEmailContact() {
                       />
                     </div>
 
-                    <FormField
-                      control={form.control}
-                      name="phoneNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="+1 (555) 123-4567" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="phoneNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone Number</FormLabel>
+                            <FormControl>
+                              <Input placeholder="+1 (555) 123-4567" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="dateOfBirth"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Customer's Date of Birth</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      "w-full pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                  >
+                                    {field.value ? (
+                                      format(field.value, "PPP")
+                                    ) : (
+                                      <span>Select date of birth</span>
+                                    )}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <CalendarComponent
+                                  selected={field.value ?? undefined}
+                                  onSelect={field.onChange}
+                                  disabled={{ after: new Date(), before: new Date("1900-01-01") }}
+                                  fromYear={1920}
+                                  toYear={new Date().getFullYear()}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
 
                   {/* Status */}
@@ -486,8 +532,8 @@ export default function EditEmailContact() {
                             return tag ? (
                               <Badge key={tagId} variant="secondary" className="flex items-center gap-1">
                                 {tag.name}
-                                <X 
-                                  className="h-3 w-3 cursor-pointer" 
+                                <X
+                                  className="h-3 w-3 cursor-pointer"
                                   onClick={() => toggleTag(tagId)}
                                 />
                               </Badge>
@@ -526,8 +572,8 @@ export default function EditEmailContact() {
                             return list ? (
                               <Badge key={listId} variant="outline" className="flex items-center gap-1">
                                 {list.name}
-                                <X 
-                                  className="h-3 w-3 cursor-pointer" 
+                                <X
+                                  className="h-3 w-3 cursor-pointer"
                                   onClick={() => toggleList(listId)}
                                 />
                               </Badge>
@@ -544,7 +590,7 @@ export default function EditEmailContact() {
                       <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                       <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">Consent Information</h3>
                     </div>
-                    
+
                     {/* Consent Given */}
                     <FormField
                       control={form.control}
@@ -552,7 +598,7 @@ export default function EditEmailContact() {
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                           <FormControl>
-                            <Checkbox 
+                            <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
                             />
@@ -609,9 +655,9 @@ export default function EditEmailContact() {
                         <FormItem>
                           <FormLabel>Consent IP Address</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="192.168.1.1" 
-                              {...field} 
+                            <Input
+                              placeholder="192.168.1.1"
+                              {...field}
                             />
                           </FormControl>
                           <FormDescription className="text-xs">
@@ -650,13 +696,9 @@ export default function EditEmailContact() {
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
                               <CalendarComponent
-                                mode="single"
                                 selected={field.value}
                                 onSelect={field.onChange}
-                                disabled={(date) =>
-                                  date > new Date() || date < new Date("1900-01-01")
-                                }
-                                initialFocus
+                                disabled={{ after: new Date(), before: new Date("1900-01-01") }}
                               />
                             </PopoverContent>
                           </Popover>
@@ -676,7 +718,7 @@ export default function EditEmailContact() {
                           Compliance Notice
                         </p>
                         <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                          Ensure all consent information is accurate and complies with GDPR, CAN-SPAM, and other applicable regulations. 
+                          Ensure all consent information is accurate and complies with GDPR, CAN-SPAM, and other applicable regulations.
                           Only send marketing emails to contacts who have explicitly consented.
                         </p>
                       </div>
@@ -713,243 +755,243 @@ export default function EditEmailContact() {
                   </div>
                 </form>
               </Form>
-              </CardContent>
-            </Card>
-          </div>
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Contact Summary */}
-            <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
-              <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
-                <CardTitle className="text-lg text-slate-800 dark:text-slate-200">Contact Summary</CardTitle>
-                <CardDescription className="text-slate-600 dark:text-slate-400">
-                  Current contact information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                      <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{contact?.email}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Email Address</p>
-                    </div>
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Contact Summary */}
+          <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
+            <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
+              <CardTitle className="text-lg text-slate-800 dark:text-slate-200">Contact Summary</CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Current contact information
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                    <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   </div>
-                  
-                  {(contact?.firstName || contact?.lastName) && (
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                        <UserCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                          {[contact?.firstName, contact?.lastName].filter(Boolean).join(' ')}
-                        </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Full Name</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                      <CheckCircle2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <div>
-                      <Badge 
-                        variant={contact?.status === 'active' ? 'default' : 'secondary'}
-                        className={
-                          contact?.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                          contact?.status === 'unsubscribed' ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' :
-                          contact?.status === 'bounced' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                          contact?.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : ''
-                        }
-                      >
-                        {contact?.status}
-                      </Badge>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Status</p>
-                    </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{contact?.email}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Email Address</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Tags Section */}
-            <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
-              <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
-                <CardTitle className="text-lg text-slate-800 dark:text-slate-200">Current Tags</CardTitle>
-                <CardDescription className="text-slate-600 dark:text-slate-400">
-                  Tags assigned to this contact
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                {Array.isArray(contact?.tags) && contact.tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {contact.tags.map((tag: any) => (
-                      <Badge 
-                        key={tag.id} 
-                        variant="outline"
-                        style={{ 
-                          backgroundColor: `${tag.color}20`,
-                          borderColor: tag.color,
-                          color: tag.color 
-                        }}
-                        className="border-2"
-                      >
-                        <Tag className="h-3 w-3 mr-1" />
-                        {tag.name}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">No tags assigned</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Lists Section */}
-            <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
-              <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
-                <CardTitle className="text-lg text-slate-800 dark:text-slate-200">Current Lists</CardTitle>
-                <CardDescription className="text-slate-600 dark:text-slate-400">
-                  Email lists this contact belongs to
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                {Array.isArray(contact?.lists) && contact.lists.length > 0 ? (
-                  <div className="space-y-2">
-                    {contact.lists.map((list: any) => (
-                      <div key={list.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-50/50 dark:bg-slate-800/50">
-                        <div className="p-1 rounded bg-blue-100 dark:bg-blue-900/30">
-                          <Mail className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{list.name}</p>
-                          {list.description && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{list.description}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Not subscribed to any lists</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Contact Details */}
-            <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
-              <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
-                <CardTitle className="text-lg text-slate-800 dark:text-slate-200">Contact Details</CardTitle>
-                <CardDescription className="text-slate-600 dark:text-slate-400">
-                  Additional contact information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="space-y-3">
+                {(contact?.firstName || contact?.lastName) && (
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
-                      <Calendar className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                      <UserCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                        {new Date(contact.createdAt).toLocaleDateString()}
+                        {[contact?.firstName, contact?.lastName].filter(Boolean).join(' ')}
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Date Added</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Full Name</p>
                     </div>
                   </div>
-                  
-                  {contact.consentDate && (
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                          {new Date(contact.consentDate).toLocaleDateString()}
-                        </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Consent Date</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {contact.consentMethod && (
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
-                        <CheckCircle2 className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 capitalize">
-                          {contact.consentMethod.replace('_', ' ')}
-                        </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Consent Method</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                )}
 
-            {/* Consent Status */}
-            <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
-              <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
-                <CardTitle className="text-lg text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Consent Status
-                </CardTitle>
-                <CardDescription className="text-slate-600 dark:text-slate-400">
-                  Marketing consent and compliance information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                    <CheckCircle2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <Badge
+                      variant={contact?.status === 'active' ? 'default' : 'secondary'}
+                      className={
+                        contact?.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                          contact?.status === 'unsubscribed' ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' :
+                            contact?.status === 'bounced' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                              contact?.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : ''
+                      }
+                    >
+                      {contact?.status}
+                    </Badge>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Status</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tags Section */}
+          <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
+            <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
+              <CardTitle className="text-lg text-slate-800 dark:text-slate-200">Current Tags</CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Tags assigned to this contact
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              {Array.isArray(contact?.tags) && contact.tags.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {contact.tags.map((tag: any) => (
+                    <Badge
+                      key={tag.id}
+                      variant="outline"
+                      style={{
+                        backgroundColor: `${tag.color}20`,
+                        borderColor: tag.color,
+                        color: tag.color
+                      }}
+                      className="border-2"
+                    >
+                      <Tag className="h-3 w-3 mr-1" />
+                      {tag.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 dark:text-slate-400">No tags assigned</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Lists Section */}
+          <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
+            <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
+              <CardTitle className="text-lg text-slate-800 dark:text-slate-200">Current Lists</CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Email lists this contact belongs to
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              {Array.isArray(contact?.lists) && contact.lists.length > 0 ? (
+                <div className="space-y-2">
+                  {contact.lists.map((list: any) => (
+                    <div key={list.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-50/50 dark:bg-slate-800/50">
+                      <div className="p-1 rounded bg-blue-100 dark:bg-blue-900/30">
+                        <Mail className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{list.name}</p>
+                        {list.description && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{list.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 dark:text-slate-400">Not subscribed to any lists</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Contact Details */}
+          <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
+            <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
+              <CardTitle className="text-lg text-slate-800 dark:text-slate-200">Contact Details</CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Additional contact information
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                    <Calendar className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                      {new Date(contact.createdAt).toLocaleDateString()}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Date Added</p>
+                  </div>
+                </div>
+
+                {contact.consentDate && (
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${contact.consentGiven ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
-                      <CheckCircle2 className={`h-4 w-4 ${contact.consentGiven ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} />
+                    <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                     </div>
                     <div>
-                      <p className={`text-sm font-medium ${contact.consentGiven ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
-                        {contact.consentGiven ? 'Consent Given' : 'No Consent'}
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                        {new Date(contact.consentDate).toLocaleDateString()}
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Marketing Permission</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Consent Date</p>
                     </div>
                   </div>
-                  
-                  {contact.consentIpAddress && (
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                        <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 font-mono">
-                          {contact.consentIpAddress}
-                        </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Consent IP Address</p>
-                      </div>
+                )}
+
+                {contact.consentMethod && (
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
+                      <CheckCircle2 className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                     </div>
-                  )}
-                  
-                  {!contact.consentGiven && (
-                    <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
-                          Compliance Warning
-                        </p>
-                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                          This contact has not given consent for marketing emails. Sending marketing content may violate regulations.
-                        </p>
-                      </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200 capitalize">
+                        {contact.consentMethod.replace('_', ' ')}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Consent Method</p>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Consent Status */}
+          <Card className="border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-200/20 dark:shadow-slate-900/20">
+            <CardHeader className="border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-white/50 to-slate-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
+              <CardTitle className="text-lg text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Consent Status
+              </CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Marketing consent and compliance information
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${contact.consentGiven ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                    <CheckCircle2 className={`h-4 w-4 ${contact.consentGiven ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} />
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium ${contact.consentGiven ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                      {contact.consentGiven ? 'Consent Given' : 'No Consent'}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Marketing Permission</p>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+
+                {contact.consentIpAddress && (
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                      <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200 font-mono">
+                        {contact.consentIpAddress}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Consent IP Address</p>
+                    </div>
+                  </div>
+                )}
+
+                {!contact.consentGiven && (
+                  <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
+                        Compliance Warning
+                      </p>
+                      <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                        This contact has not given consent for marketing emails. Sending marketing content may violate regulations.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
+      </div>
     </div>
   );
 }

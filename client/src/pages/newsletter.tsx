@@ -17,8 +17,11 @@ import {
   MoreVertical,
   Pencil,
   Loader2,
-  UserCog
+  UserCog,
+  ShieldCheck,
+  ClipboardCheck
 } from "lucide-react";
+import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
 import { Button } from "@/components/ui/button";
@@ -61,6 +64,8 @@ const getStatusBadge = (status: string) => {
       return <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800"><FileText className="h-3 w-3 mr-1" />Draft</Badge>;
     case 'ready_to_send':
       return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"><Send className="h-3 w-3 mr-1" />Ready to Send</Badge>;
+    case 'pending_review':
+      return <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800"><ShieldCheck className="h-3 w-3 mr-1" />Pending Review</Badge>;
     case 'scheduled':
       return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"><Clock className="h-3 w-3 mr-1" />Scheduled</Badge>;
     case 'sending':
@@ -81,6 +86,8 @@ export default function NewsletterPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { user } = useReduxAuth();
+  const currentUserId = (user as any)?.id;
 
   useSetBreadcrumbs([
     { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -99,6 +106,17 @@ export default function NewsletterPage() {
     refetchOnWindowFocus: true,
     retry: 2,
   });
+
+  // Fetch reviewer settings to know if reviewer workflow is enabled
+  const { data: reviewerSettings } = useQuery<{ enabled: boolean; reviewerId: string | null; reviewer: any }>({
+    queryKey: ['/api/newsletters/reviewer-settings'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/newsletters/reviewer-settings');
+      return response.json();
+    },
+  });
+
+  const reviewerEnabled = reviewerSettings?.enabled ?? false;
 
   const { data: emailDesign } = useQuery<{
     companyName?: string;
@@ -160,6 +178,28 @@ export default function NewsletterPage() {
     },
   });
 
+  // Submit for review mutation
+  const submitForReviewMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/submit-for-review`);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: "Submitted for Review",
+        description: data.message || "Newsletter has been submitted for reviewer approval."
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Submission Failed",
+        description: error.message || "Failed to submit newsletter for review",
+        variant: "destructive"
+      });
+    },
+  });
+
   const handleEditRecipientsSegmentSelected = async (segmentData: {
     segmentListId: string | null;
     recipientType: "all" | "selected" | "tags";
@@ -200,6 +240,7 @@ export default function NewsletterPage() {
   const stats = useMemo(() => ({
     total: newsletters.length,
     drafts: newsletters.filter(n => n.status === 'draft').length,
+    pendingReview: newsletters.filter(n => n.status === 'pending_review').length,
     scheduled: newsletters.filter(n => n.status === 'scheduled').length,
     sent: newsletters.filter(n => n.status === 'sent').length,
   }), [newsletters]);
@@ -300,7 +341,7 @@ export default function NewsletterPage() {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-2 ${stats.pendingReview > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
           <button
             onClick={() => setStatusFilter("all")}
             className={`rounded-xl border p-4 text-left transition-all hover:shadow-md ${statusFilter === 'all' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-500' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
@@ -321,6 +362,18 @@ export default function NewsletterPage() {
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Drafts</p>
           </button>
+          {stats.pendingReview > 0 && (
+            <button
+              onClick={() => setStatusFilter(statusFilter === "pending_review" ? "all" : "pending_review")}
+              className={`rounded-xl border p-4 text-left transition-all hover:shadow-md ${statusFilter === 'pending_review' ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30 ring-1 ring-orange-500' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
+            >
+              <div className="flex items-center justify-between">
+                <ShieldCheck className="h-5 w-5 text-orange-500" />
+                <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.pendingReview}</span>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Pending Review</p>
+            </button>
+          )}
           <button
             onClick={() => setStatusFilter(statusFilter === "scheduled" ? "all" : "scheduled")}
             className={`rounded-xl border p-4 text-left transition-all hover:shadow-md ${statusFilter === 'scheduled' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-500' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
@@ -394,9 +447,12 @@ export default function NewsletterPage() {
               const isDraft = newsletter.status === 'draft';
               const isSent = newsletter.status === 'sent';
               const isReadyToSend = newsletter.status === 'ready_to_send';
+              const isPendingReview = newsletter.status === 'pending_review';
+              const isCurrentUserReviewer = newsletter.reviewerId === currentUserId;
 
               const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
               const isDeploying = deployMutation.isPending && deployMutation.variables === newsletter.id;
+              const isSubmittingForReview = submitForReviewMutation.isPending && submitForReviewMutation.variables === newsletter.id;
 
               if (isDeleting) {
                 return (
@@ -419,9 +475,10 @@ export default function NewsletterPage() {
                   {/* Status color bar at top */}
                   <div className={`h-1 w-full ${newsletter.status === 'sent' ? 'bg-green-500' :
                     newsletter.status === 'ready_to_send' ? 'bg-blue-500' :
-                      newsletter.status === 'scheduled' ? 'bg-blue-500' :
-                        newsletter.status === 'sending' ? 'bg-purple-500' :
-                          'bg-amber-400'
+                      newsletter.status === 'pending_review' ? 'bg-orange-500' :
+                        newsletter.status === 'scheduled' ? 'bg-blue-500' :
+                          newsletter.status === 'sending' ? 'bg-purple-500' :
+                            'bg-amber-400'
                     }`} />
 
                   <CardContent className="p-5">
@@ -487,6 +544,29 @@ export default function NewsletterPage() {
                                 >
                                   <Send className="h-4 w-4 mr-2" />
                                   {isDeploying ? "Sending..." : "Send Now"}
+                                </DropdownMenuItem>
+                              )}
+                              {reviewerEnabled && (isDraft || isReadyToSend) && !isPendingReview && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    submitForReviewMutation.mutate(newsletter.id);
+                                  }}
+                                  disabled={isSubmittingForReview}
+                                >
+                                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                                  {isSubmittingForReview ? "Submitting..." : "Submit for Review"}
+                                </DropdownMenuItem>
+                              )}
+                              {isPendingReview && isCurrentUserReviewer && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setLocation(`/newsletters/${newsletter.id}`);
+                                  }}
+                                >
+                                  <ShieldCheck className="h-4 w-4 mr-2" />
+                                  Review Newsletter
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuSeparator />

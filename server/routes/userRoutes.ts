@@ -128,20 +128,39 @@ userRoutes.get("/", authenticateToken, requireRole(['Owner', 'Administrator', 'M
 // Create new user
 userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
   try {
-    const userData = {
-      ...req.body,
-      tenantId: req.user.tenantId
-    };
+    const tenantId = req.user.tenantId;
 
-    const user = await storage.createUser(userData);
+    // Validate user limits before creating
+    try {
+      await storage.validateUserCreation(tenantId);
+    } catch (limitError: any) {
+      return res.status(403).json({ message: limitError.message });
+    }
+
+    // Check for duplicate email within the tenant
+    const existingUser = await storage.getUserByEmail(req.body.email, tenantId);
+    if (existingUser) {
+      return res.status(400).json({ message: "User's email is already registered" });
+    }
+
+    const user = await storage.createUserAsAdmin(req.body, tenantId);
 
     res.status(201).json({
       message: 'User created successfully',
       user
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create user error:', error);
-    res.status(500).json({ message: 'Failed to create user' });
+
+    // Handle PostgreSQL duplicate key error (including Drizzle-wrapped errors)
+    const dbError = error?.cause ?? error;
+    if (dbError?.code === '23505' && dbError?.constraint_name === 'better_auth_user_email_unique') {
+      return res.status(400).json({ 
+        message: "User's email is already registered" 
+      });
+    }
+    
+    res.status(500).json({ message: error.message || 'Failed to create user' });
   }
 });
 

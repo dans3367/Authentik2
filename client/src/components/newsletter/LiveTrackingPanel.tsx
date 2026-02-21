@@ -21,7 +21,9 @@ import {
   TrendingUp,
   Mail,
   ShieldOff,
+  Info,
 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface LiveTrackingPanelProps {
   newsletterId: string;
@@ -162,10 +164,10 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
 
       {/* Secondary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={AlertTriangle} label="Bounced" value={stats.bounced} color="text-orange-500" small />
-        <StatCard icon={ShieldOff} label="Suppressed" value={stats.suppressed ?? 0} color="text-yellow-600" small />
-        <StatCard icon={XCircle} label="Failed" value={stats.failed} color="text-red-500" small />
-        <StatCard icon={XCircle} label="Complained" value={stats.complained} color="text-red-600" small />
+        <StatCard icon={AlertTriangle} label="Bounced" value={stats.bounced} color="text-orange-500" small tooltip="Emails that were rejected by the recipient's mail server. This can happen due to invalid addresses or full mailboxes." />
+        <StatCard icon={ShieldOff} label="Suppressed" value={stats.suppressed ?? 0} color="text-yellow-600" small tooltip="Emails that were not sent because the recipient was on a suppression list due to previous bounces or complaints." />
+        <StatCard icon={XCircle} label="Failed" value={stats.failed} color="text-red-500" small tooltip="Emails that could not be processed or sent due to a system or delivery error." />
+        <StatCard icon={XCircle} label="Complained" value={stats.complained} color="text-red-600" small tooltip="Recipients who marked the email as spam or junk in their email client." />
       </div>
 
       {/* Live Event Feed */}
@@ -218,23 +220,37 @@ function StatCard({
   value,
   color,
   small,
+  tooltip,
 }: {
   icon: typeof Send;
   label: string;
   value: number;
   color: string;
   small?: boolean;
+  tooltip?: string;
 }) {
   return (
     <Card>
       <CardContent className={small ? "p-3" : "p-4"}>
         <div className="flex items-center gap-2">
           <Icon className={`${small ? "h-3.5 w-3.5" : "h-4 w-4"} ${color}`} />
-          <div>
+          <div className="flex-1 min-w-0">
             <p className={`${small ? "text-lg" : "text-2xl"} font-bold`}>
               {value.toLocaleString()}
             </p>
-            <p className="text-xs text-muted-foreground">{label}</p>
+            <div className="flex items-center gap-1">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              {tooltip && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground/60 hover:text-muted-foreground cursor-help transition-colors" />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[220px] text-xs">
+                    {tooltip}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           </div>
         </div>
       </CardContent>

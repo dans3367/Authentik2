@@ -59,7 +59,7 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
         });
 
         // Dual-write to Axiom (fire-and-forget, never blocks)
-        logActivityToAxiom(params).catch(() => {});
+        logActivityToAxiom(params).catch(() => { });
     } catch (error) {
         // Log error but don't throw - activity logging should never break main flows
         console.error('[ActivityLogger] Failed to log activity:', error);
@@ -132,4 +132,18 @@ export const USER_TRACKED_FIELDS = [
     'email',
     'role',
     'isActive',
+];
+
+/**
+ * Fields to track for newsletter entity updates
+ */
+export const NEWSLETTER_TRACKED_FIELDS = [
+    'title',
+    'subject',
+    'status',
+    'scheduledAt',
+    'recipientType',
+    'selectedContactIds',
+    'selectedTagIds',
+    'recipientCount',
 ];

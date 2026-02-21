@@ -3,12 +3,13 @@ import { db } from '../db';
 import { sql, eq, ne, and, like, desc, inArray } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { authenticateInternalService } from '../middleware/internal-service-auth';
-import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
+import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, newsletterTaskStatus, newsletterReviewerSettings, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { sanitizeEmailHtml } from './emailManagementRoutes';
 import { emailService, enhancedEmailService } from '../emailService';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 import { initNewsletterTracking, trackNewsletterEmailSend } from '../utils/convexNewsletterTracker';
+import { logActivity, computeChanges, NEWSLETTER_TRACKED_FIELDS } from '../utils/activityLogger';
 // Temporal service removed - now using server-node proxy
 import crypto from 'crypto';
 
@@ -277,6 +278,18 @@ newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (
 
     console.log(`[Newsletter Preview] Triggered send-newsletter-preview task (run: ${handle.id}) to ${to}`);
 
+    // Log activity: preview email sent
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityName: subject,
+      activityType: 'preview_sent',
+      description: `Sent preview email to ${normalizedTo}`,
+      metadata: { to: normalizedTo, subject, runId: handle.id },
+      req,
+    });
+
     res.json({
       message: 'Preview email queued successfully',
       to,
@@ -316,7 +329,7 @@ newsletterRoutes.get("/", authenticateToken, requireTenant, async (req: any, res
     const { page = 1, limit = 50, search, status } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = sql`${newsletters.tenantId} = ${req.user.tenantId}`;
+    let whereClause = sql`${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`;
 
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
@@ -359,15 +372,164 @@ newsletterRoutes.get("/", authenticateToken, requireTenant, async (req: any, res
   }
 });
 
+// ─── Newsletter Reviewer Settings Routes ────────────────────────────────────
+// IMPORTANT: These must be defined BEFORE /:id to avoid Express matching
+// "/reviewer-settings" as a newsletter ID parameter.
+
+// Get tenant reviewer settings
+newsletterRoutes.get("/reviewer-settings", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    const settings = await db.query.newsletterReviewerSettings.findFirst({
+      where: eq(newsletterReviewerSettings.tenantId, tenantId),
+    });
+
+    if (!settings) {
+      // Return defaults if no settings exist yet
+      return res.json({
+        enabled: false,
+        reviewerId: null,
+        reviewer: null,
+      });
+    }
+
+    // Fetch reviewer details if set
+    let reviewer = null;
+    if (settings.reviewerId) {
+      const reviewerUser = await db.query.betterAuthUser.findFirst({
+        where: and(
+          eq(betterAuthUser.id, settings.reviewerId),
+          eq(betterAuthUser.tenantId, tenantId)
+        ),
+        columns: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          name: true,
+          role: true,
+          avatarUrl: true,
+        },
+      });
+      reviewer = reviewerUser || null;
+    }
+
+    res.json({
+      enabled: settings.enabled,
+      reviewerId: settings.reviewerId,
+      reviewer,
+    });
+  } catch (error) {
+    console.error('Get reviewer settings error:', error);
+    res.status(500).json({ message: 'Failed to get reviewer settings' });
+  }
+});
+
+// Update tenant reviewer settings
+newsletterRoutes.put("/reviewer-settings", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { enabled, reviewerId } = req.body;
+
+    // Only owners/admins can manage reviewer settings
+    if (!['Owner', 'Administrator'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Only owners and administrators can manage reviewer settings' });
+    }
+
+    // If enabling, validate reviewer exists and belongs to tenant
+    if (enabled && reviewerId) {
+      const reviewerUser = await db.query.betterAuthUser.findFirst({
+        where: and(
+          eq(betterAuthUser.id, reviewerId),
+          eq(betterAuthUser.tenantId, tenantId)
+        ),
+      });
+
+      if (!reviewerUser) {
+        return res.status(400).json({ message: 'Selected reviewer not found in your organization' });
+      }
+    }
+
+    // Upsert settings
+    const existing = await db.query.newsletterReviewerSettings.findFirst({
+      where: eq(newsletterReviewerSettings.tenantId, tenantId),
+    });
+
+    let result;
+    if (existing) {
+      const [updated] = await db.update(newsletterReviewerSettings)
+        .set({
+          enabled: enabled ?? existing.enabled,
+          reviewerId: reviewerId !== undefined ? (reviewerId || null) : existing.reviewerId,
+          updatedAt: new Date(),
+        })
+        .where(eq(newsletterReviewerSettings.tenantId, tenantId))
+        .returning();
+      result = updated;
+    } else {
+      const [inserted] = await db.insert(newsletterReviewerSettings)
+        .values({
+          tenantId,
+          enabled: enabled ?? false,
+          reviewerId: reviewerId || null,
+        })
+        .returning();
+      result = inserted;
+    }
+
+    // Fetch reviewer details for response
+    let reviewer = null;
+    if (result.reviewerId) {
+      const reviewerUser = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.id, result.reviewerId),
+        columns: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          name: true,
+          role: true,
+          avatarUrl: true,
+        },
+      });
+      reviewer = reviewerUser || null;
+    }
+
+    // Log activity
+    await logActivity({
+      tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: result.id,
+      entityName: 'Newsletter Reviewer Settings',
+      activityType: 'updated',
+      description: `${enabled ? 'Enabled' : 'Disabled'} newsletter reviewer approval${reviewer ? ` with reviewer ${reviewer.email}` : ''}`,
+      metadata: { enabled, reviewerId: result.reviewerId },
+      req,
+    });
+
+    res.json({
+      enabled: result.enabled,
+      reviewerId: result.reviewerId,
+      reviewer,
+    });
+  } catch (error) {
+    console.error('Update reviewer settings error:', error);
+    res.status(500).json({ message: 'Failed to update reviewer settings' });
+  }
+});
+
 // Get specific newsletter
 newsletterRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
       with: {
-        user: true
+        user: true,
+        reviewer: true
       }
     });
 
@@ -387,7 +549,7 @@ newsletterRoutes.get("/:id/recipients", authenticateToken, requireTenant, async 
     const { id } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
     });
 
     if (!newsletter) {
@@ -449,6 +611,19 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, re
       clickCount: 0,
     } as any).returning();
 
+    // Log activity: newsletter created
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: userRecord.id,
+      entityType: 'newsletter',
+      entityId: newNewsletter[0].id,
+      entityName: sanitizedTitle,
+      activityType: 'created',
+      description: `Created newsletter "${sanitizedTitle}"`,
+      metadata: { subject: sanitizedSubject, status: status || 'draft' },
+      req,
+    });
+
     res.status(201).json(newNewsletter[0]);
   } catch (error) {
     console.error('Create newsletter error:', error);
@@ -461,7 +636,7 @@ newsletterRoutes.post("/:id/clone", authenticateToken, requireTenant, async (req
     const { id } = req.params;
 
     const source = await db.query.newsletters.findFirst({
-      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
     });
 
     if (!source) {
@@ -491,6 +666,19 @@ newsletterRoutes.post("/:id/clone", authenticateToken, requireTenant, async (req
       clickCount: 0,
     } as any).returning();
 
+    // Log activity: newsletter cloned
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: userRecord.id,
+      entityType: 'newsletter',
+      entityId: cloned[0].id,
+      entityName: `${source.title} (Copy)`,
+      activityType: 'created',
+      description: `Cloned newsletter from "${source.title}"`,
+      metadata: { sourceNewsletterId: source.id, sourceTitle: source.title },
+      req,
+    });
+
     res.status(201).json(cloned[0]);
   } catch (error) {
     console.error("Clone newsletter error:", error);
@@ -506,7 +694,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
     const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds } = validatedData;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
       with: {
         user: true
       }
@@ -561,6 +749,21 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
       .where(sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`)
       .returning();
 
+    // Log activity: newsletter updated (compute changed fields)
+    const changes = computeChanges(newsletter as Record<string, any>, updateData, NEWSLETTER_TRACKED_FIELDS);
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: updatedNewsletter[0]?.title || newsletter.title,
+      activityType: 'updated',
+      description: `Updated newsletter "${updatedNewsletter[0]?.title || newsletter.title}"`,
+      changes: changes || undefined,
+      metadata: { fieldsChanged: changes ? Object.keys(changes) : [] },
+      req,
+    });
+
     res.json(updatedNewsletter[0]);
   } catch (error) {
     console.error('Update newsletter error:', error);
@@ -568,13 +771,13 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
   }
 });
 
-// Delete newsletter
+// Delete newsletter (soft delete — preserves analytics and task data)
 newsletterRoutes.delete("/:id", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
       with: {
         user: true
       }
@@ -584,9 +787,34 @@ newsletterRoutes.delete("/:id", authenticateToken, requireTenant, async (req: an
       return res.status(404).json({ message: 'Newsletter not found' });
     }
 
-    // Delete newsletter
-    await db.delete(newsletters)
-      .where(sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`);
+    // Log activity: newsletter deleted
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'deleted',
+      description: `Deleted newsletter "${newsletter.title}"`,
+      metadata: {
+        subject: newsletter.subject,
+        status: newsletter.status,
+        recipientCount: newsletter.recipientCount,
+        sentAt: newsletter.sentAt,
+      },
+      req,
+    });
+
+    if (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') {
+      // Hard delete: drafts have no analytics or send history to preserve
+      await db.delete(newsletters)
+        .where(sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`);
+    } else {
+      // Soft delete: preserve the row for analytics and task data
+      await db.update(newsletters)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`);
+    }
 
     res.json({ message: 'Newsletter deleted successfully' });
   } catch (error) {
@@ -602,7 +830,7 @@ newsletterRoutes.get("/:id/detailed-stats", authenticateToken, requireTenant, as
     const { id } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
       with: {
         user: true
       }
@@ -671,7 +899,7 @@ newsletterRoutes.get("/:id/task-status", authenticateToken, requireTenant, async
     const { id } = req.params;
 
     const newsletter = await db.query.newsletters.findFirst({
-      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`,
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
       with: {
         user: true
       }
@@ -730,6 +958,18 @@ newsletterRoutes.put("/:id/status", authenticateInternalService, async (req: any
     }
 
     console.log(`[Newsletter] Successfully updated newsletter ${id} status to: ${status}`);
+
+    // Log activity: internal status update
+    await logActivity({
+      tenantId: updatedNewsletter[0].tenantId,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: updatedNewsletter[0].title,
+      activityType: 'status_changed',
+      description: `Newsletter "${updatedNewsletter[0].title}" status changed to ${status} (internal)`,
+      metadata: { status, source: 'internal_service', ...(metadata || {}) },
+    });
+
     res.json({
       message: 'Newsletter status updated successfully',
       newsletter: updatedNewsletter[0]
@@ -754,8 +994,23 @@ newsletterRoutes.post("/:id/log", authenticateInternalService, async (req: any, 
       source: 'temporal-server'
     });
 
-    // Here you could store activity logs in a separate table if needed
-    // For now, we just log to console and return success
+    // Fetch the newsletter to get tenantId and title
+    const newsletter = await db.query.newsletters.findFirst({
+      where: eq(newsletters.id, id),
+      columns: { tenantId: true, title: true },
+    });
+
+    if (newsletter) {
+      await logActivity({
+        tenantId: newsletter.tenantId,
+        entityType: 'newsletter',
+        entityId: id,
+        entityName: newsletter.title,
+        activityType: activity,
+        description: `${activity} — ${newsletter.title}`,
+        metadata: { details, source: 'temporal-server', timestamp },
+      });
+    }
 
     res.json({
       message: 'Newsletter activity logged successfully',
@@ -944,6 +1199,26 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
       return res.status(400).json({ message: 'Newsletter has already been sent' });
     }
 
+    if (newsletter.status === 'pending_review') {
+      return res.status(400).json({ message: 'Newsletter is pending reviewer approval and cannot be sent yet' });
+    }
+
+    // Check if reviewer approval is required but not yet obtained (per-newsletter flag)
+    if (newsletter.requiresReviewerApproval && newsletter.reviewStatus !== 'approved') {
+      return res.status(400).json({ message: 'Newsletter requires reviewer approval before it can be sent' });
+    }
+
+    // Check tenant-level reviewer settings: when enabled, ALL unsent newsletters must be reviewed
+    const reviewerSettings = await db.query.newsletterReviewerSettings.findFirst({
+      where: eq(newsletterReviewerSettings.tenantId, req.user.tenantId),
+    });
+    if (reviewerSettings?.enabled && newsletter.reviewStatus !== 'approved') {
+      return res.status(400).json({
+        message: 'Newsletter reviewer approval is required. Please submit this newsletter for review before sending.',
+        requiresReview: true,
+      });
+    }
+
     // If test email is provided, send test email
     if (testEmail) {
       try {
@@ -977,6 +1252,22 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         updatedAt: new Date(),
       })
       .where(eq(newsletters.id, id));
+
+    // Log activity: newsletter send initiated
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'sent',
+      description: `Started sending newsletter "${newsletter.title}"`,
+      metadata: {
+        subject: newsletter.subject,
+        recipientType: newsletter.recipientType,
+      },
+      req,
+    });
 
     try {
       // Generate unique group UUID for tracking
@@ -1271,6 +1562,21 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         })
         .where(eq(newsletters.id, id));
 
+      // Log activity: send failure
+      await logActivity({
+        tenantId: req.user.tenantId,
+        userId: req.user.id,
+        entityType: 'newsletter',
+        entityId: id,
+        entityName: newsletter.title,
+        activityType: 'failed',
+        description: `Failed to send newsletter "${newsletter.title}"`,
+        metadata: {
+          error: sendError instanceof Error ? sendError.message : 'Unknown error',
+        },
+        req,
+      });
+
       res.status(500).json({
         message: 'Failed to create temporal workflow for newsletter sending',
         error: sendError instanceof Error ? sendError.message : 'Unknown error'
@@ -1279,6 +1585,58 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
   } catch (error) {
     console.error('Send newsletter error:', error);
     res.status(500).json({ message: 'Failed to send newsletter' });
+  }
+});
+
+// Internal endpoint: Complete analytics collection (called by Trigger.dev completeAnalyticsCollectionTask)
+newsletterRoutes.put('/internal/:id/complete-analytics', authenticateInternalService, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { tenantId, taskType, status: taskStatus, progress, completedAt } = req.body;
+
+    console.log(`[Newsletter Internal] Completing analytics collection for newsletter ${id}`);
+
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId is required' });
+    }
+
+    // Find the analytics task for this newsletter
+    const analyticsTask = await db.query.newsletterTaskStatus.findFirst({
+      where: and(
+        eq(newsletterTaskStatus.newsletterId, id),
+        eq(newsletterTaskStatus.tenantId, tenantId),
+        eq(newsletterTaskStatus.taskType, 'analytics')
+      ),
+    });
+
+    if (!analyticsTask) {
+      console.log(`[Newsletter Internal] No analytics task found for newsletter ${id}, creating one`);
+      await db.insert(newsletterTaskStatus).values({
+        newsletterId: id,
+        tenantId,
+        taskType: 'analytics',
+        taskName: 'Analytics Collection',
+        status: taskStatus || 'completed',
+        progress: progress || 100,
+        completedAt: completedAt ? new Date(completedAt) : new Date(),
+      });
+    } else {
+      // Update existing analytics task status
+      await db.update(newsletterTaskStatus)
+        .set({
+          status: taskStatus || 'completed',
+          progress: progress || 100,
+          completedAt: completedAt ? new Date(completedAt) : new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(newsletterTaskStatus.id, analyticsTask.id));
+    }
+
+    console.log(`[Newsletter Internal] Analytics collection marked as completed for newsletter ${id}`);
+    res.json({ success: true, newsletterId: id, taskType: 'analytics', status: 'completed' });
+  } catch (error) {
+    console.error('[Newsletter Internal] Complete analytics error:', error);
+    res.status(500).json({ error: 'Failed to complete analytics collection' });
   }
 });
 
@@ -1420,5 +1778,285 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
       success: false,
       error: error instanceof Error ? error.message : 'Internal server error'
     });
+  }
+});
+
+// Submit newsletter for review
+newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${tenantId} AND ${newsletters.deletedAt} IS NULL`,
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    if (newsletter.status !== 'draft' && newsletter.status !== 'ready_to_send') {
+      return res.status(400).json({ message: 'Newsletter must be in draft or ready_to_send status to submit for review' });
+    }
+
+    // Get reviewer settings
+    const settings = await db.query.newsletterReviewerSettings.findFirst({
+      where: eq(newsletterReviewerSettings.tenantId, tenantId),
+    });
+
+    if (!settings?.enabled || !settings?.reviewerId) {
+      return res.status(400).json({ message: 'Newsletter reviewer is not configured for this organization' });
+    }
+
+    // Generate a random 5-digit numeric approval code
+    const approvalCode = String(Math.floor(10000 + Math.random() * 90000));
+
+    // Update newsletter status
+    const [updated] = await db.update(newsletters)
+      .set({
+        status: 'pending_review',
+        requiresReviewerApproval: true,
+        reviewerId: settings.reviewerId,
+        reviewStatus: 'pending',
+        reviewedAt: null,
+        reviewNotes: null,
+        reviewerApprovalCode: approvalCode,
+        updatedAt: new Date(),
+      })
+      .where(eq(newsletters.id, id))
+      .returning();
+
+    // Log activity
+    await logActivity({
+      tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'submitted_for_review',
+      description: `Submitted newsletter "${newsletter.title}" for review`,
+      metadata: { reviewerId: settings.reviewerId },
+      req,
+    });
+
+    // Trigger review notification email to the reviewer
+    try {
+      // Fetch reviewer details
+      const reviewer = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.id, settings.reviewerId),
+        columns: { id: true, email: true, firstName: true, lastName: true, name: true },
+      });
+
+      if (reviewer?.email) {
+        const submitterName = [req.user.firstName, req.user.lastName].filter(Boolean).join(' ') || req.user.name || req.user.email;
+        const reviewerName = [reviewer.firstName, reviewer.lastName].filter(Boolean).join(' ') || reviewer.name || reviewer.email;
+
+        const { sendReviewNotificationTask } = await import('../../src/trigger/newsletterReviewNotification');
+        await sendReviewNotificationTask.trigger({
+          newsletterId: id,
+          newsletterTitle: newsletter.title,
+          newsletterSubject: newsletter.subject,
+          newsletterContent: newsletter.content,
+          tenantId,
+          submitterName,
+          submitterEmail: req.user.email,
+          reviewerEmail: reviewer.email,
+          reviewerName,
+          submittedAt: new Date().toISOString(),
+          approvalCode,
+        });
+        console.log(`[Newsletter] Review notification triggered for reviewer ${reviewer.email}`);
+      }
+    } catch (notifError) {
+      // Non-fatal: don't block the submission if notification fails
+      console.error('[Newsletter] Failed to trigger review notification:', notifError);
+    }
+
+    res.json({ message: 'Newsletter submitted for review', newsletter: updated });
+  } catch (error) {
+    console.error('Submit for review error:', error);
+    res.status(500).json({ message: 'Failed to submit newsletter for review' });
+  }
+});
+
+// Approve newsletter (requires 5-digit approval code verification)
+newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { notes, approvalCode } = req.body;
+    const tenantId = req.user.tenantId;
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${tenantId} AND ${newsletters.deletedAt} IS NULL`,
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    if (newsletter.status !== 'pending_review') {
+      return res.status(400).json({ message: 'Newsletter is not pending review' });
+    }
+
+    // Check that the current user is the assigned reviewer
+    if (newsletter.reviewerId !== req.user.id) {
+      return res.status(403).json({ message: 'Only the assigned reviewer can approve this newsletter' });
+    }
+
+    // Verify the 5-digit approval code
+    if (!approvalCode || String(approvalCode).trim() !== String(newsletter.reviewerApprovalCode)) {
+      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
+    }
+
+    const [updated] = await db.update(newsletters)
+      .set({
+        status: 'ready_to_send',
+        reviewStatus: 'approved',
+        reviewedAt: new Date(),
+        reviewNotes: notes || null,
+        reviewerApprovalCode: null, // Clear the code after use
+        updatedAt: new Date(),
+      })
+      .where(eq(newsletters.id, id))
+      .returning();
+
+    // Log activity
+    await logActivity({
+      tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'approved',
+      description: `Approved newsletter "${newsletter.title}"`,
+      metadata: { reviewStatus: 'approved', reviewNotes: notes },
+      req,
+    });
+
+    res.json({ message: 'Newsletter approved', newsletter: updated });
+  } catch (error) {
+    console.error('Approve newsletter error:', error);
+    res.status(500).json({ message: 'Failed to approve newsletter' });
+  }
+});
+
+// Approve & Send newsletter in one step (reviewer enters code via email link)
+newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { approvalCode } = req.body;
+    const tenantId = req.user.tenantId;
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${tenantId} AND ${newsletters.deletedAt} IS NULL`,
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    if (newsletter.status !== 'pending_review') {
+      return res.status(400).json({ message: 'Newsletter is not pending review' });
+    }
+
+    // Check that the current user is the assigned reviewer
+    if (newsletter.reviewerId !== req.user.id) {
+      return res.status(403).json({ message: 'Only the assigned reviewer can approve this newsletter' });
+    }
+
+    // Verify the 5-digit approval code
+    if (!approvalCode || String(approvalCode).trim() !== String(newsletter.reviewerApprovalCode)) {
+      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
+    }
+
+    // Approve the newsletter
+    const [updated] = await db.update(newsletters)
+      .set({
+        status: 'ready_to_send',
+        reviewStatus: 'approved',
+        reviewedAt: new Date(),
+        reviewerApprovalCode: null, // Clear the code after use
+        updatedAt: new Date(),
+      })
+      .where(eq(newsletters.id, id))
+      .returning();
+
+    // Log activity
+    await logActivity({
+      tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'approved_and_sent',
+      description: `Approved and initiated send for newsletter "${newsletter.title}"`,
+      metadata: { reviewStatus: 'approved' },
+      req,
+    });
+
+    res.json({ message: 'Newsletter approved and ready to send', newsletter: updated, sendReady: true });
+  } catch (error) {
+    console.error('Approve and send newsletter error:', error);
+    res.status(500).json({ message: 'Failed to approve and send newsletter' });
+  }
+});
+
+// Reject newsletter
+newsletterRoutes.post("/:id/reject", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const tenantId = req.user.tenantId;
+
+    if (!notes) {
+      return res.status(400).json({ message: 'Rejection notes are required' });
+    }
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${tenantId} AND ${newsletters.deletedAt} IS NULL`,
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    if (newsletter.status !== 'pending_review') {
+      return res.status(400).json({ message: 'Newsletter is not pending review' });
+    }
+
+    // Check that the current user is the assigned reviewer
+    if (newsletter.reviewerId !== req.user.id) {
+      return res.status(403).json({ message: 'Only the assigned reviewer can reject this newsletter' });
+    }
+
+    const [updated] = await db.update(newsletters)
+      .set({
+        status: 'draft', // Send back to draft for edits
+        reviewStatus: 'rejected',
+        reviewedAt: new Date(),
+        reviewNotes: notes,
+        reviewerApprovalCode: null, // Invalidate the code on rejection
+        updatedAt: new Date(),
+      })
+      .where(eq(newsletters.id, id))
+      .returning();
+
+    // Log activity
+    await logActivity({
+      tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'rejected',
+      description: `Rejected newsletter "${newsletter.title}"`,
+      metadata: { reviewStatus: 'rejected', reviewNotes: notes },
+      req,
+    });
+
+    res.json({ message: 'Newsletter rejected', newsletter: updated });
+  } catch (error) {
+    console.error('Reject newsletter error:', error);
+    res.status(500).json({ message: 'Failed to reject newsletter' });
   }
 });

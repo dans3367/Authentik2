@@ -163,7 +163,7 @@ export function CustomerSegmentationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl w-[95vw] h-[85vh] sm:h-[90vh] lg:h-[94vh] max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5">
             <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
@@ -176,8 +176,8 @@ export function CustomerSegmentationModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col space-y-4">
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col space-y-4 px-3 sm:px-4 pb-2">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <TabsList className="grid w-full grid-cols-3 bg-muted/50">
               <TabsTrigger value="all" className="flex items-center gap-2 text-sm">
                 <Users className="h-4 w-4" />
@@ -194,7 +194,7 @@ export function CustomerSegmentationModal({
             </TabsList>
 
             {/* ─── ALL CUSTOMERS TAB ─── */}
-            <TabsContent value="all" className="flex-1 mt-0 pt-4">
+            <TabsContent value="all" className="flex-1 min-h-0 mt-0 pt-4 overflow-y-auto">
               <div className="flex flex-col items-center justify-center py-10">
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-full mb-5">
                   <Users className="h-10 w-10 text-blue-500 dark:text-blue-400" />
@@ -215,7 +215,7 @@ export function CustomerSegmentationModal({
             </TabsContent>
 
             {/* ─── SELECT CUSTOMERS TAB ─── */}
-            <TabsContent value="selected" className="flex-1 overflow-hidden mt-0 pt-4">
+            <TabsContent value="selected" className="flex-1 min-h-0 overflow-hidden mt-0 pt-4 px-1">
               <div className="flex flex-col h-full space-y-3">
                 {tempSelectedContacts.length === contacts.length && contacts.length > 0 && (
                   <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/50 rounded-lg p-3">
@@ -226,7 +226,7 @@ export function CustomerSegmentationModal({
                   </div>
                 )}
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
                     <Input
@@ -236,7 +236,7 @@ export function CustomerSegmentationModal({
                       className="pl-9 h-9 text-sm"
                     />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 w-full sm:w-auto">
                     <Button
                       variant="outline"
                       size="sm"
@@ -356,9 +356,9 @@ export function CustomerSegmentationModal({
             </TabsContent>
 
             {/* ─── SELECT BY TAGS TAB ─── */}
-            <TabsContent value="tags" className="flex-1 overflow-hidden mt-0 pt-4">
+            <TabsContent value="tags" className="flex-1 min-h-0 overflow-hidden mt-0 pt-4 px-1">
               <div className="flex flex-col h-full space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
                     <Input

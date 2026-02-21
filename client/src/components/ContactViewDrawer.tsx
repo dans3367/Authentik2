@@ -34,7 +34,8 @@ import {
   Eye,
   Send,
   TrendingUp,
-  Clock
+  Clock,
+  Cake
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -65,6 +66,7 @@ interface Contact {
   zipCode?: string | null;
   country?: string | null;
   phoneNumber?: string | null;
+  dateOfBirth?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -382,7 +384,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                       </div>
 
                       {/* Address Information */}
-                      {(contact.address || contact.city || contact.state || contact.zipCode || contact.country || contact.phoneNumber) && (
+                      {(contact.address || contact.city || contact.state || contact.zipCode || contact.country || contact.phoneNumber || contact.dateOfBirth) && (
                         <>
                           <Separator />
                           <div className="space-y-3">
@@ -427,12 +429,30 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                               )}
                             </div>
 
-                            {contact.phoneNumber && (
-                              <div>
-                                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Phone Number</label>
-                                <p className="text-gray-900 dark:text-white font-mono text-sm">{contact.phoneNumber}</p>
-                              </div>
-                            )}
+                            <div className="grid grid-cols-2 gap-4">
+                              {contact.phoneNumber && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Phone Number</label>
+                                  <p className="text-gray-900 dark:text-white font-mono text-sm">{contact.phoneNumber}</p>
+                                </div>
+                              )}
+
+                              {contact.dateOfBirth && (
+                                <div>
+                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                                    <Cake className="w-3.5 h-3.5" />
+                                    Customer's Date of Birth
+                                  </label>
+                                  <p className="text-gray-900 dark:text-white">
+                                    {new Date(contact.dateOfBirth + 'T00:00:00').toLocaleDateString("en-US", {
+                                      month: "long",
+                                      day: "numeric",
+                                      year: "numeric"
+                                    })}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </>
                       )}
