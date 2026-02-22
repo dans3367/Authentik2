@@ -33,7 +33,10 @@ import {
   ClipboardCheck,
   MessageSquare,
   KeyRound,
-  Hash
+  Hash,
+  Smile,
+  ThumbsUp,
+  ThumbsDown
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,6 +61,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { LiveTrackingPanel } from "@/components/newsletter/LiveTrackingPanel";
+import { ReactionInsightsSection } from "@/components/newsletter/ReactionInsightsSection";
 import { useNewsletterStats } from "@/hooks/useNewsletterTracking";
 import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
 
@@ -1117,11 +1121,15 @@ export default function NewsletterViewPage() {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 lg:space-y-8">
           <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-5 min-w-max">
+            <TabsList className="grid w-full grid-cols-6 min-w-max">
               <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-overview">Overview</TabsTrigger>
               <TabsTrigger value="live-tracking" className="text-xs sm:text-sm" data-testid="tab-live-tracking">
                 <Activity className="h-3 w-3 mr-1" />
                 Live
+              </TabsTrigger>
+              <TabsTrigger value="reactions" className="text-xs sm:text-sm" data-testid="tab-reactions">
+                <Smile className="h-3 w-3 mr-1" />
+                Reactions
               </TabsTrigger>
               <TabsTrigger value="content" className="text-xs sm:text-sm" data-testid="tab-content">Content</TabsTrigger>
               <TabsTrigger value="status" className="text-xs sm:text-sm" data-testid="tab-status">Task Status</TabsTrigger>
@@ -1131,6 +1139,10 @@ export default function NewsletterViewPage() {
 
           <TabsContent value="live-tracking" className="space-y-6 lg:space-y-8">
             <LiveTrackingPanel newsletterId={newsletter.id} />
+          </TabsContent>
+
+          <TabsContent value="reactions" className="space-y-6 lg:space-y-8">
+            <ReactionInsightsSection newsletterId={newsletter.id} />
           </TabsContent>
 
           <TabsContent value="overview" className="space-y-6 lg:space-y-8">
@@ -1783,6 +1795,9 @@ export default function NewsletterViewPage() {
                 </Card>
               </div>
             )}
+
+            {/* Reader Reactions Insights */}
+            {newsletter?.status === 'sent' && <ReactionInsightsSection newsletterId={newsletter.id} />}
 
             {/* Per-Recipient Stats Table */}
             <Card>

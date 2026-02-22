@@ -10,6 +10,7 @@ import { emailService, enhancedEmailService } from '../emailService';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 import { initNewsletterTracking, trackNewsletterEmailSend } from '../utils/convexNewsletterTracker';
 import { logActivity, computeChanges, NEWSLETTER_TRACKED_FIELDS } from '../utils/activityLogger';
+import { buildReactionButtonsHtml } from '../utils/newsletterReactionHtml';
 // Temporal service removed - now using server-node proxy
 import crypto from 'crypto';
 
@@ -65,7 +66,7 @@ function recordFailedApprovalCodeAttempt(userId: string, newsletterId: string): 
   const key = `${userId}:${newsletterId}`;
   const now = Date.now();
   const currentData = approvalCodeRateLimit.get(key);
-  
+
   approvalCodeRateLimit.set(key, {
     count: (currentData?.count || 0) + 1,
     resetAt: now + (15 * 60 * 1000), // 15 minutes window
@@ -766,7 +767,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
   try {
     const { id } = req.params;
     const validatedData = updateNewsletterSchema.parse(req.body);
-    const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds } = validatedData;
+    const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds, reactionsEnabled } = validatedData;
 
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
@@ -817,6 +818,10 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
 
     if (selectedTagIds !== undefined) {
       updateData.selectedTagIds = selectedTagIds;
+    }
+
+    if (reactionsEnabled !== undefined) {
+      updateData.reactionsEnabled = reactionsEnabled;
     }
 
     const updatedNewsletter = await db.update(newsletters)
@@ -1486,6 +1491,8 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           })),
           batchSize: 25,
           priority: 'normal' as const,
+          reactionsEnabled: newsletter.reactionsEnabled ?? true,
+          baseUrl: `${req.protocol}://${req.get('host')}`,
         });
 
         console.log(`[Newsletter] Trigger.dev task triggered:`, {
@@ -1535,12 +1542,19 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         // Wrap newsletter content in the branded email design template
         const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
 
-        // Prepare emails for batch sending (append unsubscribe link)
+        // Prepare emails for batch sending (append reaction buttons + unsubscribe link)
         const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => {
           const token = tokenMap.get(contact.id)!;
           const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(token)}&type=newsletters`;
           const emailTrackingId = crypto.randomUUID();
+
+          // Build reaction buttons HTML if reactions are enabled
+          const reactionHtml = newsletter.reactionsEnabled
+            ? buildReactionButtonsHtml(`${req.protocol}://${req.get('host')}`, newsletter.id, contact.email)
+            : '';
+
           const html = `${wrappedContent}
+            ${reactionHtml}
             <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #94a3b8;">
                 <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
@@ -1813,6 +1827,8 @@ newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, async (
       batchSize: 25,
       priority: 'normal' as const,
       scheduledFor: scheduledDate.toISOString(),
+      reactionsEnabled: newsletter.reactionsEnabled ?? true,
+      baseUrl: `${req.protocol}://${req.get('host')}`,
     });
 
     console.log(`[Newsletter] Schedule task triggered:`, {
@@ -2062,10 +2078,20 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
     // Wrap newsletter content in the branded email design template
     const wrappedSingleContent = await wrapNewsletterContent(tenantId, content);
 
+    // Check if reactions are enabled for this newsletter
+    const singleNewsletter = await db.query.newsletters.findFirst({
+      where: eq(newsletters.id, id),
+      columns: { reactionsEnabled: true },
+    });
+    const singleReactionHtml = singleNewsletter?.reactionsEnabled
+      ? buildReactionButtonsHtml(`${req.protocol}://${req.get('host')}`, id, recipient.email)
+      : '';
+
     const email = {
       to: recipient.email,
       subject: subject,
       html: `${wrappedSingleContent}
+        ${singleReactionHtml}
         <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
           <p style="margin: 0; font-size: 12px; color: #94a3b8;">
             <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
@@ -2270,7 +2296,7 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
 
     const providedCode = Buffer.from(String(approvalCode).trim(), 'utf8');
     const expectedCode = Buffer.from(String(newsletter.reviewerApprovalCode), 'utf8');
-    
+
     // Use constant-time comparison to prevent timing attacks
     if (providedCode.length !== expectedCode.length || !crypto.timingSafeEqual(providedCode, expectedCode)) {
       // Record failed attempt for rate limiting
@@ -2355,7 +2381,7 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
 
     const providedCode = Buffer.from(String(approvalCode).trim(), 'utf8');
     const expectedCode = Buffer.from(String(newsletter.reviewerApprovalCode), 'utf8');
-    
+
     // Use constant-time comparison to prevent timing attacks
     if (providedCode.length !== expectedCode.length || !crypto.timingSafeEqual(providedCode, expectedCode)) {
       // Record failed attempt for rate limiting

@@ -514,6 +514,7 @@ export const newsletters = pgTable("newsletters", {
   reviewerApprovalCode: varchar("reviewer_approval_code", { length: 5 }), // Random 5-digit code for reviewer to confirm approval
   triggerRunId: text("trigger_run_id"), // Trigger.dev run ID for scheduled sends (used for cancellation)
   deletedAt: timestamp("deleted_at"), // Soft delete: when set, newsletter is hidden from UI but preserved for analytics
+  reactionsEnabled: boolean("reactions_enabled").notNull().default(true), // Enable/disable emoji reactions for this newsletter
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -546,6 +547,26 @@ export const newsletterReviewerSettings = pgTable("newsletter_reviewer_settings"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Newsletter reactions table for tracking reader emoji reactions
+export const newsletterReactions = pgTable("newsletter_reactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  newsletterId: varchar("newsletter_id").notNull().references(() => newsletters.id, { onDelete: 'cascade' }),
+  recipientEmail: text("recipient_email").notNull(),
+  reactionType: text("reaction_type").notNull(), // 'love_it', 'liked_it', 'cool', 'dont_agree', 'dislike'
+  reactionToken: text("reaction_token").notNull().unique(), // Unique token for identification
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  reactedAt: timestamp("reacted_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  newsletterIdx: index("idx_newsletter_reactions_newsletter").on(table.newsletterId),
+  tenantNewsletterIdx: index("idx_newsletter_reactions_tenant_newsletter").on(table.tenantId, table.newsletterId),
+  tokenIdx: index("idx_newsletter_reactions_token").on(table.reactionToken),
+  typeIdx: index("idx_newsletter_reactions_type").on(table.newsletterId, table.reactionType),
+  uniqueVoteIdx: uniqueIndex("idx_newsletter_reactions_unique_vote").on(table.newsletterId, table.recipientEmail),
+}));
 
 // Campaigns table for campaign management
 export const campaigns = pgTable("campaigns", {
@@ -1651,6 +1672,7 @@ export const newsletterRelations = relations(newsletters, ({ one, many }) => ({
     relationName: 'newsletterReviewer',
   }),
   taskStatuses: many(newsletterTaskStatus),
+  reactions: many(newsletterReactions),
 }));
 
 export const newsletterTaskStatusRelations = relations(newsletterTaskStatus, ({ one }) => ({
@@ -1660,6 +1682,17 @@ export const newsletterTaskStatusRelations = relations(newsletterTaskStatus, ({ 
   }),
   tenant: one(tenants, {
     fields: [newsletterTaskStatus.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const newsletterReactionsRelations = relations(newsletterReactions, ({ one }) => ({
+  newsletter: one(newsletters, {
+    fields: [newsletterReactions.newsletterId],
+    references: [newsletters.id],
+  }),
+  tenant: one(tenants, {
+    fields: [newsletterReactions.tenantId],
     references: [tenants.id],
   }),
 }));
@@ -1688,6 +1721,7 @@ export const createNewsletterSchema = z.object({
   selectedTagIds: z.array(z.string()).optional(),
   requiresReviewerApproval: z.boolean().optional(),
   reviewerId: z.string().optional(),
+  reactionsEnabled: z.boolean().optional().default(true),
 });
 
 export const updateNewsletterSchema = z.object({
@@ -1709,6 +1743,7 @@ export const updateNewsletterSchema = z.object({
   reviewerId: z.string().optional(),
   reviewStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
   reviewNotes: z.string().optional(),
+  reactionsEnabled: z.boolean().optional(),
 });
 
 export const insertNewsletterSchema = createInsertSchema(newsletters).omit({
@@ -1835,6 +1870,11 @@ export interface NewsletterWithUser extends Newsletter {
   opens?: number; // Unique opens (primary metric)
   totalOpens?: number; // Total opens (includes repeats)
 }
+
+// Newsletter reaction types
+export const NEWSLETTER_REACTION_TYPES = ['love_it', 'liked_it', 'cool', 'dont_agree', 'dislike'] as const;
+export type NewsletterReactionType = typeof NEWSLETTER_REACTION_TYPES[number];
+export type NewsletterReaction = typeof newsletterReactions.$inferSelect;
 
 // Bounced emails schemas
 export const createBouncedEmailSchema = z.object({
