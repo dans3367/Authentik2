@@ -72,10 +72,17 @@ app.use((req, res, next) => {
 });
 
 app.use(generalRateLimiter);
-app.use(mongoSanitizer);
+// Skip mongo sanitizer for webhook routes to avoid mangling external payloads
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/webhooks')) return next();
+  mongoSanitizer(req, res, next);
+});
 
-// Input sanitization
-app.use(sanitizeMiddleware);
+// Input sanitization — skip webhook routes to avoid corrupting external payloads
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/webhooks')) return next();
+  sanitizeMiddleware(req, res, next);
+});
 
 // Better Auth middleware for authentication
 // Note: better-auth uses toNodeHandler for Express integration
@@ -97,6 +104,8 @@ app.all("/api/auth/*", (req, res, next) => {
 // Body parsing with size limits - applied after auth handler
 app.use(express.json(requestSizeLimiter.json));
 app.use(express.urlencoded(requestSizeLimiter.urlencoded));
+// AWS SNS sends POST with Content-Type: text/plain — parse it as text so we can JSON.parse in the handler
+app.use('/api/webhooks', express.text({ type: 'text/plain', limit: '1mb' }));
 
 app.use((req, res, next) => {
   const start = Date.now();

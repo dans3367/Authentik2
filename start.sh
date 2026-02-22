@@ -35,6 +35,18 @@ print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
 
+# Function to explicitly handle common EADDRINUSE failures
+kill_eaddrinuse_port_5000() {
+    local port=5000
+
+    if check_port $port; then
+        print_warning "Detected port $port in use (common EADDRINUSE for Main Server)"
+        kill_port_process $port "Main Server (npm run dev)"
+    else
+        print_success "Port $port (Main Server npm run dev) is available"
+    fi
+}
+
 print_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
@@ -185,6 +197,9 @@ stop_services() {
 # Function to start services via npm run dev
 start_npm_dev() {
     print_status "Starting services via npm run dev..."
+
+    # npm run dev starts Main Server on 5000 via scripts/start-dev.js
+    kill_eaddrinuse_port_5000
     
     # Kill any existing processes on our ports first
     for ((i=0; i<${#SERVICE_NAMES[@]}; i++)); do
@@ -222,6 +237,9 @@ start_services() {
     rm -f /tmp/authentik_pids.txt
 
     print_status "Checking and cleaning up ports for all services..."
+
+    # Also guard against existing npm run dev Main Server using 5000
+    kill_eaddrinuse_port_5000
 
     # Check and kill processes on all required ports BEFORE starting
     for ((i=0; i<${#SERVICE_NAMES[@]}; i++)); do

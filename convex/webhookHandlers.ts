@@ -225,6 +225,153 @@ export const handleAhaSendWebhook = action({
   },
 });
 
+// ─── AMAZON SES (via SNS) ────────────────────────────────────────────────────
+
+/**
+ * Internal handler for Amazon SES webhook events (delivered via SNS).
+ * Called from Express or the Convex HTTP endpoint after SNS message parsing.
+ */
+export const handleSESWebhook = action({
+  args: { payload: v.any() },
+  handler: async (ctx, { payload: event }) => {
+    try {
+      // SES notification types → normalised types
+      const eventTypeMap: Record<string, string> = {
+        Send: "sent",
+        Delivery: "delivered",
+        Bounce: "bounced",
+        Complaint: "complained",
+        Open: "opened",
+        Click: "clicked",
+        Reject: "suppressed",
+      };
+
+      // The SES notification has a `notificationType` field at the top level
+      const sesNotificationType = event.eventType || event.notificationType;
+      const normalisedType = eventTypeMap[sesNotificationType];
+      if (!normalisedType) {
+        console.log(`Unhandled SES event type: ${sesNotificationType}`);
+        return;
+      }
+
+      // Extract messageId from mail object
+      const mail = event.mail || {};
+      const providerMessageId: string | undefined = mail.messageId ?? undefined;
+
+      // Extract recipient email based on event type
+      let recipientEmail: string | undefined;
+      if (event.bounce) {
+        recipientEmail = event.bounce.bouncedRecipients?.[0]?.emailAddress;
+      } else if (event.complaint) {
+        recipientEmail = event.complaint.complainedRecipients?.[0]?.emailAddress;
+      } else if (event.delivery) {
+        recipientEmail = event.delivery.recipients?.[0];
+      } else if (event.open) {
+        recipientEmail = mail.destination?.[0];
+      } else if (event.click) {
+        recipientEmail = mail.destination?.[0];
+      } else if (event.send) {
+        recipientEmail = mail.destination?.[0];
+      } else {
+        recipientEmail = mail.destination?.[0];
+      }
+
+      if (!recipientEmail) {
+        console.error("Could not extract recipient email from SES webhook");
+        return;
+      }
+
+      const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
+
+      if (ids) {
+        await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+          tenantId: ids.tenantId,
+          newsletterId: ids.newsletterId,
+          recipientEmail,
+          providerMessageId,
+          eventType: normalisedType as any,
+          metadata: buildSESMetadata(event),
+        });
+      } else {
+        console.log(
+          `No matching newsletterSend for SES providerMessageId=${providerMessageId}, email=${recipientEmail}`,
+        );
+      }
+    } catch (error) {
+      console.error("SES webhook error:", error);
+      throw error;
+    }
+  },
+});
+
+/**
+ * Direct HTTP endpoint for Amazon SES webhook events (via SNS).
+ * Handles both SNS SubscriptionConfirmation and Notification message types.
+ */
+export const sesWebhook = httpAction(async (ctx, request) => {
+  const messageType = request.headers.get("x-amz-sns-message-type");
+  const body = await request.text();
+
+  let snsMessage: any;
+  try {
+    snsMessage = JSON.parse(body);
+  } catch (error) {
+    console.error("Error parsing SES/SNS webhook body:", error);
+    return new Response("Invalid JSON body", { status: 400 });
+  }
+
+  // Handle SNS Subscription Confirmation
+  if (messageType === "SubscriptionConfirmation") {
+    const subscribeUrl = snsMessage.SubscribeURL;
+    if (subscribeUrl) {
+      console.log("Confirming SNS subscription:", subscribeUrl);
+      try {
+        await fetch(subscribeUrl);
+        console.log("SNS subscription confirmed successfully");
+      } catch (err) {
+        console.error("Failed to confirm SNS subscription:", err);
+      }
+    }
+    return new Response(JSON.stringify({ confirmed: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Handle SNS Notification (actual SES event)
+  if (messageType === "Notification") {
+    let sesEvent: any;
+    try {
+      sesEvent = typeof snsMessage.Message === "string"
+        ? JSON.parse(snsMessage.Message)
+        : snsMessage.Message;
+    } catch (err) {
+      console.error("Error parsing SES event from SNS Message:", err);
+      return new Response("Invalid SES event in SNS message", { status: 400 });
+    }
+
+    console.log("SES webhook received via SNS", {
+      eventType: sesEvent?.eventType || sesEvent?.notificationType,
+      messageId: sesEvent?.mail?.messageId,
+      destination: sesEvent?.mail?.destination,
+    });
+
+    try {
+      await ctx.runAction(api.webhookHandlers.handleSESWebhook, {
+        payload: sesEvent,
+      });
+    } catch (error) {
+      console.error("Error processing SES webhook:", error);
+      return new Response("Webhook processing failed", { status: 500 });
+    }
+  }
+
+  return new Response(JSON.stringify({ received: true }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+});
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 /**
@@ -312,6 +459,58 @@ function buildAhaSendMetadata(data: any): Record<string, any> | undefined {
   if (data.event) meta.event = data.event;
   if (data.reason) meta.reason = data.reason;
   if (data.sending_domain) meta.sendingDomain = data.sending_domain;
+  return Object.keys(meta).length > 0 ? meta : undefined;
+}
+
+/**
+ * Build a metadata object from Amazon SES webhook data for storage.
+ */
+function buildSESMetadata(event: any): Record<string, any> | undefined {
+  const meta: Record<string, any> = {};
+  const mail = event.mail || {};
+
+  if (mail.source) meta.from = mail.source;
+  if (mail.commonHeaders?.subject) meta.subject = mail.commonHeaders.subject;
+  if (mail.messageId) meta.sesMessageId = mail.messageId;
+
+  // Capture SES tags for correlation
+  if (mail.tags) {
+    meta.tags = mail.tags;
+  }
+
+  // Bounce details
+  if (event.bounce) {
+    meta.bounceType = event.bounce.bounceType;
+    meta.bounceSubType = event.bounce.bounceSubType;
+    if (event.bounce.bouncedRecipients?.[0]?.diagnosticCode) {
+      meta.diagnosticCode = event.bounce.bouncedRecipients[0].diagnosticCode;
+    }
+  }
+
+  // Complaint details
+  if (event.complaint) {
+    meta.complaintFeedbackType = event.complaint.complaintFeedbackType;
+  }
+
+  // Delivery details
+  if (event.delivery) {
+    meta.processingTimeMillis = event.delivery.processingTimeMillis;
+    meta.smtpResponse = event.delivery.smtpResponse;
+  }
+
+  // Open details
+  if (event.open) {
+    meta.userAgent = event.open.userAgent;
+    meta.ipAddress = event.open.ipAddress;
+  }
+
+  // Click details
+  if (event.click) {
+    meta.link = event.click.link;
+    meta.userAgent = event.click.userAgent;
+    meta.ipAddress = event.click.ipAddress;
+  }
+
   return Object.keys(meta).length > 0 ? meta : undefined;
 }
 

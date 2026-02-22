@@ -24,55 +24,40 @@ export class EmailProviderConfig {
         credentials: {
           apiKey: process.env.RESEND_API_KEY || ''
         }
+      },
+      // Amazon SES as second-priority backup provider
+      {
+        id: 'ses-backup',
+        name: 'ses',
+        priority: 2,
+        enabled: !!(process.env.AWS_SES_ACCESS_KEY_ID && process.env.AWS_SES_SECRET_ACCESS_KEY),
+        rateLimit: {
+          requestsPerSecond: 14, // SES default sending rate
+          burstSize: 20
+        },
+        retryPolicy: {
+          maxRetries: 3,
+          initialDelayMs: 2000,
+          maxDelayMs: 10000,
+          backoffMultiplier: 2
+        },
+        credentials: {
+          accessKeyId: process.env.AWS_SES_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.AWS_SES_SECRET_ACCESS_KEY || '',
+          region: process.env.AWS_SES_REGION || 'us-east-1',
+        }
       }
-      // Additional providers can be added here, e.g.:
-      // {
-      //   id: 'resend-backup',
-      //   name: 'resend',
-      //   priority: 2,
-      //   enabled: false,
-      //   rateLimit: {
-      //     requestsPerSecond: 1
-      //   },
-      //   retryPolicy: {
-      //     maxRetries: 3,
-      //     initialDelayMs: 2000,
-      //     maxDelayMs: 10000,
-      //     backoffMultiplier: 2
-      //   },
-      //   credentials: {
-      //     apiKey: process.env.RESEND_BACKUP_API_KEY || ''
-      //   }
-      // },
-      // {
-      //   id: 'sendgrid-primary',
-      //   name: 'sendgrid',
-      //   priority: 3,
-      //   enabled: false,
-      //   rateLimit: {
-      //     requestsPerSecond: 10
-      //   },
-      //   retryPolicy: {
-      //     maxRetries: 3,
-      //     initialDelayMs: 1000,
-      //     maxDelayMs: 8000,
-      //     backoffMultiplier: 2
-      //   },
-      //   credentials: {
-      //     apiKey: process.env.SENDGRID_API_KEY || ''
-      //   }
-      // }
     ];
   }
 
   static loadConfigs(): ProviderConfig[] {
     if (this.configs.length === 0) {
       this.configs = this.getDefaultConfigs();
-      
+
       // Validate configurations
       this.configs = this.configs.filter(config => this.validateConfig(config));
     }
-    
+
     return this.configs;
   }
 
@@ -94,7 +79,7 @@ export class EmailProviderConfig {
     const configIndex = this.configs.findIndex(c => c.id === providerId);
     if (configIndex >= 0) {
       this.configs[configIndex] = { ...this.configs[configIndex], ...updates };
-      
+
       if (!this.validateConfig(this.configs[configIndex])) {
         throw new Error(`Invalid updated config for provider: ${providerId}`);
       }
@@ -139,7 +124,7 @@ export class EmailProviderConfig {
           console.error(`[EmailProviderConfig] Invalid config: retry policy values must be >= 0`);
           return false;
         }
-        
+
         if (policy.backoffMultiplier <= 0) {
           console.error(`[EmailProviderConfig] Invalid config: backoffMultiplier must be > 0`);
           return false;
@@ -150,7 +135,12 @@ export class EmailProviderConfig {
       if (config.name.toLowerCase() === 'resend') {
         if (!config.credentials.apiKey) {
           console.warn(`[EmailProviderConfig] Warning: Resend provider ${config.id} has no API key`);
-          // Don't return false here as the API key might be set later
+        }
+      }
+
+      if (config.name.toLowerCase() === 'ses') {
+        if (!config.credentials.accessKeyId || !config.credentials.secretAccessKey) {
+          console.warn(`[EmailProviderConfig] Warning: SES provider ${config.id} has missing AWS credentials`);
         }
       }
 

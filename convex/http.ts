@@ -4,6 +4,7 @@ import {
   resendWebhook,
   postmarkWebhook,
   ahasendWebhook,
+  sesWebhook,
 } from "./webhookHandlers";
 
 const http = httpRouter();
@@ -34,6 +35,13 @@ http.route({
   path: "/webhooks/ahasend",
   method: "POST",
   handler: ahasendWebhook,
+});
+
+// Amazon SES webhook events via SNS (delivered, opened, clicked, bounced, etc.)
+http.route({
+  path: "/webhooks/ses",
+  method: "POST",
+  handler: sesWebhook,
 });
 
 export default http;

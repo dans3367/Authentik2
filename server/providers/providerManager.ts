@@ -1,5 +1,6 @@
 import { EmailProvider, EmailMessage, EmailSendResult, ProviderConfig } from './types';
 import { ResendProvider } from './resendProvider';
+import { SESProvider } from './sesProvider';
 
 export class EmailProviderManager {
   private providers: Map<string, EmailProvider> = new Map();
@@ -15,6 +16,9 @@ export class EmailProviderManager {
     switch (config.name.toLowerCase()) {
       case 'resend':
         provider = new ResendProvider(config);
+        break;
+      case 'ses':
+        provider = new SESProvider(config);
         break;
       default:
         throw new Error(`Unsupported provider: ${config.name}`);
@@ -71,7 +75,7 @@ export class EmailProviderManager {
 
     // Try providers in priority order
     const providers = this.getProviders();
-    
+
     if (providers.length === 0) {
       return {
         success: false,
@@ -82,20 +86,20 @@ export class EmailProviderManager {
     }
 
     let lastError = '';
-    
+
     for (const provider of providers) {
       try {
         console.log(`[ProviderManager] Trying provider: ${provider.getName()} (${provider.getId()})`);
-        
+
         const result = await this.attemptSend(provider, message);
         if (result.success) {
           console.log(`[ProviderManager] Email sent successfully via ${provider.getName()}`);
           return result;
         }
-        
+
         lastError = result.error || 'Unknown error';
         console.log(`[ProviderManager] Provider ${provider.getName()} failed: ${lastError}`);
-        
+
       } catch (error) {
         lastError = error instanceof Error ? error.message : 'Unknown error';
         console.error(`[ProviderManager] Provider ${provider.getName()} error:`, error);
@@ -117,7 +121,7 @@ export class EmailProviderManager {
     if (!provider.canSendNow()) {
       const nextAvailable = provider.getNextAvailableTime();
       const waitTime = nextAvailable.getTime() - Date.now();
-      
+
       if (waitTime > 5000) { // If we need to wait more than 5 seconds, skip this provider
         return {
           success: false,
@@ -126,7 +130,7 @@ export class EmailProviderManager {
           error: `Rate limited, next available in ${Math.round(waitTime / 1000)}s`
         };
       }
-      
+
       // Wait for a short time if the delay is reasonable
       console.log(`[ProviderManager] Waiting ${waitTime}ms for rate limit`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -163,7 +167,7 @@ export class EmailProviderManager {
   // Health check for all providers
   async healthCheck(): Promise<{ [providerId: string]: boolean }> {
     const results: { [providerId: string]: boolean } = {};
-    
+
     for (const provider of Array.from(this.providers.values())) {
       try {
         if (typeof (provider as any).healthCheck === 'function') {
@@ -176,7 +180,7 @@ export class EmailProviderManager {
         results[provider.getId()] = false;
       }
     }
-    
+
     return results;
   }
 

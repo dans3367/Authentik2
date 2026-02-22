@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ConvexHttpClient } from "convex/browser";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 import { sendAhaEmail } from "./ahasend";
+import { sendSESEmail } from "./ses";
 
 // Convex client for newsletter tracking (lazy init)
 let convexClient: ConvexHttpClient | null = null;
@@ -28,12 +29,12 @@ interface BulkSendResult {
   success: boolean;
   providerMessageId?: string;
   error?: string;
-  provider: 'resend' | 'ahasend';
+  provider: 'resend' | 'ses' | 'ahasend';
 }
 
 /**
  * Send a batch of emails using Resend batch API (up to 100 per call).
- * Falls back to AhaSend for the entire batch if Resend fails.
+ * Falls back to SES, then AhaSend if Resend fails.
  * Returns per-recipient results with provider message IDs for tracking.
  */
 async function sendBulkEmails(opts: {
@@ -105,73 +106,119 @@ async function sendBulkEmails(opts: {
     return results;
   } catch (resendErr) {
     const resendErrMsg = resendErr instanceof Error ? resendErr.message : String(resendErr);
-    logger.warn(`Resend batch failed, falling back to AhaSend for ${recipients.length} emails`, {
+    logger.warn(`Resend batch failed, falling back to SES for ${recipients.length} emails`, {
       error: resendErrMsg,
       newsletterId,
     });
 
-    // Fallback: send all via AhaSend (natively sends separate message per recipient)
+    // 2nd fallback: Amazon SES (sends one email per recipient)
     try {
-      const ahaResult = await sendAhaEmail({
+      const sesResult = await sendSESEmail({
         from: { email: fromEmail },
         recipients: recipients.map((r) => ({ email: r.email })),
         subject,
         html_content: content,
         text_content: content.replace(/<[^>]*>/g, ""),
         reply_to: replyTo,
+        tags: { type: "newsletter", newsletterId, groupUUID, tenantId },
       });
 
-      // AhaSend v2 returns { data: [{ id, recipient: { email }, status }] }
-      const ahaMessages: any[] = ahaResult?.data || [];
-
-      // Build a map of email -> message ID from AhaSend response
-      const ahaIdMap = new Map<string, string>();
-      for (const msg of ahaMessages) {
+      const sesMessages: any[] = sesResult?.data || [];
+      const sesIdMap = new Map<string, string>();
+      for (const msg of sesMessages) {
         const email = msg?.recipient?.email;
         const id = msg?.id;
         if (email && id) {
-          ahaIdMap.set(email.toLowerCase(), id);
+          sesIdMap.set(email.toLowerCase(), id);
         }
       }
 
       for (const r of recipients) {
-        const msgId = ahaIdMap.get(r.email.toLowerCase());
+        const msgId = sesIdMap.get(r.email.toLowerCase());
         results.push({
           recipientEmail: r.email,
           recipientId: r.id,
           success: true,
-          providerMessageId: msgId || 'ahasend-bulk-success',
-          provider: 'ahasend',
+          providerMessageId: msgId || 'ses-bulk-success',
+          provider: 'ses',
         });
       }
 
-      logger.info(`AhaSend bulk fallback completed`, {
+      logger.info(`SES bulk fallback completed`, {
         newsletterId,
         sent: results.length,
-        messageIds: ahaMessages.map((m: any) => m.id),
+        messageIds: sesMessages.map((m: any) => m.id),
       });
 
       return results;
-    } catch (ahaErr) {
-      const ahaErrMsg = ahaErr instanceof Error ? ahaErr.message : String(ahaErr);
-      logger.error(`Both Resend batch and AhaSend fallback failed`, {
+    } catch (sesErr) {
+      const sesErrMsg = sesErr instanceof Error ? sesErr.message : String(sesErr);
+      logger.warn(`SES batch also failed, falling back to AhaSend for ${recipients.length} emails`, {
         resendError: resendErrMsg,
-        ahasendError: ahaErrMsg,
+        sesError: sesErrMsg,
         newsletterId,
       });
 
-      // Mark all recipients as failed
-      for (const r of recipients) {
-        results.push({
-          recipientEmail: r.email,
-          recipientId: r.id,
-          success: false,
-          error: `Resend: ${resendErrMsg}; AhaSend: ${ahaErrMsg}`,
-          provider: 'resend',
+      // 3rd fallback: AhaSend
+      try {
+        const ahaResult = await sendAhaEmail({
+          from: { email: fromEmail },
+          recipients: recipients.map((r) => ({ email: r.email })),
+          subject,
+          html_content: content,
+          text_content: content.replace(/<[^>]*>/g, ""),
+          reply_to: replyTo,
         });
-      }
 
-      return results;
+        const ahaMessages: any[] = ahaResult?.data || [];
+        const ahaIdMap = new Map<string, string>();
+        for (const msg of ahaMessages) {
+          const email = msg?.recipient?.email;
+          const id = msg?.id;
+          if (email && id) {
+            ahaIdMap.set(email.toLowerCase(), id);
+          }
+        }
+
+        for (const r of recipients) {
+          const msgId = ahaIdMap.get(r.email.toLowerCase());
+          results.push({
+            recipientEmail: r.email,
+            recipientId: r.id,
+            success: true,
+            providerMessageId: msgId || 'ahasend-bulk-success',
+            provider: 'ahasend',
+          });
+        }
+
+        logger.info(`AhaSend bulk fallback completed`, {
+          newsletterId,
+          sent: results.length,
+          messageIds: ahaMessages.map((m: any) => m.id),
+        });
+
+        return results;
+      } catch (ahaErr) {
+        const ahaErrMsg = ahaErr instanceof Error ? ahaErr.message : String(ahaErr);
+        logger.error(`All providers failed (Resend, SES, AhaSend)`, {
+          resendError: resendErrMsg,
+          sesError: sesErrMsg,
+          ahasendError: ahaErrMsg,
+          newsletterId,
+        });
+
+        for (const r of recipients) {
+          results.push({
+            recipientEmail: r.email,
+            recipientId: r.id,
+            success: false,
+            error: `Resend: ${resendErrMsg}; SES: ${sesErrMsg}; AhaSend: ${ahaErrMsg}`,
+            provider: 'resend',
+          });
+        }
+
+        return results;
+      }
     }
   }
 }
@@ -306,28 +353,44 @@ export const sendNewsletterEmailTask = task({
       sendError = resendError;
 
       if (sendError) {
-        logger.warn("Resend failed, falling back to AhaSend", { error: sendError.message, to: recipient.email });
+        logger.warn("Resend failed, falling back to SES", { error: sendError.message, to: recipient.email });
         try {
-          const ahaResult = await sendAhaEmail({
+          const sesResult = await sendSESEmail({
             from: { email: fromEmail },
             recipients: [{ email: recipient.email }],
             subject,
             html_content: content,
             text_content: content.replace(/<[^>]*>/g, ""),
             reply_to: payload.replyTo,
+            tags: { type: "newsletter", newsletterId, groupUUID, tenantId, recipientId: recipient.id },
           });
-          // Extract per-recipient message ID from AhaSend v2 response
-          const ahaMessages: any[] = ahaResult?.data || [];
-          const ahaMsg = ahaMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
-          emailData = { id: ahaMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+          const sesMessages: any[] = sesResult?.data || [];
+          const sesMsg = sesMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
+          emailData = { id: sesMsg?.id || 'ses-fallback-success' };
           sendError = null;
-        } catch (ahaError) {
-          sendError = ahaError;
+        } catch (sesError) {
+          logger.warn("SES also failed, falling back to AhaSend", { error: sesError instanceof Error ? sesError.message : String(sesError), to: recipient.email });
+          try {
+            const ahaResult = await sendAhaEmail({
+              from: { email: fromEmail },
+              recipients: [{ email: recipient.email }],
+              subject,
+              html_content: content,
+              text_content: content.replace(/<[^>]*>/g, ""),
+              reply_to: payload.replyTo,
+            });
+            const ahaMessages: any[] = ahaResult?.data || [];
+            const ahaMsg = ahaMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
+            emailData = { id: ahaMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+            sendError = null;
+          } catch (ahaError) {
+            sendError = ahaError;
+          }
         }
       }
 
       if (sendError) {
-        logger.error("Failed to send newsletter email via both providers", { error: sendError });
+        logger.error("Failed to send newsletter email via all providers (Resend, SES, AhaSend)", { error: sendError });
         return {
           success: false,
           recipientId: recipient.id,
@@ -455,22 +518,39 @@ export const processNewsletterBatchTask = task({
           sendError = resendError;
 
           if (sendError) {
-            logger.warn("Resend failed, falling back to AhaSend", { error: sendError.message, to: recipient.email });
+            logger.warn("Resend failed, falling back to SES", { error: sendError.message, to: recipient.email });
             try {
-              const ahaResult = await sendAhaEmail({
+              const sesResult = await sendSESEmail({
                 from: { email: fromEmail },
                 recipients: [{ email: recipient.email }],
                 subject: payload.subject,
                 html_content: payload.content,
                 text_content: payload.content.replace(/<[^>]*>/g, ""),
                 reply_to: payload.replyTo,
+                tags: { type: "newsletter", newsletterId: payload.newsletterId, groupUUID: payload.groupUUID, tenantId: payload.tenantId, recipientId: recipient.id },
               });
-              const ahaMessages: any[] = ahaResult?.data || [];
-              const ahaMsg = ahaMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
-              emailData = { id: ahaMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+              const sesMessages: any[] = sesResult?.data || [];
+              const sesMsg = sesMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
+              emailData = { id: sesMsg?.id || 'ses-fallback-success' };
               sendError = null;
-            } catch (ahaError) {
-              sendError = ahaError;
+            } catch (sesError) {
+              logger.warn("SES also failed, falling back to AhaSend", { error: sesError instanceof Error ? sesError.message : String(sesError), to: recipient.email });
+              try {
+                const ahaResult = await sendAhaEmail({
+                  from: { email: fromEmail },
+                  recipients: [{ email: recipient.email }],
+                  subject: payload.subject,
+                  html_content: payload.content,
+                  text_content: payload.content.replace(/<[^>]*>/g, ""),
+                  reply_to: payload.replyTo,
+                });
+                const ahaMessages: any[] = ahaResult?.data || [];
+                const ahaMsg = ahaMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
+                emailData = { id: ahaMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+                sendError = null;
+              } catch (ahaError) {
+                sendError = ahaError;
+              }
             }
           }
 
@@ -714,23 +794,39 @@ export const sendNewsletterTask = task({
             sendError = resendError;
 
             if (sendError) {
-              logger.warn("Resend failed, falling back to AhaSend", { error: sendError.message, to: recipient.email });
+              logger.warn("Resend failed, falling back to SES", { error: sendError.message, to: recipient.email });
               try {
-                const ahaResult = await sendAhaEmail({
+                const sesResult = await sendSESEmail({
                   from: { email: fromEmail },
                   recipients: [{ email: recipient.email }],
                   subject: data.subject,
                   html_content: data.content,
                   text_content: data.content.replace(/<[^>]*>/g, ""),
                   reply_to: data.replyTo,
+                  tags: { type: "newsletter", newsletterId: data.newsletterId, groupUUID: data.groupUUID, tenantId: data.tenantId, recipientId: recipient.id },
                 });
-                // Extract per-recipient message ID from AhaSend v2 response
-                const ahaMessages: any[] = ahaResult?.data || [];
-                const ahaMsg = ahaMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
-                emailData = { id: ahaMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+                const sesMessages: any[] = sesResult?.data || [];
+                const sesMsg = sesMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
+                emailData = { id: sesMsg?.id || 'ses-fallback-success' };
                 sendError = null;
-              } catch (ahaError) {
-                sendError = ahaError;
+              } catch (sesError) {
+                logger.warn("SES also failed, falling back to AhaSend", { error: sesError instanceof Error ? sesError.message : String(sesError), to: recipient.email });
+                try {
+                  const ahaResult = await sendAhaEmail({
+                    from: { email: fromEmail },
+                    recipients: [{ email: recipient.email }],
+                    subject: data.subject,
+                    html_content: data.content,
+                    text_content: data.content.replace(/<[^>]*>/g, ""),
+                    reply_to: data.replyTo,
+                  });
+                  const ahaMessages: any[] = ahaResult?.data || [];
+                  const ahaMsg = ahaMessages.find((m: any) => m?.recipient?.email?.toLowerCase() === recipient.email.toLowerCase());
+                  emailData = { id: ahaMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+                  sendError = null;
+                } catch (ahaError) {
+                  sendError = ahaError;
+                }
               }
             }
 

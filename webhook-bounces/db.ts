@@ -15,7 +15,7 @@ import postgres from "postgres";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import { drizzle as drizzleNeon } from "drizzle-orm/neon-serverless";
 import ws from "ws";
-import * as schema from "../shared/schema";
+import * as schema from "./schema";
 
 if (!process.env.DATABASE_URL) {
   throw new Error(

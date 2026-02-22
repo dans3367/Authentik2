@@ -379,6 +379,167 @@ webhookRoutes.post("/ahasend", async (req, res) => {
   }
 });
 
+// Amazon SES webhook endpoint (events delivered via Amazon SNS)
+webhookRoutes.post("/ses", async (req, res) => {
+  try {
+    const messageType = req.headers['x-amz-sns-message-type'] as string;
+    const contentType = req.headers['content-type'] as string;
+
+    console.log(`📨 [SES/SNS] Incoming POST — SNS-Type: ${messageType || 'none'}, Content-Type: ${contentType}, body type: ${typeof req.body}, body length: ${typeof req.body === 'string' ? req.body.length : JSON.stringify(req.body || {}).length}`);
+
+    // AWS SNS sends Content-Type: text/plain, so body may be a raw string
+    let snsMessage: any;
+    if (typeof req.body === 'string') {
+      try {
+        snsMessage = JSON.parse(req.body);
+        console.log('[SES/SNS] Parsed text/plain body as JSON successfully');
+      } catch (parseErr) {
+        console.error('[SES/SNS] ❌ Failed to parse SNS text body as JSON:', parseErr);
+        console.error('[SES/SNS] Raw body (first 500 chars):', typeof req.body === 'string' ? req.body.substring(0, 500) : req.body);
+        return res.status(400).json({ message: 'Invalid JSON in SNS request body' });
+      }
+    } else {
+      snsMessage = req.body;
+    }
+
+    if (!snsMessage || typeof snsMessage !== 'object') {
+      console.error(`[SES/SNS] ❌ Empty or non-object body after parsing. Content-Type: ${contentType}, typeof: ${typeof snsMessage}`);
+      return res.status(400).json({ message: 'Empty or invalid SNS request body' });
+    }
+
+    console.log(`[SES/SNS] SNS message keys: ${Object.keys(snsMessage).join(', ')}`);
+
+    // Handle SNS Subscription Confirmation
+    if (messageType === 'SubscriptionConfirmation') {
+      const subscribeUrl = snsMessage.SubscribeURL;
+      console.log(`[SES/SNS] 🔗 SubscriptionConfirmation received. TopicArn: ${snsMessage.TopicArn}, SubscribeURL present: ${!!subscribeUrl}`);
+      if (subscribeUrl) {
+        try {
+          await fetch(subscribeUrl);
+          console.log('[SES/SNS] ✅ SNS subscription confirmed successfully');
+        } catch (err) {
+          console.error('[SES/SNS] ❌ Failed to confirm SNS subscription:', err);
+        }
+      }
+      return res.json({ confirmed: true });
+    }
+
+    // Handle SNS Notification (actual SES event)
+    if (messageType !== 'Notification') {
+      console.log(`[SES/SNS] ⚠️ Unhandled SNS message type: ${messageType}`);
+      return res.json({ received: true });
+    }
+
+    // Parse the SES event from the SNS Message field
+    let sesEvent: any;
+    try {
+      sesEvent = typeof snsMessage.Message === 'string'
+        ? JSON.parse(snsMessage.Message)
+        : snsMessage.Message;
+    } catch (err) {
+      console.error('[SES/SNS] ❌ Error parsing SES event from SNS Message field:', err);
+      console.error('[SES/SNS] Raw Message (first 500 chars):', typeof snsMessage.Message === 'string' ? snsMessage.Message.substring(0, 500) : snsMessage.Message);
+      return res.status(400).json({ message: 'Invalid SES event in SNS message' });
+    }
+
+    // SES event type mapping
+    const sesEventTypeMap: Record<string, string> = {
+      Send: 'sent',
+      Delivery: 'delivered',
+      Bounce: 'bounced',
+      Complaint: 'complained',
+      Open: 'opened',
+      Click: 'clicked',
+      Reject: 'suppressed',
+    };
+
+    const sesNotificationType = sesEvent.eventType || sesEvent.notificationType;
+    const normalisedType = sesEventTypeMap[sesNotificationType];
+
+    // Extract recipient early for logging
+    const mail = sesEvent.mail || {};
+    let recipientEmail: string | undefined;
+    if (sesEvent.bounce) {
+      recipientEmail = sesEvent.bounce.bouncedRecipients?.[0]?.emailAddress;
+    } else if (sesEvent.complaint) {
+      recipientEmail = sesEvent.complaint.complainedRecipients?.[0]?.emailAddress;
+    } else if (sesEvent.delivery) {
+      recipientEmail = sesEvent.delivery.recipients?.[0];
+    } else {
+      recipientEmail = mail.destination?.[0];
+    }
+
+    console.log(`[SES/SNS] 📧 Event: ${sesNotificationType} → ${normalisedType || 'UNMAPPED'} | messageId: ${mail.messageId || 'none'} | recipient: ${recipientEmail || 'unknown'} | destination: ${JSON.stringify(mail.destination || [])}`);
+
+    if (!normalisedType) {
+      console.log(`[SES/SNS] ⚠️ Unmapped SES event type: ${sesNotificationType}. SES event keys: ${Object.keys(sesEvent).join(', ')}`);
+    }
+
+    // Forward to Convex internal handler (fire-and-forget)
+    const client = getConvexClient();
+    if (client) {
+      console.log('[SES/SNS] Forwarding to Convex handleSESWebhook...');
+      client.action(api.webhookHandlers.handleSESWebhook, { payload: sesEvent })
+        .then(() => console.log('[SES/SNS] ✅ Convex SES handler completed'))
+        .catch(err => console.error('[SES/SNS] ❌ Convex SES webhook handler failed:', err));
+    } else {
+      console.log('[SES/SNS] ⚠️ No Convex client available — skipping Convex forwarding');
+    }
+
+    // Handle SQL updates using existing handlers with normalized SES data
+    if (normalisedType && sesEvent.mail) {
+      // Normalise data to match the format expected by existing handleEmail* functions
+      const normalizedData = {
+        email_id: mail.messageId,
+        to: recipientEmail ? [recipientEmail] : mail.destination || [],
+        email: recipientEmail || mail.destination?.[0],
+        tags: mail.tags || {},
+        // Bounce/complaint details
+        reason: sesEvent.bounce?.bounceType || sesEvent.complaint?.complaintFeedbackType,
+        description: sesEvent.bounce?.bouncedRecipients?.[0]?.diagnosticCode ||
+          sesEvent.delivery?.smtpResponse || '',
+      };
+
+      console.log(`[SES/SNS] 🔄 Dispatching to handler: handle${normalisedType.charAt(0).toUpperCase() + normalisedType.slice(1)}() with email_id: ${normalizedData.email_id}, recipient: ${normalizedData.email}`);
+
+      switch (normalisedType) {
+        case 'sent':
+          await handleEmailSent(normalizedData);
+          break;
+        case 'delivered':
+          await handleEmailDelivered(normalizedData);
+          break;
+        case 'bounced':
+          await handleEmailBounced(normalizedData);
+          break;
+        case 'complained':
+          await handleEmailComplained(normalizedData);
+          break;
+        case 'opened':
+          await handleEmailOpened(normalizedData);
+          break;
+        case 'clicked':
+          await handleEmailClicked(normalizedData);
+          break;
+        case 'suppressed':
+          await handleEmailSuppressed(normalizedData);
+          break;
+        default:
+          console.log(`[SES/SNS] ⚠️ No handler for normalised type: ${normalisedType}`);
+      }
+
+      console.log(`[SES/SNS] ✅ SQL handler completed for ${normalisedType} event`);
+    } else {
+      console.log(`[SES/SNS] ⚠️ Skipping SQL update — normalisedType: ${normalisedType}, has mail: ${!!sesEvent.mail}`);
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('[SES/SNS] ❌ Unhandled error in SES webhook:', error);
+    res.status(500).json({ message: 'Webhook processing failed' });
+  }
+});
+
 // Helper functions for webhook event handling
 async function handleEmailSent(data: any) {
   try {
