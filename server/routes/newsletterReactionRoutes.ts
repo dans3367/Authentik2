@@ -169,7 +169,7 @@ newsletterReactionRoutes.get('/:newsletterId/stats', authenticateToken, requireT
         for (const type of NEWSLETTER_REACTION_TYPES) {
             counts[type] = 0;
         }
-        for (const row of countResults.rows as any[]) {
+        for (const row of countResults as any[]) {
             counts[row.reaction_type] = parseInt(row.count, 10);
             totalReactions += parseInt(row.count, 10);
         }
@@ -217,7 +217,7 @@ newsletterReactionRoutes.get('/:newsletterId/stats', authenticateToken, requireT
             counts,
             sentimentScore,
             dominantReaction,
-            recentReactions: (recentReactions.rows as any[]).map(r => ({
+            recentReactions: (recentReactions as any[]).map(r => ({
                 id: r.id,
                 recipientEmail: r.recipient_email,
                 reactionType: r.reaction_type,

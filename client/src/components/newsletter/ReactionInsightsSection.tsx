@@ -10,7 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Smile, TrendingUp, Heart, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Smile, TrendingUp, Heart, ThumbsUp, ThumbsDown, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 // ── Reaction metadata ──────────────────────────────────────────────────
@@ -110,13 +110,14 @@ interface Props {
 }
 
 export function ReactionInsightsSection({ newsletterId }: Props) {
-    const { data: stats, isLoading, error } = useQuery<ReactionStats>({
+    const { data: stats, isLoading, error, refetch, isFetching } = useQuery<ReactionStats>({
         queryKey: ['newsletter-reactions', newsletterId],
         queryFn: async () => {
             const res = await apiRequest('GET', `/api/newsletter-reactions/${newsletterId}/stats`);
             return res.json();
         },
         refetchInterval: 30000, // Refresh every 30 seconds
+        staleTime: 0, // Always consider data stale so refetches work immediately
     });
 
     if (isLoading) {
@@ -140,8 +141,28 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
         );
     }
 
-    if (error || !stats) {
-        return null; // Silently fail - reactions are optional
+    if (error) {
+        return (
+            <Card className="border-dashed border-red-300 dark:border-red-700">
+                <CardContent className="py-8 text-center">
+                    <Smile className="h-10 w-10 text-red-300 dark:text-red-600 mx-auto mb-3" strokeWidth={1.5} />
+                    <p className="text-sm font-medium text-red-500 dark:text-red-400 mb-3">
+                        Failed to load reaction data
+                    </p>
+                    <button
+                        onClick={() => refetch()}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
+                    >
+                        <RefreshCw className="h-3 w-3" />
+                        Try again
+                    </button>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!stats) {
+        return null;
     }
 
     if (!stats.reactionsEnabled) {
@@ -173,11 +194,21 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                         </div>
                         Reader Reactions
                     </CardTitle>
-                    {totalReactions > 0 && (
-                        <Badge variant="secondary" className="text-xs font-semibold px-2.5 py-0.5">
-                            {totalReactions} {totalReactions === 1 ? 'reaction' : 'reactions'}
-                        </Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {totalReactions > 0 && (
+                            <Badge variant="secondary" className="text-xs font-semibold px-2.5 py-0.5">
+                                {totalReactions} {totalReactions === 1 ? 'reaction' : 'reactions'}
+                            </Badge>
+                        )}
+                        <button
+                            onClick={() => refetch()}
+                            disabled={isFetching}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                            title="Refresh reactions"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                        </button>
+                    </div>
                 </div>
                 <CardDescription className="mt-1.5">
                     How your readers are feeling about this newsletter
@@ -192,9 +223,17 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
                             No Reactions Yet
                         </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto mb-4">
                             Reactions will appear here as readers respond to your newsletter. Reactions typically start arriving within a few hours of sending.
                         </p>
+                        <button
+                            onClick={() => refetch()}
+                            disabled={isFetching}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                        >
+                            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+                            {isFetching ? 'Checking...' : 'Check for reactions'}
+                        </button>
                     </div>
                 ) : (
                     <>
