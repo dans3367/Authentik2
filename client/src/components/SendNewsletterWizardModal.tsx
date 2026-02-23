@@ -302,6 +302,7 @@ export function SendNewsletterWizardModal({
       });
       onClose();
       onSuccess?.();
+      setLocation('/newsletter');
     } catch (error: any) {
       toast({
         title: "Error",
@@ -960,6 +961,26 @@ export function SendNewsletterWizardModal({
                       Schedule Send
                     </Button>
                   )
+                )}
+                {!showSchedulePicker && (
+                  <Button
+                    variant="outline"
+                    onClick={handleSendLater}
+                    disabled={isSavingLater || isSending || isScheduling}
+                    data-testid="button-send-later"
+                  >
+                    {isSavingLater ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </span>
+                    ) : (
+                      <>
+                        <Clock className="h-4 w-4 mr-1.5" />
+                        Send Later
+                      </>
+                    )}
+                  </Button>
                 )}
                 {!showSchedulePicker && (
                   <Button
