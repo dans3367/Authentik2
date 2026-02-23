@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck, CalendarClock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ export function SendNewsletterWizardModal({
   initialSelectedTagIds,
 }: SendNewsletterWizardModalProps) {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [step, setStep] = useState<1 | 2>(1);
   const [selectionMode, setSelectionMode] = useState<"segment_list" | "custom">("segment_list");
   const [selectedSegmentListId, setSelectedSegmentListId] = useState<string | null>(null);
@@ -188,9 +190,35 @@ export function SendNewsletterWizardModal({
     setStep(2);
   };
 
-  const handleSendNow = () => {
+  const handleSendNow = async () => {
+    if (!newsletterId) return;
     setIsSending(true);
-    onSegmentSelected(getSegmentData());
+    try {
+      const segmentData = getSegmentData();
+      await apiRequest('PUT', `/api/newsletters/${newsletterId}`, {
+        recipientType: segmentData.recipientType,
+        selectedContactIds: segmentData.selectedContactIds,
+        selectedTagIds: segmentData.selectedTagIds,
+      });
+      await apiRequest('POST', `/api/newsletters/${newsletterId}/send`, {});
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+      toast({
+        title: "Newsletter Sending",
+        description: "Your newsletter is being sent to all selected recipients.",
+      });
+      onClose();
+      onSuccess?.();
+      setLocation(`/newsletters/${newsletterId}`);
+    } catch (error: any) {
+      toast({
+        title: "Send Failed",
+        description: error.message || "Failed to send newsletter",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleScheduleSend = async () => {
