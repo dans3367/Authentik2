@@ -492,7 +492,7 @@ export default function NewsletterPage() {
                 <Card
                   key={newsletter.id}
                   className="group relative border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 overflow-hidden cursor-pointer"
-                  onClick={() => isDraft
+                  onClick={() => (isDraft || isReadyToSend)
                     ? setLocation(`/newsletter/create/${newsletter.id}`)
                     : setLocation(`/newsletters/${newsletter.id}`)
                   }
@@ -536,7 +536,7 @@ export default function NewsletterPage() {
                                 <Eye className="h-4 w-4 mr-2" />
                                 Preview
                               </DropdownMenuItem>
-                              {!isSent && (
+                              {(isDraft || isReadyToSend) && (
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck, CalendarClock, X } from "lucide-react";
+import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck, CalendarClock, X, Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,8 @@ interface SendNewsletterWizardModalProps {
   initialRecipientType?: "all" | "selected" | "tags";
   initialSelectedContactIds?: string[];
   initialSelectedTagIds?: string[];
+  reactionsEnabled?: boolean;
+  onReactionsEnabledChange?: (enabled: boolean) => void;
 }
 
 interface SegmentListWithCount extends SegmentList {
@@ -54,8 +57,11 @@ export function SendNewsletterWizardModal({
   initialRecipientType,
   initialSelectedContactIds,
   initialSelectedTagIds,
+  reactionsEnabled = true,
+  onReactionsEnabledChange,
 }: SendNewsletterWizardModalProps) {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [step, setStep] = useState<1 | 2>(1);
   const [selectionMode, setSelectionMode] = useState<"segment_list" | "custom">("segment_list");
   const [selectedSegmentListId, setSelectedSegmentListId] = useState<string | null>(null);
@@ -188,9 +194,36 @@ export function SendNewsletterWizardModal({
     setStep(2);
   };
 
-  const handleSendNow = () => {
+  const handleSendNow = async () => {
+    if (!newsletterId) return;
     setIsSending(true);
-    onSegmentSelected(getSegmentData());
+    try {
+      const segmentData = getSegmentData();
+      await apiRequest('PUT', `/api/newsletters/${newsletterId}`, {
+        recipientType: segmentData.recipientType,
+        selectedContactIds: segmentData.selectedContactIds,
+        selectedTagIds: segmentData.selectedTagIds,
+        reactionsEnabled,
+      });
+      await apiRequest('POST', `/api/newsletters/${newsletterId}/send`, {});
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+      toast({
+        title: "Newsletter Sending",
+        description: "Your newsletter is being sent to all selected recipients.",
+      });
+      onClose();
+      onSuccess?.();
+      setLocation(`/newsletters/${newsletterId}`);
+    } catch (error: any) {
+      toast({
+        title: "Send Failed",
+        description: error.message || "Failed to send newsletter",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleScheduleSend = async () => {
@@ -203,6 +236,7 @@ export function SendNewsletterWizardModal({
         recipientType: segmentData.recipientType,
         selectedContactIds: segmentData.selectedContactIds,
         selectedTagIds: segmentData.selectedTagIds,
+        reactionsEnabled,
       });
 
       // Then schedule the send
@@ -265,6 +299,7 @@ export function SendNewsletterWizardModal({
         selectedContactIds: segmentData.selectedContactIds,
         selectedTagIds: segmentData.selectedTagIds,
         status: 'ready_to_send',
+        reactionsEnabled,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
@@ -274,6 +309,7 @@ export function SendNewsletterWizardModal({
       });
       onClose();
       onSuccess?.();
+      setLocation('/newsletter');
     } catch (error: any) {
       toast({
         title: "Error",
@@ -810,6 +846,27 @@ export function SendNewsletterWizardModal({
                       </div>
                     </>
                   )}
+                  <Separator />
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <Smile className={`h-4 w-4 ${reactionsEnabled ? 'text-amber-500' : 'text-muted-foreground'}`} />
+                      <span className="text-sm text-muted-foreground">Enable Reactions</span>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={reactionsEnabled}
+                      onClick={() => onReactionsEnabledChange?.(!reactionsEnabled)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer ${reactionsEnabled ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}
+                      data-testid="toggle-reactions-enabled"
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${reactionsEnabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                          }`}
+                      />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -932,6 +989,26 @@ export function SendNewsletterWizardModal({
                       Schedule Send
                     </Button>
                   )
+                )}
+                {!showSchedulePicker && (
+                  <Button
+                    variant="outline"
+                    onClick={handleSendLater}
+                    disabled={isSavingLater || isSending || isScheduling}
+                    data-testid="button-send-later"
+                  >
+                    {isSavingLater ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </span>
+                    ) : (
+                      <>
+                        <Clock className="h-4 w-4 mr-1.5" />
+                        Send Later
+                      </>
+                    )}
+                  </Button>
                 )}
                 {!showSchedulePicker && (
                   <Button

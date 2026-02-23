@@ -10,6 +10,7 @@ import { emailService, enhancedEmailService } from '../emailService';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 import { initNewsletterTracking, trackNewsletterEmailSend } from '../utils/convexNewsletterTracker';
 import { logActivity, computeChanges, NEWSLETTER_TRACKED_FIELDS } from '../utils/activityLogger';
+import { buildReactionButtonsHtml } from '../utils/newsletterReactionHtml';
 // Temporal service removed - now using server-node proxy
 import crypto from 'crypto';
 
@@ -65,7 +66,7 @@ function recordFailedApprovalCodeAttempt(userId: string, newsletterId: string): 
   const key = `${userId}:${newsletterId}`;
   const now = Date.now();
   const currentData = approvalCodeRateLimit.get(key);
-  
+
   approvalCodeRateLimit.set(key, {
     count: (currentData?.count || 0) + 1,
     resetAt: now + (15 * 60 * 1000), // 15 minutes window
@@ -304,7 +305,7 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, as
   }
 });
 
-// Send preview email via Trigger.dev + Resend
+// Send preview email via Trigger.dev + Resend (supports up to 5 recipients)
 newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { to, subject, html } = req.body;
@@ -313,36 +314,40 @@ newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (
       return res.status(400).json({ message: 'Missing required fields: to, subject, html' });
     }
 
-    const normalizedTo = String(to).trim().toLowerCase();
-    const tenantUser = await db.query.betterAuthUser.findFirst({
-      where: and(
-        eq(betterAuthUser.tenantId, req.user.tenantId),
-        sql`lower(${betterAuthUser.email}) = ${normalizedTo}`
-      ),
-      columns: { id: true },
-    });
+    // Normalize to always be an array (backward-compatible with single string)
+    const MAX_PREVIEW_RECIPIENTS = 5;
+    const recipients: string[] = (Array.isArray(to) ? to : [to])
+      .map((email: any) => String(email).trim().toLowerCase())
+      .filter(Boolean);
 
-    if (!tenantUser) {
-      return res.status(403).json({
-        message: 'Preview emails can only be sent to users within your organization.',
-      });
+    if (recipients.length === 0) {
+      return res.status(400).json({ message: 'At least one recipient is required.' });
+    }
+    if (recipients.length > MAX_PREVIEW_RECIPIENTS) {
+      return res.status(400).json({ message: `Maximum ${MAX_PREVIEW_RECIPIENTS} preview recipients allowed.` });
     }
 
-    // Trigger the preview email task via Trigger.dev
+    // Trigger one preview task per recipient
     const { sendNewsletterPreviewTask } = await import('../../src/trigger/newsletterPreview');
 
     const sanitizedHtml = sanitizeEmailHtml(html);
     const wrappedHtml = await wrapNewsletterContent(req.user.tenantId, sanitizedHtml);
-    const handle = await sendNewsletterPreviewTask.trigger({
-      to: normalizedTo,
-      subject,
-      html: sanitizedHtml,
-      wrappedHtml,
-      tenantId: req.user.tenantId,
-      requestedBy: req.user.email,
-    });
 
-    console.log(`[Newsletter Preview] Triggered send-newsletter-preview task (run: ${handle.id}) to ${to}`);
+    const handles = await Promise.all(
+      recipients.map((recipientEmail) =>
+        sendNewsletterPreviewTask.trigger({
+          to: recipientEmail,
+          subject,
+          html: sanitizedHtml,
+          wrappedHtml,
+          tenantId: req.user.tenantId,
+          requestedBy: req.user.email,
+        })
+      )
+    );
+
+    const runIds = handles.map((h) => h.id);
+    console.log(`[Newsletter Preview] Triggered ${recipients.length} send-newsletter-preview task(s) (runs: ${runIds.join(', ')}) to ${recipients.join(', ')}`);
 
     // Log activity: preview email sent
     await logActivity({
@@ -351,15 +356,15 @@ newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (
       entityType: 'newsletter',
       entityName: subject,
       activityType: 'preview_sent',
-      description: `Sent preview email to ${normalizedTo}`,
-      metadata: { to: normalizedTo, subject, runId: handle.id },
+      description: `Sent preview email to ${recipients.join(', ')}`,
+      metadata: { to: recipients, subject, runIds },
       req,
     });
 
     res.json({
-      message: 'Preview email queued successfully',
-      to,
-      runId: handle.id,
+      message: `Preview email${recipients.length > 1 ? 's' : ''} queued successfully`,
+      to: recipients,
+      runIds,
     });
   } catch (error) {
     console.error('Send preview email error:', error);
@@ -766,7 +771,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
   try {
     const { id } = req.params;
     const validatedData = updateNewsletterSchema.parse(req.body);
-    const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds } = validatedData;
+    const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds, reactionsEnabled } = validatedData;
 
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
@@ -817,6 +822,10 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
 
     if (selectedTagIds !== undefined) {
       updateData.selectedTagIds = selectedTagIds;
+    }
+
+    if (reactionsEnabled !== undefined) {
+      updateData.reactionsEnabled = reactionsEnabled;
     }
 
     const updatedNewsletter = await db.update(newsletters)
@@ -1486,6 +1495,8 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           })),
           batchSize: 25,
           priority: 'normal' as const,
+          reactionsEnabled: newsletter.reactionsEnabled ?? true,
+          baseUrl: `${req.protocol}://${req.get('host')}`,
         });
 
         console.log(`[Newsletter] Trigger.dev task triggered:`, {
@@ -1535,12 +1546,19 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         // Wrap newsletter content in the branded email design template
         const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
 
-        // Prepare emails for batch sending (append unsubscribe link)
+        // Prepare emails for batch sending (append reaction buttons + unsubscribe link)
         const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => {
           const token = tokenMap.get(contact.id)!;
           const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(token)}&type=newsletters`;
           const emailTrackingId = crypto.randomUUID();
+
+          // Build reaction buttons HTML if reactions are enabled
+          const reactionHtml = newsletter.reactionsEnabled
+            ? buildReactionButtonsHtml(`${req.protocol}://${req.get('host')}`, newsletter.id, contact.id)
+            : '';
+
           const html = `${wrappedContent}
+            ${reactionHtml}
             <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #94a3b8;">
                 <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
@@ -1813,6 +1831,8 @@ newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, async (
       batchSize: 25,
       priority: 'normal' as const,
       scheduledFor: scheduledDate.toISOString(),
+      reactionsEnabled: newsletter.reactionsEnabled ?? true,
+      baseUrl: `${req.protocol}://${req.get('host')}`,
     });
 
     console.log(`[Newsletter] Schedule task triggered:`, {
@@ -2062,10 +2082,20 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
     // Wrap newsletter content in the branded email design template
     const wrappedSingleContent = await wrapNewsletterContent(tenantId, content);
 
+    // Check if reactions are enabled for this newsletter
+    const singleNewsletter = await db.query.newsletters.findFirst({
+      where: and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)),
+      columns: { reactionsEnabled: true },
+    });
+    const singleReactionHtml = singleNewsletter?.reactionsEnabled
+      ? buildReactionButtonsHtml(`${req.protocol}://${req.get('host')}`, id, recipient.id)
+      : '';
+
     const email = {
       to: recipient.email,
       subject: subject,
       html: `${wrappedSingleContent}
+        ${singleReactionHtml}
         <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
           <p style="margin: 0; font-size: 12px; color: #94a3b8;">
             <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
@@ -2270,7 +2300,7 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
 
     const providedCode = Buffer.from(String(approvalCode).trim(), 'utf8');
     const expectedCode = Buffer.from(String(newsletter.reviewerApprovalCode), 'utf8');
-    
+
     // Use constant-time comparison to prevent timing attacks
     if (providedCode.length !== expectedCode.length || !crypto.timingSafeEqual(providedCode, expectedCode)) {
       // Record failed attempt for rate limiting
@@ -2355,7 +2385,7 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
 
     const providedCode = Buffer.from(String(approvalCode).trim(), 'utf8');
     const expectedCode = Buffer.from(String(newsletter.reviewerApprovalCode), 'utf8');
-    
+
     // Use constant-time comparison to prevent timing attacks
     if (providedCode.length !== expectedCode.length || !crypto.timingSafeEqual(providedCode, expectedCode)) {
       // Record failed attempt for rate limiting

@@ -129,7 +129,7 @@ rm -f /tmp/authentik_pids.txt
 
 # Define services and their ports
 declare -A SERVICES=(
-    ["Main Server"]="5000"
+    ["Main Server"]="5002"
     ["Form Server"]="3004"
     ["Server Node"]="3502"
     ["Temporal Server"]="50051"
@@ -154,7 +154,7 @@ echo ""
 
 # Set environment variables
 export NODE_ENV=${NODE_ENV:-development}
-export PORT=${PORT:-5000}
+export PORT=${PORT:-5002}
 export FSERVER_PORT=${FSERVER_PORT:-3004}
 export TEMPORAL_SERVER_PORT=${TEMPORAL_SERVER_PORT:-50051}
 export WEBHOOK_PORT=${WEBHOOK_PORT:-3505}
@@ -168,9 +168,9 @@ echo ""
 PROJECT_ROOT=$(pwd)
 
 # 1. Start Main Server
-start_service "Main Server" "5000" "NODE_ENV=development PORT=5000 npx tsx server/index.ts" "$PROJECT_ROOT"
+start_service "Main Server" "5002" "NODE_ENV=development PORT=5002 npx tsx server/index.ts" "$PROJECT_ROOT"
 if [ $? -eq 0 ]; then
-    print_port "Main Server: http://localhost:5000"
+    print_port "Main Server: http://localhost:5002"
 fi
 
 # 2. Start Form Server

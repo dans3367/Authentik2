@@ -9,6 +9,7 @@ import { auth } from '../auth';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { emailService } from '../emailService';
+import { randomBytes } from 'crypto';
 
 export const loginRoutes = Router();
 
@@ -243,7 +244,7 @@ loginRoutes.post('/verify-login', async (req, res) => {
     
     // For 2FA flow, we create our own temporary session token
     // since Better Auth doesn't provide one during 2FA verification
-    const sessionToken = `temp_${user.id}_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    const sessionToken = `temp_${user.id}_${Date.now()}_${randomBytes(16).toString('base64url')}`;
 
     console.log('🔍 [Login] Created temporary session token for 2FA:', sessionToken.substring(0, 8) + '...');
 
@@ -397,7 +398,7 @@ loginRoutes.post('/check-2fa-requirement', async (req, res) => {
     // User has 2FA enabled - create temporary session for verification
     console.log(`🔐 [2FA Check] 2FA required for user ${userRecord.email}`);
     
-    const sessionToken = `temp_${userRecord.id}_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    const sessionToken = `temp_${userRecord.id}_${Date.now()}_${randomBytes(16).toString('base64url')}`;
 
     // Delete any existing temp 2FA session for this user
     try {
@@ -553,7 +554,7 @@ loginRoutes.post('/verify-2fa', async (req, res) => {
     } catch (authError) {
       console.error('❌ [2FA] Failed to create Better Auth session:', authError);
       // Fallback: create manual session token (this might not work with frontend)
-      const manualToken = `auth_${user.id}_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+      const manualToken = `auth_${user.id}_${Date.now()}_${randomBytes(16).toString('base64url')}`;
       res.cookie('better-auth.session_token', manualToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -858,8 +859,8 @@ loginRoutes.get('/verify-email', async (req, res) => {
     console.log('🔐 [Verify Email] Creating session for user:', user.email);
     
     // Generate a unique session ID and token
-    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-    const sessionToken = `${sessionId}_token_${Math.random().toString(36).substring(2, 15)}`;
+    const sessionId = `session_${Date.now()}_${randomBytes(12).toString('base64url')}`;
+    const sessionToken = `${sessionId}_token_${randomBytes(18).toString('base64url')}`;
     const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     // Create session in database

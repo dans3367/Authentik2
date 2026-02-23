@@ -37,7 +37,7 @@ function AppHeader() {
   
   // Check if we're on newsletter create/edit pages or forms edit pages
   const hideHeader = location === '/newsletter/create' || 
-                    location.startsWith('/newsletter/edit/') || 
+                    location.startsWith('/newsletter/create/') || 
                     location.startsWith('/forms/');
   
   // Return null to completely hide header on newsletter create/edit pages
@@ -356,7 +356,7 @@ useEffect(() => {
   }
 
   const hideSidebar = location === '/newsletter/create' || 
-                     location.startsWith('/newsletter/edit/') || 
+                     location.startsWith('/newsletter/create/') || 
                      location.startsWith('/forms/');
 
   return (
