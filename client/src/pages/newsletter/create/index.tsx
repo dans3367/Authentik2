@@ -50,6 +50,9 @@ export default function NewsletterCreatePage() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [showSendWizard, setShowSendWizard] = useState(false);
   const [dataReady, setDataReady] = useState(!isEditMode);
+  const [initialRecipientType, setInitialRecipientType] = useState<"all" | "selected" | "tags">("all");
+  const [initialSelectedContactIds, setInitialSelectedContactIds] = useState<string[]>([]);
+  const [initialSelectedTagIds, setInitialSelectedTagIds] = useState<string[]>([]);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -80,6 +83,16 @@ export default function NewsletterCreatePage() {
         } catch {
           // puckData was invalid JSON, start fresh
         }
+      }
+      // Populate recipient data for the send wizard
+      if (nl.recipientType) {
+        setInitialRecipientType(nl.recipientType as "all" | "selected" | "tags");
+      }
+      if (nl.selectedContactIds) {
+        setInitialSelectedContactIds(nl.selectedContactIds);
+      }
+      if (nl.selectedTagIds) {
+        setInitialSelectedTagIds(nl.selectedTagIds);
       }
       setDataReady(true);
     }
@@ -886,6 +899,9 @@ export default function NewsletterCreatePage() {
           newsletterTitle={title || "Untitled Newsletter"}
           newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
           onSegmentSelected={handleSegmentSelected}
+          initialRecipientType={initialRecipientType}
+          initialSelectedContactIds={initialSelectedContactIds}
+          initialSelectedTagIds={initialSelectedTagIds}
         />
         {exitDialog}
       </>
@@ -1017,6 +1033,9 @@ export default function NewsletterCreatePage() {
         newsletterTitle={title || "Untitled Newsletter"}
         newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
         onSegmentSelected={handleSegmentSelected}
+        initialRecipientType={initialRecipientType}
+        initialSelectedContactIds={initialSelectedContactIds}
+        initialSelectedTagIds={initialSelectedTagIds}
       />
       {exitDialog}
     </>

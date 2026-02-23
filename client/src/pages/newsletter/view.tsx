@@ -817,9 +817,9 @@ export default function NewsletterViewPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:justify-end shrink-0 pl-0 sm:pl-4">
-            {newsletter.status === 'draft' && (
+            {(newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && (
               <Button
-                onClick={() => navigate(`/newsletters/${newsletter.id}/edit`)}
+                onClick={() => navigate(`/newsletter/create/${newsletter.id}`)}
                 variant="outline"
                 size="sm"
                 data-testid="button-edit"

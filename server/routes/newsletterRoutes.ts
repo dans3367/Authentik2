@@ -305,7 +305,7 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, as
   }
 });
 
-// Send preview email via Trigger.dev + Resend
+// Send preview email via Trigger.dev + Resend (supports up to 5 recipients)
 newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { to, subject, html } = req.body;
@@ -314,36 +314,40 @@ newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (
       return res.status(400).json({ message: 'Missing required fields: to, subject, html' });
     }
 
-    const normalizedTo = String(to).trim().toLowerCase();
-    const tenantUser = await db.query.betterAuthUser.findFirst({
-      where: and(
-        eq(betterAuthUser.tenantId, req.user.tenantId),
-        sql`lower(${betterAuthUser.email}) = ${normalizedTo}`
-      ),
-      columns: { id: true },
-    });
+    // Normalize to always be an array (backward-compatible with single string)
+    const MAX_PREVIEW_RECIPIENTS = 5;
+    const recipients: string[] = (Array.isArray(to) ? to : [to])
+      .map((email: any) => String(email).trim().toLowerCase())
+      .filter(Boolean);
 
-    if (!tenantUser) {
-      return res.status(403).json({
-        message: 'Preview emails can only be sent to users within your organization.',
-      });
+    if (recipients.length === 0) {
+      return res.status(400).json({ message: 'At least one recipient is required.' });
+    }
+    if (recipients.length > MAX_PREVIEW_RECIPIENTS) {
+      return res.status(400).json({ message: `Maximum ${MAX_PREVIEW_RECIPIENTS} preview recipients allowed.` });
     }
 
-    // Trigger the preview email task via Trigger.dev
+    // Trigger one preview task per recipient
     const { sendNewsletterPreviewTask } = await import('../../src/trigger/newsletterPreview');
 
     const sanitizedHtml = sanitizeEmailHtml(html);
     const wrappedHtml = await wrapNewsletterContent(req.user.tenantId, sanitizedHtml);
-    const handle = await sendNewsletterPreviewTask.trigger({
-      to: normalizedTo,
-      subject,
-      html: sanitizedHtml,
-      wrappedHtml,
-      tenantId: req.user.tenantId,
-      requestedBy: req.user.email,
-    });
 
-    console.log(`[Newsletter Preview] Triggered send-newsletter-preview task (run: ${handle.id}) to ${to}`);
+    const handles = await Promise.all(
+      recipients.map((recipientEmail) =>
+        sendNewsletterPreviewTask.trigger({
+          to: recipientEmail,
+          subject,
+          html: sanitizedHtml,
+          wrappedHtml,
+          tenantId: req.user.tenantId,
+          requestedBy: req.user.email,
+        })
+      )
+    );
+
+    const runIds = handles.map((h) => h.id);
+    console.log(`[Newsletter Preview] Triggered ${recipients.length} send-newsletter-preview task(s) (runs: ${runIds.join(', ')}) to ${recipients.join(', ')}`);
 
     // Log activity: preview email sent
     await logActivity({
@@ -352,15 +356,15 @@ newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (
       entityType: 'newsletter',
       entityName: subject,
       activityType: 'preview_sent',
-      description: `Sent preview email to ${normalizedTo}`,
-      metadata: { to: normalizedTo, subject, runId: handle.id },
+      description: `Sent preview email to ${recipients.join(', ')}`,
+      metadata: { to: recipients, subject, runIds },
       req,
     });
 
     res.json({
-      message: 'Preview email queued successfully',
-      to,
-      runId: handle.id,
+      message: `Preview email${recipients.length > 1 ? 's' : ''} queued successfully`,
+      to: recipients,
+      runIds,
     });
   } catch (error) {
     console.error('Send preview email error:', error);
