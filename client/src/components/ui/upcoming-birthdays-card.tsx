@@ -12,6 +12,7 @@ import {
   Gift,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 
 interface Contact {
   id: string;
@@ -43,6 +44,7 @@ const avatarColors = [
 
 export function UpcomingBirthdaysCard() {
   const [, setLocation] = useLocation();
+  const { t } = useTranslation();
 
   const { data: contactsData, isLoading } = useQuery({
     queryKey: ["/api/email-contacts"],
@@ -111,7 +113,7 @@ export function UpcomingBirthdaysCard() {
             <div className="w-8 h-8 rounded-lg bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
               <CakeIcon className="h-4 w-4 text-pink-500" />
             </div>
-            Upcoming Birthdays
+            {t("dashboard.birthdays.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
@@ -131,7 +133,7 @@ export function UpcomingBirthdaysCard() {
             <div className="w-8 h-8 rounded-lg bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
               <CakeIcon className="h-4 w-4 text-pink-500" />
             </div>
-            Upcoming Birthdays
+            {t("dashboard.birthdays.title")}
           </CardTitle>
           <Button
             variant="ghost"
@@ -140,7 +142,7 @@ export function UpcomingBirthdaysCard() {
             className="text-xs rounded-full text-muted-foreground hover:text-primary"
             data-testid="button-view-all-birthdays"
           >
-            View All
+            {t("dashboard.birthdays.viewAll")}
             <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
           </Button>
         </div>
@@ -153,10 +155,10 @@ export function UpcomingBirthdaysCard() {
             </div>
             <div>
               <p className="text-sm font-medium text-foreground mb-1">
-                No birthdays coming up
+                {t("dashboard.birthdays.noBirthdaysTitle")}
               </p>
               <p className="text-xs text-muted-foreground">
-                No birthdays in the next 30 days
+                {t("dashboard.birthdays.noBirthdaysDesc")}
               </p>
             </div>
             <Button
@@ -165,16 +167,16 @@ export function UpcomingBirthdaysCard() {
               onClick={() => setLocation("/birthdays")}
               className="text-xs rounded-full mt-2"
             >
-              Manage Birthdays
+              {t("dashboard.birthdays.manage")}
             </Button>
           </div>
         ) : (
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
               <span className="font-medium">
-                {upcomingBirthdays.length} upcoming
+                {t("dashboard.birthdays.upcoming", { count: upcomingBirthdays.length })}
               </span>
-              <span>Next 30 days</span>
+              <span>{t("dashboard.birthdays.next30Days")}</span>
             </div>
             <div className="space-y-2">
               {upcomingBirthdays.map((contact, index) => {
@@ -249,10 +251,10 @@ export function UpcomingBirthdaysCard() {
                               }
                             );
                             const dayText = isToday
-                              ? "🎉 Today!"
+                              ? t("dashboard.birthdays.today")
                               : daysUntil === 1
-                                ? "Tomorrow"
-                                : `in ${daysUntil} days`;
+                                ? t("dashboard.birthdays.tomorrow")
+                                : t("dashboard.birthdays.inDays", { count: daysUntil });
                             return `${dateStr} • ${dayText}`;
                           })()}
                       </p>
@@ -260,15 +262,14 @@ export function UpcomingBirthdaysCard() {
 
                     {/* Status indicator */}
                     {contact.birthdayUnsubscribedAt ? (
-                      <span title="Unsubscribed from birthday emails">
+                      <span title={t("dashboard.birthdays.unsubscribedTitle")}>
                         <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />
                       </span>
                     ) : contact.birthdayEmailEnabled ? (
                       <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
                     ) : (
                       <XCircle className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />
-                    )}
-                  </div>
+                    )}                  </div>
                 );
               })}
             </div>
@@ -278,7 +279,7 @@ export function UpcomingBirthdaysCard() {
               onClick={() => setLocation("/birthdays")}
               className="w-full mt-2 rounded-lg text-xs"
             >
-              Manage Birthday Settings
+              {t("dashboard.birthdays.manageBirthdaySettings")}
             </Button>
           </div>
         )}

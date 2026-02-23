@@ -1053,6 +1053,16 @@ export function BirthdayCardsContent() {
     }
   };
 
+  const getStatusLabel = (status: Contact['status']) => {
+    switch (status) {
+      case 'active': return t('birthdays.customers.statusActive');
+      case 'unsubscribed': return t('birthdays.customers.statusUnsubscribed');
+      case 'bounced': return t('birthdays.customers.statusBounced');
+      case 'pending': return t('birthdays.customers.statusPending');
+      default: return status;
+    }
+  };
+
   // Check if all contacts are selected
   const isAllSelected = contacts.length > 0 && selectedContacts.length === contacts.length;
 
@@ -1741,7 +1751,7 @@ export function BirthdayCardsContent() {
                 </CardTitle>
                 <Button onClick={handleAddCustomer}>
                   <UserPlus className="h-4 w-4 mr-2" />
-                  {t('common.add')} Customer
+                  {t('birthdays.customers.addCustomer')}
                 </Button>
               </div>
             </CardHeader>
@@ -1765,7 +1775,7 @@ export function BirthdayCardsContent() {
                     <SelectItem value="all">{t('birthdays.filters.allStatuses')}</SelectItem>
                     <SelectItem value="active">{t('birthdays.filters.active')}</SelectItem>
                     <SelectItem value="unsubscribed">{t('birthdays.filters.unsubscribed')}</SelectItem>
-                    <SelectItem value="bounced">Bounced</SelectItem>
+                    <SelectItem value="bounced">{t('birthdays.filters.bounced')}</SelectItem>
                     <SelectItem value="pending">{t('birthdays.filters.pending')}</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1775,13 +1785,13 @@ export function BirthdayCardsContent() {
               {selectedContacts.length > 0 && (
                 <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{selectedContacts.length} selected</span>
+                    <span className="text-sm font-medium">{selectedContacts.length} {t('birthdays.bulkActions.selected')}</span>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setSelectedContacts([])}
                     >
-                      Clear Selection
+                      {t('birthdays.bulkActions.clearSelection')}
                     </Button>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1792,7 +1802,7 @@ export function BirthdayCardsContent() {
                       disabled={bulkUpdateBirthdayEmailMutation.isPending}
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Enable Birthday Emails
+                      {t('birthdays.bulkActions.enableBirthdayEmails')}
                     </Button>
                     <Button
                       variant="outline"
@@ -1801,7 +1811,7 @@ export function BirthdayCardsContent() {
                       disabled={bulkUpdateBirthdayEmailMutation.isPending}
                     >
                       <XCircle className="h-4 w-4 mr-2" />
-                      Disable Birthday Emails
+                      {t('birthdays.bulkActions.disableBirthdayEmails')}
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -1812,21 +1822,21 @@ export function BirthdayCardsContent() {
                       <DropdownMenuContent>
                         <DropdownMenuItem onClick={handleSendBirthdayCard} disabled={sendBirthdayCardMutation.isPending}>
                           <CakeIcon className="h-4 w-4 mr-2" />
-                          {sendBirthdayCardMutation.isPending ? 'Sending...' : 'Send Birthday Card'}
+                          {sendBirthdayCardMutation.isPending ? t('birthdays.bulkActions.sending') : t('birthdays.bulkActions.sendBirthdayCard')}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleBulkRequestBirthdays} disabled={sendInvitationMutation.isPending}>
                           <Mail className="h-4 w-4 mr-2" />
-                          {sendInvitationMutation.isPending ? 'Sending...' : 'Request Birthdays'}
+                          {sendInvitationMutation.isPending ? t('birthdays.bulkActions.sending') : t('birthdays.bulkActions.requestBirthdays')}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem>
                           <Download className="h-4 w-4 mr-2" />
-                          Export Selected
+                          {t('birthdays.bulkActions.exportSelected')}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-red-600">
                           <Trash2 className="h-4 w-4 mr-2" />
-                          Remove Selected
+                          {t('birthdays.bulkActions.removeSelected')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -1841,11 +1851,11 @@ export function BirthdayCardsContent() {
               ) : contacts.length === 0 ? (
                 <div className="text-center py-12">
                   <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">No customers found</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">Start by adding your first customer to begin managing birthday emails</p>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('birthdays.customers.noCustomers')}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('birthdays.customers.noCustomersDescription')}</p>
                   <Button onClick={handleAddCustomer}>
                     <UserPlus className="h-4 w-4 mr-2" />
-                    Add Your First Customer
+                    {t('birthdays.customers.addFirstCustomer')}
                   </Button>
                 </div>
               ) : (
@@ -1857,7 +1867,7 @@ export function BirthdayCardsContent() {
                           <Checkbox
                             checked={isAllSelected}
                             onCheckedChange={handleSelectAll}
-                            aria-label="Select all customers"
+                            aria-label={t('birthdays.customers.selectAll')}
                           />
                         </TableHead>
                         <TableHead>{t('birthdays.table.name')}</TableHead>
@@ -1865,7 +1875,7 @@ export function BirthdayCardsContent() {
                         <TableHead>{t('birthdays.table.birthday')}</TableHead>
 
                         <TableHead>{t('birthdays.table.campaigns')}</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>{t('birthdays.customers.actionsColumn')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1892,7 +1902,7 @@ export function BirthdayCardsContent() {
                           </TableCell>
                           <TableCell>
                             <Badge className={getStatusColor(contact.status)}>
-                              {contact.status}
+                              {getStatusLabel(contact.status)}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -1951,7 +1961,7 @@ export function BirthdayCardsContent() {
                                 className="flex items-center gap-2"
                               >
                                 <Mail className="h-4 w-4" />
-                                {tokenLoading ? "Refreshing..." : sendInvitationMutation.isPending ? "Sending..." : "Request Birthday"}
+                                {tokenLoading ? t('birthdays.customers.refreshing') : sendInvitationMutation.isPending ? t('birthdays.bulkActions.sending') : t('birthdays.customers.requestBirthday')}
                               </Button>
                             )}
                           </TableCell>

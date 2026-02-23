@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useDashboardHighlights, type StatMetric } from "@/hooks/useStats";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslation } from "react-i18next";
 
 interface MetricItem {
   label: string;
@@ -47,10 +48,11 @@ function ChangeBadge({ change }: { change: number | null }) {
 
 export function HighlightsCard() {
   const { data, isLoading } = useDashboardHighlights();
+  const { t } = useTranslation();
 
   const metrics: MetricItem[] = [
     {
-      label: "Contacts",
+      label: t("dashboard.highlights.contacts"),
       icon: Users,
       metric: data?.totalContacts,
       accentColor: "text-blue-600 dark:text-blue-400",
@@ -58,7 +60,7 @@ export function HighlightsCard() {
       darkBgColor: "dark:bg-blue-900/20",
     },
     {
-      label: "Emails Sent",
+      label: t("dashboard.highlights.emailsSent"),
       icon: Mail,
       metric: data?.emailsSentThisMonth,
       accentColor: "text-emerald-600 dark:text-emerald-400",
@@ -66,7 +68,7 @@ export function HighlightsCard() {
       darkBgColor: "dark:bg-emerald-900/20",
     },
     {
-      label: "Newsletters",
+      label: t("dashboard.highlights.newsletters"),
       icon: Newspaper,
       metric: data?.newslettersSent,
       accentColor: "text-violet-600 dark:text-violet-400",
@@ -74,7 +76,7 @@ export function HighlightsCard() {
       darkBgColor: "dark:bg-violet-900/20",
     },
     {
-      label: "Appointments",
+      label: t("dashboard.highlights.appointments"),
       icon: CalendarCheck,
       metric: data?.upcomingAppointments,
       accentColor: "text-amber-600 dark:text-amber-400",
@@ -90,7 +92,7 @@ export function HighlightsCard() {
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
             <BarChart3 className="w-4 h-4 text-primary" />
           </div>
-          <CardTitle className="text-lg font-bold">Highlights</CardTitle>
+          <CardTitle className="text-lg font-bold">{t("dashboard.highlights.title")}</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -133,7 +135,7 @@ export function HighlightsCard() {
         {!isLoading && (
           <div className="pt-3 border-t border-border/50">
             <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-              <span className="font-medium">Activity Breakdown</span>
+              <span className="font-medium">{t("dashboard.highlights.activityBreakdown")}</span>
             </div>
             <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
               <div className="flex h-full rounded-full overflow-hidden">
@@ -171,19 +173,19 @@ export function HighlightsCard() {
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 bg-blue-500 rounded-full" />
                 <span className="text-[11px] text-muted-foreground">
-                  Contacts
+                  {t("dashboard.highlights.contacts_legend")}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 bg-emerald-500 rounded-full" />
                 <span className="text-[11px] text-muted-foreground">
-                  Emails
+                  {t("dashboard.highlights.emails_legend")}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 bg-violet-500 rounded-full" />
                 <span className="text-[11px] text-muted-foreground">
-                  Newsletters
+                  {t("dashboard.highlights.newsletters_legend")}
                 </span>
               </div>
             </div>

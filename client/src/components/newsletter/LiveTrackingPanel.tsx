@@ -5,6 +5,7 @@
  * delivery stats, and a live event feed powered by Convex.
  */
 
+import { useTranslation } from "react-i18next";
 import { useNewsletterStats, useNewsletterEvents, useStatusBreakdown } from "@/hooks/useNewsletterTracking";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,14 +41,14 @@ function formatEventDateTime(timestamp: number) {
   });
 }
 
-function formatTimeAgo(timestamp: number) {
+function formatTimeAgo(timestamp: number, t: (key: string, opts?: object) => string) {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60) return t("newsletter.view.liveTracking.timeAgoSeconds", { count: seconds });
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t("newsletter.view.liveTracking.timeAgoMinutes", { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  if (hours < 24) return t("newsletter.view.liveTracking.timeAgoHours", { count: hours });
+  return t("newsletter.view.liveTracking.timeAgoDays", { count: Math.floor(hours / 24) });
 }
 
 const eventTypeConfig: Record<string, { icon: typeof Send; color: string; label: string }> = {
@@ -64,6 +65,7 @@ const eventTypeConfig: Record<string, { icon: typeof Send; color: string; label:
 };
 
 export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
+  const { t } = useTranslation();
   const stats = useNewsletterStats(newsletterId);
   const breakdown = useStatusBreakdown(newsletterId);
 
@@ -84,7 +86,7 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
     return (
       <div className="flex items-center justify-center py-8 text-muted-foreground">
         <Activity className="h-4 w-4 animate-pulse mr-2" />
-        Loading live tracking...
+        {t("newsletter.view.liveTracking.loading")}
       </div>
     );
   }
@@ -93,8 +95,8 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
     return (
       <div className="text-center py-8 text-muted-foreground">
         <Mail className="h-8 w-8 mx-auto mb-2 opacity-50" />
-        <p className="text-sm">No tracking data yet.</p>
-        <p className="text-xs mt-1">Data will appear here once the newsletter starts sending.</p>
+        <p className="text-sm">{t("newsletter.view.liveTracking.noDataTitle")}</p>
+        <p className="text-xs mt-1">{t("newsletter.view.liveTracking.noDataDesc")}</p>
       </div>
     );
   }
@@ -111,7 +113,7 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Activity className="h-4 w-4" />
-              Live Tracking
+              {t("newsletter.view.liveTracking.title")}
             </CardTitle>
             <Badge
               variant={
@@ -132,13 +134,13 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
         <CardContent>
           <div className="space-y-2">
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{stats.sent + stats.failed + (stats.suppressed ?? 0)} / {stats.totalRecipients} processed</span>
+            <span>{t("newsletter.view.liveTracking.processed", { sent: stats.sent + stats.failed + (stats.suppressed ?? 0), total: stats.totalRecipients })}</span>
               <span>{progress}%</span>
             </div>
             <Progress value={progress} className="h-2" />
             {stats.lastEventAt && (
               <p className="text-xs text-muted-foreground">
-                Last event: {formatTimeAgo(stats.lastEventAt)}
+                {t("newsletter.view.liveTracking.lastEvent", { time: formatTimeAgo(stats.lastEventAt, t) })}
               </p>
             )}
           </div>
@@ -147,10 +149,10 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={Send} label="Sent" value={stats.sent} color="text-blue-500" />
-        <StatCard icon={CheckCircle} label="Delivered" value={stats.delivered} color="text-green-500" />
-        <StatCard icon={Eye} label="Unique Opens" value={stats.uniqueOpens} color="text-purple-500" />
-        <StatCard icon={MousePointer} label="Unique Clicks" value={stats.uniqueClicks} color="text-indigo-500" />
+        <StatCard icon={Send} label={t("newsletter.view.liveTracking.sent")} value={stats.sent} color="text-blue-500" />
+        <StatCard icon={CheckCircle} label={t("newsletter.view.liveTracking.delivered")} value={stats.delivered} color="text-green-500" />
+        <StatCard icon={Eye} label={t("newsletter.view.liveTracking.uniqueOpens")} value={stats.uniqueOpens} color="text-purple-500" />
+        <StatCard icon={MousePointer} label={t("newsletter.view.liveTracking.uniqueClicks")} value={stats.uniqueClicks} color="text-indigo-500" />
       </div>
 
       {/* Rates */}
@@ -159,16 +161,16 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              Performance Rates
+              {t("newsletter.view.liveTracking.performanceRates")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <RateItem label="Delivery Rate" value={breakdown.rates.deliveryRate} />
-              <RateItem label="Open Rate" value={breakdown.rates.openRate} />
-              <RateItem label="Click Rate" value={breakdown.rates.clickRate} />
-              <RateItem label="Bounce Rate" value={breakdown.rates.bounceRate} negative />
-              <RateItem label="Suppression Rate" value={breakdown.rates.suppressionRate} negative />
+              <RateItem label={t("newsletter.view.liveTracking.deliveryRate")} value={breakdown.rates.deliveryRate} />
+              <RateItem label={t("newsletter.view.liveTracking.openRate")} value={breakdown.rates.openRate} />
+              <RateItem label={t("newsletter.view.liveTracking.clickRate")} value={breakdown.rates.clickRate} />
+              <RateItem label={t("newsletter.view.liveTracking.bounceRate")} value={breakdown.rates.bounceRate} negative />
+              <RateItem label={t("newsletter.view.liveTracking.suppressionRate")} value={breakdown.rates.suppressionRate} negative />
             </div>
           </CardContent>
         </Card>
@@ -176,10 +178,10 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
 
       {/* Secondary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={AlertTriangle} label="Bounced" value={stats.bounced} color="text-orange-500" small tooltip="Emails that were rejected by the recipient's mail server. This can happen due to invalid addresses or full mailboxes." />
-        <StatCard icon={ShieldOff} label="Suppressed" value={stats.suppressed ?? 0} color="text-yellow-600" small tooltip="Emails that were not sent because the recipient was on a suppression list due to previous bounces or complaints." />
-        <StatCard icon={XCircle} label="Failed" value={stats.failed} color="text-red-500" small tooltip="Emails that could not be processed or sent due to a system or delivery error." />
-        <StatCard icon={XCircle} label="Complained" value={stats.complained} color="text-red-600" small tooltip="Recipients who marked the email as spam or junk in their email client." />
+        <StatCard icon={AlertTriangle} label={t("newsletter.view.liveTracking.bounced")} value={stats.bounced} color="text-orange-500" small tooltip={t("newsletter.view.liveTracking.bouncedTooltip")} />
+        <StatCard icon={ShieldOff} label={t("newsletter.view.liveTracking.suppressed")} value={stats.suppressed ?? 0} color="text-yellow-600" small tooltip={t("newsletter.view.liveTracking.suppressedTooltip")} />
+        <StatCard icon={XCircle} label={t("newsletter.view.liveTracking.failed")} value={stats.failed} color="text-red-500" small tooltip={t("newsletter.view.liveTracking.failedTooltip")} />
+        <StatCard icon={XCircle} label={t("newsletter.view.liveTracking.complained")} value={stats.complained} color="text-red-600" small tooltip={t("newsletter.view.liveTracking.complainedTooltip")} />
       </div>
 
       {/* Live Event Feed */}
@@ -188,7 +190,7 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Activity className="h-4 w-4" />
-              Recent Events
+              {t("newsletter.view.liveTracking.recentEvents")}
               {stats.status === "sending" && (
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -199,11 +201,11 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <EventColumn title="Queued" events={queuedEvents} config={eventTypeConfig.queued} />
-              <EventColumn title="Sent" events={sentEvents} config={eventTypeConfig.sent} />
-              <EventColumn title="Delivered" events={deliveredEvents} config={eventTypeConfig.delivered} />
-              <EventColumn title="Opened" events={openedEvents} config={eventTypeConfig.opened} />
-              <EventColumn title="Clicked" events={clickedEvents} config={eventTypeConfig.clicked} />
+              <EventColumn title={t("newsletter.view.liveTracking.queued")} events={queuedEvents} config={eventTypeConfig.queued} t={t} />
+              <EventColumn title={t("newsletter.view.liveTracking.sent")} events={sentEvents} config={eventTypeConfig.sent} t={t} />
+              <EventColumn title={t("newsletter.view.liveTracking.delivered")} events={deliveredEvents} config={eventTypeConfig.delivered} t={t} />
+              <EventColumn title={t("newsletter.view.liveTracking.opened")} events={openedEvents} config={eventTypeConfig.opened} t={t} />
+              <EventColumn title={t("newsletter.view.liveTracking.clicked")} events={clickedEvents} config={eventTypeConfig.clicked} t={t} />
             </div>
           </CardContent>
         </Card>
@@ -281,11 +283,13 @@ function RateItem({
 function EventColumn({
   title,
   events,
-  config
+  config,
+  t,
 }: {
   title: string;
   events: { _id: string; recipientEmail: string; occurredAt: number }[] | undefined;
   config: { icon: typeof Send; color: string; label: string };
+  t: (key: string, opts?: object) => string;
 }) {
   const Icon = config.icon;
   return (
@@ -297,9 +301,9 @@ function EventColumn({
       </div>
       <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
         {!events ? (
-          <div className="text-center text-xs text-muted-foreground py-4 animate-pulse">Loading...</div>
+          <div className="text-center text-xs text-muted-foreground py-4 animate-pulse">{t("newsletter.view.liveTracking.loadingEvents")}</div>
         ) : events.length === 0 ? (
-          <div className="text-center text-[10px] text-muted-foreground py-4 border border-dashed rounded bg-muted/30">No events</div>
+          <div className="text-center text-[10px] text-muted-foreground py-4 border border-dashed rounded bg-muted/30">{t("newsletter.view.liveTracking.noEvents")}</div>
         ) : (
           events.map((event) => (
             <div
@@ -310,7 +314,7 @@ function EventColumn({
                 {event.recipientEmail}
               </span>
               <span className="text-[10px] text-muted-foreground/70">
-                {formatTimeAgo(event.occurredAt)}
+                {formatTimeAgo(event.occurredAt, t)}
               </span>
             </div>
           ))

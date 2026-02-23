@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +62,7 @@ export function SendNewsletterWizardModal({
   onReactionsEnabledChange,
 }: SendNewsletterWizardModalProps) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [, setLocation] = useLocation();
   const [step, setStep] = useState<1 | 2>(1);
   const [selectionMode, setSelectionMode] = useState<"segment_list" | "custom">("segment_list");
@@ -209,16 +211,16 @@ export function SendNewsletterWizardModal({
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
       toast({
-        title: "Newsletter Sending",
-        description: "Your newsletter is being sent to all selected recipients.",
+        title: t("newsletter.sendWizard.toastSending", "Newsletter Sending"),
+        description: t("newsletter.sendWizard.toastSendingDesc", "Your newsletter is being sent to all selected recipients."),
       });
       onClose();
       onSuccess?.();
       setLocation(`/newsletters/${newsletterId}`);
     } catch (error: any) {
       toast({
-        title: "Send Failed",
-        description: error.message || "Failed to send newsletter",
+        title: t("newsletter.sendWizard.toastSendFailed", "Send Failed"),
+        description: error.message || t("newsletter.sendWizard.toastSendFailedDesc", "Failed to send newsletter"),
         variant: "destructive",
       });
     } finally {
@@ -249,15 +251,15 @@ export function SendNewsletterWizardModal({
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
       toast({
-        title: "Newsletter Scheduled",
-        description: `Your newsletter will be sent on ${new Date(scheduledAt).toLocaleString()}.`,
+        title: t("newsletter.sendWizard.toastScheduled", "Newsletter Scheduled"),
+        description: t("newsletter.sendWizard.toastScheduledDesc", "Your newsletter will be sent on {{date}}.", { date: new Date(scheduledAt).toLocaleString() }),
       });
       onClose();
       onSuccess?.();
     } catch (error: any) {
       toast({
-        title: "Scheduling Failed",
-        description: error.message || "Failed to schedule newsletter",
+        title: t("newsletter.sendWizard.toastScheduleFailed", "Scheduling Failed"),
+        description: error.message || t("newsletter.sendWizard.toastScheduleFailedDesc", "Failed to schedule newsletter"),
         variant: "destructive",
       });
     } finally {
@@ -304,16 +306,16 @@ export function SendNewsletterWizardModal({
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
       toast({
-        title: "Saved for Later",
-        description: "Your newsletter is ready to send. You can send it anytime from the newsletter list.",
+        title: t("newsletter.sendWizard.toastSavedForLater", "Saved for Later"),
+        description: t("newsletter.sendWizard.toastSavedForLaterDesc", "Your newsletter is ready to send. You can send it anytime from the newsletter list."),
       });
       onClose();
       onSuccess?.();
       setLocation('/newsletter');
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to save newsletter",
+        title: t("newsletter.sendWizard.toastSaveError", "Error"),
+        description: error.message || t("newsletter.sendWizard.toastSaveErrorDesc", "Failed to save newsletter"),
         variant: "destructive",
       });
     } finally {
@@ -336,12 +338,12 @@ export function SendNewsletterWizardModal({
   const getRecipientSummary = () => {
     if (selectionMode === "segment_list" && selectedSegmentListId) {
       const list = segmentLists.find((l) => l.id === selectedSegmentListId);
-      return list ? `${list.name} (${list.contactCount || 0} recipients)` : "";
+      return list ? t("newsletter.sendWizard.segmentListSummary", "{{name}} ({{count}} recipients)", { name: list.name, count: list.contactCount || 0 }) : "";
     }
     if (selectionMode === "custom") {
-      if (customRecipientType === "all") return contacts.length > 0 ? `All customers (${contacts.length})` : "All customers";
-      if (customRecipientType === "selected") return `${selectedContactIds.length} selected customers`;
-      if (customRecipientType === "tags") return `${selectedTagIds.length} tags selected`;
+      if (customRecipientType === "all") return contacts.length > 0 ? t("newsletter.sendWizard.allCustomersSummary", "All customers ({{count}})", { count: contacts.length }) : t("newsletter.sendWizard.allCustomersSummaryNoCount", "All customers");
+      if (customRecipientType === "selected") return t("newsletter.sendWizard.selectedCustomersSummary", "{{count}} selected customers", { count: selectedContactIds.length });
+      if (customRecipientType === "tags") return t("newsletter.sendWizard.tagsSelectedSummary", "{{count}} tags selected", { count: selectedTagIds.length });
     }
     return "";
   };
@@ -349,11 +351,11 @@ export function SendNewsletterWizardModal({
   const getRecipientTypeLabel = () => {
     if (selectionMode === "segment_list" && selectedSegmentListId) {
       const list = segmentLists.find((l) => l.id === selectedSegmentListId);
-      return list ? "Segment List" : "";
+      return list ? t("newsletter.sendWizard.segmentList", "Segment List") : "";
     }
-    if (customRecipientType === "all") return "All Customers";
-    if (customRecipientType === "selected") return "Selected Customers";
-    if (customRecipientType === "tags") return "By Tags";
+    if (customRecipientType === "all") return t("newsletter.sendWizard.allCustomersLabel", "All Customers");
+    if (customRecipientType === "selected") return t("newsletter.sendWizard.selectedCustomers", "Selected Customers");
+    if (customRecipientType === "tags") return t("newsletter.sendWizard.byTagsLabel", "By Tags");
     return "";
   };
 
@@ -401,10 +403,10 @@ export function SendNewsletterWizardModal({
             </div>
             <div>
               <DialogTitle className="text-lg">
-                Send Newsletter
+                {t("newsletter.sendWizard.title", "Send Newsletter")}
               </DialogTitle>
               <DialogDescription className="mt-0.5">
-                {newsletterTitle ? `"${newsletterTitle}" is ready to send` : "Select who will receive this newsletter"}
+                {newsletterTitle ? t("newsletter.sendWizard.readyToSend", "\"{{title}}\" is ready to send", { title: newsletterTitle }) : t("newsletter.sendWizard.selectRecipients", "Select who will receive this newsletter")}
               </DialogDescription>
             </div>
           </div>
@@ -416,7 +418,7 @@ export function SendNewsletterWizardModal({
               }`}>
               {step > 1 ? <Check className="h-3.5 w-3.5" /> : "1"}
             </div>
-            <span className={`text-sm font-medium ${step >= 1 ? "text-foreground" : "text-muted-foreground"}`}>Select Recipients</span>
+            <span className={`text-sm font-medium ${step >= 1 ? "text-foreground" : "text-muted-foreground"}`}>{t("newsletter.sendWizard.stepSelectRecipients", "Select Recipients")}</span>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
           <div className="flex items-center gap-1.5">
@@ -424,7 +426,7 @@ export function SendNewsletterWizardModal({
               }`}>
               2
             </div>
-            <span className={`text-sm ${step === 2 ? "font-medium text-foreground" : "text-muted-foreground"}`}>Review & Send</span>
+            <span className={`text-sm ${step === 2 ? "font-medium text-foreground" : "text-muted-foreground"}`}>{t("newsletter.sendWizard.stepReviewSend", "Review & Send")}</span>
           </div>
         </div>
 
@@ -451,8 +453,8 @@ export function SendNewsletterWizardModal({
                   <RadioGroupItem value="segment_list" id="mode-segment" />
                   <ListChecks className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   <div>
-                    <span className="text-sm font-medium text-foreground block">Use Segment List</span>
-                    <span className="text-xs text-muted-foreground">Choose from saved audience lists</span>
+                    <span className="text-sm font-medium text-foreground block">{t("newsletter.sendWizard.useSegmentList", "Use Segment List")}</span>
+                    <span className="text-xs text-muted-foreground">{t("newsletter.sendWizard.useSegmentListDesc", "Choose from saved audience lists")}</span>
                   </div>
                 </Label>
                 <Label
@@ -465,8 +467,8 @@ export function SendNewsletterWizardModal({
                   <RadioGroupItem value="custom" id="mode-custom" />
                   <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   <div>
-                    <span className="text-sm font-medium text-foreground block">Custom Selection</span>
-                    <span className="text-xs text-muted-foreground">Choose recipients manually</span>
+                    <span className="text-sm font-medium text-foreground block">{t("newsletter.sendWizard.customSelection", "Custom Selection")}</span>
+                    <span className="text-xs text-muted-foreground">{t("newsletter.sendWizard.customSelectionDesc", "Choose recipients manually")}</span>
                   </div>
                 </Label>
               </RadioGroup>
@@ -476,7 +478,7 @@ export function SendNewsletterWizardModal({
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
                     <Input
-                      placeholder="Search segment lists..."
+                      placeholder={t("newsletter.sendWizard.searchSegmentLists", "Search segment lists...")}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-9"
@@ -494,9 +496,9 @@ export function SendNewsletterWizardModal({
                     ) : segmentLists.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-10 text-center">
                         <ListChecks className="h-10 w-10 text-muted-foreground mb-3" />
-                        <p className="text-sm font-medium text-foreground">No segment lists found</p>
+                        <p className="text-sm font-medium text-foreground">{t("newsletter.sendWizard.noSegmentListsFound", "No segment lists found")}</p>
                         <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-                          Create segment lists in the Segmentation page to quickly select recipients
+                          {t("newsletter.sendWizard.noSegmentListsFoundDesc", "Create segment lists in the Segmentation page to quickly select recipients")}
                         </p>
                       </div>
                     ) : (
@@ -531,10 +533,10 @@ export function SendNewsletterWizardModal({
                                   )}
                                   <div className="flex items-center gap-2 mt-1">
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                                      {list.type === "all" ? "All Customers" : list.type === "selected" ? "Selected" : "By Tags"}
+                                      {list.type === "all" ? t("newsletter.sendWizard.allCustomers", "All Customers") : list.type === "selected" ? t("newsletter.sendWizard.selected", "Selected") : t("newsletter.sendWizard.byTags", "By Tags")}
                                     </Badge>
                                     <span className="text-[11px] text-muted-foreground">
-                                      {list.contactCount || 0} recipients
+                                      {list.contactCount || 0} {t("newsletter.sendWizard.recipients", "recipients")}
                                     </span>
                                   </div>
                                 </div>
@@ -571,7 +573,7 @@ export function SendNewsletterWizardModal({
                     >
                       <RadioGroupItem value="all" id="type-all" className="sr-only" />
                       <Users className="h-5 w-5 text-blue-500" />
-                      <span className="text-xs font-medium">All Customers</span>
+                      <span className="text-xs font-medium">{t("newsletter.sendWizard.allCustomers", "All Customers")}</span>
                     </Label>
                     <Label
                       htmlFor="type-selected"
@@ -582,7 +584,7 @@ export function SendNewsletterWizardModal({
                     >
                       <RadioGroupItem value="selected" id="type-selected" className="sr-only" />
                       <User className="h-5 w-5 text-indigo-500" />
-                      <span className="text-xs font-medium">Select Customers</span>
+                      <span className="text-xs font-medium">{t("newsletter.sendWizard.selectCustomers", "Select Customers")}</span>
                     </Label>
                     <Label
                       htmlFor="type-tags"
@@ -593,7 +595,7 @@ export function SendNewsletterWizardModal({
                     >
                       <RadioGroupItem value="tags" id="type-tags" className="sr-only" />
                       <Tag className="h-5 w-5 text-purple-500" />
-                      <span className="text-xs font-medium">By Tags</span>
+                      <span className="text-xs font-medium">{t("newsletter.sendWizard.byTags", "By Tags")}</span>
                     </Label>
                   </RadioGroup>
 
@@ -602,9 +604,9 @@ export function SendNewsletterWizardModal({
                       <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-full mb-3">
                         <Users className="h-8 w-8 text-blue-500 dark:text-blue-400" />
                       </div>
-                      <p className="text-sm font-medium text-foreground">Send to All Customers</p>
+                      <p className="text-sm font-medium text-foreground">{t("newsletter.sendWizard.sendToAllCustomers", "Send to All Customers")}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Your newsletter will be sent to all active customers
+                        {t("newsletter.sendWizard.sendToAllCustomersDesc", "Your newsletter will be sent to all active customers")}
                       </p>
                     </div>
                   )}
@@ -615,7 +617,7 @@ export function SendNewsletterWizardModal({
                         <div className="relative flex-1">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
                           <Input
-                            placeholder="Search customers..."
+                            placeholder={t("newsletter.sendWizard.searchCustomers", "Search customers...")}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-9"
@@ -628,7 +630,7 @@ export function SendNewsletterWizardModal({
                           onClick={() => setSelectedContactIds(filteredContacts.map((c: any) => c.id))}
                           disabled={selectedContactIds.length === filteredContacts.length}
                         >
-                          Select All
+                          {t("newsletter.sendWizard.selectAll", "Select All")}
                         </Button>
                         <Button
                           variant="outline"
@@ -636,11 +638,11 @@ export function SendNewsletterWizardModal({
                           onClick={() => setSelectedContactIds([])}
                           disabled={selectedContactIds.length === 0}
                         >
-                          Clear
+                          {t("newsletter.sendWizard.clear", "Clear")}
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground px-1">
-                        {selectedContactIds.length} of {filteredContacts.length} selected
+                        {t("newsletter.sendWizard.selectedOfTotal", "{{selected}} of {{total}} selected", { selected: selectedContactIds.length, total: filteredContacts.length })}
                       </p>
                       <div style={{ maxHeight: '320px', overflowY: 'auto' }} className="rounded-lg border">
                         {contactsLoading ? (
@@ -652,7 +654,7 @@ export function SendNewsletterWizardModal({
                         ) : filteredContacts.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-8 text-center">
                             <Search className="h-6 w-6 text-muted-foreground mb-2" />
-                            <p className="text-sm text-muted-foreground">No customers found</p>
+                            <p className="text-sm text-muted-foreground">{t("newsletter.sendWizard.noCustomersFound", "No customers found")}</p>
                           </div>
                         ) : (
                           <div className="divide-y divide-border/50">
@@ -689,7 +691,7 @@ export function SendNewsletterWizardModal({
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
                         <Input
-                          placeholder="Search tags..."
+                          placeholder={t("newsletter.sendWizard.searchTags", "Search tags...")}
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className="pl-9"
@@ -697,7 +699,7 @@ export function SendNewsletterWizardModal({
                         />
                       </div>
                       <p className="text-xs text-muted-foreground px-1">
-                        {selectedTagIds.length} of {filteredTags.length} tags selected
+                        {t("newsletter.sendWizard.tagsSelectedOfTotal", "{{selected}} of {{total}} tags selected", { selected: selectedTagIds.length, total: filteredTags.length })}
                       </p>
                       <div style={{ maxHeight: '320px', overflowY: 'auto', padding: '6px' }} className="rounded-md">
                         {tagsLoading ? (
@@ -709,7 +711,7 @@ export function SendNewsletterWizardModal({
                         ) : filteredTags.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-8 text-center">
                             <Tag className="h-6 w-6 text-muted-foreground mb-2" />
-                            <p className="text-sm text-muted-foreground">No tags found</p>
+                            <p className="text-sm text-muted-foreground">{t("newsletter.sendWizard.noTagsFound", "No tags found")}</p>
                           </div>
                         ) : (
                           <div className="grid grid-cols-2 gap-2 p-1">
@@ -731,7 +733,7 @@ export function SendNewsletterWizardModal({
                                   <div className="flex-1 min-w-0">
                                     <span className="text-sm font-medium text-foreground block truncate">{tag.name}</span>
                                     <span className="text-[11px] text-muted-foreground">
-                                      {tag.contactCount || 0} customers
+                                      {tag.contactCount || 0} {t("newsletter.sendWizard.customers", "customers")}
                                     </span>
                                   </div>
                                   {isSelected && (
@@ -764,14 +766,14 @@ export function SendNewsletterWizardModal({
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <Button variant="outline" onClick={onClose} data-testid="button-cancel-wizard">
-                  Cancel
+                  {t("newsletter.sendWizard.cancel", "Cancel")}
                 </Button>
                 <Button
                   onClick={handleGoToReview}
                   disabled={!canContinue()}
                   data-testid="button-continue-wizard"
                 >
-                  Continue
+                  {t("newsletter.sendWizard.continue", "Continue")}
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
@@ -788,29 +790,29 @@ export function SendNewsletterWizardModal({
                     <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground">Newsletter</p>
-                    <p className="text-xs text-muted-foreground">Details about what will be sent</p>
+                    <p className="text-sm font-medium text-foreground">{t("newsletter.sendWizard.newsletter", "Newsletter")}</p>
+                    <p className="text-xs text-muted-foreground">{t("newsletter.sendWizard.detailsAboutSend", "Details about what will be sent")}</p>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-4">
-                    <span className="text-sm text-muted-foreground flex-shrink-0">Title</span>
+                    <span className="text-sm text-muted-foreground flex-shrink-0">{t("newsletter.sendWizard.titleLabel", "Title")}</span>
                     <span className="text-sm font-medium text-foreground text-right truncate" data-testid="text-review-title">
-                      {newsletterTitle || "Untitled Newsletter"}
+                      {newsletterTitle || t("newsletter.sendWizard.untitledNewsletter", "Untitled Newsletter")}
                     </span>
                   </div>
                   <Separator />
                   <div className="flex items-start justify-between gap-4">
-                    <span className="text-sm text-muted-foreground flex-shrink-0">Selection Method</span>
+                    <span className="text-sm text-muted-foreground flex-shrink-0">{t("newsletter.sendWizard.selectionMethod", "Selection Method")}</span>
                     <span className="text-sm font-medium text-foreground text-right">
-                      {selectionMode === "segment_list" ? "Segment List" : "Custom Selection"}
+                      {selectionMode === "segment_list" ? t("newsletter.sendWizard.segmentList", "Segment List") : t("newsletter.sendWizard.customSelection", "Custom Selection")}
                     </span>
                   </div>
                   {selectionMode === "segment_list" && selectedSegmentListId && (
                     <>
                       <Separator />
                       <div className="flex items-start justify-between gap-4">
-                        <span className="text-sm text-muted-foreground flex-shrink-0">Segment List</span>
+                        <span className="text-sm text-muted-foreground flex-shrink-0">{t("newsletter.sendWizard.segmentList", "Segment List")}</span>
                         <span className="text-sm font-medium text-foreground text-right">
                           {segmentLists.find((l) => l.id === selectedSegmentListId)?.name || ""}
                         </span>
@@ -819,14 +821,14 @@ export function SendNewsletterWizardModal({
                   )}
                   <Separator />
                   <div className="flex items-start justify-between gap-4">
-                    <span className="text-sm text-muted-foreground flex-shrink-0">Recipient Type</span>
+                    <span className="text-sm text-muted-foreground flex-shrink-0">{t("newsletter.sendWizard.recipientType", "Recipient Type")}</span>
                     <Badge variant="outline" data-testid="badge-recipient-type">
                       {getRecipientTypeLabel()}
                     </Badge>
                   </div>
                   <Separator />
                   <div className="flex items-start justify-between gap-4">
-                    <span className="text-sm text-muted-foreground flex-shrink-0">Recipients</span>
+                    <span className="text-sm text-muted-foreground flex-shrink-0">{t("newsletter.sendWizard.recipientsLabel", "Recipients")}</span>
                     <span className="text-sm font-medium text-foreground" data-testid="text-recipient-count">
                       {getRecipientSummary()}
                     </span>
@@ -835,7 +837,7 @@ export function SendNewsletterWizardModal({
                     <>
                       <Separator />
                       <div className="flex items-start justify-between gap-4">
-                        <span className="text-sm text-muted-foreground flex-shrink-0">Tags</span>
+                        <span className="text-sm text-muted-foreground flex-shrink-0">{t("newsletter.sendWizard.tagsLabel", "Tags")}</span>
                         <div className="flex flex-wrap gap-1.5 justify-end">
                           {getSelectedTagNames().map((name: string) => (
                             <Badge key={name} variant="secondary" className="text-xs">
@@ -850,7 +852,7 @@ export function SendNewsletterWizardModal({
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
                       <Smile className={`h-4 w-4 ${reactionsEnabled ? 'text-amber-500' : 'text-muted-foreground'}`} />
-                      <span className="text-sm text-muted-foreground">Enable Reactions</span>
+                      <span className="text-sm text-muted-foreground">{t("newsletter.sendWizard.enableReactions", "Enable Reactions")}</span>
                     </div>
                     <button
                       type="button"
@@ -876,7 +878,7 @@ export function SendNewsletterWizardModal({
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <CalendarClock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <p className="text-sm font-medium text-foreground">Schedule Send</p>
+                      <p className="text-sm font-medium text-foreground">{t("newsletter.sendWizard.scheduleSend", "Schedule Send")}</p>
                     </div>
                     <button
                       onClick={() => setShowSchedulePicker(false)}
@@ -886,11 +888,11 @@ export function SendNewsletterWizardModal({
                     </button>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
-                    Choose when this newsletter should be sent. The time is in your local timezone.
+                    {t("newsletter.sendWizard.scheduleDesc", "Choose when this newsletter should be sent. The time is in your local timezone.")}
                   </p>
                   <div className="flex gap-3">
                     <div className="flex-1">
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Date</label>
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("newsletter.sendWizard.dateLabel", "Date")}</label>
                       <Input
                         type="date"
                         value={scheduleDate}
@@ -900,7 +902,7 @@ export function SendNewsletterWizardModal({
                       />
                     </div>
                     <div className="flex-1">
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Time</label>
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">{t("newsletter.sendWizard.timeLabel", "Time")}</label>
                       <Input
                         type="time"
                         value={scheduleTime}
@@ -912,14 +914,14 @@ export function SendNewsletterWizardModal({
                   </div>
                   {scheduleDate && scheduleTime && (
                     <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                      Will be sent on {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString(undefined, {
+                      {t("newsletter.sendWizard.willBeSentOn", "Will be sent on {{date}}", { date: new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString(undefined, {
                         weekday: 'long',
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
                         hour: 'numeric',
                         minute: '2-digit',
-                      })}
+                      })})}
                     </p>
                   )}
                 </div>
@@ -934,12 +936,12 @@ export function SendNewsletterWizardModal({
                   )}
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      {requiresReview ? "Reviewer approval required" : "Ready to send"}
+                      {requiresReview ? t("newsletter.sendWizard.reviewerApprovalRequired", "Reviewer approval required") : t("newsletter.sendWizard.readyToSendLabel", "Ready to send")}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {requiresReview
-                        ? "This newsletter requires approval from a reviewer before it can be sent. It will be submitted for review and you'll be notified once approved."
-                        : "Once sent, the newsletter will be delivered to all selected recipients. This action cannot be undone. You can also schedule it for later or save as draft."}
+                        ? t("newsletter.sendWizard.reviewerApprovalDesc", "This newsletter requires approval from a reviewer before it can be sent. It will be submitted for review and you'll be notified once approved.")
+                        : t("newsletter.sendWizard.readyToSendDesc", "Once sent, the newsletter will be delivered to all selected recipients. This action cannot be undone. You can also schedule it for later or save as draft.")}
                     </p>
                   </div>
                 </div>
@@ -955,7 +957,7 @@ export function SendNewsletterWizardModal({
                 data-testid="button-back-to-step1"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Back
+                {t("newsletter.sendWizard.back", "Back")}
               </Button>
               <div className="flex gap-2 flex-shrink-0">
                 {!requiresReview && (
@@ -969,12 +971,12 @@ export function SendNewsletterWizardModal({
                       {isScheduling ? (
                         <span className="flex items-center gap-1.5">
                           <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          Scheduling...
+                          {t("newsletter.sendWizard.scheduling", "Scheduling...")}
                         </span>
                       ) : (
                         <>
                           <CalendarClock className="h-4 w-4 mr-1.5" />
-                          Confirm Schedule
+                          {t("newsletter.sendWizard.confirmSchedule", "Confirm Schedule")}
                         </>
                       )}
                     </Button>
@@ -986,7 +988,7 @@ export function SendNewsletterWizardModal({
                       data-testid="button-schedule-send"
                     >
                       <CalendarClock className="h-4 w-4 mr-1.5" />
-                      Schedule Send
+                      {t("newsletter.sendWizard.scheduleSend", "Schedule Send")}
                     </Button>
                   )
                 )}
@@ -1000,12 +1002,12 @@ export function SendNewsletterWizardModal({
                     {isSavingLater ? (
                       <span className="flex items-center gap-1.5">
                         <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        Saving...
+                        {t("newsletter.sendWizard.saving", "Saving...")}
                       </span>
                     ) : (
                       <>
                         <Clock className="h-4 w-4 mr-1.5" />
-                        Send Later
+                        {t("newsletter.sendWizard.sendLater", "Send Later")}
                       </>
                     )}
                   </Button>
@@ -1019,17 +1021,17 @@ export function SendNewsletterWizardModal({
                     {isSending ? (
                       <span className="flex items-center gap-1.5">
                         <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        {requiresReview ? "Submitting..." : "Sending..."}
+                        {requiresReview ? t("newsletter.sendWizard.submitting", "Submitting...") : t("newsletter.sendWizard.sending", "Sending...")}
                       </span>
                     ) : requiresReview ? (
                       <>
                         <ShieldCheck className="h-4 w-4 mr-1.5" />
-                        Submit for Review
+                        {t("newsletter.sendWizard.submitForReview", "Submit for Review")}
                       </>
                     ) : (
                       <>
                         <Send className="h-4 w-4 mr-1.5" />
-                        Send Now
+                        {t("newsletter.sendWizard.sendNow", "Send Now")}
                       </>
                     )}
                   </Button>

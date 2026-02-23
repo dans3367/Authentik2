@@ -14,14 +14,23 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
     body: req.body
   });
   try {
-    const { firstName, lastName, email } = req.body;
+    const { firstName, lastName, email, language, timezone, theme, menuExpanded, avatarUrl } = req.body;
     const userId = req.user.id;
     const tenantId = req.user.tenantId;
 
     // Validate input
-    const hasValidField = (firstName?.trim()) || (lastName?.trim()) || (email?.trim());
+    const hasValidField =
+      (firstName !== undefined && firstName.trim() !== '') ||
+      (lastName !== undefined && lastName.trim() !== '') ||
+      (email !== undefined && email.trim() !== '') ||
+      language !== undefined ||
+      timezone !== undefined ||
+      theme !== undefined ||
+      menuExpanded !== undefined ||
+      avatarUrl !== undefined;
+
     if (!hasValidField) {
-      return res.status(400).json({ message: 'At least one field (firstName, lastName, or email) with a non-empty value is required' });
+      return res.status(400).json({ message: 'At least one field with a valid value is required' });
     }
 
     // Check if user exists
@@ -58,6 +67,11 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
     if (firstName !== undefined && firstName.trim()) updateData.firstName = firstName.trim();
     if (lastName !== undefined && lastName.trim()) updateData.lastName = lastName.trim();
     if (email !== undefined && email.trim()) updateData.email = email.trim();
+    if (language !== undefined) updateData.language = language;
+    if (timezone !== undefined) updateData.timezone = timezone;
+    if (theme !== undefined) updateData.theme = theme;
+    if (menuExpanded !== undefined) updateData.menuExpanded = menuExpanded;
+    if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
 
     // Also update the name field for compatibility
     if (firstName !== undefined || lastName !== undefined) {
@@ -155,11 +169,11 @@ userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']),
     // Handle PostgreSQL duplicate key error (including Drizzle-wrapped errors)
     const dbError = error?.cause ?? error;
     if (dbError?.code === '23505' && dbError?.constraint === 'better_auth_user_email_unique') {
-      return res.status(400).json({ 
-        message: "User's email is already registered" 
+      return res.status(400).json({
+        message: "User's email is already registered"
       });
     }
-    
+
     // Log detailed error for server-side debugging
     console.error('Create user failed:', {
       error: error.message,
@@ -167,7 +181,7 @@ userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']),
       body: req.body,
       tenantId: req.user.tenantId
     });
-    
+
     res.status(500).json({ message: 'Failed to create user' });
   }
 });

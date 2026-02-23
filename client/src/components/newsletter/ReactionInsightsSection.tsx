@@ -7,6 +7,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -89,12 +90,12 @@ interface ReactionStats {
 
 // ── Sentiment helpers ──────────────────────────────────────────────────
 
-function getSentimentLabel(score: number): { label: string; color: string; emoji: string } {
-    if (score >= 4.5) return { label: 'Outstanding', color: 'text-emerald-600 dark:text-emerald-400', emoji: '🌟' };
-    if (score >= 3.5) return { label: 'Very Positive', color: 'text-green-600 dark:text-green-400', emoji: '😊' };
-    if (score >= 2.5) return { label: 'Neutral', color: 'text-amber-600 dark:text-amber-400', emoji: '😐' };
-    if (score >= 1.5) return { label: 'Mixed', color: 'text-orange-600 dark:text-orange-400', emoji: '🤨' };
-    return { label: 'Negative', color: 'text-red-600 dark:text-red-400', emoji: '😔' };
+function getSentimentLabel(score: number, t: (key: string) => string): { label: string; color: string; emoji: string } {
+    if (score >= 4.5) return { label: t("newsletter.view.reactionInsights.sentiment.outstanding"), color: 'text-emerald-600 dark:text-emerald-400', emoji: '🌟' };
+    if (score >= 3.5) return { label: t("newsletter.view.reactionInsights.sentiment.veryPositive"), color: 'text-green-600 dark:text-green-400', emoji: '😊' };
+    if (score >= 2.5) return { label: t("newsletter.view.reactionInsights.sentiment.neutral"), color: 'text-amber-600 dark:text-amber-400', emoji: '😐' };
+    if (score >= 1.5) return { label: t("newsletter.view.reactionInsights.sentiment.mixed"), color: 'text-orange-600 dark:text-orange-400', emoji: '🤨' };
+    return { label: t("newsletter.view.reactionInsights.sentiment.negative"), color: 'text-red-600 dark:text-red-400', emoji: '😔' };
 }
 
 function getSentimentGradient(score: number): string {
@@ -111,6 +112,7 @@ interface Props {
 }
 
 export function ReactionInsightsSection({ newsletterId }: Props) {
+    const { t } = useTranslation();
     // Track tab visibility to avoid unnecessary polling when tab is inactive
     const [isTabVisible, setIsTabVisible] = useState(!document.hidden);
 
@@ -139,7 +141,7 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                 <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-2 text-base">
                         <Smile className="h-5 w-5 text-pink-500" strokeWidth={1.5} />
-                        Reader Reactions
+                        {t("newsletter.view.reactionInsights.loading")}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -160,14 +162,14 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                 <CardContent className="py-8 text-center">
                     <Smile className="h-10 w-10 text-red-300 dark:text-red-600 mx-auto mb-3" strokeWidth={1.5} />
                     <p className="text-sm font-medium text-red-500 dark:text-red-400 mb-3">
-                        Failed to load reaction data
+                        {t("newsletter.view.reactionInsights.errorTitle")}
                     </p>
                     <button
                         onClick={() => refetch()}
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
                     >
                         <RefreshCw className="h-3 w-3" />
-                        Try again
+                        {t("newsletter.view.reactionInsights.tryAgain")}
                     </button>
                 </CardContent>
             </Card>
@@ -184,7 +186,7 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                 <CardContent className="py-8 text-center">
                     <Smile className="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" strokeWidth={1.5} />
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                        Reader reactions are disabled for this newsletter
+                        {t("newsletter.view.reactionInsights.reactionsDisabled")}
                     </p>
                 </CardContent>
             </Card>
@@ -192,7 +194,7 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
     }
 
     const totalReactions = stats.totalReactions;
-    const sentiment = getSentimentLabel(stats.sentimentScore);
+    const sentiment = getSentimentLabel(stats.sentimentScore, t);
     const sentimentPercent = totalReactions > 0 ? ((stats.sentimentScore / 5) * 100) : 0;
 
     const orderedReactions: ReactionType[] = ['love_it', 'liked_it', 'cool', 'dont_agree', 'dislike'];
@@ -205,26 +207,26 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
                             <Smile className="h-4 w-4 text-white" strokeWidth={1.5} />
                         </div>
-                        Reader Reactions
+                        {t("newsletter.view.reactionInsights.title")}
                     </CardTitle>
                     <div className="flex items-center gap-2">
                         {totalReactions > 0 && (
                             <Badge variant="secondary" className="text-xs font-semibold px-2.5 py-0.5">
-                                {totalReactions} {totalReactions === 1 ? 'reaction' : 'reactions'}
+                                {t("newsletter.view.reactionInsights.reactionCount", { count: totalReactions })}
                             </Badge>
                         )}
                         <button
                             onClick={() => refetch()}
                             disabled={isFetching}
                             className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
-                            title="Refresh reactions"
+                            title={t("newsletter.view.reactionInsights.refreshTitle")}
                         >
                             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
                 </div>
                 <CardDescription className="mt-1.5">
-                    How your readers are feeling about this newsletter
+                    {t("newsletter.view.reactionInsights.description")}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -234,10 +236,10 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                             <span className="text-3xl">💬</span>
                         </div>
                         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1.5">
-                            No Reactions Yet
+                            {t("newsletter.view.reactionInsights.noReactionsTitle")}
                         </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto mb-4">
-                            Reactions will appear here as readers respond to your newsletter. Reactions typically start arriving within a few hours of sending.
+                            {t("newsletter.view.reactionInsights.noReactionsDesc")}
                         </p>
                         <button
                             onClick={() => refetch()}
@@ -245,7 +247,7 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                             className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
                         >
                             <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-                            {isFetching ? 'Checking...' : 'Check for reactions'}
+                            {isFetching ? t("newsletter.view.reactionInsights.checking") : t("newsletter.view.reactionInsights.checkForReactions")}
                         </button>
                     </div>
                 ) : (
@@ -263,7 +265,7 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                                             {/* Emoji + Label */}
                                             <div className={`flex items-center gap-2 min-w-[120px] p-2 rounded-lg ${config.bgLight} ${config.bgDark} border ${config.borderColor}`}>
                                                 <span className="text-xl">{config.emoji}</span>
-                                                <span className={`text-xs font-semibold ${config.textColor}`}>{config.label}</span>
+                                                <span className={`text-xs font-semibold ${config.textColor}`}>{t(`newsletter.view.reactionInsights.reactions.${type}`)}</span>
                                             </div>
 
                                             {/* Progress Bar */}
@@ -293,7 +295,7 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                             <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-800/30 p-5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <TrendingUp className="h-4 w-4 text-indigo-500" strokeWidth={1.5} />
-                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Sentiment Score</span>
+                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t("newsletter.view.reactionInsights.sentimentScore")}</span>
                                 </div>
                                 <div className="flex items-end gap-3 mb-3">
                                     <span className="text-3xl">{sentiment.emoji}</span>
@@ -312,8 +314,8 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                                     />
                                 </div>
                                 <div className="flex justify-between mt-1.5">
-                                    <span className="text-[10px] text-gray-400">Negative</span>
-                                    <span className="text-[10px] text-gray-400">Positive</span>
+                                    <span className="text-[10px] text-gray-400">{t("newsletter.view.reactionInsights.negative")}</span>
+                                    <span className="text-[10px] text-gray-400">{t("newsletter.view.reactionInsights.positive")}</span>
                                 </div>
                             </div>
 
@@ -322,7 +324,7 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                                 <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-800/30 p-5">
                                     <div className="flex items-center gap-2 mb-4">
                                         <Heart className="h-4 w-4 text-rose-500" strokeWidth={1.5} />
-                                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Dominant Reaction</span>
+                                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t("newsletter.view.reactionInsights.dominantReaction")}</span>
                                     </div>
                                     <div className="flex items-center gap-4">
                                         <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${REACTION_CONFIG[stats.dominantReaction as ReactionType].gradient} flex items-center justify-center shadow-lg`}>
@@ -330,11 +332,14 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                                         </div>
                                         <div>
                                             <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                                                {REACTION_CONFIG[stats.dominantReaction as ReactionType].label}
+                                                {t(`newsletter.view.reactionInsights.reactions.${stats.dominantReaction as ReactionType}`)}
                                             </p>
                                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                {stats.counts[stats.dominantReaction]} of {totalReactions} readers
-                                                ({totalReactions > 0 ? Math.round((stats.counts[stats.dominantReaction] / totalReactions) * 100) : 0}%)
+                                                {t("newsletter.view.reactionInsights.readersPercent", {
+                                                    count: stats.counts[stats.dominantReaction],
+                                                    total: totalReactions,
+                                                    percent: totalReactions > 0 ? Math.round((stats.counts[stats.dominantReaction] / totalReactions) * 100) : 0
+                                                })}
                                             </p>
                                         </div>
                                     </div>
@@ -345,7 +350,7 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                                             <div className="flex items-center gap-1.5">
                                                 <ThumbsUp className="h-3 w-3 text-green-500" strokeWidth={1.5} />
                                                 <span className="text-gray-600 dark:text-gray-400">
-                                                    Positive: <span className="font-semibold text-green-600 dark:text-green-400">
+                                                    {t("newsletter.view.reactionInsights.positiveLabel")} <span className="font-semibold text-green-600 dark:text-green-400">
                                                         {(stats.counts['love_it'] || 0) + (stats.counts['liked_it'] || 0) + (stats.counts['cool'] || 0)}
                                                     </span>
                                                 </span>
@@ -353,7 +358,7 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                                             <div className="flex items-center gap-1.5">
                                                 <ThumbsDown className="h-3 w-3 text-red-500" strokeWidth={1.5} />
                                                 <span className="text-gray-600 dark:text-gray-400">
-                                                    Negative: <span className="font-semibold text-red-600 dark:text-red-400">
+                                                    {t("newsletter.view.reactionInsights.negativeLabel")} <span className="font-semibold text-red-600 dark:text-red-400">
                                                         {(stats.counts['dont_agree'] || 0) + (stats.counts['dislike'] || 0)}
                                                     </span>
                                                 </span>
@@ -368,9 +373,9 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                         {stats.recentReactions.length > 0 && (
                             <div>
                                 <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1.5">
-                                    <span>Recent Reactions</span>
+                                    <span>{t("newsletter.view.reactionInsights.recentReactions")}</span>
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                                        Latest {Math.min(stats.recentReactions.length, 10)}
+                                        {t("newsletter.view.reactionInsights.latest", { count: Math.min(stats.recentReactions.length, 10) })}
                                     </Badge>
                                 </h4>
                                 <div className="space-y-2">
@@ -391,7 +396,7 @@ export function ReactionInsightsSection({ newsletterId }: Props) {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Badge className={`text-[10px] px-1.5 py-0 h-5 ${config.bgLight} ${config.bgDark} ${config.textColor} border ${config.borderColor}`}>
-                                                        {config.label}
+                                                        {t(`newsletter.view.reactionInsights.reactions.${reaction.reactionType as ReactionType}`)}
                                                     </Badge>
                                                     <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
                                                         {formatDistanceToNow(new Date(reaction.reactedAt + 'Z'), { addSuffix: true })}

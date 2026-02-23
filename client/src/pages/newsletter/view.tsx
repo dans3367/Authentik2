@@ -1,3 +1,4 @@
+import { useLanguage } from "@/hooks/useLanguage";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -78,6 +79,7 @@ interface TimelineEvent {
 }
 
 export default function NewsletterViewPage() {
+  const { t } = useLanguage();
   const { id } = useParams();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -178,7 +180,7 @@ export default function NewsletterViewPage() {
     },
   });
 
-  // Approve & Send mutation (one-step from email link)
+  // {t("newsletter.view.approveSend", "Approve & Send")} mutation (one-step from email link)
   const approveAndSendMutation = useMutation({
     mutationFn: async ({ id, approvalCode }: { id: string; approvalCode: string }) => {
       const response = await apiRequest('POST', `/api/newsletters/${id}/approve-and-send`, { approvalCode });
@@ -742,15 +744,15 @@ export default function NewsletterViewPage() {
 
               {/* Title */}
               <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-gray-100 dark:to-gray-400 bg-clip-text text-transparent mb-3">
-                Newsletter Not Found
+                {t("newsletter.view.newsletterNotFound", "Newsletter Not Found")}
               </h2>
 
               {/* Description */}
               <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base leading-relaxed max-w-sm mx-auto mb-2">
-                The newsletter you're looking for may have been deleted or doesn't exist.
+                {t("newsletter.view.newsletterNotFoundDesc", "The newsletter you're looking for may have been deleted or doesn't exist.")}
               </p>
               <p className="text-gray-400 dark:text-gray-500 text-xs mb-8">
-                Please check the URL or head back to your newsletter dashboard.
+                {t("newsletter.view.newsletterNotFoundHint", "Please check the URL or head back to your newsletter dashboard.")}
               </p>
 
               {/* Action buttons */}
@@ -760,7 +762,7 @@ export default function NewsletterViewPage() {
                   className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 transition-all duration-300 px-6"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                  Back to Newsletters
+                  {t("newsletter.view.backToNewsletters", "Back to Newsletters")}
                 </Button>
                 <Button
                   onClick={() => navigate('/newsletters/create')}
@@ -768,7 +770,7 @@ export default function NewsletterViewPage() {
                   className="w-full sm:w-auto border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-300 px-6"
                 >
                   <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                  Create New
+                  {t("newsletter.view.createNew", "Create New")}
                 </Button>
               </div>
             </div>
@@ -811,7 +813,7 @@ export default function NewsletterViewPage() {
                 {getStatusBadge(newsletter.status)}
               </div>
               <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
-                Subject: {newsletter.subject}
+                {t("newsletter.view.subject", "Subject")}: {newsletter.subject}
               </p>
             </div>
           </div>
@@ -825,7 +827,7 @@ export default function NewsletterViewPage() {
                 data-testid="button-edit"
               >
                 <Edit className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                Edit
+                {t("newsletter.view.edit", "Edit")}
               </Button>
             )}
             {reviewerEnabled && (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && (newsletter as any).reviewStatus !== 'approved' && (
@@ -840,7 +842,7 @@ export default function NewsletterViewPage() {
                 disabled={submitForReviewMutation.isPending}
               >
                 <ClipboardCheck className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                {submitForReviewMutation.isPending ? "Submitting..." : "Submit for Review"}
+                {submitForReviewMutation.isPending ? t("newsletter.view.submitting", "Submitting...") : t("newsletter.view.submitForReview", "Submit for Review")}
               </Button>
             )}
             {newsletter.status === 'ready_to_send' && (
@@ -855,7 +857,7 @@ export default function NewsletterViewPage() {
                 data-testid="button-send-now"
               >
                 <Send className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                {sendNowMutation.isPending ? "Sending..." : "Send Now"}
+                {sendNowMutation.isPending ? t("newsletter.view.sending", "Sending...") : t("newsletter.view.sendNow", "Send Now")}
               </Button>
             )}
           </div>
@@ -870,9 +872,9 @@ export default function NewsletterViewPage() {
                   <ShieldCheck className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-orange-900 dark:text-orange-100">Awaiting Reviewer Approval</h3>
+                  <h3 className="font-semibold text-orange-900 dark:text-orange-100">{t("newsletter.view.awaitingApproval", "Awaiting Reviewer Approval")}</h3>
                   <p className="text-sm text-orange-700 dark:text-orange-300 mt-0.5">
-                    This newsletter has been submitted for review. {(newsletter as any).reviewerId === currentUserId ? 'Enter the 5-digit approval code to approve and send.' : 'Waiting for the designated reviewer to approve or reject it.'}
+                    {(newsletter as any).reviewerId === currentUserId ? t("newsletter.view.awaitingApprovalDescReviewer", "This newsletter has been submitted for review. Enter the 5-digit approval code to approve and send.") : t("newsletter.view.awaitingApprovalDescOther", "This newsletter has been submitted for review. Waiting for the designated reviewer to approve or reject it.")}
                   </p>
                 </div>
               </div>
@@ -885,7 +887,7 @@ export default function NewsletterViewPage() {
                     <div className="flex items-center gap-2 mb-3">
                       <KeyRound className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                       <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-                        {isReviewerFromEmail ? 'Approval Code (from email)' : 'Enter Approval Code'}
+                        {isReviewerFromEmail ? t("newsletter.view.approvalCodeFromEmail", "Approval Code (from email)") : t("newsletter.view.enterApprovalCode", "Enter Approval Code")}
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -915,7 +917,7 @@ export default function NewsletterViewPage() {
                       <Button
                         onClick={() => {
                           if (approvalCode.length !== 5) {
-                            setApprovalCodeError('Please enter a valid 5-digit code');
+                            setApprovalCodeError(t("newsletter.view.approvalCodeError", "Please enter a valid 5-digit code"));
                             return;
                           }
                           approveAndSendMutation.mutate({ id: newsletter.id, approvalCode });
@@ -925,9 +927,9 @@ export default function NewsletterViewPage() {
                         data-testid="button-approve-and-send"
                       >
                         {approveAndSendMutation.isPending ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Approving...</>
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("newsletter.view.approving", "Approving...")}</>
                         ) : (
-                          <><Send className="h-4 w-4 mr-2" strokeWidth={1.5} /> Approve & Send</>
+                          <><Send className="h-4 w-4 mr-2" strokeWidth={1.5} /> {t("newsletter.view.approveSend", "Approve & Send")}</>
                         )}
                       </Button>
                     </div>
@@ -939,7 +941,7 @@ export default function NewsletterViewPage() {
                     )}
                     {!isReviewerFromEmail && (
                       <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                        Check your email for the 5-digit code that was sent when this newsletter was submitted for review.
+                        {t("newsletter.view.checkEmailForCode", "Check your email for the 5-digit code that was sent when this newsletter was submitted for review.")}
                       </p>
                     )}
                   </div>
@@ -949,7 +951,7 @@ export default function NewsletterViewPage() {
                     <Button
                       onClick={() => {
                         if (approvalCode.length !== 5) {
-                          setApprovalCodeError('Please enter a valid 5-digit code');
+                          setApprovalCodeError(t("newsletter.view.approvalCodeError", "Please enter a valid 5-digit code"));
                           return;
                         }
                         approveMutation.mutate({ id: newsletter.id, approvalCode });
@@ -961,7 +963,7 @@ export default function NewsletterViewPage() {
                       data-testid="button-approve-only"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                      {approveMutation.isPending ? 'Approving...' : 'Approve Only'}
+                      {approveMutation.isPending ? t("newsletter.view.approving", "Approving...") : t("newsletter.view.approveOnly", "Approve Only")}
                     </Button>
                     <Button
                       onClick={() => setShowRejectDialog(true)}
@@ -972,7 +974,7 @@ export default function NewsletterViewPage() {
                       data-testid="button-reject"
                     >
                       <XCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
-                      Reject
+                      {t("newsletter.view.reject", "Reject")}
                     </Button>
                   </div>
                 </div>
@@ -987,7 +989,7 @@ export default function NewsletterViewPage() {
             <div className="flex items-center gap-3">
               <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <div>
-                <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">Approved by reviewer</p>
+                <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">{t("newsletter.view.approvedByReviewer", "Approved by reviewer")}</p>
                 <p className="text-xs text-emerald-700 dark:text-emerald-300">
                   {format(new Date((newsletter as any).reviewedAt), 'PPP p')}
                   {(newsletter as any).reviewNotes && ` — "${(newsletter as any).reviewNotes}"`}
@@ -1002,7 +1004,7 @@ export default function NewsletterViewPage() {
             <div className="flex items-start gap-3">
               <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-red-900 dark:text-red-100">Rejected by reviewer</p>
+                <p className="text-sm font-medium text-red-900 dark:text-red-100">{t("newsletter.view.rejectedByReviewer", "Rejected by reviewer")}</p>
                 <p className="text-xs text-red-700 dark:text-red-300">
                   {format(new Date((newsletter as any).reviewedAt), 'PPP p')}
                 </p>
@@ -1026,13 +1028,13 @@ export default function NewsletterViewPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Recipients
+                    {t("newsletter.view.recipients", "Recipients")}
                   </p>
                   <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-recipients-count">
                     {(newsletter.recipientCount || 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Total sent to
+                    {t("newsletter.view.totalSentTo", "Total sent to")}
                   </p>
                 </div>
                 <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shrink-0">
@@ -1047,13 +1049,13 @@ export default function NewsletterViewPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Unique Opens
+                    {t("newsletter.view.uniqueOpens", "Unique Opens")}
                   </p>
                   <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-opens-count">
                     {newsletter.opens || 0}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {uniqueOpenRate}% unique rate
+                    {t("newsletter.view.uniqueRate", "{{rate}}% unique rate", { rate: uniqueOpenRate })}
                   </p>
                 </div>
                 <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shrink-0">
@@ -1068,13 +1070,13 @@ export default function NewsletterViewPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Clicks
+                    {t("newsletter.view.clicks", "Clicks")}
                   </p>
                   <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-clicks-count">
                     {newsletter.clickCount}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {clickThroughRate}% CTR
+                    {t("newsletter.view.ctr", "{{rate}}% CTR", { rate: clickThroughRate })}
                   </p>
                 </div>
                 <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shrink-0">
@@ -1088,7 +1090,7 @@ export default function NewsletterViewPage() {
             <CardContent className="p-4 lg:p-6">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  Delivery Issues
+                  {t("newsletter.view.deliveryIssues", "Delivery Issues")}
                 </p>
                 <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shrink-0">
                   <AlertTriangle className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
@@ -1099,19 +1101,19 @@ export default function NewsletterViewPage() {
                   <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-bounces-count">
                     {liveStats?.bounced ?? 0}
                   </p>
-                  <p className="text-xs text-muted-foreground">Bounced</p>
+                  <p className="text-xs text-muted-foreground">{t("newsletter.view.bounced", "Bounced")}</p>
                 </div>
                 <div>
                   <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-suppressed-count">
                     {liveStats?.suppressed ?? 0}
                   </p>
-                  <p className="text-xs text-muted-foreground">Suppressed</p>
+                  <p className="text-xs text-muted-foreground">{t("newsletter.view.suppressed", "Suppressed")}</p>
                 </div>
                 <div>
                   <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-complaints-count">
                     {liveStats?.complained ?? 0}
                   </p>
-                  <p className="text-xs text-muted-foreground">Complaints</p>
+                  <p className="text-xs text-muted-foreground">{t("newsletter.view.complaints", "Complaints")}</p>
                 </div>
               </div>
             </CardContent>
@@ -1122,18 +1124,18 @@ export default function NewsletterViewPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 lg:space-y-8">
           <div className="overflow-x-auto">
             <TabsList className="grid w-full grid-cols-6 min-w-max">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-overview">Overview</TabsTrigger>
+              <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-overview">{t("newsletter.view.tabs.overview", "Overview")}</TabsTrigger>
               <TabsTrigger value="live-tracking" className="text-xs sm:text-sm" data-testid="tab-live-tracking">
                 <Activity className="h-3 w-3 mr-1" />
-                Live
+                {t("newsletter.view.tabs.live", "Live")}
               </TabsTrigger>
               <TabsTrigger value="reactions" className="text-xs sm:text-sm" data-testid="tab-reactions">
                 <Smile className="h-3 w-3 mr-1" />
-                Reactions
+                {t("newsletter.view.tabs.reactions", "Reactions")}
               </TabsTrigger>
-              <TabsTrigger value="content" className="text-xs sm:text-sm" data-testid="tab-content">Content</TabsTrigger>
-              <TabsTrigger value="status" className="text-xs sm:text-sm" data-testid="tab-status">Task Status</TabsTrigger>
-              <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm" data-testid="tab-detailed-stats">Detailed Stats</TabsTrigger>
+              <TabsTrigger value="content" className="text-xs sm:text-sm" data-testid="tab-content">{t("newsletter.view.tabs.content", "Content")}</TabsTrigger>
+              <TabsTrigger value="status" className="text-xs sm:text-sm" data-testid="tab-status">{t("newsletter.view.tabs.taskStatus", "Task Status")}</TabsTrigger>
+              <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm" data-testid="tab-detailed-stats">{t("newsletter.view.detailedStats", "Detailed Stats")}</TabsTrigger>
             </TabsList>
           </div>
 
@@ -1150,10 +1152,10 @@ export default function NewsletterViewPage() {
                       <Smile className="w-8 h-8 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
                     </div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      Reactions Not Enabled
+                      {t("newsletter.view.reactionsNotEnabled", "Reactions Not Enabled")}
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-4">
-                      Emoji reactions were not included in this newsletter. Readers were not able to provide feedback through the reactions bar.
+                      {t("newsletter.view.reactionsNotEnabledDesc", "Emoji reactions were not included in this newsletter. Readers were not able to provide feedback through the reactions bar.")}
                     </p>
                     <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 p-4 w-full">
                       <div className="flex items-start gap-3">
@@ -1161,9 +1163,9 @@ export default function NewsletterViewPage() {
                           <Smile className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div className="text-left">
-                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Enable for future newsletters</p>
+                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">{t("newsletter.view.enableForFuture", "Enable for future newsletters")}</p>
                           <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 leading-relaxed">
-                            You can enable the reactions feature when creating or editing your next newsletter. The "Enable Reactions" toggle is available in the send wizard before you send.
+                            {t("newsletter.view.enableForFutureDesc", "You can enable the reactions feature when creating or editing your next newsletter. The \"Enable Reactions\" toggle is available in the send wizard before you send.")}
                           </p>
                         </div>
                       </div>
@@ -1183,19 +1185,19 @@ export default function NewsletterViewPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Newspaper className="h-5 w-5" />
-                    Newsletter Details
+                    {t("newsletter.view.newsletterDetails", "Newsletter Details")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
                     <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Created</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.created", "Created")}</p>
                       <p className="text-sm text-gray-900 dark:text-gray-100">
                         {format(new Date(newsletter.createdAt || ''), 'PPP p')}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Updated</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.updated", "Updated")}</p>
                       <p className="text-sm text-gray-900 dark:text-gray-100">
                         {format(new Date(newsletter.updatedAt || ''), 'PPP p')}
                       </p>
@@ -1203,7 +1205,7 @@ export default function NewsletterViewPage() {
                     {newsletter.scheduledAt && (
                       <>
                         <div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Scheduled</p>
+                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.scheduled", "Scheduled")}</p>
                           <p className="text-sm text-gray-900 dark:text-gray-100">
                             {format(new Date(newsletter.scheduledAt), 'PPP p')}
                           </p>
@@ -1212,7 +1214,7 @@ export default function NewsletterViewPage() {
                     )}
                     {newsletter.sentAt && (
                       <div>
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Sent</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.sent", "Sent")}</p>
                         <p className="text-sm text-gray-900 dark:text-gray-100">
                           {format(new Date(newsletter.sentAt), 'PPP p')}
                         </p>
@@ -1223,7 +1225,7 @@ export default function NewsletterViewPage() {
                   <Separator />
 
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Author</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">{t("newsletter.view.author", "Author")}</p>
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
                         <User className="h-4 w-4 text-white" />
@@ -1241,21 +1243,21 @@ export default function NewsletterViewPage() {
 
                   <Separator />
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Targeting</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">{t("newsletter.view.targeting", "Targeting")}</p>
                     <div className="space-y-2">
                       <Badge variant="outline">
                         <Tag className="h-3 w-3 mr-1" />
-                        {newsletter.recipientType === 'all' ? 'All Contacts' :
-                          newsletter.recipientType === 'selected' ? 'Selected Contacts' : 'Tagged Contacts'}
+                        {newsletter.recipientType === 'all' ? t("newsletter.view.allContacts", "All Contacts") :
+                          newsletter.recipientType === 'selected' ? t("newsletter.view.selectedContacts", "Selected Contacts") : t("newsletter.view.taggedContacts", "Tagged Contacts")}
                       </Badge>
                       {newsletter.selectedContactIds?.length ? (
                         <p className="text-xs text-gray-500">
-                          {newsletter.selectedContactIds.length} specific contacts
+                          {newsletter.selectedContactIds.length} {t("newsletter.view.specificContacts", "{{count}} specific contacts", { count: newsletter.selectedContactIds.length }).split(' ').slice(1).join(' ')}
                         </p>
                       ) : null}
                       {newsletter.selectedTagIds?.length ? (
                         <p className="text-xs text-gray-500">
-                          {newsletter.selectedTagIds.length} tag groups
+                          {newsletter.selectedTagIds.length} {t("newsletter.view.tagGroups", "{{count}} tag groups", { count: newsletter.selectedTagIds.length }).split(' ').slice(1).join(' ')}
                         </p>
                       ) : null}
                       <Button
@@ -1265,7 +1267,7 @@ export default function NewsletterViewPage() {
                         data-testid="button-view-recipients"
                       >
                         <Users className="h-4 w-4 mr-1.5" />
-                        View Recipients
+                        {t("newsletter.view.viewRecipients", "View Recipients")}
                       </Button>
                     </div>
                   </div>
@@ -1277,10 +1279,10 @@ export default function NewsletterViewPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Activity className="h-5 w-5" />
-                    Activity Timeline
+                    {t("newsletter.view.activityTimeline", "Activity Timeline")}
                   </CardTitle>
                   <CardDescription>
-                    Recent events and status changes
+                    {t("newsletter.view.recentEvents", "Recent events and status changes")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1323,10 +1325,10 @@ export default function NewsletterViewPage() {
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Eye className="h-5 w-5" strokeWidth={1.5} />
-                      Email Preview
+                      {t("newsletter.view.emailPreview", "Email Preview")}
                     </CardTitle>
                     <CardDescription>
-                      How this newsletter appears in your recipients' inbox
+                      {t("newsletter.view.emailPreviewDesc", "How this newsletter appears in your recipients' inbox")}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1342,9 +1344,9 @@ export default function NewsletterViewPage() {
                   <div className="mx-auto max-w-[640px]">
                     <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
                       <Mail className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      <span>From: {newsletter.user?.email || "your-company"}</span>
+                      <span>{t("newsletter.view.from", "From")}: {newsletter.user?.email || "your-company"}</span>
                       <span className="mx-1">|</span>
-                      <span>Subject: {newsletter.subject}</span>
+                      <span>{t("newsletter.view.subject", "Subject")}: {newsletter.subject}</span>
                     </div>
                     <div className="rounded-md border bg-white shadow-sm overflow-hidden">
                       <iframe
@@ -1375,10 +1377,10 @@ export default function NewsletterViewPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <RefreshCw className="h-5 w-5" />
-                  Newsletter Processing Status
+                  {t("newsletter.view.processingStatus", "Newsletter Processing Status")}
                 </CardTitle>
                 <CardDescription>
-                  Track the progress of your newsletter through the delivery pipeline
+                  {t("newsletter.view.processingStatusDesc", "Track the progress of your newsletter through the delivery pipeline")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1386,9 +1388,9 @@ export default function NewsletterViewPage() {
                 <div className="mb-8">
                   <div className="flex items-center justify-between">
                     {([
-                      { step: 1, title: 'Content Validation', key: 'validation' as const, icon: CheckCircle, description: 'Validating content and checking for issues' },
-                      { step: 2, title: 'Email Delivery', key: 'delivery' as const, icon: Send, description: 'Sending emails to recipients' },
-                      { step: 3, title: 'Analytics Collection', key: 'analytics' as const, icon: BarChart3, description: 'Collecting engagement data (completed 24hrs after start)' }
+                      { step: 1, title: t("newsletter.view.contentValidation", "Content Validation"), key: 'validation' as const, icon: CheckCircle, description: t("newsletter.view.contentValidationDesc", "Validating content and checking for issues") },
+                      { step: 2, title: t("newsletter.view.emailDelivery", "Email Delivery"), key: 'delivery' as const, icon: Send, description: t("newsletter.view.emailDeliveryDesc", "Sending emails to recipients") },
+                      { step: 3, title: t("newsletter.view.analyticsCollection", "Analytics Collection"), key: 'analytics' as const, icon: BarChart3, description: t("newsletter.view.analyticsCollectionDesc", "Collecting engagement data (completed 24hrs after start)") }
                     ] as const).map((item, index) => {
                       const isCompleted = getTaskStepStatus(item.key) === 'completed';
                       const isActive = getTaskStepStatus(item.key) === 'running';
@@ -1455,10 +1457,10 @@ export default function NewsletterViewPage() {
                         )}
                         <div>
                           <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            Content Validation
+                            {t("newsletter.view.contentValidation", "Content Validation")}
                           </h4>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Checking content quality, links, and compliance
+                            {t("newsletter.view.contentValidationCheckDesc", "Checking content quality, links, and compliance")}
                           </p>
                         </div>
                       </div>
@@ -1466,8 +1468,8 @@ export default function NewsletterViewPage() {
                         getTaskStepStatus('validation') === 'completed' ? 'default' :
                           getTaskStepStatus('validation') === 'running' ? 'secondary' : 'outline'
                       }>
-                        {getTaskStepStatus('validation') === 'completed' ? 'Completed' :
-                          getTaskStepStatus('validation') === 'running' ? 'In Progress' : 'Pending'}
+                        {getTaskStepStatus('validation') === 'completed' ? t("newsletter.view.completed", "Completed") :
+                          getTaskStepStatus('validation') === 'running' ? t("newsletter.view.inProgress", "In Progress") : t("newsletter.view.pending", "Pending")}
                       </Badge>
                     </div>
                     {getTaskStepStatus('validation') === 'running' && (
@@ -1488,10 +1490,10 @@ export default function NewsletterViewPage() {
                         )}
                         <div>
                           <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            Email Delivery
+                            {t("newsletter.view.emailDelivery", "Email Delivery")}
                           </h4>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Sending newsletter to {newsletter.recipientCount || 0} recipients
+                            {t("newsletter.view.sendingToRecipients", "Sending newsletter to {{count}} recipients", { count: newsletter.recipientCount || 0 })}
                           </p>
                         </div>
                       </div>
@@ -1499,8 +1501,8 @@ export default function NewsletterViewPage() {
                         getTaskStepStatus('delivery') === 'completed' ? 'default' :
                           getTaskStepStatus('delivery') === 'running' ? 'secondary' : 'outline'
                       }>
-                        {getTaskStepStatus('delivery') === 'completed' ? 'Completed' :
-                          getTaskStepStatus('delivery') === 'running' ? 'In Progress' : 'Pending'}
+                        {getTaskStepStatus('delivery') === 'completed' ? t("newsletter.view.completed", "Completed") :
+                          getTaskStepStatus('delivery') === 'running' ? t("newsletter.view.inProgress", "In Progress") : t("newsletter.view.pending", "Pending")}
                       </Badge>
                     </div>
                     {getTaskStepStatus('delivery') === 'running' && (
@@ -1521,10 +1523,10 @@ export default function NewsletterViewPage() {
                         )}
                         <div>
                           <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            Analytics Collection
+                            {t("newsletter.view.analyticsCollection", "Analytics Collection")}
                           </h4>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Gathering engagement data - completes 24 hours after sending
+                            {t("newsletter.view.analyticsGatheringDesc", "Gathering engagement data - completes 24 hours after sending")}
                           </p>
                         </div>
                       </div>
@@ -1532,15 +1534,15 @@ export default function NewsletterViewPage() {
                         getTaskStepStatus('analytics') === 'completed' ? 'default' :
                           getTaskStepStatus('analytics') === 'running' ? 'secondary' : 'outline'
                       }>
-                        {getTaskStepStatus('analytics') === 'completed' ? 'Completed' :
-                          getTaskStepStatus('analytics') === 'running' ? 'Collecting Data' : 'Pending'}
+                        {getTaskStepStatus('analytics') === 'completed' ? t("newsletter.view.completed", "Completed") :
+                          getTaskStepStatus('analytics') === 'running' ? t("newsletter.view.collectingData", "Collecting Data") : t("newsletter.view.pending", "Pending")}
                       </Badge>
                     </div>
                     {getTaskStepStatus('analytics') === 'running' && (
                       <div className="space-y-2">
                         <Progress value={65} className="h-2" />
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {newsletter.sentAt && `Time remaining: ${getAnalyticsTimeRemaining()}`}
+                          {newsletter.sentAt && t("newsletter.view.timeRemaining", "Time remaining: {{time}}", { time: getAnalyticsTimeRemaining() })}
                         </p>
                       </div>
                     )}
@@ -1559,9 +1561,9 @@ export default function NewsletterViewPage() {
                     <RefreshCw className="w-5 h-5 text-white animate-spin" strokeWidth={1.5} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-blue-900 dark:text-blue-100">Analytics Collection In Progress</h3>
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-100">{t("newsletter.view.analyticsInProgress", "Analytics Collection In Progress")}</h3>
                     <p className="text-sm text-blue-700 dark:text-blue-300 mt-0.5">
-                      Engagement data is being gathered for 24 hours after sending. Stats below will continue to update in real-time.
+                      {t("newsletter.view.analyticsInProgressDesc", "Engagement data is being gathered for 24 hours after sending. Stats below will continue to update in real-time.")}
                     </p>
                     {newsletter.sentAt && (
                       <div className="mt-3 flex items-center gap-3">
@@ -1572,7 +1574,7 @@ export default function NewsletterViewPage() {
                           />
                         </div>
                         <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
-                          {getAnalyticsTimeRemaining()} remaining
+                          {t("newsletter.view.remaining", "{{time}} remaining", { time: getAnalyticsTimeRemaining() })}
                         </span>
                       </div>
                     )}
@@ -1588,9 +1590,9 @@ export default function NewsletterViewPage() {
                     <CheckCircle className="w-5 h-5 text-white" strokeWidth={1.5} />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-emerald-900 dark:text-emerald-100">Analytics Collection Complete</h3>
+                    <h3 className="font-semibold text-emerald-900 dark:text-emerald-100">{t("newsletter.view.analyticsComplete", "Analytics Collection Complete")}</h3>
                     <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-0.5">
-                      All engagement data has been gathered. The statistics below reflect the final results.
+                      {t("newsletter.view.analyticsCompleteDesc", "All engagement data has been gathered. The statistics below reflect the final results.")}
                     </p>
                   </div>
                 </div>
@@ -1606,7 +1608,7 @@ export default function NewsletterViewPage() {
                       <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
                     </div>
                     <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{liveStats?.delivered ?? 0}</p>
-                    <p className="text-xs font-medium text-blue-600/80 dark:text-blue-400/80 mt-0.5">Delivered</p>
+                    <p className="text-xs font-medium text-blue-600/80 dark:text-blue-400/80 mt-0.5">{t("newsletter.view.delivered", "Delivered")}</p>
                   </CardContent>
                 </Card>
 
@@ -1616,7 +1618,7 @@ export default function NewsletterViewPage() {
                       <Eye className="h-4 w-4 text-green-600 dark:text-green-400" strokeWidth={1.5} />
                     </div>
                     <p className="text-2xl font-bold text-green-700 dark:text-green-300">{newsletter.opens || 0}</p>
-                    <p className="text-xs font-medium text-green-600/80 dark:text-green-400/80 mt-0.5">Unique Opens</p>
+                    <p className="text-xs font-medium text-green-600/80 dark:text-green-400/80 mt-0.5">{t("newsletter.view.uniqueOpens", "Unique Opens")}</p>
                   </CardContent>
                 </Card>
 
@@ -1626,7 +1628,7 @@ export default function NewsletterViewPage() {
                       <MousePointer className="h-4 w-4 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
                     </div>
                     <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{newsletter.clickCount || 0}</p>
-                    <p className="text-xs font-medium text-purple-600/80 dark:text-purple-400/80 mt-0.5">Clicks</p>
+                    <p className="text-xs font-medium text-purple-600/80 dark:text-purple-400/80 mt-0.5">{t("newsletter.view.clicks", "Clicks")}</p>
                   </CardContent>
                 </Card>
 
@@ -1636,7 +1638,7 @@ export default function NewsletterViewPage() {
                       <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" strokeWidth={1.5} />
                     </div>
                     <p className="text-2xl font-bold text-red-700 dark:text-red-300">{liveStats?.bounced ?? 0}</p>
-                    <p className="text-xs font-medium text-red-600/80 dark:text-red-400/80 mt-0.5">Bounced</p>
+                    <p className="text-xs font-medium text-red-600/80 dark:text-red-400/80 mt-0.5">{t("newsletter.view.bounced", "Bounced")}</p>
                   </CardContent>
                 </Card>
 
@@ -1646,7 +1648,7 @@ export default function NewsletterViewPage() {
                       <ShieldOff className="h-4 w-4 text-orange-600 dark:text-orange-400" strokeWidth={1.5} />
                     </div>
                     <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{liveStats?.complained ?? 0}</p>
-                    <p className="text-xs font-medium text-orange-600/80 dark:text-orange-400/80 mt-0.5">Complaints</p>
+                    <p className="text-xs font-medium text-orange-600/80 dark:text-orange-400/80 mt-0.5">{t("newsletter.view.complaints", "Complaints")}</p>
                   </CardContent>
                 </Card>
 
@@ -1656,7 +1658,7 @@ export default function NewsletterViewPage() {
                       <XCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" strokeWidth={1.5} />
                     </div>
                     <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">{liveStats?.suppressed ?? 0}</p>
-                    <p className="text-xs font-medium text-yellow-600/80 dark:text-yellow-400/80 mt-0.5">Suppressed</p>
+                    <p className="text-xs font-medium text-yellow-600/80 dark:text-yellow-400/80 mt-0.5">{t("newsletter.view.suppressed", "Suppressed")}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -1669,16 +1671,16 @@ export default function NewsletterViewPage() {
                   <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <BarChart3 className="h-5 w-5 text-indigo-500" strokeWidth={1.5} />
-                      Engagement Rates
+                      {t("newsletter.view.engagementRates", "Engagement Rates")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-5">
-                    {/* Open Rate */}
+                    {/* {t("newsletter.view.openRate", "Open Rate")} */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <Eye className="h-4 w-4 text-green-500" strokeWidth={1.5} />
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Unique Open Rate</span>
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t("newsletter.view.uniqueOpenRate", "Unique Open Rate")}</span>
                         </div>
                         <span className="text-lg font-bold text-green-600 dark:text-green-400">{uniqueOpenRate}%</span>
                       </div>
@@ -1689,8 +1691,8 @@ export default function NewsletterViewPage() {
                         />
                       </div>
                       <div className="flex justify-between mt-1.5">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{newsletter.opens || 0} unique / {newsletter.recipientCount || 0} sent</span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">({(newsletter as any).totalOpens || 0} total opens)</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{t("newsletter.view.uniqueSentStats", "{{unique}} unique / {{total}} sent", { unique: newsletter.opens || 0, total: newsletter.recipientCount || 0 })}</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{t("newsletter.view.totalOpens", "({{count}} total opens)", { count: (newsletter as any).totalOpens || 0 })}</span>
                       </div>
                     </div>
 
@@ -1699,7 +1701,7 @@ export default function NewsletterViewPage() {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <MousePointer className="h-4 w-4 text-purple-500" strokeWidth={1.5} />
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Click-through Rate</span>
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t("newsletter.view.clickThroughRate", "Click-through Rate")}</span>
                         </div>
                         <span className="text-lg font-bold text-purple-600 dark:text-purple-400">{clickThroughRate}%</span>
                       </div>
@@ -1710,7 +1712,7 @@ export default function NewsletterViewPage() {
                         />
                       </div>
                       <div className="flex justify-between mt-1.5">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{newsletter.clickCount || 0} clicks / {newsletter.opens || 0} unique opens</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{t("newsletter.view.clicksOpensStats", "{{clicks}} clicks / {{opens}} unique opens", { clicks: newsletter.clickCount || 0, opens: newsletter.opens || 0 })}</span>
                       </div>
                     </div>
 
@@ -1724,7 +1726,7 @@ export default function NewsletterViewPage() {
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               <Send className="h-4 w-4 text-blue-500" strokeWidth={1.5} />
-                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Delivery Rate</span>
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t("newsletter.view.deliveryRate", "Delivery Rate")}</span>
                             </div>
                             <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{deliveryRate}%</span>
                           </div>
@@ -1735,7 +1737,7 @@ export default function NewsletterViewPage() {
                             />
                           </div>
                           <div className="flex justify-between mt-1.5">
-                            <span className="text-xs text-gray-500 dark:text-gray-400">{liveStats?.delivered ?? 0} delivered / {newsletter.recipientCount || 0} sent</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">{t("newsletter.view.deliveredSentStats", "{{delivered}} delivered / {{total}} sent", { delivered: liveStats?.delivered ?? 0, total: newsletter.recipientCount || 0 })}</span>
                           </div>
                         </div>
                       );
@@ -1747,7 +1749,7 @@ export default function NewsletterViewPage() {
                   <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <TrendingUp className="h-5 w-5 text-emerald-500" strokeWidth={1.5} />
-                      Performance Insights
+                      {t("newsletter.view.performanceInsights", "Performance Insights")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -1755,9 +1757,9 @@ export default function NewsletterViewPage() {
                       <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800/50 rounded-xl">
                         <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 shrink-0" strokeWidth={1.5} />
                         <div>
-                          <p className="text-sm font-semibold text-green-800 dark:text-green-200">Excellent Engagement</p>
+                          <p className="text-sm font-semibold text-green-800 dark:text-green-200">{t("newsletter.view.excellentEngagement", "Excellent Engagement")}</p>
                           <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
-                            Your {uniqueOpenRate}% unique open rate is above the industry average of ~21%.
+                            {t("newsletter.view.excellentEngagementDesc", "Your {{rate}}% unique open rate is above the industry average of ~21%.", { rate: uniqueOpenRate })}
                           </p>
                         </div>
                       </div>
@@ -1767,9 +1769,9 @@ export default function NewsletterViewPage() {
                       <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl">
                         <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" strokeWidth={1.5} />
                         <div>
-                          <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Average Engagement</p>
+                          <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">{t("newsletter.view.averageEngagement", "Average Engagement")}</p>
                           <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
-                            Your {uniqueOpenRate}% open rate can be improved. Try more compelling subject lines.
+                            {t("newsletter.view.averageEngagementDesc", "Your {{rate}}% open rate can be improved. Try more compelling subject lines.", { rate: uniqueOpenRate })}
                           </p>
                         </div>
                       </div>
@@ -1779,9 +1781,9 @@ export default function NewsletterViewPage() {
                       <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-900/20 dark:to-gray-900/20 border border-gray-200 dark:border-gray-700/50 rounded-xl">
                         <Clock className="h-5 w-5 text-gray-400 mt-0.5 shrink-0" strokeWidth={1.5} />
                         <div>
-                          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Awaiting Opens</p>
+                          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t("newsletter.view.awaitingOpens", "Awaiting Opens")}</p>
                           <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-                            No unique opens recorded yet. Opens usually trickle in over 24-48 hours.
+                            {t("newsletter.view.awaitingOpensDesc", "No unique opens recorded yet. Opens usually trickle in over 24-48 hours.")}
                           </p>
                         </div>
                       </div>
@@ -1791,9 +1793,9 @@ export default function NewsletterViewPage() {
                       <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 border border-purple-200 dark:border-purple-800/50 rounded-xl">
                         <MousePointer className="h-5 w-5 text-purple-500 mt-0.5 shrink-0" strokeWidth={1.5} />
                         <div>
-                          <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">Great Click Rate</p>
+                          <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">{t("newsletter.view.greatClickRate", "Great Click Rate")}</p>
                           <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
-                            Your {clickThroughRate}% CTR shows strong content relevance.
+                            {t("newsletter.view.greatClickRateDesc", "Your {{rate}}% CTR shows strong content relevance.", { rate: clickThroughRate })}
                           </p>
                         </div>
                       </div>
@@ -1803,9 +1805,9 @@ export default function NewsletterViewPage() {
                       <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200 dark:border-red-800/50 rounded-xl">
                         <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" strokeWidth={1.5} />
                         <div>
-                          <p className="text-sm font-semibold text-red-800 dark:text-red-200">Bounces Detected</p>
+                          <p className="text-sm font-semibold text-red-800 dark:text-red-200">{t("newsletter.view.bouncesDetected", "Bounces Detected")}</p>
                           <p className="text-xs text-red-700 dark:text-red-300 mt-0.5">
-                            {liveStats?.bounced} email(s) bounced. Consider cleaning your contact list.
+                            {t("newsletter.view.bouncesDetectedDesc", "{{count}} email(s) bounced. Consider cleaning your contact list.", { count: liveStats?.bounced })}
                           </p>
                         </div>
                       </div>
@@ -1815,9 +1817,9 @@ export default function NewsletterViewPage() {
                       <div className="flex items-start gap-3 p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl">
                         <TrendingUp className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" strokeWidth={1.5} />
                         <div>
-                          <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">Healthy Delivery</p>
+                          <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">{t("newsletter.view.healthyDelivery", "Healthy Delivery")}</p>
                           <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
-                            Zero bounces with good opens. Your sender reputation is in great shape.
+                            {t("newsletter.view.healthyDeliveryDesc", "Zero bounces with good opens. Your sender reputation is in great shape.")}
                           </p>
                         </div>
                       </div>
@@ -1835,10 +1837,10 @@ export default function NewsletterViewPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <List className="h-5 w-5" strokeWidth={1.5} />
-                  Per-Recipient Email Activity
+                  {t("newsletter.view.perRecipientActivity", "Per-Recipient Email Activity")}
                 </CardTitle>
                 <CardDescription>
-                  Individual delivery status and engagement activity for each recipient
+                  {t("newsletter.view.perRecipientActivityDesc", "Individual delivery status and engagement activity for each recipient")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1848,10 +1850,10 @@ export default function NewsletterViewPage() {
                       <Mail className="h-8 w-8 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
                     </div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      Newsletter Not Sent Yet
+                      {t("newsletter.view.notSentYet", "Newsletter Not Sent Yet")}
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                      Per-recipient statistics will appear here after the newsletter is sent. You'll see individual open, click, bounce, and complaint data for each email.
+                      {t("newsletter.view.notSentYetDesc", "Per-recipient statistics will appear here after the newsletter is sent. You'll see individual open, click, bounce, and complaint data for each email.")}
                     </p>
                   </div>
                 ) : isDetailedStatsLoading ? (
@@ -1880,7 +1882,7 @@ export default function NewsletterViewPage() {
                       </div>
                       <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="shrink-0">
                         <RefreshCw className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
-                        Refresh
+                        {t("newsletter.view.refresh", "Refresh")}
                       </Button>
                     </div>
 
@@ -2005,10 +2007,10 @@ export default function NewsletterViewPage() {
                       <Activity className="h-8 w-8 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
                     </div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      No Email Data Available Yet
+                      {t("newsletter.view.noEmailDataYet", "No Email Data Available Yet")}
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                      Email tracking data is being collected. This typically takes a few minutes after sending begins.
+                      {t("newsletter.view.noEmailDataYetDesc", "Email tracking data is being collected. This typically takes a few minutes after sending begins.")}
                     </p>
                   </div>
                 )}
@@ -2023,7 +2025,7 @@ export default function NewsletterViewPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <History className="h-5 w-5" strokeWidth={1.5} />
-                Email Trajectory History
+                {t("newsletter.view.emailTrajectory", "Email Trajectory History")}
                 {selectedTrajectory && selectedTrajectory.totalEvents > 1 && (
                   <Badge variant="secondary" className="ml-2">
                     {selectedTrajectory.totalEvents} Events
@@ -2031,7 +2033,7 @@ export default function NewsletterViewPage() {
                 )}
               </DialogTitle>
               <DialogDescription>
-                Complete tracking timeline showing every interaction with this specific email
+                {t("newsletter.view.trajectoryDesc", "Complete tracking timeline showing every interaction with this specific email")}
               </DialogDescription>
             </DialogHeader>
 
@@ -2040,30 +2042,30 @@ export default function NewsletterViewPage() {
                 {/* Email Overview */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Email Details</CardTitle>
+                    <CardTitle className="text-lg">{t("newsletter.view.emailDetails", "Email Details")}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="grid grid-cols-1 gap-3 sm:gap-4">
                       <div>
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">From</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.from", "From")}</p>
                         <p className="text-sm">{selectedTrajectory.from}</p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">To</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.to", "To")}</p>
                         <p className="text-sm">{selectedTrajectory.to}</p>
                       </div>
                       <div className="md:col-span-2">
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Subject</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.subject", "Subject")}</p>
                         <p className="text-sm">{selectedTrajectory.subject}</p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Status</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.status", "Status")}</p>
                         <Badge className="mt-1">
                           {selectedTrajectory.status || 'Unknown'}
                         </Badge>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Created At</p>
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.createdAt", "Created At")}</p>
                         <p className="text-sm">
                           {selectedTrajectory.createdAt ?
                             format(new Date(selectedTrajectory.createdAt), 'PPP p') :
@@ -2079,9 +2081,9 @@ export default function NewsletterViewPage() {
                 {selectedTrajectory.totalEvents > 1 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">Engagement Summary</CardTitle>
+                      <CardTitle className="text-lg">{t("newsletter.view.engagementSummary", "Engagement Summary")}</CardTitle>
                       <CardDescription>
-                        Quick overview of recipient engagement with this email
+                        {t("newsletter.view.engagementSummaryDesc", "Quick overview of recipient engagement with this email")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -2091,7 +2093,7 @@ export default function NewsletterViewPage() {
                             <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
                           </div>
                           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{selectedTrajectory.totalEvents}</p>
-                          <p className="text-sm text-blue-600 dark:text-blue-400">Total Events</p>
+                          <p className="text-sm text-blue-600 dark:text-blue-400">{t("newsletter.view.totalEvents", "Total Events")}</p>
                         </div>
 
                         <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
@@ -2099,7 +2101,7 @@ export default function NewsletterViewPage() {
                             <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
                           </div>
                           <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{selectedTrajectory.totalOpens || 0}</p>
-                          <p className="text-sm text-purple-600 dark:text-purple-400">Opens</p>
+                          <p className="text-sm text-purple-600 dark:text-purple-400">{t("newsletter.view.opens", "Opens")}</p>
                         </div>
 
                         <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
@@ -2107,7 +2109,7 @@ export default function NewsletterViewPage() {
                             <MousePointer className="h-4 w-4 text-orange-600 dark:text-orange-400" strokeWidth={1.5} />
                           </div>
                           <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{selectedTrajectory.totalClicks || 0}</p>
-                          <p className="text-sm text-orange-600 dark:text-orange-400">Clicks</p>
+                          <p className="text-sm text-orange-600 dark:text-orange-400">{t("newsletter.view.clicks", "Clicks")}</p>
                         </div>
 
                         <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
@@ -2120,7 +2122,7 @@ export default function NewsletterViewPage() {
                               0
                             }%
                           </p>
-                          <p className="text-sm text-green-600 dark:text-green-400">Click Rate</p>
+                          <p className="text-sm text-green-600 dark:text-green-400">{t("newsletter.view.clickRate", "Click Rate")}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -2131,7 +2133,7 @@ export default function NewsletterViewPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center justify-between">
-                      <span>Event Timeline</span>
+                      <span>{t("newsletter.view.eventTimeline", "Event Timeline")}</span>
                       <div className="flex gap-2 text-sm">
                         {selectedTrajectory.totalOpens > 0 && (
                           <Badge variant="secondary" className="gap-1">
@@ -2247,7 +2249,7 @@ export default function NewsletterViewPage() {
                       </div>
                     ) : (
                       <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                        No event timeline available
+                        {t("newsletter.view.noEventTimeline", "No event timeline available")}
                       </p>
                     )}
                   </CardContent>
@@ -2257,13 +2259,13 @@ export default function NewsletterViewPage() {
                 {selectedTrajectory.metadata && (
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">Additional Information</CardTitle>
+                      <CardTitle className="text-lg">{t("newsletter.view.additionalInfo", "Additional Information")}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         {selectedTrajectory.metadata.reply_to && (
                           <div>
-                            <p className="font-medium text-gray-600 dark:text-gray-400">Reply To</p>
+                            <p className="font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.replyTo", "Reply To")}</p>
                             <p>{selectedTrajectory.metadata.reply_to}</p>
                           </div>
                         )}
@@ -2286,7 +2288,7 @@ export default function NewsletterViewPage() {
                           </div>
                         )}
                         <div>
-                          <p className="font-medium text-gray-600 dark:text-gray-400">Email ID</p>
+                          <p className="font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.emailId", "Email ID")}</p>
                           <p className="font-mono text-xs">{selectedTrajectory.emailId}</p>
                         </div>
                       </div>
@@ -2311,7 +2313,7 @@ export default function NewsletterViewPage() {
             <DialogHeader className="flex-shrink-0">
               <DialogTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" strokeWidth={1.5} />
-                Recipients
+                {t("newsletter.view.recipients", "Recipients")}
                 {recipientsData && (
                   <Badge variant="secondary" className="ml-1">
                     {recipientsData.total}
@@ -2319,15 +2321,15 @@ export default function NewsletterViewPage() {
                 )}
               </DialogTitle>
               <DialogDescription>
-                {newsletter?.recipientType === 'all' ? 'All active contacts' :
-                  newsletter?.recipientType === 'selected' ? 'Individually selected contacts' : 'Contacts matching selected tags'}
+                {newsletter?.recipientType === 'all' ? t("newsletter.view.allActiveContacts", "All active contacts") :
+                  newsletter?.recipientType === 'selected' ? t("newsletter.view.individuallySelected", "Individually selected contacts") : t("newsletter.view.matchingTags", "Contacts matching selected tags")}
               </DialogDescription>
             </DialogHeader>
 
             <div className="relative flex-shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search recipients..."
+                placeholder={t("newsletter.view.searchRecipients", "Search recipients...")}
                 value={recipientSearch}
                 onChange={(e) => setRecipientSearch(e.target.value)}
                 className="pl-9"
@@ -2352,7 +2354,7 @@ export default function NewsletterViewPage() {
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                   <Mail className="h-8 w-8 text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">
-                    {recipientSearch ? "No recipients match your search" : "No recipients found"}
+                    {recipientSearch ? t("newsletter.view.noRecipientsMatch", "No recipients match your search") : t("newsletter.view.noRecipientsFound", "No recipients found")}
                   </p>
                 </div>
               ) : (
@@ -2404,17 +2406,17 @@ export default function NewsletterViewPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <XCircle className="h-5 w-5 text-red-500" />
-                Reject Newsletter
+                {t("newsletter.view.rejectNewsletter", "Reject Newsletter")}
               </DialogTitle>
               <DialogDescription>
-                Please provide feedback explaining why this newsletter is being rejected. The creator will see your notes and can make adjustments.
+                {t("newsletter.view.rejectNewsletterDesc", "Please provide feedback explaining why this newsletter is being rejected. The creator will see your notes and can make adjustments.")}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Rejection Notes <span className="text-red-500">*</span></label>
+                <label className="text-sm font-medium text-foreground">{t("newsletter.view.rejectionNotes", "Rejection Notes")} <span className="text-red-500">*</span></label>
                 <Textarea
-                  placeholder="Explain what needs to change before this newsletter can be approved..."
+                  placeholder={t("newsletter.view.rejectionPlaceholder", "Explain what needs to change before this newsletter can be approved...")}
                   value={rejectNotes}
                   onChange={(e) => setRejectNotes(e.target.value)}
                   rows={4}
@@ -2430,7 +2432,7 @@ export default function NewsletterViewPage() {
                   disabled={!rejectNotes.trim() || rejectMutation.isPending}
                   className="bg-red-600 hover:bg-red-700 text-white"
                 >
-                  {rejectMutation.isPending ? "Rejecting..." : "Reject Newsletter"}
+                  {rejectMutation.isPending ? t("newsletter.view.rejecting", "Rejecting...") : t("newsletter.view.rejectNewsletter", "Reject Newsletter")}
                 </Button>
               </div>
             </div>

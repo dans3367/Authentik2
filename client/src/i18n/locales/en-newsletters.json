@@ -1,0 +1,72 @@
+{
+  "newsletters": {
+    "title": "Newsletters",
+    "description": "Create and manage your newsletter campaigns",
+    "createNew": "Create Newsletter",
+    "searchPlaceholder": "Search newsletters...",
+    "status": {
+      "draft": "Draft",
+      "scheduled": "Scheduled",
+      "sending": "Sending",
+      "sent": "Sent",
+      "failed": "Failed",
+      "ready_to_send": "Ready to Send",
+      "pending_review": "Pending Review"
+    },
+    "tabs": {
+      "all": "All",
+      "drafts": "Drafts",
+      "scheduled": "Scheduled",
+      "sent": "Sent"
+    },
+    "columns": {
+      "title": "Title",
+      "status": "Status",
+      "recipients": "Recipients",
+      "performance": "Performance",
+      "lastUpdated": "Last Updated",
+      "actions": "Actions"
+    },
+    "stats": {
+      "views": "Views",
+      "clicks": "Clicks"
+    },
+    "actions": {
+      "edit": "Edit",
+      "preview": "Preview",
+      "duplicate": "Duplicate",
+      "delete": "Delete"
+    },
+    "create": {
+      "title": "Create Newsletter",
+      "subject": "Subject",
+      "subjectPlaceholder": "Enter subject line",
+      "previewText": "Preview Text",
+      "previewTextPlaceholder": "Enter preview text",
+      "saveDraft": "Save Draft",
+      "preview": "Preview",
+      "ready": "Ready",
+      "unsavedChanges": "Unsaved changes",
+      "saving": "Saving...",
+      "saved": "Saved",
+      "sendPreview": "Send Preview",
+      "leavePageTitle": "Leave Page?",
+      "leavePageDesc": "You have unsaved changes. If you leave now, your draft will be permanently deleted. Are you sure you want to continue?",
+      "stayOnPage": "Stay on Page",
+      "leaveDiscard": "Leave & Discard"
+    },
+    "view": {
+      "back": "Back to Newsletters",
+      "details": "Details",
+      "detailedStats": "Detailed Stats",
+      "totalRecipients": "Total Recipients",
+      "openRate": "Open Rate",
+      "clickRate": "Click Rate",
+      "bounces": "Bounces",
+      "complaints": "Complaints",
+      "editRecipients": "Edit Recipients",
+      "recipientList": "Recipient List",
+      "statusTimeline": "Status Timeline"
+    }
+  }
+}

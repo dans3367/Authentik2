@@ -23,6 +23,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 
 interface AppointmentCustomer {
   id: string;
@@ -46,6 +47,7 @@ interface Appointment {
 
 export function UpcomingAppointmentsCard() {
   const [, setLocation] = useLocation();
+  const { t } = useTranslation();
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -81,7 +83,7 @@ export function UpcomingAppointmentsCard() {
     .slice(0, 5);
 
   const getCustomerName = (customer?: AppointmentCustomer) => {
-    if (!customer) return "Unknown Customer";
+    if (!customer) return t("dashboard.appointments.unknownCustomer");
     if (customer.firstName && customer.lastName)
       return `${customer.firstName} ${customer.lastName}`;
     if (customer.firstName) return customer.firstName;
@@ -156,9 +158,9 @@ export function UpcomingAppointmentsCard() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const appointmentDate = new Date(date);
 
-    if (appointmentDate.toDateString() === today.toDateString()) return "Today";
+    if (appointmentDate.toDateString() === today.toDateString()) return t("dashboard.appointments.today");
     if (appointmentDate.toDateString() === tomorrow.toDateString())
-      return "Tomorrow";
+      return t("dashboard.appointments.tomorrow");
     return new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(
       appointmentDate
     );
@@ -177,7 +179,7 @@ export function UpcomingAppointmentsCard() {
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <CalendarDays className="h-4 w-4 text-primary" />
             </div>
-            Upcoming Schedule
+            {t("dashboard.appointments.title")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -197,7 +199,7 @@ export function UpcomingAppointmentsCard() {
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <CalendarDays className="h-4 w-4 text-primary" />
             </div>
-            Upcoming Schedule
+            {t("dashboard.appointments.title")}
           </CardTitle>
         </div>
       </CardHeader>
@@ -209,10 +211,10 @@ export function UpcomingAppointmentsCard() {
             </div>
             <div>
               <p className="text-sm font-medium text-foreground mb-1">
-                Schedule is clear
+                {t("dashboard.appointments.scheduleClear")}
               </p>
               <p className="text-xs text-muted-foreground">
-                No appointments for the next 7 days
+                {t("dashboard.appointments.noAppointmentsDesc")}
               </p>
             </div>
           </div>
@@ -221,7 +223,7 @@ export function UpcomingAppointmentsCard() {
             {upcomingAppointments.map((appointment) => {
               const statusConfig = getStatusConfig(appointment.status);
               const dayLabel = getDayLabel(appointment.appointmentDate);
-              const isToday = dayLabel === "Today";
+              const isToday = new Date(appointment.appointmentDate).toDateString() === new Date().toDateString();
 
               return (
                 <button
@@ -299,7 +301,7 @@ export function UpcomingAppointmentsCard() {
           data-testid="button-schedule-appointment"
         >
           <CalendarPlus className="h-4 w-4 mr-2 text-primary" />
-          Schedule New Appointment
+          {t("dashboard.appointments.scheduleNew")}
         </Button>
       </CardContent>
 
@@ -313,9 +315,9 @@ export function UpcomingAppointmentsCard() {
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Calendar className="h-4 w-4 text-primary" />
                   </div>
-                  Appointment Details
+                  {t("dashboard.appointments.detailsTitle")}
                 </SheetTitle>
-                <SheetDescription>View appointment information</SheetDescription>
+                <SheetDescription>{t("dashboard.appointments.detailsDescription")}</SheetDescription>
               </SheetHeader>
 
               <div className="mt-6 space-y-5">
@@ -323,12 +325,12 @@ export function UpcomingAppointmentsCard() {
                 <div className="space-y-2.5">
                   <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5" />
-                    Customer
+                    {t("dashboard.appointments.customer")}
                   </h3>
                   <div className="bg-muted/40 p-4 rounded-xl space-y-2.5">
                     <div>
                       <p className="text-[11px] text-muted-foreground mb-0.5">
-                        Name
+                        {t("dashboard.appointments.name")}
                       </p>
                       <p className="font-semibold text-sm text-foreground">
                         {getCustomerName(selectedAppointment.customer)}
@@ -337,7 +339,7 @@ export function UpcomingAppointmentsCard() {
                     {selectedAppointment.customer?.email && (
                       <div>
                         <p className="text-[11px] text-muted-foreground mb-0.5">
-                          Email
+                          {t("dashboard.appointments.email")}
                         </p>
                         <p className="text-sm flex items-center gap-1.5 text-foreground">
                           <Mail className="h-3 w-3 text-muted-foreground" />
@@ -352,12 +354,12 @@ export function UpcomingAppointmentsCard() {
                 <div className="space-y-2.5">
                   <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
-                    Details
+                    {t("dashboard.appointments.details")}
                   </h3>
                   <div className="bg-muted/40 p-4 rounded-xl space-y-3">
                     <div>
                       <p className="text-[11px] text-muted-foreground mb-0.5">
-                        Title
+                        {t("dashboard.appointments.title_label")}
                       </p>
                       <p className="font-semibold text-sm text-foreground">
                         {selectedAppointment.title}
@@ -366,7 +368,7 @@ export function UpcomingAppointmentsCard() {
                     {selectedAppointment.description && (
                       <div>
                         <p className="text-[11px] text-muted-foreground mb-0.5">
-                          Description
+                          {t("dashboard.appointments.description_label")}
                         </p>
                         <p className="text-sm text-foreground">
                           {selectedAppointment.description}
@@ -375,7 +377,7 @@ export function UpcomingAppointmentsCard() {
                     )}
                     <div>
                       <p className="text-[11px] text-muted-foreground mb-0.5">
-                        Date & Time
+                        {t("dashboard.appointments.dateTime")}
                       </p>
                       <p className="text-sm font-medium flex items-center gap-1.5 text-foreground">
                         <Clock className="h-3 w-3 text-muted-foreground" />
@@ -388,31 +390,31 @@ export function UpcomingAppointmentsCard() {
                       {selectedAppointment.duration && (
                         <div>
                           <p className="text-[11px] text-muted-foreground mb-0.5">
-                            Duration
+                            {t("dashboard.appointments.duration")}
                           </p>
                           <p className="text-sm flex items-center gap-1.5 text-foreground">
                             <Timer className="h-3 w-3 text-muted-foreground" />
-                            {selectedAppointment.duration} min
+                            {t("dashboard.appointments.durationMin", { count: selectedAppointment.duration })}
                           </p>
                         </div>
                       )}
                       <div>
                         <p className="text-[11px] text-muted-foreground mb-0.5">
-                          Status
+                          {t("dashboard.appointments.status")}
                         </p>
                         <Badge
                           className={
                             getStatusConfig(selectedAppointment.status).color
                           }
                         >
-                          {selectedAppointment.status.replace("_", " ")}
+                          {t(`dashboard.appointments.status_${selectedAppointment.status}`)}
                         </Badge>
                       </div>
                     </div>
                     {selectedAppointment.location && (
                       <div>
                         <p className="text-[11px] text-muted-foreground mb-0.5">
-                          Location
+                          {t("dashboard.appointments.location")}
                         </p>
                         <p className="text-sm flex items-center gap-1.5 text-foreground">
                           <MapPin className="h-3 w-3 text-muted-foreground" />
@@ -432,13 +434,13 @@ export function UpcomingAppointmentsCard() {
                       setLocation("/reminders");
                     }}
                   >
-                    View Full Details
+                    {t("dashboard.appointments.viewFullDetails")}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => setDetailsOpen(false)}
                   >
-                    Close
+                    {t("dashboard.appointments.close")}
                   </Button>
                 </div>
               </div>

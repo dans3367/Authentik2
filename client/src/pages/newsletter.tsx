@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   Plus,
   Mail,
@@ -57,22 +58,23 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { format, formatDistanceToNow } from "date-fns";
+import { es as esLocale } from "date-fns/locale/es";
 import type { NewsletterWithUser } from "@shared/schema";
 
-const getStatusBadge = (status: string) => {
+const getStatusBadge = (status: string, t: (key: string, fallback?: string) => string) => {
   switch (status) {
     case 'draft':
-      return <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800"><FileText className="h-3 w-3 mr-1" />Draft</Badge>;
+      return <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800"><FileText className="h-3 w-3 mr-1" />{t('newsletter.status.draft')}</Badge>;
     case 'ready_to_send':
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"><Send className="h-3 w-3 mr-1" />Ready to Send</Badge>;
+      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"><Send className="h-3 w-3 mr-1" />{t('newsletter.status.readyToSend')}</Badge>;
     case 'pending_review':
-      return <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800"><ShieldCheck className="h-3 w-3 mr-1" />Pending Review</Badge>;
+      return <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800"><ShieldCheck className="h-3 w-3 mr-1" />{t('newsletter.status.pendingReview')}</Badge>;
     case 'scheduled':
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"><Clock className="h-3 w-3 mr-1" />Scheduled</Badge>;
+      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"><Clock className="h-3 w-3 mr-1" />{t('newsletter.status.scheduled')}</Badge>;
     case 'sending':
-      return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800"><Send className="h-3 w-3 mr-1 animate-pulse" />Sending</Badge>;
+      return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800"><Send className="h-3 w-3 mr-1 animate-pulse" />{t('newsletter.status.sending')}</Badge>;
     case 'sent':
-      return <Badge variant="default" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"><Send className="h-3 w-3 mr-1" />Sent</Badge>;
+      return <Badge variant="default" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"><Send className="h-3 w-3 mr-1" />{t('newsletter.status.sent')}</Badge>;
     default:
       return <Badge variant="secondary">{status}</Badge>;
   }
@@ -86,13 +88,15 @@ export default function NewsletterPage() {
   const [editRecipientsNewsletter, setEditRecipientsNewsletter] = useState<(NewsletterWithUser & { opens?: number; totalOpens?: number }) | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { t, currentLanguage } = useLanguage();
   const queryClient = useQueryClient();
   const { user } = useReduxAuth();
   const currentUserId = (user as any)?.id;
+  const dateFnsLocale = currentLanguage === 'es' ? { locale: esLocale } : {};
 
   useSetBreadcrumbs([
-    { label: "Dashboard", href: "/", icon: LayoutDashboard },
-    { label: "Email Newsletters", icon: Mail }
+    { label: t("newsletter.breadcrumbDashboard", "Dashboard"), href: "/", icon: LayoutDashboard },
+    { label: t("newsletter.breadcrumbNewsletters", "Email Newsletters"), icon: Mail }
   ]);
 
   const { data: newslettersData, isLoading, error, refetch } = useQuery({
@@ -149,11 +153,11 @@ export default function NewsletterPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      toast({ title: "Deleted", description: "Newsletter deleted successfully." });
+      toast({ title: t("newsletter.toast.deleted"), description: t("newsletter.toast.deletedDesc") });
       setDeleteId(null);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to delete newsletter", variant: "destructive" });
+      toast({ title: t("newsletter.toast.error"), description: error.message || t("newsletter.toast.deleteError"), variant: "destructive" });
     },
   });
 
@@ -165,15 +169,15 @@ export default function NewsletterPage() {
     onSuccess: (data: any, variables: string) => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       toast({
-        title: "Newsletter Deployed",
-        description: data.message || "Newsletter is now being sent to recipients."
+        title: t("newsletter.toast.deployed"),
+        description: data.message || t("newsletter.toast.deployedDesc")
       });
       setLocation(`/newsletters/${data.newsletterId || data.id || variables}`);
     },
     onError: (error: any) => {
       toast({
-        title: "Deploy Failed",
-        description: error.message || "Failed to deploy newsletter",
+        title: t("newsletter.toast.deployFailed"),
+        description: error.message || t("newsletter.toast.deployFailedDesc"),
         variant: "destructive"
       });
     },
@@ -188,14 +192,14 @@ export default function NewsletterPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       toast({
-        title: "Schedule Cancelled",
-        description: "The scheduled send has been cancelled. Newsletter reverted to draft."
+        title: t("newsletter.toast.scheduleCancelled"),
+        description: t("newsletter.toast.scheduleCancelledDesc")
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Cancel Failed",
-        description: error.message || "Failed to cancel scheduled send",
+        title: t("newsletter.toast.cancelFailed"),
+        description: error.message || t("newsletter.toast.cancelFailedDesc"),
         variant: "destructive"
       });
     },
@@ -210,14 +214,14 @@ export default function NewsletterPage() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       toast({
-        title: "Submitted for Review",
-        description: data.message || "Newsletter has been submitted for reviewer approval."
+        title: t("newsletter.toast.submittedForReview"),
+        description: data.message || t("newsletter.toast.submittedForReviewDesc")
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Submission Failed",
-        description: error.message || "Failed to submit newsletter for review",
+        title: t("newsletter.toast.submissionFailed"),
+        description: error.message || t("newsletter.toast.submissionFailedDesc"),
         variant: "destructive"
       });
     },
@@ -237,12 +241,12 @@ export default function NewsletterPage() {
         selectedTagIds: segmentData.selectedTagIds,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      toast({ title: "Recipients Updated", description: "Newsletter recipients have been updated successfully." });
+      toast({ title: t("newsletter.toast.recipientsUpdated"), description: t("newsletter.toast.recipientsUpdatedDesc") });
       setEditRecipientsNewsletter(null);
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to update recipients",
+        title: t("newsletter.toast.error"),
+        description: error.message || t("newsletter.toast.recipientsError"),
         variant: "destructive",
       });
     }
@@ -307,13 +311,13 @@ export default function NewsletterPage() {
       <div className="container mx-auto p-4 lg:p-6">
         <Card className="w-full max-w-md mx-auto">
           <CardHeader>
-            <CardTitle className="text-red-600">Error</CardTitle>
+            <CardTitle className="text-red-600">{t("newsletter.error.title")}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-600 mb-4">
-              {error instanceof Error ? error.message : 'Failed to load newsletter data'}
+              {error instanceof Error ? error.message : t("newsletter.error.loadFailed")}
             </p>
-            <Button onClick={() => refetch()}>Try Again</Button>
+            <Button onClick={() => refetch()}>{t("newsletter.error.tryAgain")}</Button>
           </CardContent>
         </Card>
       </div>
@@ -351,15 +355,15 @@ export default function NewsletterPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
-              Newsletters
+              {t("newsletter.title")}
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Create and manage email newsletters for your subscribers
+              {t("newsletter.subtitle")}
             </p>
           </div>
           <Button onClick={() => setLocation('/newsletter/create')} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="h-4 w-4 mr-2" />
-            Create Newsletter
+            {t("newsletter.createNew", "Create Newsletter")}
           </Button>
         </div>
 
@@ -373,7 +377,7 @@ export default function NewsletterPage() {
               <Mail className="h-5 w-5 text-blue-500" />
               <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Total</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t("newsletter.stats.total")}</p>
           </button>
           <button
             onClick={() => setStatusFilter(statusFilter === "draft" ? "all" : "draft")}
@@ -383,7 +387,7 @@ export default function NewsletterPage() {
               <FileText className="h-5 w-5 text-amber-500" />
               <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.drafts}</span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Drafts</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t("newsletter.stats.drafts")}</p>
           </button>
           {stats.pendingReview > 0 && (
             <button
@@ -394,7 +398,7 @@ export default function NewsletterPage() {
                 <ShieldCheck className="h-5 w-5 text-orange-500" />
                 <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.pendingReview}</span>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Pending Review</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t("newsletter.stats.pendingReview")}</p>
             </button>
           )}
           <button
@@ -405,7 +409,7 @@ export default function NewsletterPage() {
               <Clock className="h-5 w-5 text-blue-500" />
               <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.scheduled}</span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Scheduled</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t("newsletter.stats.scheduled")}</p>
           </button>
           <button
             onClick={() => setStatusFilter(statusFilter === "sent" ? "all" : "sent")}
@@ -415,7 +419,7 @@ export default function NewsletterPage() {
               <Send className="h-5 w-5 text-green-500" />
               <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.sent}</span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Sent</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t("newsletter.stats.sent")}</p>
           </button>
         </div>
 
@@ -424,7 +428,7 @@ export default function NewsletterPage() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search newsletters..."
+            placeholder={t("newsletter.searchPlaceholder", "Search newsletters...")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
@@ -438,27 +442,27 @@ export default function NewsletterPage() {
               <Mail className="h-8 w-8 text-gray-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              No newsletters yet
+              {t("newsletter.noNewslettersYet")}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-sm mx-auto">
-              Create your first email newsletter to start engaging with your subscribers.
+              {t("newsletter.noNewslettersDesc")}
             </p>
             <Button onClick={() => setLocation('/newsletter/create')} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="h-4 w-4 mr-2" />
-              Create Your First Newsletter
+              {t("newsletter.createFirst")}
             </Button>
           </div>
         ) : filteredNewsletters.length === 0 ? (
           <div className="text-center py-16">
             <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              No newsletters found
+              {t("newsletter.noNewslettersFound")}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Try adjusting your search or filter criteria.
+              {t("newsletter.noNewslettersFoundDesc")}
             </p>
             <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("all"); }}>
-              Clear filters
+              {t("newsletter.clearFilters")}
             </Button>
           </div>
         ) : (
@@ -483,7 +487,7 @@ export default function NewsletterPage() {
                 return (
                   <Card key={newsletter.id} className="h-64 flex flex-col items-center justify-center border-dashed border-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 animate-pulse">
                     <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-4" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Deleting newsletter...</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t("newsletter.card.deleting")}</p>
                   </Card>
                 );
               }
@@ -519,7 +523,7 @@ export default function NewsletterPage() {
                           </p>
                         </div>
                         <div className="shrink-0 flex items-center gap-2">
-                          {getStatusBadge(newsletter.status)}
+                          {getStatusBadge(newsletter.status, t)}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                               <Button variant="ghost" size="icon" aria-label="Newsletter actions" className="h-8 w-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
@@ -534,7 +538,7 @@ export default function NewsletterPage() {
                                 }}
                               >
                                 <Eye className="h-4 w-4 mr-2" />
-                                Preview
+                                {t("newsletter.actions.preview")}
                               </DropdownMenuItem>
                               {(isDraft || isReadyToSend) && (
                                 <DropdownMenuItem
@@ -544,7 +548,7 @@ export default function NewsletterPage() {
                                   }}
                                 >
                                   <Pencil className="h-4 w-4 mr-2" />
-                                  Edit
+                                  {t("newsletter.actions.edit")}
                                 </DropdownMenuItem>
                               )}
                               {(isDraft || isReadyToSend) && (
@@ -556,7 +560,7 @@ export default function NewsletterPage() {
                                   data-testid={`button-edit-recipients-${newsletter.id}`}
                                 >
                                   <UserCog className="h-4 w-4 mr-2" />
-                                  Edit Recipients
+                                  {t("newsletter.actions.editRecipients")}
                                 </DropdownMenuItem>
                               )}
                               {isReadyToSend && (
@@ -568,7 +572,7 @@ export default function NewsletterPage() {
                                   disabled={isDeploying}
                                 >
                                   <Send className="h-4 w-4 mr-2" />
-                                  {isDeploying ? "Sending..." : "Send Now"}
+                                  {isDeploying ? t("newsletter.actions.sending") : t("newsletter.actions.sendNow")}
                                 </DropdownMenuItem>
                               )}
                               {isScheduled && (
@@ -581,7 +585,7 @@ export default function NewsletterPage() {
                                   className="text-orange-600 focus:text-orange-600 focus:bg-orange-50 dark:focus:bg-orange-950/50"
                                 >
                                   <CalendarClock className="h-4 w-4 mr-2" />
-                                  {isCancellingSchedule ? "Cancelling..." : "Cancel Schedule"}
+                                  {isCancellingSchedule ? t("newsletter.actions.cancelling") : t("newsletter.actions.cancelSchedule")}
                                 </DropdownMenuItem>
                               )}
                               {reviewerEnabled && (isDraft || isReadyToSend) && !isPendingReview && newsletter.reviewStatus !== 'approved' && (
@@ -593,7 +597,7 @@ export default function NewsletterPage() {
                                   disabled={isSubmittingForReview}
                                 >
                                   <ClipboardCheck className="h-4 w-4 mr-2" />
-                                  {isSubmittingForReview ? "Submitting..." : "Submit for Review"}
+                                  {isSubmittingForReview ? t("newsletter.actions.submitting") : t("newsletter.actions.submitForReview")}
                                 </DropdownMenuItem>
                               )}
                               {isPendingReview && isCurrentUserReviewer && (
@@ -604,7 +608,7 @@ export default function NewsletterPage() {
                                   }}
                                 >
                                   <ShieldCheck className="h-4 w-4 mr-2" />
-                                  Review Newsletter
+                                  {t("newsletter.actions.reviewNewsletter")}
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuSeparator />
@@ -616,7 +620,7 @@ export default function NewsletterPage() {
                                 }}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
+                                {t("newsletter.actions.delete")}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -635,9 +639,9 @@ export default function NewsletterPage() {
                         </div>
                         <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
                           {newsletter.sentAt
-                            ? formatDistanceToNow(new Date(newsletter.sentAt), { addSuffix: true })
+                            ? formatDistanceToNow(new Date(newsletter.sentAt), { addSuffix: true, ...dateFnsLocale })
                             : newsletter.createdAt
-                              ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true })
+                              ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true, ...dateFnsLocale })
                               : ''}
                         </span>
                       </div>
@@ -652,7 +656,7 @@ export default function NewsletterPage() {
                                 {(newsletter.recipientCount || 0).toLocaleString()}
                               </span>
                             </div>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">Sent</p>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.sent")}</p>
                           </div>
                           <div className="text-center">
                             <div className="flex items-center justify-center gap-1">
@@ -661,7 +665,7 @@ export default function NewsletterPage() {
                                 {newsletter.opens || 0}
                               </span>
                             </div>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{openRate}% opened</p>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.opened", { rate: openRate })}</p>
                           </div>
                           <div className="text-center">
                             <div className="flex items-center justify-center gap-1">
@@ -670,7 +674,7 @@ export default function NewsletterPage() {
                                 {newsletter.clickCount || 0}
                               </span>
                             </div>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">Clicks</p>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.clicks")}</p>
                           </div>
                         </div>
                       ) : (
@@ -678,9 +682,9 @@ export default function NewsletterPage() {
                           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                             <Calendar className="h-3.5 w-3.5" />
                             {newsletter.status === 'scheduled' && newsletter.scheduledAt ? (
-                              <span>Scheduled for {format(new Date(newsletter.scheduledAt), 'MMM d, yyyy \'at\' h:mm a')}</span>
+                              <span>{t("newsletter.card.scheduledFor", { date: format(new Date(newsletter.scheduledAt), 'MMM d, yyyy \'at\' h:mm a') })}</span>
                             ) : (
-                              <span>Last edited {newsletter.updatedAt ? formatDistanceToNow(new Date(newsletter.updatedAt), { addSuffix: true }) : 'recently'}</span>
+                              <span>{newsletter.updatedAt ? t("newsletter.card.lastEdited", { time: formatDistanceToNow(new Date(newsletter.updatedAt), { addSuffix: true, ...dateFnsLocale }) }) : t("newsletter.card.lastEditedRecently")}</span>
                             )}
                           </div>
                         </div>
@@ -698,13 +702,13 @@ export default function NewsletterPage() {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Newsletter</AlertDialogTitle>
+            <AlertDialogTitle>{t("newsletter.deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this newsletter? This action cannot be undone.
+              {t("newsletter.deleteDialog.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("newsletter.deleteDialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
               onClick={() => {
@@ -714,7 +718,7 @@ export default function NewsletterPage() {
                 }
               }}
             >
-              Delete
+              {t("newsletter.deleteDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -737,10 +741,10 @@ export default function NewsletterPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
-              Newsletter Preview
+              {t("newsletter.previewDialog.title")}
             </DialogTitle>
             <DialogDescription>
-              Preview of how this newsletter appears in an email client.
+              {t("newsletter.previewDialog.description")}
             </DialogDescription>
           </DialogHeader>
 
@@ -749,13 +753,13 @@ export default function NewsletterPage() {
               <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full">
                 <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
                   <div className="flex gap-2 mb-1">
-                    <span className="font-semibold text-right w-16">Subject:</span>
+                    <span className="font-semibold text-right w-16">{t("newsletter.previewDialog.subject")}</span>
                     <span className="text-gray-900 font-semibold truncate">
-                      {previewNewsletter?.subject || previewNewsletter?.title || "(no subject)"}
+                      {previewNewsletter?.subject || previewNewsletter?.title || t("newsletter.previewDialog.noSubject")}
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    <span className="font-semibold text-right w-16">Status:</span>
+                    <span className="font-semibold text-right w-16">{t("newsletter.previewDialog.status")}</span>
                     <span className="text-gray-900 capitalize">{previewNewsletter?.status || "draft"}</span>
                   </div>
                 </div>

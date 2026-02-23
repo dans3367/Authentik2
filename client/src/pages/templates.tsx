@@ -75,9 +75,36 @@ const categoryOptions = [
   { value: "custom", label: "Custom" },
 ];
 
-type TemplateChannel = (typeof channelOptions)[number]["value"];
+const getChannelOptions = (t: (key: string) => string) => [
+  { value: "individual", label: t('templatesPage.channels.individual'), description: t('templatesPage.channels.individualDesc') },
+  { value: "promotional", label: t('templatesPage.channels.promotional'), description: t('templatesPage.channels.promotionalDesc') },
+  { value: "newsletter", label: t('templatesPage.channels.newsletter'), description: t('templatesPage.channels.newsletterDesc') },
+  { value: "transactional", label: t('templatesPage.channels.transactional'), description: t('templatesPage.channels.transactionalDesc') },
+  { value: "single-purpose", label: t('templatesPage.channels.singlePurpose'), description: t('templatesPage.channels.singlePurposeDesc') },
+];
+
+const getCategoryOptions = (t: (key: string) => string) => [
+  { value: "welcome", label: t('templatesPage.categories.welcome') },
+  { value: "retention", label: t('templatesPage.categories.retention') },
+  { value: "seasonal", label: t('templatesPage.categories.seasonal') },
+  { value: "update", label: t('templatesPage.categories.update') },
+  { value: "custom", label: t('templatesPage.categories.custom') },
+];
+
+// Preset id → translation key map
+const PRESET_LABEL_KEYS: Record<string, { label: string; description: string }> = {
+  "appointment-thank-you": { label: "templatesPage.createTemplatePage.presets.appointmentThankYou", description: "templatesPage.createTemplatePage.presets.appointmentThankYouDesc" },
+  "appointment-reminder": { label: "templatesPage.createTemplatePage.presets.appointmentReminder", description: "templatesPage.createTemplatePage.presets.appointmentReminderDesc" },
+  "follow-up": { label: "templatesPage.createTemplatePage.presets.followUp", description: "templatesPage.createTemplatePage.presets.followUpDesc" },
+  "birthday-greeting": { label: "templatesPage.createTemplatePage.presets.birthdayGreeting", description: "templatesPage.createTemplatePage.presets.birthdayGreetingDesc" },
+  "review-request": { label: "templatesPage.createTemplatePage.presets.reviewRequest", description: "templatesPage.createTemplatePage.presets.reviewRequestDesc" },
+  "welcome-new-customer": { label: "templatesPage.createTemplatePage.presets.welcomeNewCustomer", description: "templatesPage.createTemplatePage.presets.welcomeNewCustomerDesc" },
+  "missed-you": { label: "templatesPage.createTemplatePage.presets.weMessYou", description: "templatesPage.createTemplatePage.presets.weMissYouDesc" },
+  "referral-request": { label: "templatesPage.createTemplatePage.presets.referralRequest", description: "templatesPage.createTemplatePage.presets.referralRequestDesc" },
+};
 
 type TemplateCategory = (typeof categoryOptions)[number]["value"];
+type TemplateChannel = (typeof channelOptions)[number]["value"];
 
 // Template types from API
 interface Template {
@@ -694,6 +721,9 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
   const [showPreview, setShowPreview] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
 
+  const localizedChannelOptions = getChannelOptions(t);
+  const localizedCategoryOptions = getCategoryOptions(t);
+
   const { data: masterDesign } = useQuery({
     queryKey: ["/api/master-email-design", "edit-preview"],
     queryFn: async () => {
@@ -768,10 +798,11 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
 
   const handleSelectPreset = (preset: SinglePurposePreset) => {
     setSelectedPreset(preset.id);
-    setName(preset.label);
+    const contentKey = `templatesPage.createTemplatePage.presetContent.${preset.id}`;
+    setName(t(PRESET_LABEL_KEYS[preset.id]?.label ?? preset.label));
     setCategory(preset.category as TemplateCategory);
-    setSubjectLine(preset.subjectLine);
-    setContent(preset.body);
+    setSubjectLine(t(`${contentKey}.subjectLine`, preset.subjectLine));
+    setContent(t(`${contentKey}.body`, preset.body));
     setTagInput(preset.tags.join(", "));
   };
 
@@ -854,7 +885,7 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
                   <SelectValue placeholder={t('templatesPage.editDialog.selectChannel')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {channelOptions.map((option) => (
+                  {localizedChannelOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       <div className="flex flex-col">
                         <span className="font-medium">{option.label}</span>
@@ -868,38 +899,43 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
 
             {channel === "single-purpose" && (
               <div className="grid gap-2">
-                <Label>{t('templatesPage.createTemplatePage.selectPurpose', 'Select a Purpose')}</Label>
+                <Label>{t('templatesPage.createTemplatePage.selectPurpose')}</Label>
                 <p className="text-xs text-muted-foreground mb-1">
-                  {t('templatesPage.createTemplatePage.selectPurposeHelp', 'Choose a preset to auto-fill the template with starter content. You can customize it afterwards.')}
+                  {t('templatesPage.createTemplatePage.selectPurposeHelp')}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {SINGLE_PURPOSE_PRESETS.map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => handleSelectPreset(preset)}
-                      className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${selectedPreset === preset.id
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
-                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                        }`}
-                    >
-                      {selectedPreset === preset.id && (
-                        <CheckCircle className="absolute top-2 right-2 h-4 w-4 text-blue-500 dark:text-blue-400" />
-                      )}
-                      <div className="flex items-center gap-2">
-                        <Sparkles className={`h-4 w-4 ${selectedPreset === preset.id ? "text-blue-500 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`} />
-                        <span className="font-medium text-sm text-gray-900 dark:text-gray-100">{preset.label}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground leading-snug">{preset.description}</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {preset.tags.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </button>
-                  ))}
+                  {SINGLE_PURPOSE_PRESETS.map((preset) => {
+                    const keys = PRESET_LABEL_KEYS[preset.id];
+                    const label = keys ? t(keys.label) : preset.label;
+                    const description = keys ? t(keys.description) : preset.description;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handleSelectPreset(preset)}
+                        className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${selectedPreset === preset.id
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
+                          : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                          }`}
+                      >
+                        {selectedPreset === preset.id && (
+                          <CheckCircle className="absolute top-2 right-2 h-4 w-4 text-blue-500 dark:text-blue-400" />
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Sparkles className={`h-4 w-4 ${selectedPreset === preset.id ? "text-blue-500 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`} />
+                          <span className="font-medium text-sm text-gray-900 dark:text-gray-100">{label}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground leading-snug">{description}</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {preset.tags.map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -911,7 +947,7 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
                   <SelectValue placeholder={t('templatesPage.editDialog.selectCategory')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {categoryOptions.map((option) => (
+                  {localizedCategoryOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>

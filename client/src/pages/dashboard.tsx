@@ -17,11 +17,11 @@ import {
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 
-function getGreeting(): { text: string; emoji: string } {
+function getGreeting(t: (key: string) => string): { text: string; emoji: string } {
   const hour = new Date().getHours();
-  if (hour < 12) return { text: "Good Morning", emoji: "☀️" };
-  if (hour < 17) return { text: "Good Afternoon", emoji: "🌤️" };
-  return { text: "Good Evening", emoji: "🌙" };
+  if (hour < 12) return { text: t("dashboard.greeting.morning"), emoji: "☀️" };
+  if (hour < 17) return { text: t("dashboard.greeting.afternoon"), emoji: "🌤️" };
+  return { text: t("dashboard.greeting.evening"), emoji: "🌙" };
 }
 
 function getFormattedDate(): string {
@@ -37,7 +37,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading } = useReduxAuth();
   const { t } = useTranslation();
-  const greeting = getGreeting();
+  const greeting = getGreeting(t);
 
   useSetBreadcrumbs([{ label: "Dashboard", icon: LayoutDashboard }]);
 
@@ -50,7 +50,7 @@ export default function Dashboard() {
             <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 text-primary animate-pulse" />
           </div>
           <p className="text-sm text-muted-foreground animate-pulse">
-            Loading your dashboard...
+            {t("dashboard.loading")}
           </p>
         </div>
       </div>
@@ -66,7 +66,7 @@ export default function Dashboard() {
 
   const quickActions = [
     {
-      label: "New Newsletter",
+      label: t("dashboard.quickActions.newNewsletter"),
       icon: Newspaper,
       path: "/newsletter/create",
       color: "from-blue-500/10 to-indigo-500/10 dark:from-blue-500/20 dark:to-indigo-500/20",
@@ -74,7 +74,7 @@ export default function Dashboard() {
       borderColor: "border-blue-200/60 dark:border-blue-500/20",
     },
     {
-      label: "Send Email",
+      label: t("dashboard.quickActions.sendEmail"),
       icon: Mail,
       path: "/email-compose",
       color: "from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/20 dark:to-teal-500/20",
@@ -82,7 +82,7 @@ export default function Dashboard() {
       borderColor: "border-emerald-200/60 dark:border-emerald-500/20",
     },
     {
-      label: "Add Contact",
+      label: t("dashboard.quickActions.addContact"),
       icon: Users,
       path: "/email-contacts",
       color: "from-violet-500/10 to-purple-500/10 dark:from-violet-500/20 dark:to-purple-500/20",
@@ -90,7 +90,7 @@ export default function Dashboard() {
       borderColor: "border-violet-200/60 dark:border-violet-500/20",
     },
     {
-      label: "Book Appointment",
+      label: t("dashboard.quickActions.bookAppointment"),
       icon: CalendarPlus,
       path: "/reminders",
       color: "from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20",
@@ -123,8 +123,7 @@ export default function Dashboard() {
               className="text-sm sm:text-base text-muted-foreground max-w-lg"
               data-testid="text-dashboard-welcome"
             >
-              Here's what's happening with your business today. Let's make it a
-              great one.
+              {t("dashboard.welcomeMessage")}
             </p>
           </div>
         </div>

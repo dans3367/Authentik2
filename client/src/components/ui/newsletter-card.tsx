@@ -2,9 +2,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Newspaper, ArrowRight, Sparkles, Send } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export function NewsletterCard() {
   const [, setLocation] = useLocation();
+  const { t } = useTranslation();
 
   const handleCreateNewsletter = () => {
     setLocation("/newsletter/create");
@@ -32,16 +34,15 @@ export function NewsletterCard() {
           <div className="flex-1 space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-sm text-white/90 text-xs font-medium">
               <Sparkles className="w-3.5 h-3.5" />
-              Get Started
+              {t("dashboard.newsletterCard.getStarted")}
             </div>
 
             <h2 className="text-2xl sm:text-3xl font-bold text-white leading-tight tracking-tight">
-              Build Your First<br className="hidden sm:block" /> Newsletter
+              {t("dashboard.newsletterCard.title")}
             </h2>
 
             <p className="text-white/75 text-sm sm:text-base leading-relaxed max-w-md">
-              Design and send professional newsletters that reach your audience
-              directly in their inbox — in just a few steps.
+              {t("dashboard.newsletterCard.description")}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -52,7 +53,7 @@ export function NewsletterCard() {
                 data-testid="button-create-newsletter"
               >
                 <Newspaper className="w-4 h-4 mr-2" />
-                Create Newsletter
+                {t("dashboard.newsletterCard.create")}
                 <ArrowRight className="w-4 h-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
               </Button>
               <Button
@@ -62,7 +63,7 @@ export function NewsletterCard() {
                 className="text-white/80 hover:text-white hover:bg-white/10 font-medium"
               >
                 <Send className="w-4 h-4 mr-2" />
-                View All
+                {t("dashboard.newsletterCard.viewAll")}
               </Button>
             </div>
           </div>

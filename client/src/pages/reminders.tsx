@@ -97,6 +97,15 @@ import {
 // Import extracted components
 import { DeleteConfirmDialog, AppointmentStats } from "@/components/appointments";
 
+// Map appointment status values to translation keys
+const STATUS_TRANSLATION_KEYS: Record<string, string> = {
+  scheduled: 'reminders.appointments.scheduled',
+  confirmed: 'reminders.appointments.confirmed',
+  cancelled: 'reminders.appointments.cancelled',
+  completed: 'reminders.appointments.completed',
+  no_show: 'reminders.appointments.noShow',
+};
+
 // Types based on our schema (local definitions to match API response)
 
 
@@ -2102,7 +2111,7 @@ export default function RemindersPage() {
                           }}
                           className="text-xs"
                         >
-                          Today
+                          {t('reminders.appointments.today')}
                         </Button>
                         <Button
                           variant="outline"
@@ -2118,7 +2127,7 @@ export default function RemindersPage() {
                           }}
                           className="text-xs"
                         >
-                          1 Week
+                          {t('reminders.appointments.oneWeek')}
                         </Button>
                         <Button
                           variant="outline"
@@ -2134,7 +2143,7 @@ export default function RemindersPage() {
                           }}
                           className="text-xs"
                         >
-                          1 Month
+                          {t('reminders.appointments.oneMonth')}
                         </Button>
                       </div>
                       <div className="flex flex-col gap-3">
@@ -2384,7 +2393,7 @@ export default function RemindersPage() {
                                         </Badge>
                                       ) : (
                                         <Badge className={getStatusColor(appointment.status)}>
-                                          {appointment.status.replace('_', ' ')}
+                                          {t(STATUS_TRANSLATION_KEYS[appointment.status] || appointment.status)}
                                         </Badge>
                                       )}
                                     </TableCell>
@@ -2564,7 +2573,7 @@ export default function RemindersPage() {
                                         </Badge>
                                       ) : (
                                         <Badge className={getStatusColor(appointment.status)}>
-                                          {appointment.status.replace('_', ' ')}
+                                          {t(STATUS_TRANSLATION_KEYS[appointment.status] || appointment.status)}
                                         </Badge>
                                       )}
                                     </div>
@@ -2829,7 +2838,7 @@ export default function RemindersPage() {
                           }}
                           className="text-xs"
                         >
-                          Last Week
+                          {t('reminders.appointments.lastWeek')}
                         </Button>
                         <Button
                           variant="outline"
@@ -2845,7 +2854,7 @@ export default function RemindersPage() {
                           }}
                           className="text-xs"
                         >
-                          Last Month
+                          {t('reminders.appointments.lastMonth')}
                         </Button>
                         <Button
                           variant="outline"
@@ -2861,7 +2870,7 @@ export default function RemindersPage() {
                           }}
                           className="text-xs"
                         >
-                          Last 3 Months
+                          {t('reminders.appointments.last3Months')}
                         </Button>
                       </div>
                       <div className="flex flex-col gap-3">
@@ -3041,7 +3050,7 @@ export default function RemindersPage() {
                                 </TableCell>
                                 <TableCell>
                                   <Badge className={getStatusColor(appointment.status)}>
-                                    {appointment.status.replace('_', ' ')}
+                                    {t(STATUS_TRANSLATION_KEYS[appointment.status] || appointment.status)}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
@@ -3081,7 +3090,7 @@ export default function RemindersPage() {
                                     <p className="text-xs text-gray-500 dark:text-gray-500">{appointment.customer?.email}</p>
                                   </div>
                                   <Badge className={getStatusColor(appointment.status)}>
-                                    {appointment.status.replace('_', ' ')}
+                                    {t(STATUS_TRANSLATION_KEYS[appointment.status] || appointment.status)}
                                   </Badge>
                                 </div>
                                 <div className="space-y-2 text-sm">

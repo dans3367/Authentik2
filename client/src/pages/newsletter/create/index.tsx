@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Puck } from "@puckeditor/core";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import config, { initialData } from "@/config/puck";
+import { createConfig, initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
 import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X, Rocket, Eye } from "lucide-react";
 import { SendPreviewDialog } from "@/components/SendPreviewDialog";
@@ -11,6 +11,7 @@ import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { useLocation, useParams } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,7 +57,11 @@ export default function NewsletterCreatePage() {
   const [reactionsEnabled, setReactionsEnabled] = useState(true);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { t, currentLanguage } = useLanguage();
   const queryClient = useQueryClient();
+
+  // Build translated Puck config — rebuilds when language changes
+  const translatedConfig = useMemo(() => createConfig(t), [t, currentLanguage]);
 
   useEffect(() => { dataRef.current = data; }, [data]);
 
@@ -136,7 +141,7 @@ export default function NewsletterCreatePage() {
   const saveToDatabase = useCallback(async (status: 'draft' | 'ready_to_send' | 'scheduled' = 'draft') => {
     const htmlContent = extractPuckEmailHtml();
     const puckDataJson = JSON.stringify(dataRef.current);
-    const currentTitle = title.trim() || "Untitled Newsletter";
+    const currentTitle = title.trim() || t("newsletter.create.untitled", "Untitled Newsletter");
     const currentSubject = subject.trim() || currentTitle;
 
     setIsSaving(true);
@@ -178,8 +183,8 @@ export default function NewsletterCreatePage() {
       }
     } catch (error: any) {
       toast({
-        title: "Save Failed",
-        description: error.message || "Failed to save newsletter",
+        title: t("newsletter.create.saveFailed", "Save Failed"),
+        description: error.message || t("newsletter.create.saveFailedDesc", "Failed to save newsletter"),
         variant: "destructive",
       });
       throw error;
@@ -191,7 +196,7 @@ export default function NewsletterCreatePage() {
   const handleSaveDraft = useCallback(async () => {
     try {
       await saveToDatabase('draft');
-      toast({ title: "Draft Saved", description: "Newsletter draft saved successfully." });
+      toast({ title: t("newsletter.create.draftSaved", "Draft Saved"), description: t("newsletter.create.draftSavedDesc", "Newsletter draft saved successfully.") });
     } catch {
       // Error already handled in saveToDatabase
     }
@@ -298,13 +303,13 @@ export default function NewsletterCreatePage() {
       });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
-      toast({ title: "Recipients Selected", description: "Your newsletter recipients have been saved." });
+      toast({ title: t("newsletter.create.recipientsSelected", "Recipients Selected"), description: t("newsletter.create.recipientsSaved", "Your newsletter recipients have been saved.") });
       setShowSendWizard(false);
       setLocation('/newsletter');
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to save recipients",
+        title: t("newsletter.create.error", "Error"),
+        description: error.message || t("newsletter.create.errorSaveRecipients", "Failed to save recipients"),
         variant: "destructive",
       });
     }
@@ -545,7 +550,7 @@ export default function NewsletterCreatePage() {
               transition: "color 0.3s ease",
             }}
           >
-            {isSaving ? "Saving..." : justSaved ? "Saved" : hasUnsavedChanges ? "Unsaved changes" : ""}
+            {isSaving ? t("newsletter.create.saving", "Saving...") : justSaved ? t("newsletter.create.saved", "Saved") : hasUnsavedChanges ? t("newsletter.create.unsavedChanges", "Unsaved changes") : ""}
           </span>
         </div>
         <div style={{ display: "flex", gap: "4px", marginRight: "8px" }}>
@@ -562,7 +567,7 @@ export default function NewsletterCreatePage() {
               alignItems: "center",
               gap: "4px",
             }}
-            title="Mobile view"
+            title={t("newsletter.create.mobileView", "Mobile view")}
             data-testid="viewport-mobile"
           >
             <Smartphone size={16} />
@@ -581,11 +586,11 @@ export default function NewsletterCreatePage() {
               alignItems: "center",
               gap: "4px",
             }}
-            title="Desktop view"
+            title={t("newsletter.create.desktopView", "Desktop view")}
             data-testid="viewport-desktop"
           >
             <Monitor size={16} />
-            <span style={{ fontSize: "12px" }}>Full</span>
+            <span style={{ fontSize: "12px" }}>{t("newsletter.create.full", "Full")}</span>
           </button>
         </div>
         <div style={{ display: "flex", gap: "4px", marginRight: "8px", alignItems: "center" }}>
@@ -603,7 +608,7 @@ export default function NewsletterCreatePage() {
               alignItems: "center",
               gap: "4px",
             }}
-            title="Zoom out"
+            title={t("newsletter.create.zoomOut", "Zoom out")}
             data-testid="zoom-out"
           >
             <ZoomOut size={16} />
@@ -621,7 +626,7 @@ export default function NewsletterCreatePage() {
               fontWeight: 500,
               minWidth: "60px",
             }}
-            title="Reset zoom"
+            title={t("newsletter.create.resetZoom", "Reset zoom")}
             data-testid="zoom-reset"
           >
             {zoom}%
@@ -640,7 +645,7 @@ export default function NewsletterCreatePage() {
               alignItems: "center",
               gap: "4px",
             }}
-            title="Zoom in"
+            title={t("newsletter.create.zoomIn", "Zoom in")}
             data-testid="zoom-in"
           >
             <ZoomIn size={16} />
@@ -668,7 +673,7 @@ export default function NewsletterCreatePage() {
           data-testid="button-send-preview"
         >
           <Mail size={16} />
-          Send Preview
+          {t("newsletter.create.sendPreview", "Send Preview")}
         </button>
         <button
           onClick={handleSaveDraft}
@@ -694,7 +699,7 @@ export default function NewsletterCreatePage() {
           data-testid="button-save-draft"
         >
           {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          Save Draft
+          {t("newsletter.create.saveDraft", "Save Draft")}
         </button>
         <button
           onClick={() => {
@@ -736,7 +741,7 @@ export default function NewsletterCreatePage() {
           data-testid="button-preview"
         >
           <Eye size={16} />
-          Preview
+          {t("newsletter.create.preview", "Preview")}
         </button>
         {/* Replace default Puck Publish button with custom "Ready" button */}
         <button
@@ -760,7 +765,7 @@ export default function NewsletterCreatePage() {
           data-testid="button-ready"
         >
           <Rocket size={16} />
-          Ready
+          {t("newsletter.create.ready", "Ready")}
         </button>
       </>
     ),
@@ -778,14 +783,14 @@ export default function NewsletterCreatePage() {
     <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Leave Page?</AlertDialogTitle>
+          <AlertDialogTitle>{t("newsletter.create.leavePage", "Leave Page?")}</AlertDialogTitle>
           <AlertDialogDescription>
-            You have unsaved changes. If you leave now, your draft will be permanently deleted. Are you sure you want to continue?
+            {t("newsletter.create.leaveDesc", "You have unsaved changes. If you leave now, your draft will be permanently deleted. Are you sure you want to continue?")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={handleCancelExit}>Stay on Page</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirmExit} className="bg-red-600 hover:bg-red-700">Leave & Discard</AlertDialogAction>
+          <AlertDialogCancel onClick={handleCancelExit}>{t("newsletter.create.stay", "Stay on Page")}</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmExit} className="bg-red-600 hover:bg-red-700">{t("newsletter.create.leaveDiscard", "Leave & Discard")}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -877,7 +882,7 @@ export default function NewsletterCreatePage() {
             {dataReady ? (
               <Puck
                 key={`${newsletterId || 'new'}-loaded`}
-                config={config}
+                config={translatedConfig}
                 data={data}
                 onChange={handleDataChange}
                 onPublish={handlePublish}
