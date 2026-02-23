@@ -53,6 +53,7 @@ export default function NewsletterCreatePage() {
   const [initialRecipientType, setInitialRecipientType] = useState<"all" | "selected" | "tags">("all");
   const [initialSelectedContactIds, setInitialSelectedContactIds] = useState<string[]>([]);
   const [initialSelectedTagIds, setInitialSelectedTagIds] = useState<string[]>([]);
+  const [reactionsEnabled, setReactionsEnabled] = useState(true);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -93,6 +94,10 @@ export default function NewsletterCreatePage() {
       }
       if (nl.selectedTagIds) {
         setInitialSelectedTagIds(nl.selectedTagIds);
+      }
+      // Load reactions preference
+      if (nl.reactionsEnabled !== undefined && nl.reactionsEnabled !== null) {
+        setReactionsEnabled(nl.reactionsEnabled);
       }
       setDataReady(true);
     }
@@ -144,6 +149,7 @@ export default function NewsletterCreatePage() {
           content: htmlContent,
           puckData: puckDataJson,
           status,
+          reactionsEnabled,
         });
         const result = await response.json();
         setHasUnsavedChanges(false);
@@ -180,7 +186,7 @@ export default function NewsletterCreatePage() {
     } finally {
       setIsSaving(false);
     }
-  }, [newsletterId, title, subject, toast, queryClient]);
+  }, [newsletterId, title, subject, reactionsEnabled, toast, queryClient]);
 
   const handleSaveDraft = useCallback(async () => {
     try {
@@ -902,6 +908,8 @@ export default function NewsletterCreatePage() {
           initialRecipientType={initialRecipientType}
           initialSelectedContactIds={initialSelectedContactIds}
           initialSelectedTagIds={initialSelectedTagIds}
+          reactionsEnabled={reactionsEnabled}
+          onReactionsEnabledChange={setReactionsEnabled}
         />
         {exitDialog}
       </>
@@ -1036,6 +1044,8 @@ export default function NewsletterCreatePage() {
         initialRecipientType={initialRecipientType}
         initialSelectedContactIds={initialSelectedContactIds}
         initialSelectedTagIds={initialSelectedTagIds}
+        reactionsEnabled={reactionsEnabled}
+        onReactionsEnabledChange={setReactionsEnabled}
       />
       {exitDialog}
     </>

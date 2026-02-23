@@ -1142,7 +1142,38 @@ export default function NewsletterViewPage() {
           </TabsContent>
 
           <TabsContent value="reactions" className="space-y-6 lg:space-y-8">
-            <ReactionInsightsSection newsletterId={newsletter.id} />
+            {newsletter.reactionsEnabled === false ? (
+              <Card>
+                <CardContent className="p-8 lg:p-12">
+                  <div className="flex flex-col items-center text-center max-w-md mx-auto">
+                    <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-5">
+                      <Smile className="w-8 h-8 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                      Reactions Not Enabled
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-4">
+                      Emoji reactions were not included in this newsletter. Readers were not able to provide feedback through the reactions bar.
+                    </p>
+                    <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 p-4 w-full">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0 mt-0.5">
+                          <Smile className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Enable for future newsletters</p>
+                          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 leading-relaxed">
+                            You can enable the reactions feature when creating or editing your next newsletter. The "Enable Reactions" toggle is available in the send wizard before you send.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <ReactionInsightsSection newsletterId={newsletter.id} />
+            )}
           </TabsContent>
 
           <TabsContent value="overview" className="space-y-6 lg:space-y-8">
