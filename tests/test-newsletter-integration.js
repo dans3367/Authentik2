@@ -6,7 +6,7 @@
 
 const fetch = require('node-fetch');
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:5002';
 const GO_SERVER_URL = process.env.GO_SERVER_URL || 'http://localhost:3501';
 
 async function testNewsletterIntegration() {

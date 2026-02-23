@@ -135,7 +135,7 @@ export async function sendBirthdayTestEmail(
     }
 
     // Build unsubscribe URL for List-Unsubscribe header
-    const baseUrl = process.env.APP_URL || 'http://localhost:5000';
+    const baseUrl = process.env.APP_URL || 'http://localhost:5002';
     const unsubscribeUrl = unsubscribeToken
         ? `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
         : undefined;

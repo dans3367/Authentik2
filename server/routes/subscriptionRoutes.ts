@@ -717,8 +717,8 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
             quantity: 1,
           },
         ],
-        success_url: `${process.env.FRONTEND_URL || 'http://localhost:5000'}/settings/subscription?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5000'}/settings/subscription?canceled=true`,
+        success_url: `${process.env.FRONTEND_URL || 'http://localhost:5002'}/settings/subscription?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5002'}/settings/subscription?canceled=true`,
         metadata: {
           tenantId,
           userId: req.user.id,
