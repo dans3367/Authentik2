@@ -8,11 +8,31 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
-import { newsletters, newsletterReactions, NEWSLETTER_REACTION_TYPES } from '@shared/schema';
+import { newsletters, newsletterReactions, emailContacts, NEWSLETTER_REACTION_TYPES } from '@shared/schema';
 import type { NewsletterReactionType } from '@shared/schema';
 
 export const newsletterReactionRoutes = Router();
+
+const DEFAULT_REACTION_RETENTION_MONTHS = 12;
+
+function parseReactionRetentionMonths(): number {
+    const raw = process.env.NEWSLETTER_REACTION_RETENTION_MONTHS;
+    const parsed = raw ? Number(raw) : DEFAULT_REACTION_RETENTION_MONTHS;
+
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return DEFAULT_REACTION_RETENTION_MONTHS;
+    }
+
+    return Math.floor(parsed);
+}
+
+function getReactionRetentionExpires(reactedAt: Date): Date {
+    const expiresAt = new Date(reactedAt);
+    expiresAt.setMonth(expiresAt.getMonth() + parseReactionRetentionMonths());
+    return expiresAt;
+}
 
 // ── Reaction metadata ──────────────────────────────────────────────────────
 
@@ -23,6 +43,55 @@ const REACTION_META: Record<NewsletterReactionType, { emoji: string; label: stri
     dont_agree: { emoji: '🤔', label: "Don't agree" },
     dislike: { emoji: '👎', label: 'Dislike' },
 };
+
+function getReactionTokenSecret(): string | null {
+    return process.env.NEWSLETTER_REACTION_TOKEN_SECRET || process.env.SESSION_SECRET || process.env.JWT_SECRET || null;
+}
+
+function verifyAndExtractRecipientId(token: string, expectedNewsletterId: string): string | null {
+    const secret = getReactionTokenSecret();
+    if (!secret) {
+        return null;
+    }
+
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 2 || !tokenParts[0] || !tokenParts[1]) {
+        return null;
+    }
+
+    const [payloadEncoded, providedSignature] = tokenParts;
+    const expectedSignature = createHmac('sha256', secret).update(payloadEncoded).digest('base64url');
+
+    const providedBuffer = Buffer.from(providedSignature, 'utf-8');
+    const expectedBuffer = Buffer.from(expectedSignature, 'utf-8');
+    if (providedBuffer.length !== expectedBuffer.length || !timingSafeEqual(providedBuffer, expectedBuffer)) {
+        return null;
+    }
+
+    let payload: string;
+    try {
+        payload = Buffer.from(payloadEncoded, 'base64url').toString('utf-8');
+    } catch {
+        return null;
+    }
+
+    const payloadParts = payload.split('|');
+    if (payloadParts.length !== 4) {
+        return null;
+    }
+
+    const [recipientId, tokenNewsletterId, expiresAtMsRaw] = payloadParts;
+    if (!recipientId || !tokenNewsletterId || tokenNewsletterId !== expectedNewsletterId) {
+        return null;
+    }
+
+    const expiresAtMs = Number(expiresAtMsRaw);
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+        return null;
+    }
+
+    return recipientId;
+}
 
 // ── Public: Submit a reaction (called from email links) ────────────────────
 
@@ -68,14 +137,24 @@ newsletterReactionRoutes.get('/react', async (req, res) => {
         // Extract tenant ID from the newsletter
         const tenantId = newsletter.tenantId;
 
-        // Decode the email from the token (format: base64(email):randomPart)
-        let recipientEmail: string;
-        try {
-            const tokenParts = reactionToken.split(':');
-            recipientEmail = Buffer.from(tokenParts[0], 'base64url').toString('utf-8');
-        } catch {
+        const recipientId = verifyAndExtractRecipientId(reactionToken, newsletterId);
+        if (!recipientId) {
             return res.status(400).send(buildReactionPage('error', 'Invalid reaction token.'));
         }
+
+        const recipient = await db.query.emailContacts.findFirst({
+            where: and(
+                eq(emailContacts.id, recipientId),
+                eq(emailContacts.tenantId, tenantId),
+            ),
+            columns: { email: true },
+        });
+
+        if (!recipient?.email) {
+            return res.status(400).send(buildReactionPage('error', 'Invalid reaction token.'));
+        }
+
+        const recipientEmail = recipient.email;
 
         // Check if this user already reacted (upsert: update their reaction)
         const existingReaction = await db.query.newsletterReactions.findFirst({
@@ -88,6 +167,9 @@ newsletterReactionRoutes.get('/react', async (req, res) => {
         const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || null;
         const userAgent = req.headers['user-agent'] || null;
 
+        const reactedAt = new Date();
+        const reactedRetentionExpires = getReactionRetentionExpires(reactedAt);
+
         if (existingReaction) {
             // Update existing reaction
             await db.update(newsletterReactions)
@@ -95,7 +177,9 @@ newsletterReactionRoutes.get('/react', async (req, res) => {
                     reactionType: reactionType,
                     ipAddress: ipAddress,
                     userAgent: userAgent,
-                    reactedAt: new Date(),
+                    reactedAt,
+                    reactedRetentionExpires,
+                    reactedAnonymizedAt: null,
                 })
                 .where(eq(newsletterReactions.id, existingReaction.id));
         } else {
@@ -108,7 +192,9 @@ newsletterReactionRoutes.get('/react', async (req, res) => {
                 reactionToken,
                 ipAddress: ipAddress,
                 userAgent: userAgent,
-                reactedAt: new Date(),
+                reactedAt,
+                reactedRetentionExpires,
+                reactedAnonymizedAt: null,
             });
         }
 

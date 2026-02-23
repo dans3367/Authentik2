@@ -1550,7 +1550,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
 
           // Build reaction buttons HTML if reactions are enabled
           const reactionHtml = newsletter.reactionsEnabled
-            ? buildReactionButtonsHtml(`${req.protocol}://${req.get('host')}`, newsletter.id, contact.email)
+            ? buildReactionButtonsHtml(`${req.protocol}://${req.get('host')}`, newsletter.id, contact.id)
             : '';
 
           const html = `${wrappedContent}
@@ -2084,7 +2084,7 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
       columns: { reactionsEnabled: true },
     });
     const singleReactionHtml = singleNewsletter?.reactionsEnabled
-      ? buildReactionButtonsHtml(`${req.protocol}://${req.get('host')}`, id, recipient.email)
+      ? buildReactionButtonsHtml(`${req.protocol}://${req.get('host')}`, id, recipient.id)
       : '';
 
     const email = {

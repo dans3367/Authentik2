@@ -5,14 +5,34 @@
  * Each recipient gets a unique reaction token so their vote is attributed to them.
  */
 
+import { createHmac, randomBytes } from 'crypto';
+
+function getReactionTokenSecret(): string | null {
+    return process.env.NEWSLETTER_REACTION_TOKEN_SECRET || process.env.SESSION_SECRET || process.env.JWT_SECRET || null;
+}
+
 /**
  * Generate a reaction token for a specific recipient.
- * Format: base64url(email):randomPart
+ * Format: base64url(recipientId|newsletterId|expiresAtMs|nonce).base64url(hmac(payload))
+ *
+ * Security: token does not embed email (PII) and cannot be forged without the server secret.
  */
-export function generateReactionToken(email: string): string {
-    const emailEncoded = Buffer.from(email, 'utf-8').toString('base64url');
-    const randomPart = Math.random().toString(36).substring(2, 10);
-    return `${emailEncoded}:${randomPart}`;
+export function generateReactionToken(recipientId: string, newsletterId: string): string {
+    const secret = getReactionTokenSecret();
+
+    if (!secret) {
+        throw new Error('Missing reaction token secret. Set NEWSLETTER_REACTION_TOKEN_SECRET (or SESSION_SECRET/JWT_SECRET).');
+    }
+
+    const ttlDaysRaw = Number(process.env.NEWSLETTER_REACTION_TOKEN_TTL_DAYS || '90');
+    const ttlDays = Number.isFinite(ttlDaysRaw) && ttlDaysRaw > 0 ? Math.floor(ttlDaysRaw) : 90;
+    const expiresAtMs = Date.now() + (ttlDays * 24 * 60 * 60 * 1000);
+    const nonce = randomBytes(16).toString('base64url');
+    const payload = `${recipientId}|${newsletterId}|${expiresAtMs}|${nonce}`;
+    const payloadEncoded = Buffer.from(payload, 'utf-8').toString('base64url');
+    const signature = createHmac('sha256', secret).update(payloadEncoded).digest('base64url');
+
+    return `${payloadEncoded}.${signature}`;
 }
 
 /**
@@ -22,9 +42,9 @@ export function generateReactionToken(email: string): string {
 export function buildReactionButtonsHtml(
     baseUrl: string,
     newsletterId: string,
-    recipientEmail: string,
+    recipientId: string,
 ): string {
-    const reactionToken = generateReactionToken(recipientEmail);
+    const reactionToken = generateReactionToken(recipientId, newsletterId);
 
     const reactions = [
         { type: 'love_it', emoji: '❤️', label: 'Love it' },

@@ -6,6 +6,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 import { sendAhaEmail } from "./ahasend";
 import { sendSESEmail } from "./ses";
+import { buildReactionButtonsHtml } from "./newsletterReactionHtml";
 
 // Convex client for newsletter tracking (lazy init)
 let convexClient: ConvexHttpClient | null = null;
@@ -33,64 +34,11 @@ interface BulkSendResult {
 }
 
 /**
- * Generate a reaction token for a specific recipient.
- * Format: base64url(email):randomPart
- */
-function generateReactionToken(email: string): string {
-  const emailEncoded = Buffer.from(email, 'utf-8').toString('base64url');
-  const randomPart = Math.random().toString(36).substring(2, 10);
-  return `${emailEncoded}:${randomPart}`;
-}
-
-/**
- * Build the HTML for the reaction buttons section to be inserted into newsletter emails.
- * Uses inline styles for maximum email client compatibility.
- */
-function buildReactionHtml(baseUrl: string, newsletterId: string, recipientEmail: string): string {
-  const reactionToken = generateReactionToken(recipientEmail);
-
-  const reactions = [
-    { type: 'love_it', emoji: '❤️', label: 'Love it' },
-    { type: 'liked_it', emoji: '👍', label: 'Liked it' },
-    { type: 'cool', emoji: '😎', label: 'Cool' },
-    { type: 'dont_agree', emoji: '🤔', label: "Don't agree" },
-    { type: 'dislike', emoji: '👎', label: 'Dislike' },
-  ];
-
-  const buttonHtml = reactions.map(r => {
-    const url = `${baseUrl}/api/newsletter-reactions/react?token=${encodeURIComponent(reactionToken)}&type=${r.type}&nid=${encodeURIComponent(newsletterId)}`;
-    return `
-      <td style="padding: 0 4px;">
-        <a href="${url}" target="_blank" style="display: inline-block; text-decoration: none; text-align: center; padding: 8px 6px; min-width: 56px; border-radius: 12px; background-color: #f1f5f9; border: 1px solid #e2e8f0; transition: all 0.2s;">
-          <span style="display: block; font-size: 24px; line-height: 1.2;">${r.emoji}</span>
-          <span style="display: block; font-size: 10px; color: #64748b; margin-top: 2px; white-space: nowrap;">${r.label}</span>
-        </a>
-      </td>`;
-  }).join('');
-
-  return `
-    <!-- Newsletter Reaction Buttons -->
-    <div style="padding: 24px 24px 8px 24px; text-align: center; background-color: #ffffff; border-top: 1px solid #f1f5f9;">
-      <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #475569; letter-spacing: 0.025em;">
-        How did you like this newsletter?
-      </p>
-      <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto;">
-        <tr>
-          ${buttonHtml}
-        </tr>
-      </table>
-      <p style="margin: 8px 0 0 0; font-size: 11px; color: #94a3b8;">
-        Click an emoji to share your feedback
-      </p>
-    </div>`;
-}
-
-/**
  * Inject per-recipient reaction bar into the email HTML content.
  * Inserts the reaction bar just before the footer section.
  */
-function injectReactionBar(content: string, baseUrl: string, newsletterId: string, recipientEmail: string): string {
-  const reactionHtml = buildReactionHtml(baseUrl, newsletterId, recipientEmail);
+function injectReactionBar(content: string, baseUrl: string, newsletterId: string, recipientId: string): string {
+  const reactionHtml = buildReactionButtonsHtml(baseUrl, newsletterId, recipientId);
   // Insert before the footer (<!-- Footer --> comment or the footer div)
   const footerMarker = '<!-- Footer -->';
   if (content.includes(footerMarker)) {
@@ -130,7 +78,7 @@ async function sendBulkEmails(opts: {
     const emailTrackingId = randomUUID();
     // Inject per-recipient reaction bar if enabled
     const recipientHtml = (reactionsEnabled && baseUrl)
-      ? injectReactionBar(content, baseUrl, newsletterId, r.email)
+      ? injectReactionBar(content, baseUrl, newsletterId, r.id)
       : content;
     return {
       from: fromEmail,
@@ -858,7 +806,7 @@ export const sendNewsletterTask = task({
 
             // Inject per-recipient reaction bar if enabled
             const recipientHtml = (data.reactionsEnabled && data.baseUrl)
-              ? injectReactionBar(data.content, data.baseUrl, data.newsletterId, recipient.email)
+              ? injectReactionBar(data.content, data.baseUrl, data.newsletterId, recipient.id)
               : data.content;
 
             const { data: resendData, error: resendError } = await resend.emails.send({

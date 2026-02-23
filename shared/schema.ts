@@ -549,6 +549,10 @@ export const newsletterReviewerSettings = pgTable("newsletter_reviewer_settings"
 });
 
 // Newsletter reactions table for tracking reader emoji reactions
+// GDPR/Compliance Note: ip_address and user_agent are personal data (Recital 30).
+// Retention policy: keep raw request identifiers for a limited period (default: 12 months)
+// after reacted_at, then anonymize these fields and set reacted_anonymized_at.
+// Use the scheduled anonymization job (tools/anonymize-newsletter-reactions.ts) to enforce policy.
 export const newsletterReactions = pgTable("newsletter_reactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
@@ -559,12 +563,15 @@ export const newsletterReactions = pgTable("newsletter_reactions", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   reactedAt: timestamp("reacted_at").notNull().defaultNow(),
+  reactedRetentionExpires: timestamp("reacted_retention_expires"),
+  reactedAnonymizedAt: timestamp("reacted_anonymized_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   newsletterIdx: index("idx_newsletter_reactions_newsletter").on(table.newsletterId),
   tenantNewsletterIdx: index("idx_newsletter_reactions_tenant_newsletter").on(table.tenantId, table.newsletterId),
   tokenIdx: index("idx_newsletter_reactions_token").on(table.reactionToken),
   typeIdx: index("idx_newsletter_reactions_type").on(table.newsletterId, table.reactionType),
+  retentionIdx: index("idx_newsletter_reactions_retention").on(table.reactedRetentionExpires),
   uniqueVoteIdx: uniqueIndex("idx_newsletter_reactions_unique_vote").on(table.newsletterId, table.recipientEmail),
 }));
 
