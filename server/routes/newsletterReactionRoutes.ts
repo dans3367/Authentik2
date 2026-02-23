@@ -137,76 +137,22 @@ function isPreviewBot(userAgent: string | null): boolean {
     return PREVIEW_BOT_PATTERNS.some(pattern => pattern.test(userAgent));
 }
 
-// ── Public: Record reaction directly (called from email links) ─────────────
+// ── Helper: Record reaction to database ────────────────────────────────────
 
-/**
- * GET /api/newsletter-reactions/react
- * 
- * Public endpoint. The reaction link in the email encodes:
- *   ?token=<reactionToken>&type=<reactionType>&nid=<newsletterId>
- * 
- * Records the reaction immediately and shows a thank-you page.
- * Preview bots are filtered out via user-agent detection.
- */
-newsletterReactionRoutes.get('/react', async (req, res) => {
-    const { token, type, nid } = req.query;
+interface RecordReactionParams {
+    tenantId: string;
+    newsletterId: string;
+    recipientEmail: string;
+    reactionType: NewsletterReactionType;
+    reactionToken: string;
+    ipAddress: string | null;
+    userAgent: string | null;
+}
 
-    // Validate inputs
-    if (!token || !type || !nid) {
-        return res.status(400).send(buildReactionPage('error', 'Invalid reaction link. Missing required parameters.'));
-    }
-
-    const reactionType = String(type) as NewsletterReactionType;
-    if (!NEWSLETTER_REACTION_TYPES.includes(reactionType)) {
-        return res.status(400).send(buildReactionPage('error', 'Invalid reaction type.'));
-    }
-
-    const newsletterId = String(nid);
-    const reactionToken = String(token);
-    const userAgent = req.headers['user-agent'] || null;
-
-    // Block known preview bots from recording reactions
-    if (isPreviewBot(userAgent as string)) {
-        console.log('[Newsletter Reactions] Blocked preview bot:', userAgent);
-        return res.status(403).send(buildReactionPage('error', 'Automated requests are not allowed.'));
-    }
+async function recordReaction(params: RecordReactionParams): Promise<{ success: boolean; isUpdate: boolean; error?: string }> {
+    const { tenantId, newsletterId, recipientEmail, reactionType, reactionToken, ipAddress, userAgent } = params;
 
     try {
-        // Find the newsletter
-        const newsletter = await db.query.newsletters.findFirst({
-            where: eq(newsletters.id, newsletterId),
-        });
-
-        if (!newsletter) {
-            return res.status(404).send(buildReactionPage('error', 'Newsletter not found.'));
-        }
-
-        if (!newsletter.reactionsEnabled) {
-            return res.status(400).send(buildReactionPage('error', 'Reactions are not enabled for this newsletter.'));
-        }
-
-        // Extract tenant ID from the newsletter
-        const tenantId = newsletter.tenantId;
-
-        const recipientId = verifyAndExtractRecipientId(reactionToken, newsletterId);
-        if (!recipientId) {
-            return res.status(400).send(buildReactionPage('error', 'Invalid reaction token.'));
-        }
-
-        const recipient = await db.query.emailContacts.findFirst({
-            where: and(
-                eq(emailContacts.id, recipientId),
-                eq(emailContacts.tenantId, tenantId),
-            ),
-            columns: { email: true },
-        });
-
-        if (!recipient?.email) {
-            return res.status(400).send(buildReactionPage('error', 'Invalid reaction token.'));
-        }
-
-        const recipientEmail = recipient.email;
-
         // Check if this user already reacted (upsert: update their reaction)
         const existingReaction = await db.query.newsletterReactions.findFirst({
             where: and(
@@ -214,8 +160,6 @@ newsletterReactionRoutes.get('/react', async (req, res) => {
                 eq(newsletterReactions.recipientEmail, recipientEmail),
             ),
         });
-
-        const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || null;
 
         const reactedAt = new Date();
         const reactedRetentionExpires = getReactionRetentionExpires(reactedAt);
@@ -231,7 +175,8 @@ newsletterReactionRoutes.get('/react', async (req, res) => {
                     reactedRetentionExpires,
                     reactedAnonymizedAt: null,
                 })
-                .where(eq(newsletterReactions.id, existingReaction.id));
+                .where(and(eq(newsletterReactions.id, existingReaction.id), eq(newsletterReactions.tenantId, tenantId)));
+            return { success: true, isUpdate: true };
         } else {
             // Insert new reaction
             await db.insert(newsletterReactions).values({
@@ -246,25 +191,14 @@ newsletterReactionRoutes.get('/react', async (req, res) => {
                 reactedRetentionExpires,
                 reactedAnonymizedAt: null,
             });
+            return { success: true, isUpdate: false };
         }
-
-        const meta = REACTION_META[reactionType];
-        const updatedMsg = existingReaction ? ' Your previous reaction has been updated.' : '';
-        return res.send(buildReactionPage(
-            'success',
-            `Thank you for your feedback!${updatedMsg}`,
-            meta.emoji,
-            meta.label,
-        ));
     } catch (error: any) {
-        console.error('[Newsletter Reactions] Error recording reaction:', error);
-
         // Handle unique constraint violation (race condition)
         if (error.code === '23505') {
             try {
                 const reactedAt = new Date();
                 const reactedRetentionExpires = getReactionRetentionExpires(reactedAt);
-                const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || null;
 
                 await db.update(newsletterReactions)
                     .set({
@@ -275,16 +209,191 @@ newsletterReactionRoutes.get('/react', async (req, res) => {
                         reactedRetentionExpires,
                         reactedAnonymizedAt: null,
                     })
-                    .where(eq(newsletterReactions.reactionToken, reactionToken));
-
-                const meta = REACTION_META[reactionType];
-                return res.send(buildReactionPage('success', 'Your reaction has been recorded!', meta.emoji, meta.label));
+                    .where(and(eq(newsletterReactions.reactionToken, reactionToken), eq(newsletterReactions.tenantId, tenantId)));
+                return { success: true, isUpdate: true };
             } catch (updateError) {
                 console.error('[Newsletter Reactions] Error updating reaction after constraint violation:', updateError);
-                return res.status(500).send(buildReactionPage('error', 'Something went wrong. Please try again later.'));
+                return { success: false, isUpdate: false, error: 'Database error' };
             }
         }
+        console.error('[Newsletter Reactions] Error recording reaction:', error);
+        return { success: false, isUpdate: false, error: 'Database error' };
+    }
+}
 
+// ── Helper: Validate reaction request and extract data ─────────────────────
+
+interface ValidatedReactionData {
+    reactionType: NewsletterReactionType;
+    newsletterId: string;
+    reactionToken: string;
+    tenantId: string;
+    recipientEmail: string;
+}
+
+async function validateReactionRequest(
+    token: string | undefined,
+    type: string | undefined,
+    nid: string | undefined,
+): Promise<{ valid: true; data: ValidatedReactionData } | { valid: false; error: string; status: number }> {
+    if (!token || !type || !nid) {
+        return { valid: false, error: 'Invalid reaction link. Missing required parameters.', status: 400 };
+    }
+
+    const reactionType = String(type) as NewsletterReactionType;
+    if (!NEWSLETTER_REACTION_TYPES.includes(reactionType)) {
+        return { valid: false, error: 'Invalid reaction type.', status: 400 };
+    }
+
+    const newsletterId = String(nid);
+    const reactionToken = String(token);
+
+    // Find the newsletter
+    const newsletter = await db.query.newsletters.findFirst({
+        where: eq(newsletters.id, newsletterId),
+    });
+
+    if (!newsletter) {
+        return { valid: false, error: 'Newsletter not found.', status: 404 };
+    }
+
+    if (!newsletter.reactionsEnabled) {
+        return { valid: false, error: 'Reactions are not enabled for this newsletter.', status: 400 };
+    }
+
+    const tenantId = newsletter.tenantId;
+
+    const recipientId = verifyAndExtractRecipientId(reactionToken, newsletterId);
+    if (!recipientId) {
+        return { valid: false, error: 'Invalid reaction token.', status: 400 };
+    }
+
+    const recipient = await db.query.emailContacts.findFirst({
+        where: and(
+            eq(emailContacts.id, recipientId),
+            eq(emailContacts.tenantId, tenantId),
+        ),
+        columns: { email: true },
+    });
+
+    if (!recipient?.email) {
+        return { valid: false, error: 'Invalid reaction token.', status: 400 };
+    }
+
+    return {
+        valid: true,
+        data: {
+            reactionType,
+            newsletterId,
+            reactionToken,
+            tenantId,
+            recipientEmail: recipient.email,
+        },
+    };
+}
+
+// ── Public: Show confirmation page (called from email links) ───────────────
+
+/**
+ * GET /api/newsletter-reactions/react
+ * 
+ * Public endpoint. The reaction link in the email encodes:
+ *   ?token=<reactionToken>&type=<reactionType>&nid=<newsletterId>
+ * 
+ * Shows a confirmation page with a button to submit the reaction.
+ * Does NOT record the reaction - that happens via POST /confirm.
+ * This prevents email preview bots from recording false reactions.
+ */
+newsletterReactionRoutes.get('/react', async (req, res) => {
+    const { token, type, nid } = req.query;
+    const userAgent = req.headers['user-agent'] || null;
+
+    // Block known preview bots early
+    if (isPreviewBot(userAgent as string)) {
+        console.log('[Newsletter Reactions] Blocked preview bot on GET:', userAgent);
+        return res.status(403).send(buildReactionPage('error', 'Automated requests are not allowed.'));
+    }
+
+    try {
+        const validation = await validateReactionRequest(
+            token as string | undefined,
+            type as string | undefined,
+            nid as string | undefined,
+        );
+
+        if (!validation.valid) {
+            return res.status(validation.status).send(buildReactionPage('error', validation.error));
+        }
+
+        const { reactionType } = validation.data;
+        const meta = REACTION_META[reactionType];
+
+        // Show confirmation page with form to POST
+        return res.send(buildConfirmationPage(
+            String(token),
+            String(type),
+            String(nid),
+            meta.emoji,
+            meta.label,
+        ));
+    } catch (error) {
+        console.error('[Newsletter Reactions] Error on GET /react:', error);
+        return res.status(500).send(buildReactionPage('error', 'Something went wrong. Please try again later.'));
+    }
+});
+
+// ── Public: Record reaction (POST from confirmation page) ──────────────────
+
+/**
+ * POST /api/newsletter-reactions/confirm
+ * 
+ * Public endpoint called from the confirmation page form.
+ * Actually records the reaction to the database.
+ */
+newsletterReactionRoutes.post('/confirm', async (req, res) => {
+    const { token, type, nid } = req.body;
+    const userAgent = req.headers['user-agent'] || null;
+
+    // Block known preview bots
+    if (isPreviewBot(userAgent as string)) {
+        console.log('[Newsletter Reactions] Blocked preview bot on POST:', userAgent);
+        return res.status(403).send(buildReactionPage('error', 'Automated requests are not allowed.'));
+    }
+
+    try {
+        const validation = await validateReactionRequest(token, type, nid);
+
+        if (!validation.valid) {
+            return res.status(validation.status).send(buildReactionPage('error', validation.error));
+        }
+
+        const { reactionType, newsletterId, reactionToken, tenantId, recipientEmail } = validation.data;
+        const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || null;
+
+        const result = await recordReaction({
+            tenantId,
+            newsletterId,
+            recipientEmail,
+            reactionType,
+            reactionToken,
+            ipAddress,
+            userAgent,
+        });
+
+        if (!result.success) {
+            return res.status(500).send(buildReactionPage('error', 'Something went wrong. Please try again later.'));
+        }
+
+        const meta = REACTION_META[reactionType];
+        const updatedMsg = result.isUpdate ? ' Your previous reaction has been updated.' : '';
+        return res.send(buildReactionPage(
+            'success',
+            `Thank you for your feedback!${updatedMsg}`,
+            meta.emoji,
+            meta.label,
+        ));
+    } catch (error) {
+        console.error('[Newsletter Reactions] Error on POST /confirm:', error);
         return res.status(500).send(buildReactionPage('error', 'Something went wrong. Please try again later.'));
     }
 });
@@ -430,7 +539,142 @@ newsletterReactionRoutes.put('/:newsletterId/toggle', authenticateToken, require
     }
 });
 
-// ── HTML Page Builder ──────────────────────────────────────────────────────
+// ── HTML Page Builders ─────────────────────────────────────────────────────
+
+/**
+ * Build confirmation page with a form to submit the reaction via POST.
+ * This prevents email preview bots from recording reactions on GET.
+ */
+function buildConfirmationPage(
+    token: string,
+    type: string,
+    nid: string,
+    emoji: string,
+    label: string,
+): string {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm Your Reaction</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 48px 40px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      animation: fadeUp 0.6s ease-out;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .emoji {
+      font-size: 72px;
+      margin-bottom: 20px;
+      animation: bounceIn 0.8s ease-out 0.3s both;
+    }
+    @keyframes bounceIn {
+      0% { opacity: 0; transform: scale(0.3); }
+      50% { opacity: 1; transform: scale(1.1); }
+      70% { transform: scale(0.9); }
+      100% { transform: scale(1); }
+    }
+    .label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #7c3aed;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+    p {
+      font-size: 16px;
+      color: #64748b;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .confirm-btn {
+      display: inline-block;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 14px 32px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+    }
+    .confirm-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    }
+    .confirm-btn:active {
+      transform: translateY(0);
+    }
+    .confirm-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="emoji">${emoji}</div>
+    <div class="label">${label}</div>
+    <h1>Confirm Your Reaction</h1>
+    <p>Click the button below to submit your feedback.</p>
+    <form method="POST" action="/api/newsletter-reactions/confirm" id="reactionForm">
+      <input type="hidden" name="token" value="${escapeHtml(token)}">
+      <input type="hidden" name="type" value="${escapeHtml(type)}">
+      <input type="hidden" name="nid" value="${escapeHtml(nid)}">
+      <button type="submit" class="confirm-btn" id="confirmBtn">Submit Reaction</button>
+    </form>
+  </div>
+  <script>
+    document.getElementById('reactionForm').addEventListener('submit', function() {
+      var btn = document.getElementById('confirmBtn');
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+    });
+  </script>
+</body>
+</html>`;
+}
+
+function escapeHtml(str: string): string {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 function buildReactionPage(
     status: 'success' | 'error',

@@ -1546,7 +1546,22 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         // Wrap newsletter content in the branded email design template
         const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
 
-        // Prepare emails for batch sending (append reaction buttons + unsubscribe link)
+        // Helper to inject content before the footer marker (inside the document body)
+        const injectBeforeFooter = (content: string, injection: string): string => {
+          const footerMarker = '<!-- Footer -->';
+          if (content.includes(footerMarker)) {
+            return content.replace(footerMarker, `${injection}\n\n      ${footerMarker}`);
+          }
+          // Fallback: insert before closing </div></body>
+          const closingMatch = content.lastIndexOf('</div>\n  </body>');
+          if (closingMatch !== -1) {
+            return content.slice(0, closingMatch) + injection + '\n' + content.slice(closingMatch);
+          }
+          // Last resort: insert before </body>
+          return content.replace('</body>', `${injection}\n</body>`);
+        };
+
+        // Prepare emails for batch sending (inject reaction buttons + unsubscribe link inside body)
         const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => {
           const token = tokenMap.get(contact.id)!;
           const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(token)}&type=newsletters`;
@@ -1557,13 +1572,19 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
             ? buildReactionButtonsHtml(`${req.protocol}://${req.get('host')}`, newsletter.id, contact.id)
             : '';
 
-          const html = `${wrappedContent}
-            ${reactionHtml}
-            <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+          // Build unsubscribe block
+          const unsubscribeBlock = `<div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #94a3b8;">
                 <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
               </p>
             </div>`;
+
+          // Inject reaction buttons and unsubscribe block inside the document body
+          let html = wrappedContent;
+          if (reactionHtml) {
+            html = injectBeforeFooter(html, reactionHtml);
+          }
+          html = injectBeforeFooter(html, unsubscribeBlock);
           const text = `${newsletter.content.replace(/<[^>]*>/g, '')}\n\nUnsubscribe: ${unsubscribeUrl}`;
           return {
             to: contact.email,

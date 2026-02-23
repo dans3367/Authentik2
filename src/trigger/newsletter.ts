@@ -140,33 +140,28 @@ async function sendBulkEmails(opts: {
 
     // 2nd fallback: Amazon SES (sends one email per recipient)
     try {
-      const sesResult = await sendSESEmail({
-        from: { email: fromEmail },
-        recipients: recipients.map((r) => ({ email: r.email })),
-        subject,
-        html_content: content,
-        text_content: content.replace(/<[^>]*>/g, ""),
-        reply_to: replyTo,
-        tags: { type: "newsletter", newsletterId, groupUUID, tenantId },
-      });
-
-      const sesMessages: any[] = sesResult?.data || [];
-      const sesIdMap = new Map<string, string>();
-      for (const msg of sesMessages) {
-        const email = msg?.recipient?.email;
-        const id = msg?.id;
-        if (email && id) {
-          sesIdMap.set(email.toLowerCase(), id);
-        }
-      }
-
+      // SES sends per-recipient internally, so we can inject unique reaction bars
       for (const r of recipients) {
-        const msgId = sesIdMap.get(r.email.toLowerCase());
+        const recipientHtml = (reactionsEnabled && baseUrl)
+          ? injectReactionBar(content, baseUrl, newsletterId, r.id)
+          : content;
+
+        const sesResult = await sendSESEmail({
+          from: { email: fromEmail },
+          recipients: [{ email: r.email }],
+          subject,
+          html_content: recipientHtml,
+          text_content: content.replace(/<[^>]*>/g, ""),
+          reply_to: replyTo,
+          tags: { type: "newsletter", newsletterId, groupUUID, tenantId },
+        });
+
+        const sesMsg = sesResult?.data?.[0];
         results.push({
           recipientEmail: r.email,
           recipientId: r.id,
           success: true,
-          providerMessageId: msgId || 'ses-bulk-success',
+          providerMessageId: sesMsg?.id || 'ses-bulk-success',
           provider: 'ses',
         });
       }
@@ -174,7 +169,6 @@ async function sendBulkEmails(opts: {
       logger.info(`SES bulk fallback completed`, {
         newsletterId,
         sent: results.length,
-        messageIds: sesMessages.map((m: any) => m.id),
       });
 
       return results;
@@ -186,34 +180,28 @@ async function sendBulkEmails(opts: {
         newsletterId,
       });
 
-      // 3rd fallback: AhaSend
+      // 3rd fallback: AhaSend (send per-recipient for unique reaction bars)
       try {
-        const ahaResult = await sendAhaEmail({
-          from: { email: fromEmail },
-          recipients: recipients.map((r) => ({ email: r.email })),
-          subject,
-          html_content: content,
-          text_content: content.replace(/<[^>]*>/g, ""),
-          reply_to: replyTo,
-        });
-
-        const ahaMessages: any[] = ahaResult?.data || [];
-        const ahaIdMap = new Map<string, string>();
-        for (const msg of ahaMessages) {
-          const email = msg?.recipient?.email;
-          const id = msg?.id;
-          if (email && id) {
-            ahaIdMap.set(email.toLowerCase(), id);
-          }
-        }
-
         for (const r of recipients) {
-          const msgId = ahaIdMap.get(r.email.toLowerCase());
+          const recipientHtml = (reactionsEnabled && baseUrl)
+            ? injectReactionBar(content, baseUrl, newsletterId, r.id)
+            : content;
+
+          const ahaResult = await sendAhaEmail({
+            from: { email: fromEmail },
+            recipients: [{ email: r.email }],
+            subject,
+            html_content: recipientHtml,
+            text_content: content.replace(/<[^>]*>/g, ""),
+            reply_to: replyTo,
+          });
+
+          const ahaMsg = ahaResult?.data?.[0];
           results.push({
             recipientEmail: r.email,
             recipientId: r.id,
             success: true,
-            providerMessageId: msgId || 'ahasend-bulk-success',
+            providerMessageId: ahaMsg?.id || 'ahasend-bulk-success',
             provider: 'ahasend',
           });
         }
@@ -221,7 +209,6 @@ async function sendBulkEmails(opts: {
         logger.info(`AhaSend bulk fallback completed`, {
           newsletterId,
           sent: results.length,
-          messageIds: ahaMessages.map((m: any) => m.id),
         });
 
         return results;
@@ -473,6 +460,8 @@ export const processNewsletterBatchTask = task({
     totalBatches: number;
     from?: string;
     replyTo?: string;
+    reactionsEnabled?: boolean;
+    baseUrl?: string;
   }) => {
     const { recipients, batchNumber, totalBatches, newsletterId } = payload;
 
@@ -505,6 +494,8 @@ export const processNewsletterBatchTask = task({
           newsletterId: payload.newsletterId,
           groupUUID: payload.groupUUID,
           tenantId: payload.tenantId,
+          reactionsEnabled: payload.reactionsEnabled,
+          baseUrl: payload.baseUrl,
         });
 
         for (const result of bulkResults) {
@@ -526,11 +517,16 @@ export const processNewsletterBatchTask = task({
           let emailData: any = null;
           let sendError: any = null;
 
+          // Inject per-recipient reaction bar if enabled
+          const recipientHtml = (payload.reactionsEnabled && payload.baseUrl)
+            ? injectReactionBar(payload.content, payload.baseUrl, payload.newsletterId, recipient.id)
+            : payload.content;
+
           const { data: resendData, error: resendError } = await resend.emails.send({
             from: fromEmail,
             to: recipient.email,
             subject: payload.subject,
-            html: payload.content,
+            html: recipientHtml,
             text: payload.content.replace(/<[^>]*>/g, ""),
             replyTo: payload.replyTo,
             tags: [
@@ -553,7 +549,7 @@ export const processNewsletterBatchTask = task({
                 from: { email: fromEmail },
                 recipients: [{ email: recipient.email }],
                 subject: payload.subject,
-                html_content: payload.content,
+                html_content: recipientHtml,
                 text_content: payload.content.replace(/<[^>]*>/g, ""),
                 reply_to: payload.replyTo,
                 tags: { type: "newsletter", newsletterId: payload.newsletterId, groupUUID: payload.groupUUID, tenantId: payload.tenantId, recipientId: recipient.id },
@@ -569,7 +565,7 @@ export const processNewsletterBatchTask = task({
                   from: { email: fromEmail },
                   recipients: [{ email: recipient.email }],
                   subject: payload.subject,
-                  html_content: payload.content,
+                  html_content: recipientHtml,
                   text_content: payload.content.replace(/<[^>]*>/g, ""),
                   reply_to: payload.replyTo,
                 });
