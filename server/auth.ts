@@ -35,10 +35,10 @@ const authInstance = betterAuth({
     // Configure social providers as needed
     // Example: google, github, etc.
   },
-  baseURL: process.env.BASE_URL || `http://localhost:${process.env.PORT || "5002"}`,
+  baseURL: process.env.BASE_URL || `http://localhost:${process.env.PORT || "5000"}`,
   secret: process.env.BETTER_AUTH_SECRET || "fallback-secret-key-change-in-production",
   trustedOrigins: [
-    `http://localhost:${process.env.PORT || "5002"}`,
+    `http://localhost:${process.env.PORT || "5000"}`,
     "http://localhost:5173",
     "http://127.0.0.1:35145", // Browser preview URL
     "https://weby.zendwise.work",
@@ -53,7 +53,7 @@ const authInstance = betterAuth({
     // Allow any IP address on local networks
     ...(() => {
       const origins = [];
-      const port = process.env.PORT || "5002";
+      const port = process.env.PORT || "5000";
       // Support common private IP ranges
       for (let i = 1; i <= 254; i++) {
         origins.push(`http://192.168.${i}:${port}`);

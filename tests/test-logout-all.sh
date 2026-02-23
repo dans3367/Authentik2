@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Test logout all devices functionality
-API_URL="http://localhost:5002/api"
+API_URL="http://localhost:5000/api"
 
 # First, get the current access token from the browser
 echo "Please provide your current access token from the browser (check Network tab):"

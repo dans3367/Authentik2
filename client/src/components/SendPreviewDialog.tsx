@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Send, Mail, Search, Loader2, User, Users, X, Check } from "lucide-react";
+import { Send, Mail, Search, Loader2, User, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,35 +37,16 @@ export function SendPreviewDialog({
 }: SendPreviewDialogProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+  const [selectedEmail, setSelectedEmail] = useState("");
   const [sending, setSending] = useState(false);
-
-  const MAX_RECIPIENTS = 5;
 
   useEffect(() => {
     if (!open) {
       setSearch("");
-      setSelectedEmails([]);
+      setSelectedEmail("");
       setSending(false);
     }
   }, [open]);
-
-  const toggleEmail = (email: string) => {
-    setSelectedEmails((prev) => {
-      if (prev.includes(email)) {
-        return prev.filter((e) => e !== email);
-      }
-      if (prev.length >= MAX_RECIPIENTS) {
-        toast({ title: "Limit reached", description: `You can select up to ${MAX_RECIPIENTS} recipients.`, variant: "destructive" });
-        return prev;
-      }
-      return [...prev, email];
-    });
-  };
-
-  const removeEmail = (email: string) => {
-    setSelectedEmails((prev) => prev.filter((e) => e !== email));
-  };
 
   const { data, isLoading } = useQuery<{ recipients: PreviewRecipient[] }>({
     queryKey: ["/api/newsletters/preview-recipients"],
@@ -84,8 +65,8 @@ export function SendPreviewDialog({
   );
 
   const handleSend = async () => {
-    if (selectedEmails.length === 0) {
-      toast({ title: "Select a recipient", description: "Please select at least one email address to send the preview to.", variant: "destructive" });
+    if (!selectedEmail) {
+      toast({ title: "Select a recipient", description: "Please select an email address to send the preview to.", variant: "destructive" });
       return;
     }
 
@@ -98,14 +79,13 @@ export function SendPreviewDialog({
     setSending(true);
     try {
       await apiRequest("POST", "/api/newsletters/send-preview", {
-        to: selectedEmails,
+        to: selectedEmail,
         subject,
         html,
       });
-      const count = selectedEmails.length;
-      toast({ title: "Preview sent", description: `Preview email sent to ${count} recipient${count > 1 ? "s" : ""}` });
+      toast({ title: "Preview sent", description: `Preview email sent to ${selectedEmail}` });
       onOpenChange(false);
-      setSelectedEmails([]);
+      setSelectedEmail("");
       setSearch("");
     } catch (error: any) {
       toast({ title: "Failed to send", description: error.message || "Could not send preview email", variant: "destructive" });
@@ -123,7 +103,7 @@ export function SendPreviewDialog({
             Send Preview Email
           </DialogTitle>
           <DialogDescription>
-            Select up to {MAX_RECIPIENTS} recipients to send a preview of your newsletter.
+            Select a recipient to send a preview of your newsletter.
           </DialogDescription>
         </DialogHeader>
 
@@ -148,59 +128,35 @@ export function SendPreviewDialog({
                 {search ? "No matching recipients" : "No recipients found"}
               </div>
             ) : (
-              filtered.map((r) => {
-                const isSelected = selectedEmails.includes(r.email);
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => toggleEmail(r.email)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-accent transition-colors border-b last:border-b-0 ${
-                      isSelected ? "bg-accent" : ""
-                    }`}
-                  >
-                    <div className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${
-                      isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-gray-300 dark:border-gray-600"
-                    }`}>
-                      {isSelected && <Check className="h-3 w-3" />}
-                    </div>
-                    <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${
-                      r.type === "user" ? "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300" : "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
-                    }`}>
-                      {r.type === "user" ? <User className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium truncate">{r.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">{r.email}</div>
-                    </div>
-                  </button>
-                );
-              })
+              filtered.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setSelectedEmail(r.email)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-accent transition-colors border-b last:border-b-0 ${
+                    selectedEmail === r.email ? "bg-accent" : ""
+                  }`}
+                >
+                  <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${
+                    r.type === "user" ? "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300" : "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
+                  }`}>
+                    {r.type === "user" ? <User className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium truncate">{r.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{r.email}</div>
+                  </div>
+                  {selectedEmail === r.email && (
+                    <div className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-600" />
+                  )}
+                </button>
+              ))
             )}
           </div>
 
-          {selectedEmails.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground">
-                Sending to {selectedEmails.length} recipient{selectedEmails.length > 1 ? "s" : ""}:
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {selectedEmails.map((email) => (
-                  <span
-                    key={email}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs font-medium"
-                  >
-                    {email}
-                    <button
-                      type="button"
-                      onClick={() => removeEmail(email)}
-                      className="hover:text-blue-600 dark:hover:text-blue-100 transition-colors"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
+          {selectedEmail && (
+            <div className="text-sm text-muted-foreground">
+              Sending to: <span className="font-medium text-foreground">{selectedEmail}</span>
             </div>
           )}
         </div>
@@ -209,7 +165,7 @@ export function SendPreviewDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSend} disabled={selectedEmails.length === 0 || sending}>
+          <Button onClick={handleSend} disabled={!selectedEmail || sending}>
             {sending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -218,7 +174,7 @@ export function SendPreviewDialog({
             ) : (
               <>
                 <Send className="h-4 w-4 mr-2" />
-                Send Preview{selectedEmails.length > 1 ? ` (${selectedEmails.length})` : ""}
+                Send Preview
               </>
             )}
           </Button>

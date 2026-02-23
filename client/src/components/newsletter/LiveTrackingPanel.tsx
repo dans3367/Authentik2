@@ -66,19 +66,7 @@ const eventTypeConfig: Record<string, { icon: typeof Send; color: string; label:
 export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
   const stats = useNewsletterStats(newsletterId);
   const breakdown = useStatusBreakdown(newsletterId);
-
-  const queuedEvents = useNewsletterEvents(newsletterId, { eventType: "queued", limit: 20 });
-  const sentEvents = useNewsletterEvents(newsletterId, { eventType: "sent", limit: 20 });
-  const deliveredEvents = useNewsletterEvents(newsletterId, { eventType: "delivered", limit: 20 });
-  const openedEvents = useNewsletterEvents(newsletterId, { eventType: "opened", limit: 20 });
-  const clickedEvents = useNewsletterEvents(newsletterId, { eventType: "clicked", limit: 20 });
-
-  const hasEvents =
-    (queuedEvents && queuedEvents.length > 0) ||
-    (sentEvents && sentEvents.length > 0) ||
-    (deliveredEvents && deliveredEvents.length > 0) ||
-    (openedEvents && openedEvents.length > 0) ||
-    (clickedEvents && clickedEvents.length > 0);
+  const events = useNewsletterEvents(newsletterId, { limit: 20 });
 
   if (stats === undefined) {
     return (
@@ -116,7 +104,7 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
             <Badge
               variant={
                 stats.status === "completed" ? "default" :
-                  stats.status === "sending" ? "secondary" : "outline"
+                stats.status === "sending" ? "secondary" : "outline"
               }
             >
               {stats.status === "sending" && (
@@ -183,7 +171,7 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
       </div>
 
       {/* Live Event Feed */}
-      {hasEvents && (
+      {events && events.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -198,12 +186,26 @@ export function LiveTrackingPanel({ newsletterId }: LiveTrackingPanelProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <EventColumn title="Queued" events={queuedEvents} config={eventTypeConfig.queued} />
-              <EventColumn title="Sent" events={sentEvents} config={eventTypeConfig.sent} />
-              <EventColumn title="Delivered" events={deliveredEvents} config={eventTypeConfig.delivered} />
-              <EventColumn title="Opened" events={openedEvents} config={eventTypeConfig.opened} />
-              <EventColumn title="Clicked" events={clickedEvents} config={eventTypeConfig.clicked} />
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {events.map((event) => {
+                const config = eventTypeConfig[event.eventType] || eventTypeConfig.sent;
+                const Icon = config.icon;
+                return (
+                  <div
+                    key={event._id}
+                    className="flex items-center gap-2 py-1.5 px-2 rounded text-xs hover:bg-muted/50 transition-colors"
+                  >
+                    <Icon className={`h-3.5 w-3.5 flex-shrink-0 ${config.color}`} />
+                    <span className="font-medium min-w-[70px]">{config.label}</span>
+                    <span className="text-muted-foreground truncate flex-1">
+                      {event.recipientEmail}
+                    </span>
+                    <span className="text-muted-foreground flex-shrink-0">
+                      {formatEventDateTime(event.occurredAt)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -274,48 +276,6 @@ function RateItem({
     <div className="text-center">
       <p className={`text-lg font-bold ${colorClass}`}>{value}%</p>
       <p className="text-xs text-muted-foreground">{label}</p>
-    </div>
-  );
-}
-
-function EventColumn({
-  title,
-  events,
-  config
-}: {
-  title: string;
-  events: { _id: string; recipientEmail: string; occurredAt: number }[] | undefined;
-  config: { icon: typeof Send; color: string; label: string };
-}) {
-  const Icon = config.icon;
-  return (
-    <div className="flex flex-col border rounded-md bg-muted/10 p-2 h-full">
-      <div className="flex items-center gap-2 mb-2 pb-2 border-b">
-        <Icon className={`h-4 w-4 ${config.color}`} />
-        <span className="font-semibold text-sm">{title}</span>
-        <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">{events?.length || 0}</Badge>
-      </div>
-      <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
-        {!events ? (
-          <div className="text-center text-xs text-muted-foreground py-4 animate-pulse">Loading...</div>
-        ) : events.length === 0 ? (
-          <div className="text-center text-[10px] text-muted-foreground py-4 border border-dashed rounded bg-muted/30">No events</div>
-        ) : (
-          events.map((event) => (
-            <div
-              key={event._id}
-              className="flex flex-col gap-0.5 py-1.5 px-2 rounded text-xs hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
-            >
-              <span className="text-muted-foreground truncate w-full" title={event.recipientEmail}>
-                {event.recipientEmail}
-              </span>
-              <span className="text-[10px] text-muted-foreground/70">
-                {formatTimeAgo(event.occurredAt)}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
     </div>
   );
 }

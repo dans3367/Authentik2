@@ -6,7 +6,7 @@
 const crypto = require('crypto');
 
 // Configuration
-const WEBHOOK_URL = 'http://localhost:5002/api/webhooks/resend';
+const WEBHOOK_URL = 'http://localhost:5000/api/webhooks/resend';
 const WEBHOOK_SECRET = 'whsec_dQmHqFcRLvFHgdRvQwBHQXcm8GnvCrF6'; // Matches RESEND_WEBHOOK_SECRET in .env
 
 // Helper function to generate webhook signature

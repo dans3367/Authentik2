@@ -46,7 +46,6 @@ import { accountUsageRoutes } from "./routes/accountUsageRoutes";
 import { roleRoutes } from "./routes/roleRoutes";
 import internalRoutes from "./routes/internalRoutes";
 import { statsRoutes } from "./routes/statsRoutes";
-import { newsletterReactionRoutes } from "./routes/newsletterReactionRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -67,9 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Internal routes (authenticated via internal service middleware)
   app.use("/api/internal", internalRoutes);
 
-
   // Public routes (no authentication required)
-  app.use("/api/newsletter-reactions", newsletterReactionRoutes); // Public reaction endpoint + authenticated stats
   app.use("/api/appointments", appointmentConfirmationRoutes); // Public appointment confirmation/decline
 
   app.use("/api/signup", signupRoutes); // Signup helper endpoints

@@ -130,7 +130,7 @@ function isValidHttpUrl(url: string): boolean {
  * Fetch the master email design for a tenant via the internal API
  */
 export async function fetchEmailDesign(tenantId: string): Promise<EmailDesign | null> {
-  const apiUrl = process.env.API_URL || 'http://localhost:5002';
+  const apiUrl = process.env.API_URL || 'http://localhost:5000';
   const secret = process.env.INTERNAL_SERVICE_SECRET;
 
   if (!secret) {

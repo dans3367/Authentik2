@@ -33,10 +33,7 @@ import {
   ClipboardCheck,
   MessageSquare,
   KeyRound,
-  Hash,
-  Smile,
-  ThumbsUp,
-  ThumbsDown
+  Hash
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,7 +58,6 @@ import { format, formatDistanceToNow } from "date-fns";
 import EmailActivityTimelineModal from "@/components/EmailActivityTimelineModal";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { LiveTrackingPanel } from "@/components/newsletter/LiveTrackingPanel";
-import { ReactionInsightsSection } from "@/components/newsletter/ReactionInsightsSection";
 import { useNewsletterStats } from "@/hooks/useNewsletterTracking";
 import type { NewsletterWithUser, NewsletterTaskStatus } from "@shared/schema";
 
@@ -817,9 +813,9 @@ export default function NewsletterViewPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:justify-end shrink-0 pl-0 sm:pl-4">
-            {(newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && (
+            {newsletter.status === 'draft' && (
               <Button
-                onClick={() => navigate(`/newsletter/create/${newsletter.id}`)}
+                onClick={() => navigate(`/newsletters/${newsletter.id}/edit`)}
                 variant="outline"
                 size="sm"
                 data-testid="button-edit"
@@ -1121,15 +1117,11 @@ export default function NewsletterViewPage() {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 lg:space-y-8">
           <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-6 min-w-max">
+            <TabsList className="grid w-full grid-cols-5 min-w-max">
               <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-overview">Overview</TabsTrigger>
               <TabsTrigger value="live-tracking" className="text-xs sm:text-sm" data-testid="tab-live-tracking">
                 <Activity className="h-3 w-3 mr-1" />
                 Live
-              </TabsTrigger>
-              <TabsTrigger value="reactions" className="text-xs sm:text-sm" data-testid="tab-reactions">
-                <Smile className="h-3 w-3 mr-1" />
-                Reactions
               </TabsTrigger>
               <TabsTrigger value="content" className="text-xs sm:text-sm" data-testid="tab-content">Content</TabsTrigger>
               <TabsTrigger value="status" className="text-xs sm:text-sm" data-testid="tab-status">Task Status</TabsTrigger>
@@ -1139,41 +1131,6 @@ export default function NewsletterViewPage() {
 
           <TabsContent value="live-tracking" className="space-y-6 lg:space-y-8">
             <LiveTrackingPanel newsletterId={newsletter.id} />
-          </TabsContent>
-
-          <TabsContent value="reactions" className="space-y-6 lg:space-y-8">
-            {newsletter.reactionsEnabled === false ? (
-              <Card>
-                <CardContent className="p-8 lg:p-12">
-                  <div className="flex flex-col items-center text-center max-w-md mx-auto">
-                    <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-5">
-                      <Smile className="w-8 h-8 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      Reactions Not Enabled
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-4">
-                      Emoji reactions were not included in this newsletter. Readers were not able to provide feedback through the reactions bar.
-                    </p>
-                    <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 p-4 w-full">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0 mt-0.5">
-                          <Smile className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div className="text-left">
-                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Enable for future newsletters</p>
-                          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 leading-relaxed">
-                            You can enable the reactions feature when creating or editing your next newsletter. The "Enable Reactions" toggle is available in the send wizard before you send.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <ReactionInsightsSection newsletterId={newsletter.id} />
-            )}
           </TabsContent>
 
           <TabsContent value="overview" className="space-y-6 lg:space-y-8">
@@ -1826,9 +1783,6 @@ export default function NewsletterViewPage() {
                 </Card>
               </div>
             )}
-
-            {/* Reader Reactions Insights */}
-            {newsletter?.status === 'sent' && <ReactionInsightsSection newsletterId={newsletter.id} />}
 
             {/* Per-Recipient Stats Table */}
             <Card>

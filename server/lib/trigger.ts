@@ -118,12 +118,12 @@ export function generateInternalSignature(
  * Make an authenticated request to an internal endpoint.
  * Used by Trigger.dev tasks to call back to the main server securely.
  */
-export async function callInternalApi(
+export async function callInternalEndpoint(
   endpoint: string,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   payload?: object
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-  const apiUrl = process.env.API_URL || 'http://localhost:5002';
+  const apiUrl = process.env.API_URL || 'http://localhost:5000';
   const secret = process.env.INTERNAL_SERVICE_SECRET;
 
   if (!secret) {
@@ -171,7 +171,7 @@ export async function updateReminderStatus(
   status: 'pending' | 'sent' | 'failed' | 'cancelled',
   errorMessage?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const result = await callInternalApi(
+  const result = await callInternalEndpoint(
     `/api/appointment-reminders/internal/${reminderId}/status`,
     'PUT',
     { status, errorMessage }
