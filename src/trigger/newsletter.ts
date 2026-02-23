@@ -273,7 +273,7 @@ const newsletterJobSchema = z.object({
   from: z.string().optional(),
   replyTo: z.string().optional(),
   scheduledFor: z.string().optional(),
-  reactionsEnabled: z.boolean().default(false),
+  reactionsEnabled: z.boolean().default(true),
   baseUrl: z.string().optional(),
 });
 

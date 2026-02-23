@@ -2080,7 +2080,7 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
 
     // Check if reactions are enabled for this newsletter
     const singleNewsletter = await db.query.newsletters.findFirst({
-      where: eq(newsletters.id, id),
+      where: and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)),
       columns: { reactionsEnabled: true },
     });
     const singleReactionHtml = singleNewsletter?.reactionsEnabled

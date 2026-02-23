@@ -6,6 +6,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -110,14 +111,26 @@ interface Props {
 }
 
 export function ReactionInsightsSection({ newsletterId }: Props) {
+    // Track tab visibility to avoid unnecessary polling when tab is inactive
+    const [isTabVisible, setIsTabVisible] = useState(!document.hidden);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            setIsTabVisible(!document.hidden);
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, []);
+
     const { data: stats, isLoading, error, refetch, isFetching } = useQuery<ReactionStats>({
         queryKey: ['newsletter-reactions', newsletterId],
         queryFn: async () => {
             const res = await apiRequest('GET', `/api/newsletter-reactions/${newsletterId}/stats`);
             return res.json();
         },
-        refetchInterval: 30000, // Refresh every 30 seconds
-        staleTime: 0, // Always consider data stale so refetches work immediately
+        // Only auto-refresh when tab is visible, use 60s interval to reduce load
+        refetchInterval: isTabVisible ? 60000 : false,
+        staleTime: 30000, // Consider data fresh for 30 seconds
     });
 
     if (isLoading) {
