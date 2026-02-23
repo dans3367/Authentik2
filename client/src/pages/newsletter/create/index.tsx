@@ -3,7 +3,7 @@ import { Puck } from "@puckeditor/core";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import config, { initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
-import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X, Rocket } from "lucide-react";
+import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X, Rocket, Eye } from "lucide-react";
 import { SendPreviewDialog } from "@/components/SendPreviewDialog";
 import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
 import { extractPuckEmailHtml } from "@/utils/puck-to-email-html";
@@ -50,6 +50,10 @@ export default function NewsletterCreatePage() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [showSendWizard, setShowSendWizard] = useState(false);
   const [dataReady, setDataReady] = useState(!isEditMode);
+  const [initialRecipientType, setInitialRecipientType] = useState<"all" | "selected" | "tags">("all");
+  const [initialSelectedContactIds, setInitialSelectedContactIds] = useState<string[]>([]);
+  const [initialSelectedTagIds, setInitialSelectedTagIds] = useState<string[]>([]);
+  const [reactionsEnabled, setReactionsEnabled] = useState(true);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -80,6 +84,20 @@ export default function NewsletterCreatePage() {
         } catch {
           // puckData was invalid JSON, start fresh
         }
+      }
+      // Populate recipient data for the send wizard
+      if (nl.recipientType) {
+        setInitialRecipientType(nl.recipientType as "all" | "selected" | "tags");
+      }
+      if (nl.selectedContactIds) {
+        setInitialSelectedContactIds(nl.selectedContactIds);
+      }
+      if (nl.selectedTagIds) {
+        setInitialSelectedTagIds(nl.selectedTagIds);
+      }
+      // Load reactions preference
+      if (nl.reactionsEnabled !== undefined && nl.reactionsEnabled !== null) {
+        setReactionsEnabled(nl.reactionsEnabled);
       }
       setDataReady(true);
     }
@@ -131,6 +149,7 @@ export default function NewsletterCreatePage() {
           content: htmlContent,
           puckData: puckDataJson,
           status,
+          reactionsEnabled,
         });
         const result = await response.json();
         setHasUnsavedChanges(false);
@@ -167,7 +186,7 @@ export default function NewsletterCreatePage() {
     } finally {
       setIsSaving(false);
     }
-  }, [newsletterId, title, subject, toast, queryClient]);
+  }, [newsletterId, title, subject, reactionsEnabled, toast, queryClient]);
 
   const handleSaveDraft = useCallback(async () => {
     try {
@@ -698,15 +717,25 @@ export default function NewsletterCreatePage() {
             setIsEdit(false);
           }}
           style={{
-            padding: "8px 16px",
+            padding: "4px 12px",
             marginRight: "8px",
-            background: "#fff",
-            border: "1px solid #e5e7eb",
+            background: "#4b5563",
+            color: "white",
+            border: "1px solid #4b5563",
             borderRadius: "4px",
             cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            fontSize: "12px",
+            fontWeight: 500,
+            height: "32px",
+            boxSizing: "border-box",
+            whiteSpace: "nowrap",
           }}
           data-testid="button-preview"
         >
+          <Eye size={16} />
           Preview
         </button>
         {/* Replace default Puck Publish button with custom "Ready" button */}
@@ -876,6 +905,11 @@ export default function NewsletterCreatePage() {
           newsletterTitle={title || "Untitled Newsletter"}
           newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
           onSegmentSelected={handleSegmentSelected}
+          initialRecipientType={initialRecipientType}
+          initialSelectedContactIds={initialSelectedContactIds}
+          initialSelectedTagIds={initialSelectedTagIds}
+          reactionsEnabled={reactionsEnabled}
+          onReactionsEnabledChange={setReactionsEnabled}
         />
         {exitDialog}
       </>
@@ -890,125 +924,130 @@ export default function NewsletterCreatePage() {
 
   return (
     <>
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#f0f0f0" }}>
-      {/* Toolbar */}
-      <div
-        style={{
-          background: "white",
-          borderBottom: "1px solid #e5e7eb",
-          padding: "12px 16px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexShrink: 0,
-        }}
-      >
-        <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>
-          Email Preview
-        </h1>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          {/* Viewport switcher */}
-          {(["mobile", "desktop"] as const).map((vp) => {
-            const Icon = vp === "mobile" ? Smartphone : Monitor;
-            const label = vp === "mobile" ? "360px" : "620px";
-            return (
-              <button
-                key={vp}
-                onClick={() => setPreviewViewport(vp)}
-                style={{
-                  padding: "6px 10px",
-                  background: previewViewport === vp ? "#2563eb" : "#fff",
-                  color: previewViewport === vp ? "#fff" : "#000",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  fontSize: "12px",
-                }}
-              >
-                <Icon size={14} />
-                {label}
-              </button>
-            );
-          })}
-          <button
-            onClick={() => setIsEdit(true)}
-            style={{
-              padding: "8px 16px",
-              background: "#2563eb",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              marginLeft: "8px",
-            }}
-            data-testid="button-edit"
-          >
-            Back to Editor
-          </button>
-        </div>
-      </div>
-
-      {/* Email preview iframe */}
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "flex-start",
-          padding: "24px",
-          overflow: "auto",
-        }}
-      >
+      <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#f0f0f0" }}>
+        {/* Toolbar */}
         <div
           style={{
-            width: previewViewportWidths[previewViewport],
-            maxWidth: "100%",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)",
-            borderRadius: "8px",
-            overflow: "hidden",
-            background: "#fff",
+            background: "white",
+            borderBottom: "1px solid #e5e7eb",
+            padding: "12px 16px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexShrink: 0,
           }}
         >
-          <iframe
-            srcDoc={previewHtml}
-            title="Email Preview"
-            sandbox="allow-same-origin"
+          <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>
+            Email Preview
+          </h1>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {/* Viewport switcher */}
+            {(["mobile", "desktop"] as const).map((vp) => {
+              const Icon = vp === "mobile" ? Smartphone : Monitor;
+              const label = vp === "mobile" ? "360px" : "620px";
+              return (
+                <button
+                  key={vp}
+                  onClick={() => setPreviewViewport(vp)}
+                  style={{
+                    padding: "6px 10px",
+                    background: previewViewport === vp ? "#2563eb" : "#fff",
+                    color: previewViewport === vp ? "#fff" : "#000",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    fontSize: "12px",
+                  }}
+                >
+                  <Icon size={14} />
+                  {label}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setIsEdit(true)}
+              style={{
+                padding: "8px 16px",
+                background: "#2563eb",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                marginLeft: "8px",
+              }}
+              data-testid="button-edit"
+            >
+              Back to Editor
+            </button>
+          </div>
+        </div>
+
+        {/* Email preview iframe */}
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "flex-start",
+            padding: "24px",
+            overflow: "auto",
+          }}
+        >
+          <div
             style={{
-              width: "100%",
-              height: "100%",
-              minHeight: "600px",
-              border: "none",
-              display: "block",
+              width: previewViewportWidths[previewViewport],
+              maxWidth: "100%",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)",
+              borderRadius: "8px",
+              overflow: "hidden",
+              background: "#fff",
             }}
-            onLoad={(e) => {
-              // Auto-resize iframe to fit content
-              const iframe = e.currentTarget;
-              try {
-                const doc = iframe.contentDocument;
-                if (doc?.body) {
-                  iframe.style.height = doc.body.scrollHeight + "px";
+          >
+            <iframe
+              srcDoc={previewHtml}
+              title="Email Preview"
+              sandbox="allow-same-origin"
+              style={{
+                width: "100%",
+                height: "100%",
+                minHeight: "600px",
+                border: "none",
+                display: "block",
+              }}
+              onLoad={(e) => {
+                // Auto-resize iframe to fit content
+                const iframe = e.currentTarget;
+                try {
+                  const doc = iframe.contentDocument;
+                  if (doc?.body) {
+                    iframe.style.height = doc.body.scrollHeight + "px";
+                  }
+                } catch {
+                  // sandbox may block access in some cases
                 }
-              } catch {
-                // sandbox may block access in some cases
-              }
-            }}
-          />
+              }}
+            />
+          </div>
         </div>
       </div>
-    </div>
-    <SendNewsletterWizardModal
-      isOpen={showSendWizard}
-      onClose={() => setShowSendWizard(false)}
-      onSuccess={() => { setHasUnsavedChanges(false); setLocation('/newsletter'); }}
-      newsletterId={newsletterId}
-      newsletterTitle={title || "Untitled Newsletter"}
-      newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
-      onSegmentSelected={handleSegmentSelected}
-    />
-    {exitDialog}
+      <SendNewsletterWizardModal
+        isOpen={showSendWizard}
+        onClose={() => setShowSendWizard(false)}
+        onSuccess={() => { setHasUnsavedChanges(false); setLocation('/newsletter'); }}
+        newsletterId={newsletterId}
+        newsletterTitle={title || "Untitled Newsletter"}
+        newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
+        onSegmentSelected={handleSegmentSelected}
+        initialRecipientType={initialRecipientType}
+        initialSelectedContactIds={initialSelectedContactIds}
+        initialSelectedTagIds={initialSelectedTagIds}
+        reactionsEnabled={reactionsEnabled}
+        onReactionsEnabledChange={setReactionsEnabled}
+      />
+      {exitDialog}
     </>
   );
 }

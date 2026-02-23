@@ -36,8 +36,8 @@ print_status() {
 }
 
 # Function to explicitly handle common EADDRINUSE failures
-kill_eaddrinuse_port_5000() {
-    local port=5000
+kill_eaddrinuse_port_5002() {
+    local port=5002
 
     if check_port $port; then
         print_warning "Detected port $port in use (common EADDRINUSE for Main Server)"
@@ -198,8 +198,8 @@ stop_services() {
 start_npm_dev() {
     print_status "Starting services via npm run dev..."
 
-    # npm run dev starts Main Server on 5000 via scripts/start-dev.js
-    kill_eaddrinuse_port_5000
+    # npm run dev starts Main Server on 5002 via scripts/start-dev.js
+    kill_eaddrinuse_port_5002
     
     # Kill any existing processes on our ports first
     for ((i=0; i<${#SERVICE_NAMES[@]}; i++)); do
@@ -238,8 +238,8 @@ start_services() {
 
     print_status "Checking and cleaning up ports for all services..."
 
-    # Also guard against existing npm run dev Main Server using 5000
-    kill_eaddrinuse_port_5000
+    # Also guard against existing npm run dev Main Server using 5002
+    kill_eaddrinuse_port_5002
 
     # Check and kill processes on all required ports BEFORE starting
     for ((i=0; i<${#SERVICE_NAMES[@]}; i++)); do

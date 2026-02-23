@@ -5,7 +5,7 @@ echo
 
 # Step 1: Login to get token
 echo "1️⃣ Logging in..."
-LOGIN_RESPONSE=$(curl -s -X POST http://localhost:5000/api/login \
+LOGIN_RESPONSE=$(curl -s -X POST http://localhost:5002/api/login \
   -H "Content-Type: application/json" \
   -d '{"email":"beats@zendwise.work","password":"password"}')
 
@@ -34,7 +34,7 @@ CAMPAIGN_DATA='{
 }'
 
 echo "📤 Sending campaign creation request..."
-CAMPAIGN_RESPONSE=$(curl -s -X POST http://localhost:5000/api/campaigns \
+CAMPAIGN_RESPONSE=$(curl -s -X POST http://localhost:5002/api/campaigns \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d "$CAMPAIGN_DATA" \
@@ -45,7 +45,7 @@ echo
 
 # Step 3: Get campaigns
 echo "3️⃣ Fetching campaigns..."
-CAMPAIGNS_RESPONSE=$(curl -s -X GET http://localhost:5000/api/campaigns \
+CAMPAIGNS_RESPONSE=$(curl -s -X GET http://localhost:5002/api/campaigns \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -w "HTTP_STATUS:%{http_code}")
 

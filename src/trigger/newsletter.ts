@@ -6,6 +6,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 import { sendAhaEmail } from "./ahasend";
 import { sendSESEmail } from "./ses";
+import { buildReactionButtonsHtml } from "./newsletterReactionHtml";
 
 // Convex client for newsletter tracking (lazy init)
 let convexClient: ConvexHttpClient | null = null;
@@ -33,6 +34,26 @@ interface BulkSendResult {
 }
 
 /**
+ * Inject per-recipient reaction bar into the email HTML content.
+ * Inserts the reaction bar just before the footer section.
+ */
+function injectReactionBar(content: string, baseUrl: string, newsletterId: string, recipientId: string): string {
+  const reactionHtml = buildReactionButtonsHtml(baseUrl, newsletterId, recipientId);
+  // Insert before the footer (<!-- Footer --> comment or the footer div)
+  const footerMarker = '<!-- Footer -->';
+  if (content.includes(footerMarker)) {
+    return content.replace(footerMarker, `${reactionHtml}\n\n      ${footerMarker}`);
+  }
+  // Fallback: insert before closing </div></body>
+  const closingMatch = content.lastIndexOf('</div>\n  </body>');
+  if (closingMatch !== -1) {
+    return content.slice(0, closingMatch) + reactionHtml + '\n' + content.slice(closingMatch);
+  }
+  // Last resort: append before </body>
+  return content.replace('</body>', `${reactionHtml}\n</body>`);
+}
+
+/**
  * Send a batch of emails using Resend batch API (up to 100 per call).
  * Falls back to SES, then AhaSend if Resend fails.
  * Returns per-recipient results with provider message IDs for tracking.
@@ -46,18 +67,24 @@ async function sendBulkEmails(opts: {
   newsletterId: string;
   groupUUID: string;
   tenantId: string;
+  reactionsEnabled?: boolean;
+  baseUrl?: string;
 }): Promise<BulkSendResult[]> {
-  const { recipients, subject, content, from: fromEmail, replyTo, newsletterId, groupUUID, tenantId } = opts;
+  const { recipients, subject, content, from: fromEmail, replyTo, newsletterId, groupUUID, tenantId, reactionsEnabled, baseUrl } = opts;
   const results: BulkSendResult[] = [];
 
   // Build Resend batch payload (max 100 per call)
   const resendBatchPayload = recipients.map((r) => {
     const emailTrackingId = randomUUID();
+    // Inject per-recipient reaction bar if enabled
+    const recipientHtml = (reactionsEnabled && baseUrl)
+      ? injectReactionBar(content, baseUrl, newsletterId, r.id)
+      : content;
     return {
       from: fromEmail,
       to: r.email,
       subject,
-      html: content,
+      html: recipientHtml,
       text: content.replace(/<[^>]*>/g, ""),
       replyTo,
       tags: [
@@ -246,6 +273,8 @@ const newsletterJobSchema = z.object({
   from: z.string().optional(),
   replyTo: z.string().optional(),
   scheduledFor: z.string().optional(),
+  reactionsEnabled: z.boolean().default(true),
+  baseUrl: z.string().optional(),
 });
 
 export type NewsletterJobPayload = z.infer<typeof newsletterJobSchema>;
@@ -716,6 +745,8 @@ export const sendNewsletterTask = task({
             newsletterId: data.newsletterId,
             groupUUID: data.groupUUID,
             tenantId: data.tenantId,
+            reactionsEnabled: data.reactionsEnabled,
+            baseUrl: data.baseUrl,
           });
 
           // Track each result individually in Convex
@@ -773,11 +804,16 @@ export const sendNewsletterTask = task({
             let emailData: any = null;
             let sendError: any = null;
 
+            // Inject per-recipient reaction bar if enabled
+            const recipientHtml = (data.reactionsEnabled && data.baseUrl)
+              ? injectReactionBar(data.content, data.baseUrl, data.newsletterId, recipient.id)
+              : data.content;
+
             const { data: resendData, error: resendError } = await resend.emails.send({
               from: fromEmail,
               to: recipient.email,
               subject: data.subject,
-              html: data.content,
+              html: recipientHtml,
               text: data.content.replace(/<[^>]*>/g, ""),
               replyTo: data.replyTo,
               tags: [
@@ -800,7 +836,7 @@ export const sendNewsletterTask = task({
                   from: { email: fromEmail },
                   recipients: [{ email: recipient.email }],
                   subject: data.subject,
-                  html_content: data.content,
+                  html_content: recipientHtml,
                   text_content: data.content.replace(/<[^>]*>/g, ""),
                   reply_to: data.replyTo,
                   tags: { type: "newsletter", newsletterId: data.newsletterId, groupUUID: data.groupUUID, tenantId: data.tenantId, recipientId: recipient.id },
@@ -816,7 +852,7 @@ export const sendNewsletterTask = task({
                     from: { email: fromEmail },
                     recipients: [{ email: recipient.email }],
                     subject: data.subject,
-                    html_content: data.content,
+                    html_content: recipientHtml,
                     text_content: data.content.replace(/<[^>]*>/g, ""),
                     reply_to: data.replyTo,
                   });
