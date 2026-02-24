@@ -14,42 +14,37 @@ export function NewsletterCard() {
 
   return (
     <Card className="h-full group relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow duration-300">
-      {/* Gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 dark:from-blue-700 dark:via-indigo-700 dark:to-violet-700" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary via-blue-600 to-indigo-700 dark:from-primary/90 dark:via-blue-700 dark:to-indigo-800" />
 
-      {/* Decorative floating shapes */}
-      <div className="absolute top-6 right-8 w-20 h-20 rounded-full bg-white/10 blur-xl group-hover:scale-125 transition-transform duration-500" />
-      <div className="absolute bottom-4 left-1/4 w-16 h-16 rounded-full bg-white/5 blur-lg group-hover:translate-y-[-8px] transition-transform duration-500" />
-      <div className="absolute top-1/2 right-1/4 w-8 h-8 rounded-full bg-white/10 blur-sm group-hover:scale-150 transition-transform duration-700" />
+      <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-white/[0.07] blur-2xl group-hover:scale-110 transition-transform duration-700" />
+      <div className="absolute bottom-0 left-0 w-36 h-36 rounded-full bg-white/[0.04] blur-2xl translate-y-1/2 -translate-x-1/4" />
 
-      {/* Pattern overlay */}
-      <div className="absolute inset-0 opacity-[0.03]" style={{
+      <div className="absolute inset-0 opacity-[0.025]" style={{
         backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
-        backgroundSize: '24px 24px'
+        backgroundSize: '20px 20px'
       }} />
 
-      <CardContent className="relative p-6 sm:p-8 flex flex-col justify-center h-full min-h-[260px]">
+      <CardContent className="relative p-6 sm:p-8 flex flex-col justify-center h-full min-h-[240px]">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-          {/* Icon & Content */}
-          <div className="flex-1 space-y-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-sm text-white/90 text-xs font-medium">
-              <Sparkles className="w-3.5 h-3.5" />
+          <div className="flex-1 space-y-3">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-sm text-white/90 text-[11px] font-semibold uppercase tracking-wider">
+              <Sparkles className="w-3 h-3" />
               {t("dashboard.newsletterCard.getStarted")}
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-bold text-white leading-tight tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight tracking-tight">
               {t("dashboard.newsletterCard.title")}
             </h2>
 
-            <p className="text-white/75 text-sm sm:text-base leading-relaxed max-w-md">
+            <p className="text-white/70 text-sm leading-relaxed max-w-md">
               {t("dashboard.newsletterCard.description")}
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
               <Button
                 onClick={handleCreateNewsletter}
-                size="lg"
-                className="bg-white text-indigo-700 hover:bg-white/90 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 group/btn"
+                size="default"
+                className="bg-white text-indigo-700 font-semibold shadow-lg group/btn"
                 data-testid="button-create-newsletter"
               >
                 <Newspaper className="w-4 h-4 mr-2" />
@@ -59,8 +54,9 @@ export function NewsletterCard() {
               <Button
                 onClick={() => setLocation("/newsletter")}
                 variant="ghost"
-                size="lg"
-                className="text-white/80 hover:text-white hover:bg-white/10 font-medium"
+                size="default"
+                className="text-white/80 font-medium"
+                data-testid="button-view-all-newsletters"
               >
                 <Send className="w-4 h-4 mr-2" />
                 {t("dashboard.newsletterCard.viewAll")}
@@ -68,23 +64,20 @@ export function NewsletterCard() {
             </div>
           </div>
 
-          {/* Decorative illustration replacement */}
           <div className="hidden lg:flex flex-col items-center justify-center">
-            <div className="relative w-36 h-36">
-              {/* Outer ring */}
+            <div className="relative w-32 h-32">
               <div className="absolute inset-0 rounded-2xl bg-white/10 backdrop-blur-sm rotate-6 group-hover:rotate-12 transition-transform duration-500" />
-              {/* Inner card */}
               <div className="absolute inset-2 rounded-xl bg-white/15 backdrop-blur-md flex flex-col items-center justify-center gap-2 -rotate-3 group-hover:rotate-0 transition-transform duration-500">
-                <Newspaper className="w-10 h-10 text-white/80" />
+                <Newspaper className="w-9 h-9 text-white/80" />
                 <div className="flex gap-1">
-                  <div className="w-8 h-1 rounded-full bg-white/40" />
-                  <div className="w-5 h-1 rounded-full bg-white/25" />
+                  <div className="w-7 h-1 rounded-full bg-white/40" />
+                  <div className="w-4 h-1 rounded-full bg-white/25" />
                 </div>
                 <div className="flex gap-1">
-                  <div className="w-5 h-1 rounded-full bg-white/30" />
-                  <div className="w-8 h-1 rounded-full bg-white/20" />
+                  <div className="w-4 h-1 rounded-full bg-white/30" />
+                  <div className="w-7 h-1 rounded-full bg-white/20" />
                 </div>
-                <div className="w-10 h-1 rounded-full bg-white/15 mt-1" />
+                <div className="w-9 h-1 rounded-full bg-white/15 mt-0.5" />
               </div>
             </div>
           </div>
