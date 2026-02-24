@@ -925,3 +925,124 @@ loginRoutes.get('/verify-email', async (req, res) => {
     });
   }
 });
+
+// Change email for unverified users endpoint
+// Allows authenticated users whose email is NOT yet verified to change their email
+// and receive a new verification email at the updated address.
+const changeEmailRateLimit = new Map<string, { nextAllowedAt: number }>();
+
+loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const { newEmail } = req.body;
+
+    if (!newEmail || typeof newEmail !== 'string') {
+      return res.status(400).json({ message: 'A valid new email address is required' });
+    }
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const normalizedEmail = newEmail.toLowerCase().trim();
+
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'Please enter a valid email address' });
+    }
+
+    // Rate limiting – 2-minute cooldown per user
+    const now = Date.now();
+    const rl = changeEmailRateLimit.get(userId);
+    if (rl && now < rl.nextAllowedAt) {
+      const retrySeconds = Math.ceil((rl.nextAllowedAt - now) / 1000);
+      return res.status(429).json({
+        message: `Please wait ${retrySeconds} seconds before changing your email again`,
+        retryAfter: retrySeconds,
+      });
+    }
+
+    // Fetch current user
+    const user = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, userId),
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Only allow if user is NOT yet verified
+    if (user.emailVerified) {
+      return res.status(400).json({ message: 'Your email is already verified. Use the account settings to change your email.' });
+    }
+
+    // Prevent setting the same email
+    if (user.email.toLowerCase() === normalizedEmail) {
+      return res.status(400).json({ message: 'New email is the same as your current email' });
+    }
+
+    // Check that the new email is not already taken
+    const existingUser = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.email, normalizedEmail),
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ message: 'An account with this email already exists' });
+    }
+
+    console.log(`📧 [Change Email] Changing email for user ${userId}: ${user.email} → ${normalizedEmail}`);
+
+    // Update the user's email
+    await db.update(betterAuthUser)
+      .set({
+        email: normalizedEmail,
+        emailVerified: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(betterAuthUser.id, userId));
+
+    // Generate new verification token
+    const secret = process.env.BETTER_AUTH_SECRET || 'fallback-secret-key-change-in-production';
+    const verificationToken = jwt.sign(
+      { email: normalizedEmail, iat: Math.floor(Date.now() / 1000) },
+      secret,
+      { expiresIn: '24h' },
+    );
+
+    // Dispatch verification email
+    try {
+      const triggerResult = await triggerTransactionalEmail({
+        type: 'verification',
+        recipientEmail: normalizedEmail,
+        recipientName: user.firstName || user.name?.split(' ')[0],
+        verificationToken: verificationToken,
+        baseUrl: process.env.BASE_URL || 'http://localhost:5002',
+        appName: process.env.APP_NAME || 'Zendwise',
+      });
+
+      if (triggerResult.success) {
+        console.log('✅ [Change Email] Verification email dispatched, runId:', triggerResult.runId);
+      } else {
+        console.error('❌ [Change Email] Failed to dispatch verification email:', triggerResult.error);
+      }
+    } catch (emailError) {
+      console.error('❌ [Change Email] Failed to dispatch verification email:', emailError);
+      // Don't fail the overall operation – the email was changed successfully
+    }
+
+    // Set rate limit
+    changeEmailRateLimit.set(userId, { nextAllowedAt: now + 2 * 60 * 1000 });
+
+    console.log(`✅ [Change Email] Email changed successfully for user ${userId}`);
+
+    return res.json({
+      success: true,
+      message: 'Email changed successfully. A new verification email has been sent.',
+      email: normalizedEmail,
+    });
+  } catch (error) {
+    console.error('❌ [Change Email] Error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});

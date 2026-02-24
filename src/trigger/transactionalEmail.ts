@@ -1,7 +1,19 @@
 import { task, logger } from "@trigger.dev/sdk/v3";
 import { z } from "zod";
+import { createHash } from "crypto";
 import { EMAIL_RETRY_CONFIG, emailSendCatchError } from "./retryStrategy";
 import { sendSESEmail } from "./ses";
+
+function hashEmail(email: string): string {
+  return createHash("sha256").update(email.toLowerCase().trim()).digest("hex").slice(0, 16);
+}
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!domain) return "***";
+  const visibleLocal = local.length > 2 ? local.slice(0, 2) : local.slice(0, 1);
+  return `${visibleLocal}***@${domain}`;
+}
 
 /**
  * Schema for transactional email payloads.
@@ -41,9 +53,11 @@ export const sendTransactionalEmailTask = task({
     const fromEmail = "noreply@zendwise.com";
     const displayName = data.recipientName ? ` ${data.recipientName}` : "";
 
+    const recipientHash = hashEmail(data.recipientEmail);
+
     logger.info("Sending transactional email via SES", {
       type: data.type,
-      to: data.recipientEmail,
+      recipientHash,
     });
 
     let subject: string;
@@ -56,13 +70,13 @@ export const sendTransactionalEmailTask = task({
           throw new Error("verificationToken is required for verification emails");
         }
 
-        const verificationUrl = `${baseUrl}/verify-email?token=${data.verificationToken}`;
+        const verificationUrl = `${baseUrl}/verify-email?token=${encodeURIComponent(data.verificationToken)}`;
 
         subject = `Welcome to ${appName} - Please verify your email`;
         htmlContent = buildVerificationEmailHtml(displayName, verificationUrl, appName);
         textContent = buildVerificationEmailText(displayName, verificationUrl, appName);
 
-        logger.info("Verification URL generated", { verificationUrl, to: data.recipientEmail });
+        logger.info("Verification URL generated", { verificationUrl, recipientHash });
         break;
       }
 
@@ -77,52 +91,36 @@ export const sendTransactionalEmailTask = task({
         throw new Error(`Unknown transactional email type: ${data.type}`);
     }
 
-    try {
-      const result = await sendSESEmail({
-        from: {
-          email: fromEmail,
-          name: appName,
-        },
-        recipients: [{ email: data.recipientEmail }],
-        subject,
-        html_content: htmlContent,
-        text_content: textContent,
-        tags: {
-          type: `transactional-${data.type}`,
-          recipient: data.recipientEmail,
-        },
-      });
+    const result = await sendSESEmail({
+      from: {
+        email: fromEmail,
+        name: appName,
+      },
+      recipients: [{ email: data.recipientEmail }],
+      subject,
+      html_content: htmlContent,
+      text_content: textContent,
+      tags: {
+        type: `transactional-${data.type}`,
+        recipient: data.recipientEmail,
+      },
+    });
 
-      const messageId = result.data?.[0]?.id || "unknown";
+    const messageId = result.data?.[0]?.id || "unknown";
 
-      logger.info("Transactional email sent via SES", {
-        type: data.type,
-        messageId,
-        to: data.recipientEmail,
-      });
+    logger.info("Transactional email sent via SES", {
+      type: data.type,
+      messageId,
+      to: maskEmail(data.recipientEmail),
+    });
 
-      return {
-        success: true,
-        type: data.type,
-        messageId,
-        to: data.recipientEmail,
-        sentAt: new Date().toISOString(),
-      };
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      logger.error("Failed to send transactional email via SES", {
-        type: data.type,
-        to: data.recipientEmail,
-        error: errorMessage,
-      });
-
-      return {
-        success: false,
-        type: data.type,
-        to: data.recipientEmail,
-        error: errorMessage,
-      };
-    }
+    return {
+      success: true,
+      type: data.type,
+      messageId,
+      to: data.recipientEmail,
+      sentAt: new Date().toISOString(),
+    };
   },
 });
 
@@ -154,14 +152,14 @@ function buildVerificationEmailHtml(displayName: string, verificationUrl: string
                 </p>
 
                 <div style="text-align: center; margin: 28px 0;">
-                  <a href="${verificationUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; letter-spacing: 0.02em; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);">
+                  <a href="${escapeHtml(verificationUrl)}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; letter-spacing: 0.02em; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);">
                     Verify Email Address
                   </a>
                 </div>
 
                 <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b;">If the button doesn't work, copy and paste this link into your browser:</p>
                 <div style="background: #f1f5f9; padding: 12px; border-radius: 6px; word-break: break-all; font-family: monospace; font-size: 13px; color: #475569; margin-bottom: 20px;">
-                  ${verificationUrl}
+                  ${escapeHtml(verificationUrl)}
                 </div>
 
                 <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748b;"><strong>This verification link will expire in 24 hours.</strong></p>
@@ -231,7 +229,7 @@ function buildWelcomeEmailHtml(displayName: string, baseUrl: string, appName: st
                 </ul>
 
                 <div style="text-align: center; margin: 28px 0;">
-                  <a href="${baseUrl}" style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: #ffffff; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; letter-spacing: 0.02em; box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);">
+                  <a href="${escapeHtml(baseUrl)}" style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: #ffffff; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; letter-spacing: 0.02em; box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);">
                     Go to Dashboard
                   </a>
                 </div>

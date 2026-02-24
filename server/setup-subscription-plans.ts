@@ -11,8 +11,8 @@ const defaultPlans = [
     description: 'Get started with the essentials — single user, single login',
     price: '0.00',
     yearlyPrice: '0.00',
-    stripePriceId: 'price_1Sz4wQFKvavhLWPgJVSuidDp',
-    stripeYearlyPriceId: 'price_1Sz4wQFKvavhLWPgOkRA34yt',
+    stripePriceId: 'price_1T4SoXFKvavhLWPgjs4nq3fo',
+    stripeYearlyPriceId: 'price_1T4SoYFKvavhLWPgKeWHaD4f',
     features: [
       '1 user (Owner only)',
       '100 emails/month',
@@ -38,8 +38,8 @@ const defaultPlans = [
     description: 'For growing businesses — add team members and shops',
     price: '49.00',
     yearlyPrice: '470.40',
-    stripePriceId: 'price_1Sz4wQFKvavhLWPgiMUztAdb',
-    stripeYearlyPriceId: 'price_1Sz4wQFKvavhLWPgrvvuxhHj',
+    stripePriceId: 'price_1T4SoZFKvavhLWPgWl7TyAVh',
+    stripeYearlyPriceId: 'price_1T4SoaFKvavhLWPg43rVgfgk',
     features: [
       'Up to 3 users',
       '500 emails/month',
@@ -66,8 +66,8 @@ const defaultPlans = [
     description: 'For established businesses — full power with more capacity',
     price: '79.00',
     yearlyPrice: '758.40',
-    stripePriceId: 'price_1Sz4wRFKvavhLWPg1vogU8PN',
-    stripeYearlyPriceId: 'price_1Sz4wSFKvavhLWPgT92tDeuL',
+    stripePriceId: 'price_1T4SobFKvavhLWPgbzKlSh7I',
+    stripeYearlyPriceId: 'price_1T4SobFKvavhLWPgro2QTqQU',
     features: [
       'Up to 20 users',
       '1,000 emails/month',

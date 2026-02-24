@@ -85,9 +85,9 @@ export default function OnboardingPage() {
         }
     };
 
-    const redirectToDashboard = (delayMs = 0) => {
+    const redirectToPlanSelection = (delayMs = 0) => {
         const go = () => {
-            window.location.href = '/dashboard';
+            window.location.href = '/select-plan';
         };
 
         if (delayMs > 0) {
@@ -107,7 +107,7 @@ export default function OnboardingPage() {
                     const company = await response.json();
                     if (company && company.setupCompleted) {
                         cacheOnboardingCompleted();
-                        redirectToDashboard();
+                        redirectToPlanSelection();
                         return;
                     }
                 }
@@ -186,7 +186,7 @@ export default function OnboardingPage() {
                         title: 'Already Completed',
                         description: 'Onboarding is already completed. Redirecting to dashboard...',
                     });
-                    redirectToDashboard(600);
+                    redirectToPlanSelection(600);
                     return;
                 }
                 throw new Error(errorMessage);
@@ -201,7 +201,7 @@ export default function OnboardingPage() {
             });
 
             // Small delay for the toast, then redirect
-            redirectToDashboard(800);
+            redirectToPlanSelection(800);
         } catch (error) {
             console.error('Onboarding error:', error);
             toast({

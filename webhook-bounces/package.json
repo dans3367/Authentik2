@@ -15,7 +15,6 @@
     "helmet": "^7.0.0",
     "dotenv": "^16.3.1",
     "drizzle-orm": "^0.45.1",
-    "@neondatabase/serverless": "^0.10.0",
     "postgres": "^3.3.5",
     "tsx": "^3.12.7"
   },

@@ -68,8 +68,7 @@ export default defineConfig({
           // Date and utility libraries
           'utils-vendor': ['date-fns', 'nanoid'],
 
-          // Payment processing
-          'stripe-vendor': ['@stripe/stripe-js', '@stripe/react-stripe-js', 'stripe'],
+          // Payment processing (Stripe Checkout — no client-side Stripe SDK needed)
 
           // AWS and cloud services
           'aws-vendor': ['@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner']

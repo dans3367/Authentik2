@@ -44,80 +44,7 @@ import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { Badge } from "@/components/ui/badge";
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
-
-interface CheckoutFormProps {
-  planId: string;
-  billingCycle: 'monthly' | 'yearly';
-}
-
-const CheckoutForm = ({ planId, billingCycle }: CheckoutFormProps) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const { toast } = useToast();
-  const { t } = useLanguage();
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!stripe || !elements) {
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      const { error } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/dashboard`,
-        },
-      });
-
-      if (error) {
-        toast({
-          title: t('profile.subscription.paymentFailed'),
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: t('profile.subscription.paymentSuccessful'),
-          description: t('profile.subscription.welcomeMessage'),
-        });
-      }
-    } catch (error) {
-      toast({
-        title: t('profile.subscription.paymentError'),
-        description: t('profile.subscription.paymentErrorDescription'),
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement />
-      <Button type="submit" disabled={!stripe || isProcessing} className="w-full">
-        {isProcessing ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {t('profile.subscription.processing')}
-          </>
-        ) : (
-          t(billingCycle === 'yearly' ? 'profile.subscription.subscribeYearly' : 'profile.subscription.subscribeMonthly')
-        )}
-      </Button>
-    </form>
-  );
-};
 
 interface DowngradeImpact {
   resource: string;
@@ -402,9 +329,7 @@ export default function ProfilePage() {
   }, [user?.timezone]);
 
   // Subscription-related state and queries
-  const [clientSecret, setClientSecret] = useState("");
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-  const [currentPlan, setCurrentPlan] = useState<string>('');
 
   // Check if user already has a subscription
   const { data: userSubscription, isLoading: subscriptionLoading } = useQuery<UserSubscriptionResponse>({
@@ -417,61 +342,28 @@ export default function ProfilePage() {
   // Fetch subscription plans
   const { data: plans, isLoading: plansLoading, error: plansError, refetch: refetchPlans } = useQuery<SubscriptionPlan[]>({
     queryKey: ['/api/subscription/plans'],
-    queryFn: async () => {
-      // Use direct fetch for subscription plans since it doesn't require auth
-      try {
-        const response = await fetch('/api/subscription/plans');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return await response.json();
-      } catch (error) {
-        console.error('Error fetching subscription plans:', error);
-        throw error;
-      }
-    },
     enabled: user?.role === 'Owner',
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    retry: (failureCount, error) => {
-      // Only retry on network errors, not on 4xx errors
-      if (error && typeof error === 'object' && 'status' in error) {
-        const status = (error as any).status;
-        if (status >= 400 && status < 500) return false;
-      }
-      return failureCount < 3;
-    }
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 3,
   });
 
-  // Create subscription mutation
-  const createSubscriptionMutation = useMutation({
-    mutationFn: async ({ planId, billingCycle }: { planId: string; billingCycle: 'monthly' | 'yearly' }) => {
-      return await apiRequest('POST', '/api/create-subscription', { planId, billingCycle });
-    },
-    onSuccess: (data: any) => {
-      setClientSecret(data.clientSecret);
-      setCurrentPlan(data.planId);
-    },
-    onError: (error: any) => {
-      toast({
-        title: t('profile.subscription.subscriptionError'),
-        description: error.message || t('profile.subscription.subscriptionErrorDescription'),
-        variant: "destructive",
-      });
-    }
-  }, queryClient);
-
-  // Upgrade subscription mutation
+  // Upgrade subscription mutation — uses Stripe Checkout redirect
   const upgradeSubscriptionMutation = useMutation({
     mutationFn: async ({ planId, billingCycle }: { planId: string; billingCycle: 'monthly' | 'yearly' }) => {
-      return await apiRequest('POST', '/api/subscription/upgrade-subscription', { planId, billingCycle });
+      const response = await apiRequest('POST', '/api/subscription/upgrade-subscription', { planId, billingCycle });
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      if (data.requiresPayment && data.checkoutUrl) {
+        // Redirect to Stripe Checkout hosted page
+        window.location.href = data.checkoutUrl;
+        return;
+      }
       toast({
         title: t('profile.subscription.subscriptionUpdated'),
         description: t('profile.subscription.subscriptionUpdatedDescription'),
       });
-      // Refetch subscription data
       queryClient.invalidateQueries({ queryKey: ['/api/subscription/my-subscription'] });
     },
     onError: (error: any) => {
@@ -483,11 +375,6 @@ export default function ProfilePage() {
     }
   }, queryClient);
 
-  // Subscription handler functions
-  const handleSelectPlan = (planId: string, billingCycle: 'monthly' | 'yearly') => {
-    createSubscriptionMutation.mutate({ planId, billingCycle });
-  };
-
   // Downgrade confirmation state
   const [downgradeModalOpen, setDowngradeModalOpen] = useState(false);
   const [downgradeCheck, setDowngradeCheck] = useState<DowngradeCheckResult | null>(null);
@@ -497,13 +384,12 @@ export default function ProfilePage() {
   const handleUpgrade = async (planId: string, billingCycle: 'monthly' | 'yearly') => {
     // Determine if this is a downgrade
     const targetPlan = plans?.find((p: SubscriptionPlan) => p.id === planId);
-    const currentPlan = userSubscription?.subscription?.plan;
-    const currentPrice = currentPlan ? parseFloat(currentPlan.price) : 0;
+    const currentPlanData = userSubscription?.subscription?.plan;
+    const currentPrice = currentPlanData ? parseFloat(currentPlanData.price) : 0;
     const targetPrice = targetPlan ? parseFloat(targetPlan.price) : 0;
     const isDowngrade = targetPrice < currentPrice;
 
     if (isDowngrade) {
-      // Call check-downgrade endpoint to get impact preview
       setIsCheckingDowngrade(true);
       try {
         const response = await apiRequest('POST', '/api/subscription/check-downgrade', { planId });
@@ -521,7 +407,7 @@ export default function ProfilePage() {
         setIsCheckingDowngrade(false);
       }
     } else {
-      // Direct upgrade
+      // Upgrade — server will create Stripe Checkout session and return URL
       upgradeSubscriptionMutation.mutate({ planId, billingCycle });
     }
   };
@@ -1445,17 +1331,6 @@ export default function ProfilePage() {
                         {t('profile.subscription.retry')}
                       </Button>
                     </div>
-                  ) : clientSecret && currentPlan ? (
-                    /* Show checkout form if payment is in progress */
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">{t('profile.subscription.completeSubscription')}</h3>
-                      <Elements stripe={stripePromise} options={{ clientSecret }}>
-                        <CheckoutForm
-                          planId={currentPlan}
-                          billingCycle={billingCycle}
-                        />
-                      </Elements>
-                    </div>
                   ) : userSubscription?.subscription ? (
                     /* Show subscription management for existing subscribers */
                     <SubscriptionManagement
@@ -1466,100 +1341,19 @@ export default function ProfilePage() {
                       isCheckingDowngrade={isCheckingDowngrade}
                     />
                   ) : (
-                    /* Show plan selection for new users */
-                    <div className="space-y-8">
-                      <div className="text-center">
-                        <h3 className="text-2xl font-bold mb-4">{t('profile.subscription.chooseYourPlan')}</h3>
-                        <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-                          {t('profile.subscription.trialDescription')}
-                        </p>
-                      </div>
-
-                      <div className="flex justify-center">
-                        <Tabs value={billingCycle} onValueChange={(value) => setBillingCycle(value as 'monthly' | 'yearly')}>
-                          <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="monthly">{t('profile.subscription.monthly')}</TabsTrigger>
-                            <TabsTrigger value="yearly">
-                              {t('profile.subscription.yearly')}
-                              <Badge variant="secondary" className="ml-2">{t('profile.subscription.save20')}</Badge>
-                            </TabsTrigger>
-                          </TabsList>
-                        </Tabs>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {plans?.map((plan) => (
-                          <Card key={plan.id} className={`relative ${plan.isPopular ? 'border-primary shadow-lg' : ''}`}>
-                            {plan.isPopular && (
-                              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                                <Badge className="bg-primary text-primary-foreground px-3 py-1">
-                                  <Star className="w-3 h-3 mr-1" />
-                                  {t('profile.subscription.mostPopular')}
-                                </Badge>
-                              </div>
-                            )}
-
-                            <CardHeader className="text-center pb-4">
-                              <CardTitle className="text-xl">{plan.displayName}</CardTitle>
-                              <CardDescription className="text-sm">{plan.description}</CardDescription>
-
-                              <div className="py-4">
-                                <div className="text-3xl font-bold">
-                                  ${billingCycle === 'yearly' ? plan.yearlyPrice : plan.price}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {t(billingCycle === 'yearly' ? 'profile.subscription.perYear' : 'profile.subscription.perMonth')}
-                                </div>
-                                {billingCycle === 'yearly' && plan.yearlyPrice && (
-                                  <div className="text-xs text-green-600 mt-1">
-                                    {t('profile.subscription.saveAmount', { amount: ((parseFloat(plan.price) * 12) - parseFloat(plan.yearlyPrice)).toFixed(2) })}
-                                  </div>
-                                )}
-                              </div>
-                            </CardHeader>
-
-                            <CardContent className="space-y-4">
-                              <Button
-                                className="w-full"
-                                disabled={createSubscriptionMutation.isPending}
-                                onClick={() => handleSelectPlan(plan.id, billingCycle)}
-                              >
-                                {createSubscriptionMutation.isPending ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    {t('profile.subscription.settingUp')}
-                                  </>
-                                ) : (
-                                  t(billingCycle === 'yearly' ? 'profile.subscription.startYearlyPlan' : 'profile.subscription.startMonthlyPlan')
-                                )}
-                              </Button>
-
-                              <ul className="space-y-2">
-                                {plan.features.map((feature, index) => (
-                                  <li key={index} className="flex items-center text-sm">
-                                    <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                                    {feature}
-                                  </li>
-                                ))}
-                              </ul>
-
-                              <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
-                                <div className="space-y-1">
-                                  {plan.maxUsers && <div>{t('profile.subscription.maxUsers', { count: plan.maxUsers })}</div>}
-                                  {plan.maxShops && <div>{t('profile.subscription.maxShops', { count: plan.maxShops })}</div>}
-                                  {plan.maxProjects && <div>{t('profile.subscription.maxProjects', { count: plan.maxProjects })}</div>}
-                                  {plan.storageLimit && <div>{t('profile.subscription.storageLimit', { size: plan.storageLimit })}</div>}
-                                  <div className="capitalize">{t('profile.subscription.supportLevel', { level: plan.supportLevel })}</div>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-
-                      <div className="text-center text-sm text-muted-foreground">
-                        <p>{t('profile.subscription.needHelpChoosing')} <a href="mailto:support@example.com" className="text-primary hover:underline">{t('profile.subscription.contactSupportTeam')}</a></p>
-                      </div>
+                    /* No subscription — link to plan selection page */
+                    <div className="text-center py-12 space-y-4">
+                      <CreditCard className="mx-auto h-12 w-12 text-muted-foreground" />
+                      <h3 className="text-xl font-semibold">{t('profile.subscription.chooseYourPlan')}</h3>
+                      <p className="text-muted-foreground max-w-md mx-auto">
+                        You don't have an active subscription yet. Choose a plan to get started.
+                      </p>
+                      <Link href="/select-plan">
+                        <Button size="lg">
+                          <CreditCard className="mr-2 h-4 w-4" />
+                          Choose a Plan
+                        </Button>
+                      </Link>
                     </div>
                   )}
                 </CardContent>

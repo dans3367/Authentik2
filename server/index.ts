@@ -32,16 +32,16 @@ app.use(helmetMiddleware);
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   let allowedOrigin = process.env.CORS_ORIGIN || '*';
-  
+
   // Allow localhost, 127.0.0.1, and any IP address on the local network
   if (origin && (
-    origin.startsWith('http://localhost:') || 
+    origin.startsWith('http://localhost:') ||
     origin.startsWith('http://127.0.0.1:') ||
     origin.startsWith('http://192.168.') ||
     origin.startsWith('http://10.') ||
     origin.startsWith('http://172.') ||
     // Also allow HTTPS versions
-    origin.startsWith('https://localhost:') || 
+    origin.startsWith('https://localhost:') ||
     origin.startsWith('https://127.0.0.1:') ||
     origin.startsWith('https://192.168.') ||
     origin.startsWith('https://10.') ||
@@ -49,7 +49,7 @@ app.use((req, res, next) => {
   )) {
     allowedOrigin = origin;
   }
-  
+
   res.header('Access-Control-Allow-Origin', allowedOrigin);
   res.header('Vary', 'Origin');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
@@ -89,7 +89,7 @@ app.use((req, res, next) => {
 // Only handle standard better-auth routes, exclude custom routes like verify-login
 app.all("/api/auth/*", (req, res, next) => {
   // Skip custom auth routes that should be handled by our custom routes
-  const customRoutes = ['verify-login', 'verify-2fa', 'check-2fa-requirement', 'verify-session-2fa', '2fa-status', 'verify-email', 'resend-verification', 'profile', 'avatar'];
+  const customRoutes = ['verify-login', 'verify-2fa', 'check-2fa-requirement', 'verify-session-2fa', '2fa-status', 'verify-email', 'resend-verification', 'change-email-unverified', 'profile', 'avatar'];
   const path = req.path.replace('/api/auth/', '');
 
   if (customRoutes.includes(path)) {
@@ -100,6 +100,9 @@ app.all("/api/auth/*", (req, res, next) => {
   const authHandler = toNodeHandler(auth);
   return authHandler(req, res);
 });
+
+// Stripe webhook needs raw body for signature verification — must come before express.json()
+app.use('/api/subscription/webhook', express.raw({ type: 'application/json', limit: '1mb' }));
 
 // Body parsing with size limits - applied after auth handler
 app.use(express.json(requestSizeLimiter.json));

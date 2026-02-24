@@ -66,6 +66,7 @@ const UpdateProfilePage = lazy(() => import("@/pages/update-profile"));
 const SegmentationPage = lazy(() => import("@/pages/segmentation"));
 const ManagementPage = lazy(() => import("@/pages/management"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding"));
+const SelectPlanPage = lazy(() => import("@/pages/select-plan"));
 
 // Redirect components for legacy routes
 function BirthdaysRedirect() {
@@ -186,7 +187,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     if (localStorage.getItem(cacheKey) === 'true') {
       // If user somehow landed on /onboarding but already completed, redirect away
       if (location === '/onboarding') {
-        setLocation('/dashboard');
+        setLocation('/select-plan');
       }
       return;
     }
@@ -200,13 +201,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         if (response.ok) {
           const company = await response.json();
           if (company && !company.setupCompleted) {
-            setNeedsOnboarding(true);
-            setLocation('/onboarding');
+            // Don't redirect if user is already on /select-plan (they may have come back)
+            if (location !== '/select-plan') {
+              setNeedsOnboarding(true);
+              setLocation('/onboarding');
+            }
           } else {
             localStorage.setItem(cacheKey, 'true');
-            // If on /onboarding but setup is done, redirect to dashboard
+            // If on /onboarding but setup is done, redirect to plan selection
             if (location === '/onboarding') {
-              setLocation('/dashboard');
+              setLocation('/select-plan');
             }
           }
         }
@@ -254,6 +258,7 @@ function Router() {
           <Route path="/verify-email" component={VerifyEmailPage} />
           <Route path="/update-profile" component={UpdateProfilePage} />
           <Route path="/onboarding" component={OnboardingPage} />
+          <Route path="/select-plan" component={SelectPlanPage} />
           <Route path="/confirm-appointment/:id" component={ConfirmAppointmentPage} />
           <Route path="/newsletter/create/:id" component={NewsletterCreatePage} />
           <Route path="/newsletter/create" component={NewsletterCreatePage} />
@@ -304,6 +309,7 @@ function Router() {
                   <Route path="/sessions" component={SessionsPage} />
                   <Route path="/users" component={UsersPage} />
                   <Route path="/table-example" component={TableExamplePage} />
+                  <Route path="/subscribe" component={Subscribe} />
 
                   <Route component={NotFound} />
                 </Switch>

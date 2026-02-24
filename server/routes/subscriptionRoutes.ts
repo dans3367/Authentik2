@@ -373,7 +373,7 @@ subscriptionRoutes.post("/create-portal-session", authenticateToken, requireRole
     // Create portal session
     const session = await stripe.billingPortal.sessions.create({
       customer: company.subscription.stripeCustomerId,
-      return_url: returnUrl || `${process.env.FRONTEND_URL}/dashboard/billing`,
+      return_url: returnUrl || `${process.env.FRONTEND_URL || 'https://web.zendwise.work'}/subscribe`,
     });
 
     res.json({
@@ -717,8 +717,8 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
             quantity: 1,
           },
         ],
-        success_url: `${process.env.FRONTEND_URL || 'http://localhost:5002'}/settings/subscription?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5002'}/settings/subscription?canceled=true`,
+        success_url: `${process.env.FRONTEND_URL || 'https://web.zendwise.work'}/subscribe?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL || 'https://web.zendwise.work'}/subscribe?canceled=true`,
         metadata: {
           tenantId,
           userId: req.user.id,
@@ -955,6 +955,285 @@ subscriptionRoutes.get("/usage", authenticateToken, requireRole(["Owner"]), asyn
   }
 });
 
+// Check if current tenant has an active subscription (used by frontend to gate plan selection)
+subscriptionRoutes.get("/check-subscription", authenticateToken, async (req: any, res) => {
+  try {
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const subscription = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.tenantId, req.user.tenantId),
+    });
+
+    res.json({
+      hasSubscription: !!subscription,
+      status: subscription?.status || null,
+    });
+  } catch (error) {
+    console.error('Check subscription error:', error);
+    res.status(500).json({ message: 'Failed to check subscription' });
+  }
+});
+
+// Create Stripe Checkout Session for new signup plan selection
+// All plans (including Free) require going through Stripe to collect a payment method
+subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, res) => {
+  try {
+    if (!stripe) {
+      return res.status(503).json({ message: 'Payment processing is not configured' });
+    }
+
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const { planId, billingCycle = 'monthly' } = req.body;
+
+    if (!planId) {
+      return res.status(400).json({ message: 'Plan ID is required' });
+    }
+
+    const tenantId = req.user.tenantId;
+    const userId = req.user.id;
+    const userEmail = req.user.email;
+
+    // Check if tenant already has a subscription
+    const existingSub = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.tenantId, tenantId),
+    });
+
+    if (existingSub && existingSub.status === 'active') {
+      return res.status(400).json({ message: 'You already have an active subscription. Use the subscription management page to change plans.' });
+    }
+
+    // Get plan details
+    const plan = await db.query.subscriptionPlans.findFirst({
+      where: eq(subscriptionPlans.id, planId),
+    });
+
+    if (!plan || !plan.isActive) {
+      return res.status(404).json({ message: 'Plan not found or inactive' });
+    }
+
+    const isYearly = billingCycle === 'yearly';
+    const stripePriceId = isYearly ? plan.stripeYearlyPriceId : plan.stripePriceId;
+
+    if (!stripePriceId) {
+      return res.status(400).json({ message: `No Stripe price configured for ${isYearly ? 'yearly' : 'monthly'} billing` });
+    }
+
+    // Get or create Stripe customer
+    let stripeCustomerId: string | undefined;
+
+    // Check if we already have a Stripe customer for this tenant
+    if (existingSub?.stripeCustomerId && !existingSub.stripeCustomerId.startsWith('free_') && !existingSub.stripeCustomerId.startsWith('manual_')) {
+      stripeCustomerId = existingSub.stripeCustomerId;
+    }
+
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: userEmail,
+        metadata: {
+          tenantId,
+          userId,
+        },
+      });
+      stripeCustomerId = customer.id;
+    }
+
+    const isFree = parseFloat(plan.price) === 0;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://web.zendwise.work';
+
+    // Create Checkout Session
+    // For Free plan: use 'setup' mode to collect card without charging
+    // For paid plans: use 'subscription' mode to charge immediately
+    if (isFree) {
+      const session = await stripe.checkout.sessions.create({
+        customer: stripeCustomerId,
+        mode: 'setup',
+        payment_method_types: ['card'],
+        success_url: `${frontendUrl}/select-plan?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${frontendUrl}/select-plan?canceled=true`,
+        metadata: {
+          tenantId,
+          userId,
+          planId: plan.id,
+          billingCycle: isYearly ? 'yearly' : 'monthly',
+          setupType: 'new_signup',
+        },
+      });
+
+      return res.json({
+        checkoutUrl: session.url,
+        sessionId: session.id,
+      });
+    } else {
+      const session = await stripe.checkout.sessions.create({
+        customer: stripeCustomerId,
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: stripePriceId,
+            quantity: 1,
+          },
+        ],
+        success_url: `${frontendUrl}/select-plan?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${frontendUrl}/select-plan?canceled=true`,
+        metadata: {
+          tenantId,
+          userId,
+          planId: plan.id,
+          billingCycle: isYearly ? 'yearly' : 'monthly',
+          setupType: 'new_signup',
+        },
+      });
+
+      return res.json({
+        checkoutUrl: session.url,
+        sessionId: session.id,
+      });
+    }
+  } catch (error) {
+    console.error('Setup checkout error:', error);
+    res.status(500).json({ message: 'Failed to create checkout session' });
+  }
+});
+
+// Confirm checkout session and create subscription record in DB
+subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any, res) => {
+  try {
+    if (!stripe) {
+      return res.status(503).json({ message: 'Payment processing is not configured' });
+    }
+
+    if (!req.user || !req.user.tenantId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ message: 'Session ID is required' });
+    }
+
+    const tenantId = req.user.tenantId;
+    const userId = req.user.id;
+
+    // Retrieve the checkout session from Stripe
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ message: 'Checkout session not found' });
+    }
+
+    // Verify the session belongs to this tenant
+    if (session.metadata?.tenantId !== tenantId) {
+      return res.status(403).json({ message: 'Session does not belong to this tenant' });
+    }
+
+    const planId = session.metadata?.planId;
+    const billingCycle = session.metadata?.billingCycle || 'monthly';
+    const isYearly = billingCycle === 'yearly';
+    const stripeCustomerId = typeof session.customer === 'string' ? session.customer : session.customer?.id || '';
+
+    if (!planId) {
+      return res.status(400).json({ message: 'Plan ID not found in session metadata' });
+    }
+
+    // Check if subscription already exists for this tenant (idempotency)
+    const existingSub = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.tenantId, tenantId),
+    });
+
+    if (existingSub && existingSub.status === 'active') {
+      return res.json({
+        message: 'Subscription already active',
+        subscription: existingSub,
+      });
+    }
+
+    const now = new Date();
+    const periodEnd = new Date(now);
+    if (isYearly) {
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+
+    if (session.mode === 'setup') {
+      // Free plan — setup mode, no Stripe subscription created
+      // Create a local subscription record
+      const subValues = {
+        tenantId,
+        userId,
+        planId,
+        stripeSubscriptionId: `free_${tenantId}_${Date.now()}`,
+        stripeCustomerId,
+        status: 'active',
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false,
+        isYearly,
+      };
+
+      if (existingSub) {
+        await db.update(subscriptions)
+          .set({ ...subValues, updatedAt: now })
+          .where(eq(subscriptions.id, existingSub.id));
+      } else {
+        await db.insert(subscriptions).values(subValues);
+      }
+
+      console.log(`✅ [Confirm Checkout] Free plan subscription created for tenant ${tenantId}`);
+    } else {
+      // Paid plan — subscription mode
+      const stripeSubscriptionId = typeof session.subscription === 'string'
+        ? session.subscription
+        : (session.subscription as any)?.id;
+
+      if (!stripeSubscriptionId) {
+        return res.status(400).json({ message: 'No subscription found in checkout session' });
+      }
+
+      // Get subscription details from Stripe
+      const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId) as any;
+
+      const subValues = {
+        tenantId,
+        userId,
+        planId,
+        stripeSubscriptionId: stripeSub.id,
+        stripeCustomerId,
+        status: stripeSub.status,
+        currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
+        currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
+        cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+        isYearly,
+      };
+
+      if (existingSub) {
+        await db.update(subscriptions)
+          .set({ ...subValues, updatedAt: now })
+          .where(eq(subscriptions.id, existingSub.id));
+      } else {
+        await db.insert(subscriptions).values(subValues);
+      }
+
+      console.log(`✅ [Confirm Checkout] Paid subscription ${stripeSub.id} created for tenant ${tenantId}`);
+    }
+
+    res.json({
+      message: 'Subscription activated successfully',
+      success: true,
+    });
+  } catch (error) {
+    console.error('Confirm checkout error:', error);
+    res.status(500).json({ message: 'Failed to confirm checkout' });
+  }
+});
+
 // Webhook endpoint for Stripe events
 subscriptionRoutes.post("/webhook", async (req: any, res) => {
   try {
@@ -1009,98 +1288,136 @@ subscriptionRoutes.post("/webhook", async (req: any, res) => {
 // Helper functions for webhook handling
 async function handleCheckoutSessionCompleted(session: any) {
   try {
-    const { companyId, planId } = session.metadata;
+    const { tenantId, userId, planId, billingCycle } = session.metadata || {};
 
-    if (!companyId || !planId) {
+    if (!tenantId || !planId) {
       console.error('Missing metadata in checkout session:', session.id);
       return;
     }
 
-    // Get subscription from Stripe
     if (!stripe) {
       console.error('Stripe is not initialized');
       return;
     }
-    const subscription = await stripe.subscriptions.retrieve(session.subscription) as any;
 
-    // Create or update subscription in database
-    await db.insert(db.subscriptions).values({
-      companyId,
-      planId,
-      stripeCustomerId: session.customer,
-      stripeSubscriptionId: subscription.id,
-      status: subscription.status,
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).onConflictDoUpdate({
-      target: db.subscriptions.companyId,
-      set: {
-        planId,
-        stripeCustomerId: session.customer,
-        stripeSubscriptionId: subscription.id,
-        status: subscription.status,
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        updatedAt: new Date(),
-      },
+    const stripeCustomerId = session.customer;
+    const isYearly = billingCycle === 'yearly';
+
+    // Check if subscription already exists (confirm-checkout may have already created it)
+    const existingSub = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.tenantId, tenantId),
     });
 
-    console.log('Subscription created/updated for company:', companyId);
+    if (session.mode === 'setup') {
+      // Free plan — setup mode, no Stripe subscription
+      const now = new Date();
+      const periodEnd = new Date(now);
+      if (isYearly) {
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+      } else {
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+      }
+
+      const subValues = {
+        tenantId,
+        userId: userId || 'unknown',
+        planId,
+        stripeSubscriptionId: `free_${tenantId}_${Date.now()}`,
+        stripeCustomerId,
+        status: 'active',
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: false,
+        isYearly,
+      };
+
+      if (existingSub) {
+        await db.update(subscriptions)
+          .set({ ...subValues, updatedAt: new Date() })
+          .where(eq(subscriptions.id, existingSub.id));
+      } else {
+        await db.insert(subscriptions).values(subValues);
+      }
+
+      console.log('✅ [Webhook] Free plan subscription created for tenant:', tenantId);
+    } else {
+      // Paid plan — subscription mode
+      const stripeSubscription = await stripe.subscriptions.retrieve(session.subscription) as any;
+
+      const subValues = {
+        tenantId,
+        userId: userId || 'unknown',
+        planId,
+        stripeCustomerId,
+        stripeSubscriptionId: stripeSubscription.id,
+        status: stripeSubscription.status,
+        currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
+        currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
+        cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+        isYearly,
+      };
+
+      if (existingSub) {
+        await db.update(subscriptions)
+          .set({ ...subValues, updatedAt: new Date() })
+          .where(eq(subscriptions.id, existingSub.id));
+      } else {
+        await db.insert(subscriptions).values(subValues);
+      }
+
+      console.log('✅ [Webhook] Paid subscription created for tenant:', tenantId);
+    }
   } catch (error) {
     console.error('Error handling checkout session completed:', error);
   }
 }
 
-async function handleSubscriptionUpdated(subscription: any) {
+async function handleSubscriptionUpdated(stripeSubscription: any) {
   try {
     const dbSubscription = await db.query.subscriptions.findFirst({
-      where: sql`${db.subscriptions.stripeSubscriptionId} = ${subscription.id}`,
+      where: eq(subscriptions.stripeSubscriptionId, stripeSubscription.id),
     });
 
     if (!dbSubscription) {
-      console.error('Subscription not found in database:', subscription.id);
+      console.error('Subscription not found in database:', stripeSubscription.id);
       return;
     }
 
-    await db.update(db.subscriptions)
+    await db.update(subscriptions)
       .set({
-        status: subscription.status,
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        status: stripeSubscription.status,
+        currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
+        currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
+        cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
         updatedAt: new Date(),
       })
-      .where(sql`${db.subscriptions.id} = ${dbSubscription.id}`);
+      .where(eq(subscriptions.id, dbSubscription.id));
 
-    console.log('Subscription updated:', subscription.id);
+    console.log('Subscription updated:', stripeSubscription.id);
   } catch (error) {
     console.error('Error handling subscription updated:', error);
   }
 }
 
-async function handleSubscriptionDeleted(subscription: any) {
+async function handleSubscriptionDeleted(stripeSubscription: any) {
   try {
     const dbSubscription = await db.query.subscriptions.findFirst({
-      where: sql`${db.subscriptions.stripeSubscriptionId} = ${subscription.id}`,
+      where: eq(subscriptions.stripeSubscriptionId, stripeSubscription.id),
     });
 
     if (!dbSubscription) {
-      console.error('Subscription not found in database:', subscription.id);
+      console.error('Subscription not found in database:', stripeSubscription.id);
       return;
     }
 
-    await db.update(db.subscriptions)
+    await db.update(subscriptions)
       .set({
         status: 'cancelled',
         updatedAt: new Date(),
       })
-      .where(sql`${db.subscriptions.id} = ${dbSubscription.id}`);
+      .where(eq(subscriptions.id, dbSubscription.id));
 
-    console.log('Subscription cancelled:', subscription.id);
+    console.log('Subscription cancelled:', stripeSubscription.id);
   } catch (error) {
     console.error('Error handling subscription deleted:', error);
   }
@@ -1112,25 +1429,25 @@ async function handlePaymentSucceeded(invoice: any) {
       console.error('Stripe is not initialized');
       return;
     }
-    const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+    const stripeSub = await stripe.subscriptions.retrieve(invoice.subscription) as any;
 
     const dbSubscription = await db.query.subscriptions.findFirst({
-      where: sql`${db.subscriptions.stripeSubscriptionId} = ${subscription.id}`,
+      where: eq(subscriptions.stripeSubscriptionId, stripeSub.id),
     });
 
     if (!dbSubscription) {
-      console.error('Subscription not found in database:', subscription.id);
+      console.error('Subscription not found in database:', stripeSub.id);
       return;
     }
 
-    await db.update(db.subscriptions)
+    await db.update(subscriptions)
       .set({
         status: 'active',
         updatedAt: new Date(),
       })
-      .where(sql`${db.subscriptions.id} = ${dbSubscription.id}`);
+      .where(eq(subscriptions.id, dbSubscription.id));
 
-    console.log('Payment succeeded for subscription:', subscription.id);
+    console.log('Payment succeeded for subscription:', stripeSub.id);
   } catch (error) {
     console.error('Error handling payment succeeded:', error);
   }
@@ -1142,25 +1459,25 @@ async function handlePaymentFailed(invoice: any) {
       console.error('Stripe is not initialized');
       return;
     }
-    const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+    const stripeSub = await stripe.subscriptions.retrieve(invoice.subscription) as any;
 
     const dbSubscription = await db.query.subscriptions.findFirst({
-      where: sql`${db.subscriptions.stripeSubscriptionId} = ${subscription.id}`,
+      where: eq(subscriptions.stripeSubscriptionId, stripeSub.id),
     });
 
     if (!dbSubscription) {
-      console.error('Subscription not found in database:', subscription.id);
+      console.error('Subscription not found in database:', stripeSub.id);
       return;
     }
 
-    await db.update(db.subscriptions)
+    await db.update(subscriptions)
       .set({
         status: 'past_due',
         updatedAt: new Date(),
       })
-      .where(sql`${db.subscriptions.id} = ${dbSubscription.id}`);
+      .where(eq(subscriptions.id, dbSubscription.id));
 
-    console.log('Payment failed for subscription:', subscription.id);
+    console.log('Payment failed for subscription:', stripeSub.id);
   } catch (error) {
     console.error('Error handling payment failed:', error);
   }

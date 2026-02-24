@@ -1,6 +1,7 @@
 import { signOut } from "@/lib/betterAuthClient";
 import { store } from "@/store";
 import { clearAuth } from "@/store/authSlice";
+import { clearAllAuthState, clearClientCaches } from "@/lib/clearAuthState";
 
 // Global navigation function - will be set by the App component
 let globalNavigate: ((path: string) => void) | null = null;
@@ -11,25 +12,19 @@ export function setGlobalNavigate(navigate: (path: string) => void) {
 
 /**
  * Handles 401 authentication errors globally
- * - Signs out from Better Auth
- * - Clears Redux auth state
+ * - Clears all auth state (server session, cookies, localStorage, sessionStorage, React Query cache, Redux)
  * - Redirects to login page
  */
 export async function handle401Error(source = 'API') {
-  console.warn(`🚨 [Auth] 401 Unauthorized detected from ${source} - initiating logout`);
+  console.warn(`🚨 [Auth] 401 Unauthorized detected from ${source} - initiating full cleanup`);
   
   try {
-    // Clear Redux auth state first
-    store.dispatch(clearAuth());
-    
-    // Sign out from Better Auth (this also clears cookies/session)
-    await signOut();
-    
-    console.log('✅ [Auth] Successfully logged out user');
+    await clearAllAuthState();
+    console.log('✅ [Auth] Successfully cleared all auth state');
   } catch (error) {
-    console.error('❌ [Auth] Error during logout:', error);
-    // Even if logout fails, we still need to clear local state and redirect
-    store.dispatch(clearAuth());
+    console.error('❌ [Auth] Error during auth cleanup:', error);
+    // Even if full cleanup fails, force clear locally
+    clearClientCaches();
   }
   
   // Redirect to auth page

@@ -117,7 +117,8 @@ export function AppSidebar() {
 
   const handleLogout = async () => {
     await logout();
-    setLocation("/auth");
+    // Hard redirect to fully reset all React state — prevents stale user data in components
+    window.location.href = "/auth";
   };
 
 

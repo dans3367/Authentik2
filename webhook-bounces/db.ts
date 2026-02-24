@@ -12,9 +12,6 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { Pool, neonConfig } from "@neondatabase/serverless";
-import { drizzle as drizzleNeon } from "drizzle-orm/neon-serverless";
-import ws from "ws";
 import * as schema from "./schema";
 
 if (!process.env.DATABASE_URL) {
@@ -23,36 +20,23 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Check database type from environment variable (default to 'postgres')
-const dbType = process.env.DB_TYPE || 'postgres';
+// Use standard PostgreSQL (non-SSL by default)
+const ssl = process.env.DB_SSL === 'true' ? true : false;
 
-let pool: any;
-let db: any;
-
-if (dbType === 'neon') {
-  // Use NeonDB with WebSocket support
-  neonConfig.webSocketConstructor = ws;
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  db = drizzleNeon(pool, { schema, logger: false });
-} else {
-  // Use standard PostgreSQL (non-SSL by default)
-  const ssl = process.env.DB_SSL === 'true' ? true : false;
-
-  // Parse URL to safely manipulate params
-  const dbUrl = new URL(process.env.DATABASE_URL!);
-  if (!ssl) {
-    dbUrl.searchParams.delete('sslmode');
-  }
-
-  const connectionString = dbUrl.toString();
-
-  const client = postgres(connectionString, {
-    ssl: ssl ? 'require' : false,
-    max: 1,
-  });
-
-  db = drizzle(client, { schema, logger: false });
+// Parse URL to safely manipulate params
+const dbUrl = new URL(process.env.DATABASE_URL!);
+if (!ssl) {
+  dbUrl.searchParams.delete('sslmode');
 }
+
+const connectionString = dbUrl.toString();
+
+const client = postgres(connectionString, {
+  ssl: ssl ? 'require' : false,
+  max: 1,
+});
+
+const db = drizzle(client, { schema, logger: false });
 
 export { db };
 export { schema };

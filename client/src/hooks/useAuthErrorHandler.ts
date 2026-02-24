@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { signOut } from '@/lib/betterAuthClient';
+import { clearAllAuthState, clearClientCaches } from '@/lib/clearAuthState';
 
 export interface AuthErrorHandlerOptions {
   showToast?: boolean;
@@ -15,13 +16,13 @@ export function useAuthErrorHandler() {
   const handleAuthError = async (options: AuthErrorHandlerOptions = {}) => {
     const { showToast = true, customMessage } = options;
     
-    console.log('🔄 [Auth] Handling authentication error - redirecting to login');
+    console.log('🔄 [Auth] Handling authentication error - clearing all state and redirecting to login');
     
     try {
-      // Sign out from Better Auth to clear any stale session data
-      await signOut();
+      await clearAllAuthState();
     } catch (error) {
-      console.warn('⚠️ [Auth] Error during signout:', error);
+      console.warn('⚠️ [Auth] Error during full cleanup:', error);
+      clearClientCaches();
     }
 
     // Show user-friendly message

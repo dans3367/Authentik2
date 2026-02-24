@@ -3,6 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { getApiBaseUrl } from "@/lib/apiConfig";
 import { queryClient } from "@/lib/queryClient";
+import { clearAllAuthState, clearClientCaches } from "@/lib/clearAuthState";
 import type {
   LoginCredentials,
   RegisterData,
@@ -81,6 +82,10 @@ export function useRegister() {
   const mutateAsync = async (data: RegisterData) => {
     setIsPending(true);
     try {
+      // Step 0: Clear any existing session/cookies/cache from a previously logged-in user
+      // This prevents the new account from inheriting the old user's dashboard
+      await clearAllAuthState();
+
       // Step 1: Store company name on the server before signup
       // This allows the auth hook to access it when creating the tenant/company
       await fetch(`${getApiBaseUrl()}/api/signup/store-company-name`, {
@@ -144,14 +149,16 @@ export function useLogout() {
   return {
     mutateAsync: async () => {
       try {
-        await signOut();
+        // Clear ALL auth state: server session, cookies, localStorage, sessionStorage, React Query cache, Redux
+        await clearAllAuthState();
         toast({
           title: "Success",
           description: "Logged out successfully.",
         });
       } catch (error) {
-        // Even if logout fails, we can still show success
+        // Even if logout fails, force clear everything locally
         console.error("Logout error:", error);
+        clearClientCaches();
         toast({
           title: "Info",
           description: "Logged out locally.",
@@ -300,8 +307,8 @@ export function useDeleteAccount() {
         description: "Your account has been deleted successfully.",
       });
 
-      // Sign out after deletion
-      await signOut();
+      // Clear all auth state after deletion
+      await clearAllAuthState();
     } catch (error: any) {
       toast({
         title: "Deletion Failed",
