@@ -36,9 +36,9 @@ export default function PendingVerificationPage() {
   // Redirect if user is already verified
   useEffect(() => {
     if (user?.emailVerified) {
-      setLocation("/");
+      window.location.href = "/dashboard";
     }
-  }, [user, setLocation]);
+  }, [user]);
 
   // Periodically check for verification status updates
   useEffect(() => {
@@ -75,7 +75,7 @@ export default function PendingVerificationPage() {
   }, [nextAllowedTime]);
 
   const handleResendVerification = async () => {
-    if (!user?.email || timeRemaining > 0) return;
+    if (!user?.email || timeRemaining > 0 || user?.emailVerified) return;
     
     setIsResending(true);
     
@@ -87,6 +87,19 @@ export default function PendingVerificationPage() {
       const data = await response.json();
 
       if (response.ok) {
+        // Check if user was already verified
+        if (data.alreadyVerified) {
+          toast({
+            title: "Already Verified",
+            description: "Your email is already verified. Redirecting to dashboard...",
+          });
+          // Full page reload to get fresh auth state
+          setTimeout(() => {
+            window.location.href = "/dashboard";
+          }, 1500);
+          return;
+        }
+        
         toast({
           title: "Verification Email Sent",
           description: "Please check your inbox for the new verification email.",
@@ -155,7 +168,7 @@ export default function PendingVerificationPage() {
           <div className="space-y-3">
             <Button
               onClick={handleResendVerification}
-              disabled={isResending || timeRemaining > 0}
+              disabled={isResending || timeRemaining > 0 || user?.emailVerified}
               className="w-full"
               variant="outline"
             >

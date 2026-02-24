@@ -65,6 +65,7 @@ const EditEmailCampaignPage = lazy(() => import("@/pages/email-campaigns/edit"))
 const UpdateProfilePage = lazy(() => import("@/pages/update-profile"));
 const SegmentationPage = lazy(() => import("@/pages/segmentation"));
 const ManagementPage = lazy(() => import("@/pages/management"));
+const OnboardingPage = lazy(() => import("@/pages/onboarding"));
 
 // Redirect components for legacy routes
 function BirthdaysRedirect() {
@@ -147,9 +148,11 @@ class ErrorBoundary extends Component<
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isInitialized } = useReduxAuth();
   const [location, setLocation] = useLocation();
-  
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+
   const isEmailVerified = user ? user.emailVerified : undefined;
-  
+
   // Handle redirects in useEffect to prevent React warnings about updating during render
   useEffect(() => {
     if (!isInitialized) {
@@ -170,7 +173,55 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       }
     }
   }, [isAuthenticated, isEmailVerified, location, setLocation, isInitialized, user?.email]);
-  
+
+  // Check onboarding status once per authenticated user
+  const userId = user?.id;
+  useEffect(() => {
+    if (!isAuthenticated || !isInitialized || !userId || isEmailVerified !== true) {
+      return;
+    }
+
+    // Check localStorage cache first — skip API call entirely if already completed
+    const cacheKey = `onboardingCompleted:${userId}`;
+    if (localStorage.getItem(cacheKey) === 'true') {
+      // If user somehow landed on /onboarding but already completed, redirect away
+      if (location === '/onboarding') {
+        setLocation('/dashboard');
+      }
+      return;
+    }
+
+    // Only fetch once
+    let cancelled = false;
+    const checkStatus = async () => {
+      try {
+        const response = await fetch('/api/company', { credentials: 'include' });
+        if (cancelled) return;
+        if (response.ok) {
+          const company = await response.json();
+          if (company && !company.setupCompleted) {
+            setNeedsOnboarding(true);
+            setLocation('/onboarding');
+          } else {
+            localStorage.setItem(cacheKey, 'true');
+            // If on /onboarding but setup is done, redirect to dashboard
+            if (location === '/onboarding') {
+              setLocation('/dashboard');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check onboarding status:', error);
+      } finally {
+        if (!cancelled) setOnboardingChecked(true);
+      }
+    };
+
+    checkStatus();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isInitialized, userId, isEmailVerified]);
+
   return <>{children}</>;
 }
 
@@ -202,6 +253,7 @@ function Router() {
           <Route path="/pending-verification" component={PendingVerificationPage} />
           <Route path="/verify-email" component={VerifyEmailPage} />
           <Route path="/update-profile" component={UpdateProfilePage} />
+          <Route path="/onboarding" component={OnboardingPage} />
           <Route path="/confirm-appointment/:id" component={ConfirmAppointmentPage} />
           <Route path="/newsletter/create/:id" component={NewsletterCreatePage} />
           <Route path="/newsletter/create" component={NewsletterCreatePage} />
