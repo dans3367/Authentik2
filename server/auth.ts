@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db";
 import { betterAuthUser, betterAuthSession, betterAuthAccount, betterAuthVerification, tenants, companies } from "@shared/schema";
-import { emailService } from "./emailService";
+import { triggerTransactionalEmail } from "./lib/trigger";
 import { eq, sql } from "drizzle-orm";
 
 const authInstance = betterAuth({
@@ -24,10 +24,24 @@ const authInstance = betterAuth({
     sendOnSignUp: true,
     sendVerificationEmail: async ({ user, url, token }) => {
       try {
-        await emailService.sendVerificationEmail(user.email, token);
+        console.log(`📧 [Auth] Dispatching verification email via Trigger.dev + SES for: ${user.email}`);
+        const result = await triggerTransactionalEmail({
+          type: "verification",
+          recipientEmail: user.email,
+          recipientName: (user as any).firstName || user.name?.split(' ')[0],
+          verificationToken: token,
+          baseUrl: process.env.BASE_URL || `http://localhost:${process.env.PORT || "5002"}`,
+          appName: process.env.APP_NAME || "Zendwise",
+        });
+        if (result.success) {
+          console.log(`✅ [Auth] Verification email task dispatched, runId: ${result.runId}`);
+        } else {
+          console.error(`❌ [Auth] Failed to dispatch verification email task:`, result.error);
+        }
       } catch (error) {
-        console.error("Failed to send verification email:", error);
-        throw error;
+        console.error("Failed to dispatch verification email task:", error);
+        // Don't throw - allow signup to proceed even if task dispatch fails
+        // The user can use the resend-verification endpoint later
       }
     },
   },
