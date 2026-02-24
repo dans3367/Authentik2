@@ -59,6 +59,18 @@ const getCategoryOptions = (t: any) => [
   { value: "custom", label: t('templatesPage.categories.custom') },
 ];
 
+// Shared preset id → translation key map (avoids duplication between handleSelectPreset and the render loop)
+const PRESET_LABEL_KEYS: Record<string, { label: string; description: string }> = {
+  "appointment-thank-you": { label: "templatesPage.createTemplatePage.presets.appointmentThankYou", description: "templatesPage.createTemplatePage.presets.appointmentThankYouDesc" },
+  "appointment-reminder": { label: "templatesPage.createTemplatePage.presets.appointmentReminder", description: "templatesPage.createTemplatePage.presets.appointmentReminderDesc" },
+  "follow-up": { label: "templatesPage.createTemplatePage.presets.followUp", description: "templatesPage.createTemplatePage.presets.followUpDesc" },
+  "birthday-greeting": { label: "templatesPage.createTemplatePage.presets.birthdayGreeting", description: "templatesPage.createTemplatePage.presets.birthdayGreetingDesc" },
+  "review-request": { label: "templatesPage.createTemplatePage.presets.reviewRequest", description: "templatesPage.createTemplatePage.presets.reviewRequestDesc" },
+  "welcome-new-customer": { label: "templatesPage.createTemplatePage.presets.welcomeNewCustomer", description: "templatesPage.createTemplatePage.presets.welcomeNewCustomerDesc" },
+  "missed-you": { label: "templatesPage.createTemplatePage.presets.weMissYou", description: "templatesPage.createTemplatePage.presets.weMissYouDesc" },
+  "referral-request": { label: "templatesPage.createTemplatePage.presets.referralRequest", description: "templatesPage.createTemplatePage.presets.referralRequestDesc" },
+};
+
 
 type TemplateChannel = (typeof channelOptions)[number]["value"];
 type TemplateCategory = (typeof categoryOptions)[number]["value"];
@@ -196,17 +208,7 @@ export default function CreateTemplatePage() {
   const handleSelectPreset = (preset: SinglePurposePreset) => {
     setSelectedPreset(preset.id);
     const contentKey = `templatesPage.createTemplatePage.presetContent.${preset.id}`;
-    const presetKeys: Record<string, { label: string; description: string }> = {
-      "appointment-thank-you": { label: "templatesPage.createTemplatePage.presets.appointmentThankYou", description: "templatesPage.createTemplatePage.presets.appointmentThankYouDesc" },
-      "appointment-reminder": { label: "templatesPage.createTemplatePage.presets.appointmentReminder", description: "templatesPage.createTemplatePage.presets.appointmentReminderDesc" },
-      "follow-up": { label: "templatesPage.createTemplatePage.presets.followUp", description: "templatesPage.createTemplatePage.presets.followUpDesc" },
-      "birthday-greeting": { label: "templatesPage.createTemplatePage.presets.birthdayGreeting", description: "templatesPage.createTemplatePage.presets.birthdayGreetingDesc" },
-      "review-request": { label: "templatesPage.createTemplatePage.presets.reviewRequest", description: "templatesPage.createTemplatePage.presets.reviewRequestDesc" },
-      "welcome-new-customer": { label: "templatesPage.createTemplatePage.presets.welcomeNewCustomer", description: "templatesPage.createTemplatePage.presets.welcomeNewCustomerDesc" },
-      "missed-you": { label: "templatesPage.createTemplatePage.presets.weMissYou", description: "templatesPage.createTemplatePage.presets.weMissYouDesc" },
-      "referral-request": { label: "templatesPage.createTemplatePage.presets.referralRequest", description: "templatesPage.createTemplatePage.presets.referralRequestDesc" },
-    };
-    setName(t(presetKeys[preset.id]?.label ?? preset.label));
+    setName(t(PRESET_LABEL_KEYS[preset.id]?.label ?? preset.label));
     setCategory(preset.category);
     setSubjectLine(t(`${contentKey}.subjectLine`, preset.subjectLine));
     setContent(t(`${contentKey}.body`, preset.body));
@@ -368,17 +370,7 @@ export default function CreateTemplatePage() {
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {SINGLE_PURPOSE_PRESETS.map((preset) => {
-                      const presetKeys: Record<string, { label: string; description: string }> = {
-                        "appointment-thank-you": { label: "templatesPage.createTemplatePage.presets.appointmentThankYou", description: "templatesPage.createTemplatePage.presets.appointmentThankYouDesc" },
-                        "appointment-reminder": { label: "templatesPage.createTemplatePage.presets.appointmentReminder", description: "templatesPage.createTemplatePage.presets.appointmentReminderDesc" },
-                        "follow-up": { label: "templatesPage.createTemplatePage.presets.followUp", description: "templatesPage.createTemplatePage.presets.followUpDesc" },
-                        "birthday-greeting": { label: "templatesPage.createTemplatePage.presets.birthdayGreeting", description: "templatesPage.createTemplatePage.presets.birthdayGreetingDesc" },
-                        "review-request": { label: "templatesPage.createTemplatePage.presets.reviewRequest", description: "templatesPage.createTemplatePage.presets.reviewRequestDesc" },
-                        "welcome-new-customer": { label: "templatesPage.createTemplatePage.presets.welcomeNewCustomer", description: "templatesPage.createTemplatePage.presets.welcomeNewCustomerDesc" },
-                        "missed-you": { label: "templatesPage.createTemplatePage.presets.weMissYou", description: "templatesPage.createTemplatePage.presets.weMissYouDesc" },
-                        "referral-request": { label: "templatesPage.createTemplatePage.presets.referralRequest", description: "templatesPage.createTemplatePage.presets.referralRequestDesc" },
-                      };
-                      const keys = presetKeys[preset.id];
+                      const keys = PRESET_LABEL_KEYS[preset.id];
                       const label = keys ? t(keys.label) : preset.label;
                       const description = keys ? t(keys.description) : preset.description;
                       return (

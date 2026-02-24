@@ -1549,7 +1549,9 @@
       "newsletter": "Boletín",
       "newsletterDesc": "Diseños de boletines recurrentes",
       "transactional": "Transaccional",
-      "transactionalDesc": "Recibos, confirmaciones y notificaciones"
+      "transactionalDesc": "Recibos, confirmaciones y notificaciones",
+      "singlePurpose": "Propósito Único",
+      "singlePurposeDesc": "Envíos únicos para un objetivo específico"
     },
     "categories": {
       "welcome": "Bienvenida e Incorporación",

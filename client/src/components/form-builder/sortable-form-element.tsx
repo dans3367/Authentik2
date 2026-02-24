@@ -38,13 +38,13 @@ export function SortableFormElement({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: transition || 'transform 200ms ease',
+    opacity: isDragging ? 0.3 : 1,
     zIndex: isDragging ? 100 : undefined,
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="relative group">
+    <div ref={setNodeRef} style={style} className={`relative group ${isDragging ? 'pointer-events-none' : ''}`}>
       {/* Drag handle */}
       <div
         {...attributes}

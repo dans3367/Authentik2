@@ -1603,7 +1603,9 @@
       "newsletter": "Newsletter",
       "newsletterDesc": "Recurring newsletter layouts",
       "transactional": "Transactional",
-      "transactionalDesc": "Receipts, confirmations, and notifications"
+      "transactionalDesc": "Receipts, confirmations, and notifications",
+      "singlePurpose": "Single Purpose",
+      "singlePurposeDesc": "One-time sends for a specific goal"
     },
     "categories": {
       "welcome": "Welcome & Onboarding",

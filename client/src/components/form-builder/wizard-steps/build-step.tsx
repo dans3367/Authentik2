@@ -44,19 +44,20 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   const [showMobileAdd, setShowMobileAdd] = useState(false);
   const [showMobileProperties, setShowMobileProperties] = useState(false);
   const [draggedType, setDraggedType] = useState<FormElementType | null>(null);
+  const [draggedElementId, setDraggedElementId] = useState<string | null>(null);
   const [isDraggingElement, setIsDraggingElement] = useState(false);
 
 
-  // Configure drag and drop sensors with better desktop support
+  // Configure drag and drop sensors - distance 8 prevents accidental drags on click
   const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: { distance: 5 }
+    activationConstraint: { distance: 8 }
   });
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 100, tolerance: 5 }
+    activationConstraint: { delay: 200, tolerance: 8 }
   });
   const sensors = useSensors(mouseSensor, touchSensor);
 
-  // Custom collision detection that allows dropping from sidelines
+  // Custom collision detection: prioritize insertion points near pointer, then canvas
   const customCollisionDetection: CollisionDetection = (args) => {
     const { droppableContainers, pointerCoordinates, active } = args;
     
@@ -64,7 +65,6 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       return closestCenter(args);
     }
     
-    // Check if we're dragging an existing element (reordering) or a new element from palette
     const isDraggingExistingElement = !active.data.current?.isNew;
     
     // Filter to only insertion points
@@ -72,54 +72,49 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       (container) => container.data.current?.isInsertionPoint
     );
     
-    // Get the form canvas bounds to determine if we're in the general canvas area
+    // Get the form canvas bounds
     const formCanvas = droppableContainers.find(c => c.id === 'form-canvas');
     const canvasRect = formCanvas?.rect.current;
     
-    // If we have insertion points, find the closest one by Y position
-    // Allow drops from sidelines by using generous X tolerance
-    if (insertionPoints.length > 0) {
-      let closestInsertionPoint: typeof insertionPoints[0] | null = null;
-      let closestDistance = Infinity;
+    if (insertionPoints.length > 0 && canvasRect) {
+      // Only activate insertion points when pointer is reasonably near the canvas
+      const isNearCanvas = 
+        pointerCoordinates.x >= canvasRect.left - 150 && 
+        pointerCoordinates.x <= canvasRect.right + 150 &&
+        pointerCoordinates.y >= canvasRect.top - 50 &&
+        pointerCoordinates.y <= canvasRect.bottom + 50;
       
-      for (const container of insertionPoints) {
-        if (!container.rect.current) continue;
+      if (isNearCanvas) {
+        let closestInsertionPoint: typeof insertionPoints[0] | null = null;
+        let closestDistance = Infinity;
         
-        // Skip insertion points that reference the element being dragged
-        if (isDraggingExistingElement) {
-          const insertionElementId = container.data.current?.elementId;
-          if (insertionElementId === active.id) continue;
+        for (const container of insertionPoints) {
+          if (!container.rect.current) continue;
+          
+          // Skip insertion points adjacent to the dragged element
+          if (isDraggingExistingElement) {
+            const insertionElementId = container.data.current?.elementId;
+            if (insertionElementId === active.id) continue;
+          }
+          
+          const rect = container.rect.current;
+          const centerY = rect.top + rect.height / 2;
+          const distanceY = Math.abs(pointerCoordinates.y - centerY);
+          
+          if (distanceY < closestDistance) {
+            closestDistance = distanceY;
+            closestInsertionPoint = container;
+          }
         }
         
-        const rect = container.rect.current;
-        const centerY = rect.top + rect.height / 2;
-        const distanceY = Math.abs(pointerCoordinates.y - centerY);
-        
-        // Check if pointer is within extended horizontal bounds (400px on each side)
-        // This allows dropping from the sidelines
-        const extendedLeft = rect.left - 400;
-        const extendedRight = rect.right + 400;
-        const isWithinExtendedX = pointerCoordinates.x >= extendedLeft && pointerCoordinates.x <= extendedRight;
-        
-        // Also allow if within canvas bounds horizontally
-        const isWithinCanvas = canvasRect && 
-          pointerCoordinates.x >= canvasRect.left - 200 && 
-          pointerCoordinates.x <= canvasRect.right + 200;
-        
-        // Use Y distance primarily for insertion points, but only if within extended X bounds
-        if ((isWithinExtendedX || isWithinCanvas) && distanceY < closestDistance) {
-          closestDistance = distanceY;
-          closestInsertionPoint = container;
+        // Tighter threshold - 120px is enough for comfortable targeting
+        if (closestInsertionPoint && closestDistance < 120) {
+          return [{ id: closestInsertionPoint.id, data: { droppableContainer: closestInsertionPoint } }];
         }
-      }
-      
-      // Increased threshold to 300px for more forgiving vertical detection
-      if (closestInsertionPoint && closestDistance < 300) {
-        return [{ id: closestInsertionPoint.id, data: { droppableContainer: closestInsertionPoint } }];
       }
     }
     
-    // Fall back to pointer within for precise detection
+    // Fall back to pointer-within for the canvas itself
     const pointerCollisions = pointerWithin(args);
     if (pointerCollisions.length > 0) {
       return pointerCollisions;
@@ -131,7 +126,6 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       return rectCollisions;
     }
     
-    // Final fallback to closest center
     return closestCenter(args);
   };
 
@@ -197,12 +191,18 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
     if (active.data.current?.isNew) {
       const type = active.id.toString().replace('palette-', '') as FormElementType;
       setDraggedType(type);
+      setDraggedElementId(null);
+    } else {
+      // Reordering an existing element
+      setDraggedType(null);
+      setDraggedElementId(active.id.toString());
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setDraggedType(null);
+    setDraggedElementId(null);
     setIsDraggingElement(false);
 
     if (!over) return;
@@ -291,6 +291,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
 
   const handleDragCancel = () => {
     setDraggedType(null);
+    setDraggedElementId(null);
     setIsDraggingElement(false);
   };
 
@@ -460,10 +461,10 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
           </div>
         )}
         
-        {/* Drag Overlay */}
-        <DragOverlay dropAnimation={null}>
+        {/* Drag Overlay - shows ghost for both new palette items and reordering */}
+        <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
           {draggedType && (
-            <div className="p-4 bg-white border-2 border-blue-400 rounded-xl shadow-xl opacity-95 pointer-events-none">
+            <div className="p-4 bg-white border-2 border-blue-400 rounded-xl shadow-2xl opacity-90 pointer-events-none max-w-xs">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                   <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
@@ -476,6 +477,17 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
               </div>
             </div>
           )}
+          {draggedElementId && (() => {
+            const el = elements.find(e => e.id === draggedElementId);
+            if (!el) return null;
+            return (
+              <div className="p-4 bg-white border-2 border-indigo-400 rounded-xl shadow-2xl opacity-90 pointer-events-none max-w-md">
+                <div className="text-sm font-medium text-indigo-700 truncate">
+                  {el.label || el.type.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                </div>
+              </div>
+            );
+          })()}
         </DragOverlay>
 
 

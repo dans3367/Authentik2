@@ -21,31 +21,24 @@ function EndDropZone({ elementCount }: { elementCount: number }) {
   return (
     <div
       ref={setNodeRef}
-      className={`relative transition-all duration-200 mt-2 ${
-        isOver ? 'h-28' : 'h-20'
+      className={`relative transition-all duration-150 mt-1 ${
+        isOver ? 'h-8' : 'h-4'
       }`}
     >
-      {/* Extended invisible hit area for sideline drops */}
-      <div className="absolute -inset-x-20 inset-y-0" />
       <div className="absolute inset-0 flex items-center justify-center">
         <div
-          className={`w-full h-1 rounded-full transition-all duration-200 ${
+          className={`w-full h-0.5 rounded-full transition-all duration-150 ${
             isOver 
-              ? 'bg-blue-500 shadow-lg shadow-blue-500/50' 
-              : 'bg-slate-200/50'
+              ? 'bg-blue-500 shadow-md shadow-blue-500/40 h-1' 
+              : 'bg-transparent'
           }`}
         />
       </div>
       {isOver && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
-          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
+          <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
           </svg>
-        </div>
-      )}
-      {!isOver && (
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs text-slate-400 whitespace-nowrap">
-          Drop here to add at end
         </div>
       )}
     </div>

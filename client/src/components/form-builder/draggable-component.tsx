@@ -41,11 +41,10 @@ export function DraggableComponent({ item, onAddElement, isMobile = false }: Dra
     },
   });
 
-  const style = transform ? {
-    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-    opacity: isDragging ? 0.8 : 1,
-    zIndex: isDragging ? 1000 : 1,
-    cursor: isDragging ? 'grabbing' : 'grab',
+  // Don't transform the original item - the DragOverlay handles the visual ghost
+  const style = isDragging ? {
+    opacity: 0.4,
+    zIndex: 1,
   } : undefined;
 
   const IconComponent = iconMap[item.type] || Type;
