@@ -682,7 +682,7 @@ export default function NewsletterPage() {
                           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                             <Calendar className="h-3.5 w-3.5" />
                             {newsletter.status === 'scheduled' && newsletter.scheduledAt ? (
-                              <span>{t("newsletter.card.scheduledFor", { date: format(new Date(newsletter.scheduledAt), 'MMM d, yyyy \'at\' h:mm a') })}</span>
+                              <span>{t("newsletter.card.scheduledFor", { date: t("newsletter.card.dateTimeAt", { date: format(new Date(newsletter.scheduledAt), 'MMM d, yyyy', { locale: currentLanguage === 'es' ? esLocale : undefined }), time: format(new Date(newsletter.scheduledAt), 'h:mm a', { locale: currentLanguage === 'es' ? esLocale : undefined }) }) })}</span>
                             ) : (
                               <span>{newsletter.updatedAt ? t("newsletter.card.lastEdited", { time: formatDistanceToNow(new Date(newsletter.updatedAt), { addSuffix: true, ...dateFnsLocale }) }) : t("newsletter.card.lastEditedRecently")}</span>
                             )}
@@ -760,7 +760,15 @@ export default function NewsletterPage() {
                   </div>
                   <div className="flex gap-2">
                     <span className="font-semibold text-right w-16">{t("newsletter.previewDialog.status")}</span>
-                    <span className="text-gray-900 capitalize">{previewNewsletter?.status || "draft"}</span>
+                    <span className="text-gray-900 capitalize">{(() => {
+                      const s = previewNewsletter?.status || 'draft';
+                      const keyMap: Record<string, string> = {
+                        ready_to_send: 'readyToSend',
+                        pending_review: 'pendingReview',
+                      };
+                      const i18nKey = `newsletter.status.${keyMap[s] ?? s}`;
+                      return t(i18nKey, s);
+                    })()}</span>
                   </div>
                 </div>
 

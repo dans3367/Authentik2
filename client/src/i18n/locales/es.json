@@ -1667,7 +1667,7 @@
         "reviewRequestDesc": "Pide a los clientes que dejen una reseña después de su visita",
         "welcomeNewCustomer": "Bienvenida a Nuevo Cliente",
         "welcomeNewCustomerDesc": "Da la bienvenida a un nuevo cliente después de su primera visita o registro",
-        "weMessYou": "Te Extrañamos",
+        "weMissYou": "Te Extrañamos",
         "weMissYouDesc": "Vuelve a conectar con clientes que no han visitado en un tiempo",
         "referralRequest": "Solicitud de Referido",
         "referralRequestDesc": "Pide a clientes satisfechos que refieran a amigos y familiares"
@@ -2377,6 +2377,7 @@
     },
     "card": {
       "scheduledFor": "Programado para {{date}}",
+      "dateTimeAt": "{{date}} a las {{time}}",
       "lastEdited": "Última edición {{time}}",
       "lastEditedRecently": "Editado recientemente",
       "deleting": "Eliminando boletín..."

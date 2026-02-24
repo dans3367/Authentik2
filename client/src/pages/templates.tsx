@@ -99,7 +99,7 @@ const PRESET_LABEL_KEYS: Record<string, { label: string; description: string }> 
   "birthday-greeting": { label: "templatesPage.createTemplatePage.presets.birthdayGreeting", description: "templatesPage.createTemplatePage.presets.birthdayGreetingDesc" },
   "review-request": { label: "templatesPage.createTemplatePage.presets.reviewRequest", description: "templatesPage.createTemplatePage.presets.reviewRequestDesc" },
   "welcome-new-customer": { label: "templatesPage.createTemplatePage.presets.welcomeNewCustomer", description: "templatesPage.createTemplatePage.presets.welcomeNewCustomerDesc" },
-  "missed-you": { label: "templatesPage.createTemplatePage.presets.weMessYou", description: "templatesPage.createTemplatePage.presets.weMissYouDesc" },
+  "missed-you": { label: "templatesPage.createTemplatePage.presets.weMissYou", description: "templatesPage.createTemplatePage.presets.weMissYouDesc" },
   "referral-request": { label: "templatesPage.createTemplatePage.presets.referralRequest", description: "templatesPage.createTemplatePage.presets.referralRequestDesc" },
 };
 
@@ -788,7 +788,9 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
       setOpen(true);
       // If editing a single-purpose template, try to match it to a preset
       if (template.channel === "single-purpose") {
-        const matchedPreset = SINGLE_PURPOSE_PRESETS.find(p => p.label === template.name);
+        const matchedPreset = SINGLE_PURPOSE_PRESETS.find(p =>
+          t(PRESET_LABEL_KEYS[p.id]?.label ?? p.label) === template.name
+        );
         setSelectedPreset(matchedPreset?.id || null);
       } else {
         setSelectedPreset(null);

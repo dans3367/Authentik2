@@ -203,7 +203,7 @@ export default function CreateTemplatePage() {
       "birthday-greeting": { label: "templatesPage.createTemplatePage.presets.birthdayGreeting", description: "templatesPage.createTemplatePage.presets.birthdayGreetingDesc" },
       "review-request": { label: "templatesPage.createTemplatePage.presets.reviewRequest", description: "templatesPage.createTemplatePage.presets.reviewRequestDesc" },
       "welcome-new-customer": { label: "templatesPage.createTemplatePage.presets.welcomeNewCustomer", description: "templatesPage.createTemplatePage.presets.welcomeNewCustomerDesc" },
-      "missed-you": { label: "templatesPage.createTemplatePage.presets.weMessYou", description: "templatesPage.createTemplatePage.presets.weMissYouDesc" },
+      "missed-you": { label: "templatesPage.createTemplatePage.presets.weMissYou", description: "templatesPage.createTemplatePage.presets.weMissYouDesc" },
       "referral-request": { label: "templatesPage.createTemplatePage.presets.referralRequest", description: "templatesPage.createTemplatePage.presets.referralRequestDesc" },
     };
     setName(t(presetKeys[preset.id]?.label ?? preset.label));
@@ -375,7 +375,7 @@ export default function CreateTemplatePage() {
                         "birthday-greeting": { label: "templatesPage.createTemplatePage.presets.birthdayGreeting", description: "templatesPage.createTemplatePage.presets.birthdayGreetingDesc" },
                         "review-request": { label: "templatesPage.createTemplatePage.presets.reviewRequest", description: "templatesPage.createTemplatePage.presets.reviewRequestDesc" },
                         "welcome-new-customer": { label: "templatesPage.createTemplatePage.presets.welcomeNewCustomer", description: "templatesPage.createTemplatePage.presets.welcomeNewCustomerDesc" },
-                        "missed-you": { label: "templatesPage.createTemplatePage.presets.weMessYou", description: "templatesPage.createTemplatePage.presets.weMissYouDesc" },
+                        "missed-you": { label: "templatesPage.createTemplatePage.presets.weMissYou", description: "templatesPage.createTemplatePage.presets.weMissYouDesc" },
                         "referral-request": { label: "templatesPage.createTemplatePage.presets.referralRequest", description: "templatesPage.createTemplatePage.presets.referralRequestDesc" },
                       };
                       const keys = presetKeys[preset.id];

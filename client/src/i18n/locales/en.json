@@ -1721,7 +1721,7 @@
         "reviewRequestDesc": "Ask customers to leave a review after their visit",
         "welcomeNewCustomer": "Welcome New Customer",
         "welcomeNewCustomerDesc": "Welcome a new customer after their first visit or signup",
-        "weMessYou": "We Miss You",
+        "weMissYou": "We Miss You",
         "weMissYouDesc": "Re-engage customers who haven't visited in a while",
         "referralRequest": "Referral Request",
         "referralRequestDesc": "Ask satisfied customers to refer friends and family"
@@ -2466,6 +2466,7 @@
     },
     "card": {
       "scheduledFor": "Scheduled for {{date}}",
+      "dateTimeAt": "{{date}} at {{time}}",
       "lastEdited": "Last edited {{time}}",
       "lastEditedRecently": "Last edited recently",
       "deleting": "Deleting newsletter..."

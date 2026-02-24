@@ -20,14 +20,14 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
 
     // Validate input
     const hasValidField =
-      (firstName !== undefined && firstName.trim() !== '') ||
-      (lastName !== undefined && lastName.trim() !== '') ||
-      (email !== undefined && email.trim() !== '') ||
-      language !== undefined ||
-      timezone !== undefined ||
-      theme !== undefined ||
-      menuExpanded !== undefined ||
-      avatarUrl !== undefined;
+      (firstName !== undefined && firstName !== null && firstName.trim() !== '') ||
+      (lastName !== undefined && lastName !== null && lastName.trim() !== '') ||
+      (email !== undefined && email !== null && email.trim() !== '') ||
+      (language !== undefined && language !== null && typeof language === 'string' && language.trim() !== '') ||
+      (timezone !== undefined && timezone !== null && typeof timezone === 'string' && timezone.trim() !== '') ||
+      (theme !== undefined && theme !== null && typeof theme === 'string' && ['light', 'dark', 'system'].includes(theme)) ||
+      (menuExpanded !== undefined && menuExpanded !== null && typeof menuExpanded === 'boolean') ||
+      (avatarUrl !== undefined && avatarUrl !== null && typeof avatarUrl === 'string' && avatarUrl.trim() !== '');
 
     if (!hasValidField) {
       return res.status(400).json({ message: 'At least one field with a valid value is required' });
@@ -67,11 +67,25 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
     if (firstName !== undefined && firstName.trim()) updateData.firstName = firstName.trim();
     if (lastName !== undefined && lastName.trim()) updateData.lastName = lastName.trim();
     if (email !== undefined && email.trim()) updateData.email = email.trim();
-    if (language !== undefined) updateData.language = language;
-    if (timezone !== undefined) updateData.timezone = timezone;
-    if (theme !== undefined) updateData.theme = theme;
-    if (menuExpanded !== undefined) updateData.menuExpanded = menuExpanded;
-    if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
+    if (language !== undefined && language !== null && typeof language === 'string' && language.trim() !== '') updateData.language = language.trim();
+    if (timezone !== undefined && timezone !== null && typeof timezone === 'string' && timezone.trim() !== '') updateData.timezone = timezone.trim();
+    if (theme !== undefined && theme !== null && typeof theme === 'string' && ['light', 'dark', 'system'].includes(theme)) updateData.theme = theme;
+    if (menuExpanded !== undefined && menuExpanded !== null && typeof menuExpanded === 'boolean') updateData.menuExpanded = menuExpanded;
+    if (avatarUrl !== undefined) {
+      if (typeof avatarUrl !== 'string' || avatarUrl.length > 2048) {
+        return res.status(400).json({ message: 'avatarUrl must be a string of 2048 characters or fewer' });
+      }
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(avatarUrl);
+      } catch {
+        return res.status(400).json({ message: 'avatarUrl must be a well-formed URL' });
+      }
+      if (parsedUrl.protocol !== 'https:') {
+        return res.status(400).json({ message: 'avatarUrl must use the https:// scheme' });
+      }
+      updateData.avatarUrl = avatarUrl;
+    }
 
     // Also update the name field for compatibility
     if (firstName !== undefined || lastName !== undefined) {
