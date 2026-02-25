@@ -292,7 +292,7 @@ async function validateReactionRequest(
     };
 }
 
-// ── Public: Show confirmation page (called from email links) ───────────────
+// ── Public: Record reaction (called from email links) ──────────────────────
 
 /**
  * GET /api/newsletter-reactions/react
@@ -300,9 +300,8 @@ async function validateReactionRequest(
  * Public endpoint. The reaction link in the email encodes:
  *   ?token=<reactionToken>&type=<reactionType>&nid=<newsletterId>
  * 
- * Shows a confirmation page with a button to submit the reaction.
- * Does NOT record the reaction - that happens via POST /confirm.
- * This prevents email preview bots from recording false reactions.
+ * Records the reaction immediately and shows a thank-you page.
+ * Preview bots are blocked to prevent false reactions.
  */
 newsletterReactionRoutes.get('/react', async (req, res) => {
     const { token, type, nid } = req.query;
@@ -325,14 +324,28 @@ newsletterReactionRoutes.get('/react', async (req, res) => {
             return res.status(validation.status).send(buildReactionPage('error', validation.error));
         }
 
-        const { reactionType } = validation.data;
-        const meta = REACTION_META[reactionType];
+        const { reactionType, newsletterId, reactionToken, tenantId, recipientEmail } = validation.data;
+        const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || null;
 
-        // Show confirmation page with form to POST
-        return res.send(buildConfirmationPage(
-            String(token),
-            String(type),
-            String(nid),
+        const result = await recordReaction({
+            tenantId,
+            newsletterId,
+            recipientEmail,
+            reactionType,
+            reactionToken,
+            ipAddress,
+            userAgent,
+        });
+
+        if (!result.success) {
+            return res.status(500).send(buildReactionPage('error', 'Something went wrong. Please try again later.'));
+        }
+
+        const meta = REACTION_META[reactionType];
+        const updatedMsg = result.isUpdate ? ' Your previous reaction has been updated.' : '';
+        return res.send(buildReactionPage(
+            'success',
+            `Thank you for your feedback!${updatedMsg}`,
             meta.emoji,
             meta.label,
         ));
@@ -342,13 +355,12 @@ newsletterReactionRoutes.get('/react', async (req, res) => {
     }
 });
 
-// ── Public: Record reaction (POST from confirmation page) ──────────────────
+// ── Public: Legacy confirm endpoint (backward compatibility) ────────────────
 
 /**
  * POST /api/newsletter-reactions/confirm
  * 
- * Public endpoint called from the confirmation page form.
- * Actually records the reaction to the database.
+ * Kept for backward compatibility. Records the reaction the same way as GET /react.
  */
 newsletterReactionRoutes.post('/confirm', async (req, res) => {
     const { token, type, nid } = req.body;
@@ -540,132 +552,6 @@ newsletterReactionRoutes.put('/:newsletterId/toggle', authenticateToken, require
 });
 
 // ── HTML Page Builders ─────────────────────────────────────────────────────
-
-/**
- * Build confirmation page with a form to submit the reaction via POST.
- * This prevents email preview bots from recording reactions on GET.
- */
-function buildConfirmationPage(
-    token: string,
-    type: string,
-    nid: string,
-    emoji: string,
-    label: string,
-): string {
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Confirm Your Reaction</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .card {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(20px);
-      border-radius: 24px;
-      padding: 48px 40px;
-      max-width: 440px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      animation: fadeUp 0.6s ease-out;
-    }
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .emoji {
-      font-size: 72px;
-      margin-bottom: 20px;
-      animation: bounceIn 0.8s ease-out 0.3s both;
-    }
-    @keyframes bounceIn {
-      0% { opacity: 0; transform: scale(0.3); }
-      50% { opacity: 1; transform: scale(1.1); }
-      70% { transform: scale(0.9); }
-      100% { transform: scale(1); }
-    }
-    .label {
-      font-size: 14px;
-      font-weight: 600;
-      color: #7c3aed;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin-bottom: 12px;
-    }
-    h1 {
-      font-size: 24px;
-      font-weight: 700;
-      color: #1e293b;
-      margin-bottom: 12px;
-      line-height: 1.3;
-    }
-    p {
-      font-size: 16px;
-      color: #64748b;
-      line-height: 1.6;
-      margin-bottom: 24px;
-    }
-    .confirm-btn {
-      display: inline-block;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      font-size: 16px;
-      font-weight: 600;
-      padding: 14px 32px;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
-    }
-    .confirm-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
-    }
-    .confirm-btn:active {
-      transform: translateY(0);
-    }
-    .confirm-btn:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-      transform: none;
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="emoji">${emoji}</div>
-    <div class="label">${label}</div>
-    <h1>Confirm Your Reaction</h1>
-    <p>Click the button below to submit your feedback.</p>
-    <form method="POST" action="/api/newsletter-reactions/confirm" id="reactionForm">
-      <input type="hidden" name="token" value="${escapeHtml(token)}">
-      <input type="hidden" name="type" value="${escapeHtml(type)}">
-      <input type="hidden" name="nid" value="${escapeHtml(nid)}">
-      <button type="submit" class="confirm-btn" id="confirmBtn">Submit Reaction</button>
-    </form>
-  </div>
-  <script>
-    document.getElementById('reactionForm').addEventListener('submit', function() {
-      var btn = document.getElementById('confirmBtn');
-      btn.disabled = true;
-      btn.textContent = 'Submitting...';
-    });
-  </script>
-</body>
-</html>`;
-}
 
 function escapeHtml(str: string): string {
     return str
