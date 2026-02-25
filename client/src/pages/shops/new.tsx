@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
   Store,
@@ -30,7 +29,10 @@ import {
   Clock,
   User,
   Building,
-  Tag
+  Tag,
+  Info,
+  Loader2,
+  X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -80,7 +82,6 @@ const DEFAULT_OPERATING_HOURS: Record<string, { open: string; close: string } | 
   sunday: { closed: true as const },
 };
 
-// Fallback times used when reopening a day that is closed by default
 const FALLBACK_OPERATING_HOURS = { open: '09:00', close: '17:00' };
 
 export default function NewShopPage() {
@@ -91,22 +92,20 @@ export default function NewShopPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
-  // Operating hours state
   type DayHours = { open: string; close: string; closed?: boolean } | { closed: true };
   type OperatingHoursState = Record<string, DayHours>;
   const [operatingHours, setOperatingHours] = useState<OperatingHoursState>(DEFAULT_OPERATING_HOURS);
 
   const DAYS_OF_WEEK = [
-    { key: 'monday', label: 'Monday' },
-    { key: 'tuesday', label: 'Tuesday' },
-    { key: 'wednesday', label: 'Wednesday' },
-    { key: 'thursday', label: 'Thursday' },
-    { key: 'friday', label: 'Friday' },
-    { key: 'saturday', label: 'Saturday' },
-    { key: 'sunday', label: 'Sunday' },
+    { key: 'monday', label: 'Monday', short: 'Mon' },
+    { key: 'tuesday', label: 'Tuesday', short: 'Tue' },
+    { key: 'wednesday', label: 'Wednesday', short: 'Wed' },
+    { key: 'thursday', label: 'Thursday', short: 'Thu' },
+    { key: 'friday', label: 'Friday', short: 'Fri' },
+    { key: 'saturday', label: 'Saturday', short: 'Sat' },
+    { key: 'sunday', label: 'Sunday', short: 'Sun' },
   ];
 
-  // Generate time options in 30-minute increments
   const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
     const hours24 = Math.floor(i / 2);
     const minutes = i % 2 === 0 ? '00' : '30';
@@ -117,7 +116,6 @@ export default function NewShopPage() {
     return { value, label };
   });
 
-  // Convert 24hr to 12hr display format
   const formatTime12hr = (time24: string) => {
     const [hours, minutes] = time24.split(':').map(Number);
     const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
@@ -130,7 +128,6 @@ export default function NewShopPage() {
       const dayHours = prev[day];
       if ('closed' in dayHours && dayHours.closed === true) {
         const defaultDay = DEFAULT_OPERATING_HOURS[day];
-        // Use fallback times if default is closed, otherwise use default times
         const baseHours = ('closed' in defaultDay && defaultDay.closed === true)
           ? FALLBACK_OPERATING_HOURS
           : defaultDay as { open: string; close: string };
@@ -152,11 +149,9 @@ export default function NewShopPage() {
         return { ...prev, [day]: { closed: true } };
       }
       const defaultDay = DEFAULT_OPERATING_HOURS[day];
-      // Use fallback times if default is closed, otherwise use default times
       if ('closed' in defaultDay && defaultDay.closed === true) {
         return { ...prev, [day]: { open: FALLBACK_OPERATING_HOURS.open, close: FALLBACK_OPERATING_HOURS.close } };
       }
-      // TypeScript knows defaultDay has open/close properties here
       const { open: defaultOpen, close: defaultClose } = defaultDay as { open: string; close: string };
       return { ...prev, [day]: { open: defaultOpen, close: defaultClose } };
     });
@@ -180,64 +175,23 @@ export default function NewShopPage() {
     },
   });
 
-
-  // Fetch managers
   const { data: managersData, isLoading: managersLoading, error: managersError } = useQuery<Manager[]>({
     queryKey: ['/api/shops/managers/list'],
     queryFn: async () => {
-      try {
-        const response = await apiRequest('GET', '/api/shops/managers/list');
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to fetch managers: ${response.status} ${errorText}`);
-        }
-        const data = await response.json();
-        return data;
-      } catch (error) {
-        throw error;
+      const response = await apiRequest('GET', '/api/shops/managers/list');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch managers: ${response.status} ${errorText}`);
       }
+      return response.json();
     },
     enabled: !!isAuthenticated && !authLoading,
     retry: 2,
     retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
-
-  // Debug function to create test managers
-  const createTestManagers = async () => {
-    try {
-      const response = await apiRequest('POST', '/api/dev/create-test-managers');
-      if (response.ok) {
-        const result = await response.json();
-        toast({
-          title: "Test Managers Created",
-          description: `Created: ${result.created.join(', ')}`,
-        });
-        // Refetch managers
-        window.location.reload();
-      } else {
-        // Handle non-ok responses
-        const errorText = await response.text();
-        toast({
-          title: "Error Creating Test Managers",
-          description: `Failed to create test managers: ${response.status} ${errorText}`,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      // Handle caught errors
-      console.error("Error creating test managers:", error);
-      toast({
-        title: "Error Creating Test Managers",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Create shop mutation
   const createShopMutation = useMutation({
     mutationFn: async (data: CreateShopData) => {
       const response = await apiRequest('POST', '/api/shops', data);
@@ -255,7 +209,6 @@ export default function NewShopPage() {
       navigate('/shops');
     },
     onError: (error: any) => {
-      // Handle shop limit errors specifically
       if (error.message && error.message.includes("Shop limit reached")) {
         toast({
           title: t('shops.limitDialog.title'),
@@ -295,431 +248,493 @@ export default function NewShopPage() {
     setValue('tags', newTags);
   };
 
-  // Show loading state while authentication is being determined
   if (authLoading) {
     return (
-      <div className="p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-4">{t('common.loading')}</span>
-        </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  // Redirect if not authenticated
   if (!isAuthenticated) {
     navigate('/auth');
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-6">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate('/shops')}
-                data-testid="button-back-shops"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">{t('shops.newShop')}</h1>
-                <p className="text-muted-foreground">{t('shops.subtitle')}</p>
-              </div>
-            </div>
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/shops')}
+            className="shrink-0 h-9 w-9 rounded-full"
+            data-testid="button-back-shops"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight" data-testid="text-page-title">
+              {t('shops.newShop')}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{t('shops.subtitle')}</p>
           </div>
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-full px-3 py-1.5">
+            <Info className="h-3.5 w-3.5" />
+            <span>{t('shops.form.requiredFields') || 'Fields marked * are required'}</span>
+          </div>
+        </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Basic Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('shops.form.basicDetails')}</CardTitle>
-                <CardDescription>{t('shops.subtitle')}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">{t('shops.form.name')} *</Label>
-                    <Input
-                      id="name"
-                      {...register('name')}
-                      placeholder={t('shops.form.namePlaceholder')}
-                      data-testid="input-shop-name"
-                    />
-                    {errors.name && (
-                      <p className="text-sm text-destructive">{errors.name.message}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="category">{t('shops.form.category')}</Label>
-                    <Select
-                      value={watch('category') || ''}
-                      onValueChange={(value) => setValue('category', value, { shouldDirty: true })}
-                    >
-                      <SelectTrigger data-testid="select-category">
-                        <SelectValue placeholder={t('shops.form.categoryPlaceholder')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SHOP_CATEGORIES.map(category => (
-                          <SelectItem key={category.value} value={category.value}>
-                            {category.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          {/* Basic Information */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary/10 text-primary">
+                  <Store className="h-4 w-4" />
                 </div>
-
+                <div>
+                  <CardTitle className="text-base">{t('shops.form.basicDetails')}</CardTitle>
+                  <CardDescription className="text-xs mt-0.5">{t('shops.subtitle')}</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="description">{t('shops.form.description')}</Label>
-                  <Textarea
-                    id="description"
-                    {...register('description')}
-                    placeholder={t('shops.form.descriptionPlaceholder')}
-                    rows={3}
-                    data-testid="textarea-description"
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="status">{t('shops.form.status')}</Label>
-                    <Select
-                      value={watch('status')}
-                      onValueChange={(value) => setValue('status', value as any)}
-                    >
-                      <SelectTrigger data-testid="select-status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">{t('shops.status.active')}</SelectItem>
-                        <SelectItem value="inactive">{t('shops.status.inactive')}</SelectItem>
-                        <SelectItem value="maintenance">{t('shops.status.maintenance')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="managerId">{t('shops.form.manager')}</Label>
-                    <Select
-                      value={watch('managerId') || undefined}
-                      onValueChange={(value) => setValue('managerId', value)}
-                      disabled={managersLoading}
-                    >
-                      <SelectTrigger data-testid="select-manager">
-                        <SelectValue placeholder={managersLoading ? t('shops.loadingManagers') : t('shops.form.managerPlaceholder')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {managersLoading ? (
-                          <SelectItem value="loading" disabled>
-                            Loading managers...
-                          </SelectItem>
-                        ) : managersError ? (
-                          <SelectItem value="error" disabled>
-                            Error loading managers
-                          </SelectItem>
-                        ) : managersData && managersData.length > 0 ? (
-                          managersData.map(manager => (
-                            <SelectItem key={manager.id} value={manager.id}>
-                              {manager.firstName || manager.lastName
-                                ? `${manager.firstName || ''} ${manager.lastName || ''}`.trim()
-                                : t('users.table.noName')} ({manager.email})
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-managers" disabled>
-                            No managers available
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {managersError && (
-                      <p className="text-sm text-destructive">
-                        Failed to load managers. Please try refreshing the page.
-                      </p>
-                    )}
-                    {!managersLoading && !managersError && managersData && managersData.length === 0 && (
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          No managers found. Only users with "Manager" or "Owner" role can be assigned to shops.
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={createTestManagers}
-                          data-testid="button-create-test-managers"
-                        >
-                          Create Test Managers
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Location Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('shops.form.locationDetails')}</CardTitle>
-                <CardDescription>{t('shops.form.locationDetails')}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="address">{t('shops.form.address')}</Label>
+                  <Label htmlFor="name" className="text-sm font-medium">{t('shops.form.name')} <span className="text-destructive">*</span></Label>
                   <Input
-                    id="address"
-                    {...register('address')}
-                    placeholder={t('shops.form.addressPlaceholder')}
-                    data-testid="input-address"
+                    id="name"
+                    {...register('name')}
+                    placeholder={t('shops.form.namePlaceholder')}
+                    className={errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
+                    data-testid="input-shop-name"
                   />
-                  {errors.address && (
-                    <p className="text-sm text-destructive">{errors.address.message}</p>
+                  {errors.name && (
+                    <p className="text-xs text-destructive">{errors.name.message}</p>
                   )}
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">{t('shops.form.city')}</Label>
-                    <Input
-                      id="city"
-                      {...register('city')}
-                      placeholder={t('shops.form.cityPlaceholder')}
-                      data-testid="input-city"
-                    />
-                    {errors.city && (
-                      <p className="text-sm text-destructive">{errors.city.message}</p>
-                    )}
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category" className="text-sm font-medium">{t('shops.form.category')}</Label>
+                  <Select
+                    value={watch('category') || ''}
+                    onValueChange={(value) => setValue('category', value, { shouldDirty: true })}
+                  >
+                    <SelectTrigger data-testid="select-category">
+                      <SelectValue placeholder={t('shops.form.categoryPlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SHOP_CATEGORIES.map(category => (
+                        <SelectItem key={category.value} value={category.value}>
+                          {category.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="state">{t('shops.form.state')}</Label>
-                    <Input
-                      id="state"
-                      {...register('state')}
-                      placeholder={t('shops.form.statePlaceholder')}
-                      data-testid="input-state"
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-sm font-medium">{t('shops.form.description')}</Label>
+                <Textarea
+                  id="description"
+                  {...register('description')}
+                  placeholder={t('shops.form.descriptionPlaceholder')}
+                  rows={3}
+                  className="resize-none"
+                  data-testid="textarea-description"
+                />
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="zipCode">{t('shops.form.zipCode')}</Label>
-                    <Input
-                      id="zipCode"
-                      {...register('zipCode')}
-                      placeholder={t('shops.form.zipCodePlaceholder')}
-                      data-testid="input-zip"
-                    />
-                  </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="status" className="text-sm font-medium">{t('shops.form.status')}</Label>
+                  <Select
+                    value={watch('status')}
+                    onValueChange={(value) => setValue('status', value as any)}
+                  >
+                    <SelectTrigger data-testid="select-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">{t('shops.status.active')}</SelectItem>
+                      <SelectItem value="inactive">{t('shops.status.inactive')}</SelectItem>
+                      <SelectItem value="maintenance">{t('shops.status.maintenance')}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="country">{t('shops.form.country')}</Label>
+                  <Label htmlFor="managerId" className="text-sm font-medium">{t('shops.form.manager')}</Label>
+                  <Select
+                    value={watch('managerId') || undefined}
+                    onValueChange={(value) => setValue('managerId', value)}
+                    disabled={managersLoading}
+                  >
+                    <SelectTrigger data-testid="select-manager">
+                      <SelectValue placeholder={managersLoading ? t('shops.loadingManagers') : t('shops.form.managerPlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {managersLoading ? (
+                        <SelectItem value="loading" disabled>
+                          <span className="flex items-center gap-2">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Loading managers...
+                          </span>
+                        </SelectItem>
+                      ) : managersError ? (
+                        <SelectItem value="error" disabled>
+                          Error loading managers
+                        </SelectItem>
+                      ) : managersData && managersData.length > 0 ? (
+                        managersData.map(manager => (
+                          <SelectItem key={manager.id} value={manager.id}>
+                            {manager.firstName || manager.lastName
+                              ? `${manager.firstName || ''} ${manager.lastName || ''}`.trim()
+                              : t('users.table.noName')} ({manager.email})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-managers" disabled>
+                          No managers available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {managersError && (
+                    <p className="text-xs text-destructive">
+                      Failed to load managers. Please try refreshing the page.
+                    </p>
+                  )}
+                  {!managersLoading && !managersError && managersData && managersData.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No managers found. Only users with "Manager" or "Owner" role can be assigned.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Location Information */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <MapPin className="h-4 w-4" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">{t('shops.form.locationDetails')}</CardTitle>
+                  <CardDescription className="text-xs mt-0.5">{t('shops.form.addressPlaceholder') || 'Physical address of the shop'}</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="address" className="text-sm font-medium">{t('shops.form.address')}</Label>
+                <Input
+                  id="address"
+                  {...register('address')}
+                  placeholder={t('shops.form.addressPlaceholder')}
+                  className={errors.address ? 'border-destructive focus-visible:ring-destructive' : ''}
+                  data-testid="input-address"
+                />
+                {errors.address && (
+                  <p className="text-xs text-destructive">{errors.address.message}</p>
+                )}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="city" className="text-sm font-medium">{t('shops.form.city')}</Label>
                   <Input
-                    id="country"
-                    {...register('country')}
-                    placeholder={t('shops.form.countryPlaceholder')}
-                    data-testid="input-country"
+                    id="city"
+                    {...register('city')}
+                    placeholder={t('shops.form.cityPlaceholder')}
+                    className={errors.city ? 'border-destructive focus-visible:ring-destructive' : ''}
+                    data-testid="input-city"
+                  />
+                  {errors.city && (
+                    <p className="text-xs text-destructive">{errors.city.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="state" className="text-sm font-medium">{t('shops.form.state')}</Label>
+                  <Input
+                    id="state"
+                    {...register('state')}
+                    placeholder={t('shops.form.statePlaceholder')}
+                    data-testid="input-state"
                   />
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Contact Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('shops.form.contactInformation')}</CardTitle>
-                <CardDescription>{t('shops.form.contactInformation')}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">{t('shops.form.phone')} *</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="zipCode" className="text-sm font-medium">{t('shops.form.zipCode')}</Label>
+                  <Input
+                    id="zipCode"
+                    {...register('zipCode')}
+                    placeholder={t('shops.form.zipCodePlaceholder')}
+                    data-testid="input-zip"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="country" className="text-sm font-medium">{t('shops.form.country')}</Label>
+                <Input
+                  id="country"
+                  {...register('country')}
+                  placeholder={t('shops.form.countryPlaceholder')}
+                  data-testid="input-country"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Contact Information */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <Phone className="h-4 w-4" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">{t('shops.form.contactInformation')}</CardTitle>
+                  <CardDescription className="text-xs mt-0.5">{t('shops.form.emailPlaceholder') || 'How customers can reach this shop'}</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-sm font-medium">{t('shops.form.phone')} <span className="text-destructive">*</span></Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="phone"
                       {...register('phone')}
                       placeholder={t('shops.form.phonePlaceholder')}
+                      className={`pl-9 ${errors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                       data-testid="input-phone"
                     />
-                    {errors.phone && (
-                      <p className="text-sm text-destructive">{errors.phone.message}</p>
-                    )}
                   </div>
+                  {errors.phone && (
+                    <p className="text-xs text-destructive">{errors.phone.message}</p>
+                  )}
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email">{t('shops.form.email')} *</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-medium">{t('shops.form.email')} <span className="text-destructive">*</span></Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="email"
                       type="email"
                       {...register('email')}
                       placeholder={t('shops.form.emailPlaceholder')}
+                      className={`pl-9 ${errors.email ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                       data-testid="input-email"
                     />
-                    {errors.email && (
-                      <p className="text-sm text-destructive">{errors.email.message}</p>
-                    )}
                   </div>
+                  {errors.email && (
+                    <p className="text-xs text-destructive">{errors.email.message}</p>
+                  )}
                 </div>
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="website">{t('shops.form.website')}</Label>
+              <div className="space-y-2">
+                <Label htmlFor="website" className="text-sm font-medium">{t('shops.form.website')}</Label>
+                <div className="relative">
+                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="website"
                     {...register('website')}
                     placeholder={t('shops.form.websitePlaceholder')}
+                    className={`pl-9 ${errors.website ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                     data-testid="input-website"
                   />
-                  {errors.website && (
-                    <p className="text-sm text-destructive">{errors.website.message}</p>
-                  )}
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Operating Hours */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  {t('shops.operatingHoursTitle')}
-                </CardTitle>
-                <CardDescription>{t('shops.operatingHoursDescription')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {DAYS_OF_WEEK.map(({ key, label }) => {
-                    const dayHours = operatingHours[key];
-                    const isClosed = 'closed' in dayHours && dayHours.closed === true;
-
-                    return (
-                      <div key={key} className="flex items-center gap-4 py-2 border-b last:border-b-0">
-                        <div className="w-28 font-medium text-sm">{label}</div>
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={!isClosed}
-                            onCheckedChange={(checked) => toggleDayClosed(key, !checked)}
-                            data-testid={`switch-${key}`}
-                            aria-label={t('shops.toggleDayAriaLabel', { day: label })}
-                          />
-                          <span className="text-sm text-muted-foreground w-12">
-                            {isClosed ? t('shops.closed') : t('shops.open')}
-                          </span>
-                        </div>
-                        {!isClosed && (
-                          <div className="flex items-center gap-2 flex-1">
-                            <Select
-                              value={'open' in dayHours ? dayHours.open : '09:00'}
-                              onValueChange={(value) => updateDayHours(key, 'open', value)}
-                            >
-                              <SelectTrigger className="w-32" data-testid={`input-${key}-open`} aria-label={t('shops.openingTimeAriaLabel', { day: label })}>
-                                <SelectValue>
-                                  {formatTime12hr('open' in dayHours ? dayHours.open : '09:00')}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {TIME_OPTIONS.map(({ value, label }) => (
-                                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <span className="text-muted-foreground">{t('shops.timeTo')}</span>
-                            <Select
-                              value={'close' in dayHours ? dayHours.close : '18:00'}
-                              onValueChange={(value) => updateDayHours(key, 'close', value)}
-                            >
-                              <SelectTrigger className="w-32" data-testid={`input-${key}-close`} aria-label={t('shops.closingTimeAriaLabel', { day: label })}>
-                                <SelectValue>
-                                  {formatTime12hr('close' in dayHours ? dayHours.close : '18:00')}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {TIME_OPTIONS.map(({ value, label }) => (
-                                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Tags */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('shops.form.tags')}</CardTitle>
-                <CardDescription>{t('shops.form.tagsPlaceholder')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <Input
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      placeholder={t('shops.form.addTag')}
-                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-                      data-testid="input-tag"
-                    />
-                    <Button type="button" onClick={handleAddTag} variant="secondary" data-testid="button-add-tag">
-                      <Tag className="h-4 w-4 mr-2" />
-                      {t('common.add')}
-                    </Button>
-                  </div>
-                  {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {tags.map(tag => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="cursor-pointer"
-                          onClick={() => handleRemoveTag(tag)}
-                          data-testid={`tag-${tag}`}
-                        >
-                          {tag} ×
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Actions */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-6">
-              <div className="flex flex-col sm:flex-row gap-4 sm:justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate('/shops')}
-                  className="w-full sm:w-auto"
-                  data-testid="button-cancel"
-                >
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto"
-                  data-testid="button-submit"
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  {t('shops.form.createShop')}
-                </Button>
+                {errors.website && (
+                  <p className="text-xs text-destructive">{errors.website.message}</p>
+                )}
               </div>
-            </div>
-          </form>
-        </div>
+            </CardContent>
+          </Card>
+
+          {/* Operating Hours */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <Clock className="h-4 w-4" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">{t('shops.operatingHoursTitle')}</CardTitle>
+                  <CardDescription className="text-xs mt-0.5">{t('shops.operatingHoursDescription')}</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border divide-y">
+                {DAYS_OF_WEEK.map(({ key, label, short }) => {
+                  const dayHours = operatingHours[key];
+                  const isClosed = 'closed' in dayHours && dayHours.closed === true;
+
+                  return (
+                    <div
+                      key={key}
+                      className={`flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 transition-colors ${
+                        isClosed ? 'bg-muted/30' : ''
+                      }`}
+                    >
+                      <div className="w-20 sm:w-28 shrink-0">
+                        <span className="font-medium text-sm hidden sm:inline">{label}</span>
+                        <span className="font-medium text-sm sm:hidden">{short}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Switch
+                          checked={!isClosed}
+                          onCheckedChange={(checked) => toggleDayClosed(key, !checked)}
+                          data-testid={`switch-${key}`}
+                          aria-label={t('shops.toggleDayAriaLabel', { day: label })}
+                        />
+                        <Badge
+                          variant={isClosed ? "secondary" : "default"}
+                          className={`text-[10px] px-1.5 py-0 h-5 font-normal ${
+                            isClosed
+                              ? ''
+                              : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/30 border-transparent'
+                          }`}
+                        >
+                          {isClosed ? t('shops.closed') : t('shops.open')}
+                        </Badge>
+                      </div>
+                      {!isClosed ? (
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                          <Select
+                            value={'open' in dayHours ? dayHours.open : '09:00'}
+                            onValueChange={(value) => updateDayHours(key, 'open', value)}
+                          >
+                            <SelectTrigger className="w-[110px] sm:w-32 h-8 text-xs sm:text-sm" data-testid={`input-${key}-open`} aria-label={t('shops.openingTimeAriaLabel', { day: label })}>
+                              <SelectValue>
+                                {formatTime12hr('open' in dayHours ? dayHours.open : '09:00')}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {TIME_OPTIONS.map(({ value, label }) => (
+                                <SelectItem key={value} value={value}>{label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="text-muted-foreground text-xs shrink-0">to</span>
+                          <Select
+                            value={'close' in dayHours ? dayHours.close : '18:00'}
+                            onValueChange={(value) => updateDayHours(key, 'close', value)}
+                          >
+                            <SelectTrigger className="w-[110px] sm:w-32 h-8 text-xs sm:text-sm" data-testid={`input-${key}-close`} aria-label={t('shops.closingTimeAriaLabel', { day: label })}>
+                              <SelectValue>
+                                {formatTime12hr('close' in dayHours ? dayHours.close : '18:00')}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {TIME_OPTIONS.map(({ value, label }) => (
+                                <SelectItem key={value} value={value}>{label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <div className="flex-1" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tags */}
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                  <Tag className="h-4 w-4" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">{t('shops.form.tags')}</CardTitle>
+                  <CardDescription className="text-xs mt-0.5">{t('shops.form.tagsPlaceholder')}</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    placeholder={t('shops.form.addTag')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddTag();
+                      }
+                    }}
+                    data-testid="input-tag"
+                  />
+                  <Button type="button" onClick={handleAddTag} variant="secondary" size="default" data-testid="button-add-tag">
+                    {t('common.add')}
+                  </Button>
+                </div>
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {tags.map(tag => (
+                      <Badge
+                        key={tag}
+                        variant="secondary"
+                        className="cursor-pointer gap-1 pr-1.5 hover:bg-destructive/10 hover:text-destructive transition-colors"
+                        onClick={() => handleRemoveTag(tag)}
+                        data-testid={`tag-${tag}`}
+                      >
+                        {tag}
+                        <X className="h-3 w-3" />
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pt-2 pb-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate('/shops')}
+              className="w-full sm:w-auto"
+              data-testid="button-cancel"
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting || createShopMutation.isPending}
+              className="w-full sm:w-auto gap-2"
+              data-testid="button-submit"
+            >
+              {createShopMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {t('shops.form.createShop')}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   );
