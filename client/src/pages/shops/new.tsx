@@ -382,12 +382,12 @@ export default function NewShopPage() {
                         <SelectItem value="loading" disabled>
                           <span className="flex items-center gap-2">
                             <Loader2 className="h-3 w-3 animate-spin" />
-                            Loading managers...
+                            {t('shops.loadingManagers')}
                           </span>
                         </SelectItem>
                       ) : managersError ? (
                         <SelectItem value="error" disabled>
-                          Error loading managers
+                          {t('shops.errorLoadingManagers')}
                         </SelectItem>
                       ) : managersData && managersData.length > 0 ? (
                         managersData.map(manager => (
@@ -399,19 +399,19 @@ export default function NewShopPage() {
                         ))
                       ) : (
                         <SelectItem value="no-managers" disabled>
-                          No managers available
+                          {t('shops.noManagersAvailable')}
                         </SelectItem>
                       )}
                     </SelectContent>
                   </Select>
                   {managersError && (
                     <p className="text-xs text-destructive">
-                      Failed to load managers. Please try refreshing the page.
+                      {t('shops.failedLoadManagersHelp')}
                     </p>
                   )}
                   {!managersLoading && !managersError && managersData && managersData.length === 0 && (
                     <p className="text-xs text-muted-foreground">
-                      No managers found. Only users with "Manager" or "Owner" role can be assigned.
+                      {t('shops.noManagersFoundHelp')}
                     </p>
                   )}
                 </div>
@@ -692,16 +692,17 @@ export default function NewShopPage() {
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {tags.map(tag => (
-                      <Badge
+                      <button
                         key={tag}
-                        variant="secondary"
-                        className="cursor-pointer gap-1 pr-1.5 hover:bg-destructive/10 hover:text-destructive transition-colors"
+                        type="button"
+                        className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-destructive/10 hover:text-destructive cursor-pointer gap-1 pr-1.5"
+                        aria-label={`Remove ${tag}`}
                         onClick={() => handleRemoveTag(tag)}
                         data-testid={`tag-${tag}`}
                       >
                         {tag}
                         <X className="h-3 w-3" />
-                      </Badge>
+                      </button>
                     ))}
                   </div>
                 )}

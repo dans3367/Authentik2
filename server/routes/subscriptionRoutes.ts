@@ -986,8 +986,11 @@ subscriptionRoutes.get("/check-subscription", authenticateToken, async (req: any
       where: eq(subscriptions.tenantId, req.user.tenantId),
     });
 
+    const activeStatuses = ['active', 'trialing'];
+    const hasSubscription = !!subscription && activeStatuses.includes(subscription.status);
+
     res.json({
-      hasSubscription: !!subscription,
+      hasSubscription,
       status: subscription?.status || null,
     });
   } catch (error) {

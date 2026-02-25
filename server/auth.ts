@@ -40,8 +40,8 @@ const authInstance = betterAuth({
           // Don't block signup — user can resend via /resend-verification
         }
       } catch (error) {
-        console.error("Failed to send verification email:", error);
-        throw error;
+        console.error("❌ [Auth] Failed to send verification email:", error);
+        // Don't block signup — user can resend via /resend-verification
       }
     },
   },

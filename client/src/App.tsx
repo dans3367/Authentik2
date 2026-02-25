@@ -262,12 +262,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Don't redirect if already on a signup flow page
-    if (signupFlowPages.includes(location)) {
-      setSubscriptionChecked(true);
-      return;
-    }
-
     let cancelled = false;
     const checkSubscription = async () => {
       try {
@@ -278,8 +272,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
           if (data.hasSubscription && data.status === 'active') {
             // Subscription is active — cache it and allow through
             localStorage.setItem(subCacheKey, 'true');
-          } else {
-            // No active subscription — redirect to plan selection
+          } else if (!signupFlowPages.includes(location)) {
+            // No active subscription — redirect to plan selection (skip redirect on signup flow pages)
             console.log('🔒 [ProtectedRoute] No active subscription, redirecting to /select-plan');
             setLocation('/select-plan');
           }
@@ -295,7 +289,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     checkSubscription();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, isInitialized, userId, isEmailVerified, onboardingChecked, needsOnboarding]);
+  }, [isAuthenticated, isInitialized, userId, isEmailVerified, onboardingChecked, needsOnboarding, location]);
 
   // Determine if we need to gate rendering behind signup checks
   const isOnSignupFlowPage = signupFlowPages.includes(location);
