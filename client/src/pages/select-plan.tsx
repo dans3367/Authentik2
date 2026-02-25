@@ -96,6 +96,10 @@ export default function SelectPlanPage() {
     },
     onSuccess: (data) => {
       if (data.success) {
+        // Cache subscription status so ProtectedRoute won't re-check
+        if (user?.id) {
+          localStorage.setItem(`subscriptionActive:${user.id}`, 'true');
+        }
         toast({
           title: "Welcome!",
           description: "Your subscription is active. Redirecting to dashboard...",
@@ -133,9 +137,12 @@ export default function SelectPlanPage() {
     }
   }, [isCanceled]);
 
-  // If already subscribed, redirect to dashboard
+  // If already subscribed, cache and redirect to dashboard
   useEffect(() => {
     if (subCheck?.hasSubscription && subCheck?.status === "active") {
+      if (user?.id) {
+        localStorage.setItem(`subscriptionActive:${user.id}`, 'true');
+      }
       window.location.href = "/dashboard";
     }
   }, [subCheck]);
@@ -269,11 +276,10 @@ export default function SelectPlanPage() {
             return (
               <Card
                 key={plan.id}
-                className={`relative bg-white/5 backdrop-blur-sm border transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
-                  plan.isPopular
+                className={`relative bg-white/5 backdrop-blur-sm border transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${plan.isPopular
                     ? "border-blue-400/50 shadow-lg shadow-blue-500/10"
                     : "border-white/10 hover:border-white/20"
-                }`}
+                  }`}
               >
                 {plan.isPopular && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
@@ -320,13 +326,12 @@ export default function SelectPlanPage() {
 
                 <CardContent className="pt-0 pb-8 px-6">
                   <Button
-                    className={`w-full mb-6 h-11 font-semibold ${
-                      plan.isPopular
+                    className={`w-full mb-6 h-11 font-semibold ${plan.isPopular
                         ? "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25"
                         : isFree
                           ? "bg-white/10 hover:bg-white/20 text-white border border-white/20"
                           : "bg-white/10 hover:bg-white/20 text-white border border-white/20"
-                    }`}
+                      }`}
                     onClick={() => handleSelectPlan(plan.id)}
                     disabled={checkoutMutation.isPending}
                   >

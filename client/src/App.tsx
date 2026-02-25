@@ -150,9 +150,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isInitialized } = useReduxAuth();
   const [location, setLocation] = useLocation();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   const isEmailVerified = user ? user.emailVerified : undefined;
+
+  // Pages that are part of the signup flow and should not be redirected away from
+  const signupFlowPages = ['/auth', '/verify-email', '/update-profile', '/pending-verification', '/onboarding', '/select-plan'];
 
   // Handle redirects in useEffect to prevent React warnings about updating during render
   useEffect(() => {
@@ -185,6 +189,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     // Check localStorage cache first — skip API call entirely if already completed
     const cacheKey = `onboardingCompleted:${userId}`;
     if (localStorage.getItem(cacheKey) === 'true') {
+      setOnboardingChecked(true);
       // If user somehow landed on /onboarding but already completed, redirect away
       if (location === '/onboarding') {
         setLocation('/select-plan');
@@ -201,8 +206,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         if (response.ok) {
           const company = await response.json();
           if (company && !company.setupCompleted) {
-            // Don't redirect if user is already on /select-plan (they may have come back)
-            if (location !== '/select-plan') {
+            // Redirect to onboarding if not already there or on select-plan
+            if (location !== '/onboarding' && location !== '/select-plan') {
               setNeedsOnboarding(true);
               setLocation('/onboarding');
             }
@@ -225,6 +230,96 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isInitialized, userId, isEmailVerified]);
+
+  // Check subscription status — only after onboarding is confirmed complete
+  useEffect(() => {
+    if (!isAuthenticated || !isInitialized || !userId || isEmailVerified !== true) {
+      return;
+    }
+
+    // Wait until onboarding check is done
+    if (!onboardingChecked) {
+      return;
+    }
+
+    // If user still needs onboarding, don't check subscription yet
+    if (needsOnboarding) {
+      return;
+    }
+
+    // Check localStorage cache first — skip API call if subscription already confirmed
+    const subCacheKey = `subscriptionActive:${userId}`;
+    if (localStorage.getItem(subCacheKey) === 'true') {
+      setSubscriptionChecked(true);
+      return;
+    }
+
+    // Don't redirect if already on a signup flow page
+    if (signupFlowPages.includes(location)) {
+      setSubscriptionChecked(true);
+      return;
+    }
+
+    let cancelled = false;
+    const checkSubscription = async () => {
+      try {
+        const response = await fetch('/api/subscription/check-subscription', { credentials: 'include' });
+        if (cancelled) return;
+        if (response.ok) {
+          const data = await response.json();
+          if (data.hasSubscription && data.status === 'active') {
+            // Subscription is active — cache it and allow through
+            localStorage.setItem(subCacheKey, 'true');
+          } else {
+            // No active subscription — redirect to plan selection
+            console.log('🔒 [ProtectedRoute] No active subscription, redirecting to /select-plan');
+            setLocation('/select-plan');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check subscription status:', error);
+        // On error, don't block the user — let them through
+      } finally {
+        if (!cancelled) setSubscriptionChecked(true);
+      }
+    };
+
+    checkSubscription();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isInitialized, userId, isEmailVerified, onboardingChecked, needsOnboarding]);
+
+  // Determine if we need to gate rendering behind signup checks
+  const isOnSignupFlowPage = signupFlowPages.includes(location);
+  const isFullyAuthenticated = isAuthenticated && isEmailVerified === true && isInitialized;
+
+  // Block dashboard/protected pages from rendering until both checks pass
+  // Don't block signup flow pages — they manage their own state
+  if (isFullyAuthenticated && !isOnSignupFlowPage) {
+    // If onboarding check hasn't completed yet, show a loading spinner
+    if (!onboardingChecked) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="text-sm text-muted-foreground">Verifying account setup...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // If subscription check hasn't completed yet (and onboarding passed), show loading
+    if (!needsOnboarding && !subscriptionChecked) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="text-sm text-muted-foreground">Checking subscription status...</p>
+          </div>
+        </div>
+      );
+    }
+  }
 
   return <>{children}</>;
 }

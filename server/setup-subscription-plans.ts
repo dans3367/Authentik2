@@ -3,6 +3,10 @@ import { db } from './db';
 import { subscriptionPlans } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
+// Detect test vs live mode based on Stripe secret key prefix
+const isTestMode = process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_');
+console.log(`Stripe mode: ${isTestMode ? 'TEST' : 'LIVE'}`);
+
 // Subscription plans: Free, Plus, Pro
 const defaultPlans = [
   {
@@ -11,8 +15,8 @@ const defaultPlans = [
     description: 'Get started with the essentials — single user, single login',
     price: '0.00',
     yearlyPrice: '0.00',
-    stripePriceId: 'price_1T4SoXFKvavhLWPgjs4nq3fo',
-    stripeYearlyPriceId: 'price_1T4SoYFKvavhLWPgKeWHaD4f',
+    stripePriceId: isTestMode ? 'price_1T4VA5FJFJPRMbUMgSoqPTxe' : 'price_1T4SoXFKvavhLWPgjs4nq3fo',
+    stripeYearlyPriceId: isTestMode ? 'price_1T4VA5FJFJPRMbUM13OmlfVn' : 'price_1T4SoYFKvavhLWPgKeWHaD4f',
     features: [
       '1 user (Owner only)',
       '100 emails/month',
@@ -38,8 +42,8 @@ const defaultPlans = [
     description: 'For growing businesses — add team members and shops',
     price: '49.00',
     yearlyPrice: '470.40',
-    stripePriceId: 'price_1T4SoZFKvavhLWPgWl7TyAVh',
-    stripeYearlyPriceId: 'price_1T4SoaFKvavhLWPg43rVgfgk',
+    stripePriceId: isTestMode ? 'price_1T4VA6FJFJPRMbUMmEKEck4y' : 'price_1T4SoZFKvavhLWPgWl7TyAVh',
+    stripeYearlyPriceId: isTestMode ? 'price_1T4VA6FJFJPRMbUMwN6tYlyi' : 'price_1T4SoaFKvavhLWPg43rVgfgk',
     features: [
       'Up to 3 users',
       '500 emails/month',
@@ -66,8 +70,8 @@ const defaultPlans = [
     description: 'For established businesses — full power with more capacity',
     price: '79.00',
     yearlyPrice: '758.40',
-    stripePriceId: 'price_1T4SobFKvavhLWPgbzKlSh7I',
-    stripeYearlyPriceId: 'price_1T4SobFKvavhLWPgro2QTqQU',
+    stripePriceId: isTestMode ? 'price_1T4VA6FJFJPRMbUMEqhqbZbU' : 'price_1T4SobFKvavhLWPgbzKlSh7I',
+    stripeYearlyPriceId: isTestMode ? 'price_1T4VA7FJFJPRMbUMf4BLcsyp' : 'price_1T4SobFKvavhLWPgro2QTqQU',
     features: [
       'Up to 20 users',
       '1,000 emails/month',
@@ -129,6 +133,8 @@ async function setupSubscriptionPlans() {
             description: plan.description,
             price: plan.price,
             yearlyPrice: plan.yearlyPrice,
+            stripePriceId: plan.stripePriceId,
+            stripeYearlyPriceId: plan.stripeYearlyPriceId,
             features: plan.features,
             maxUsers: plan.maxUsers,
             maxProjects: plan.maxProjects,

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { sql, eq } from 'drizzle-orm';
+import { sql, eq, or } from 'drizzle-orm';
 import { betterAuthUser, subscriptionPlans, forms, formResponses, companies, subscriptions, subscriptionPlanRelations, tenants, shopLimitEvents, shops } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import { storage } from '../storage';
@@ -717,6 +717,15 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
             quantity: 1,
           },
         ],
+        subscription_data: {
+          metadata: {
+            tenantId,
+            userId: req.user.id,
+            planId: targetPlan.id,
+            billingCycle: isYearly ? 'yearly' : 'monthly',
+            setupType: 'upgrade',
+          },
+        },
         success_url: `${process.env.FRONTEND_URL || 'https://web.zendwise.work'}/subscribe?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.FRONTEND_URL || 'https://web.zendwise.work'}/subscribe?canceled=true`,
         metadata: {
@@ -724,6 +733,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
           userId: req.user.id,
           planId: targetPlan.id,
           billingCycle: isYearly ? 'yearly' : 'monthly',
+          setupType: 'upgrade',
         },
       });
 
@@ -1095,9 +1105,16 @@ subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, r
         sessionId: session.id,
       });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Setup checkout error:', error);
-    res.status(500).json({ message: 'Failed to create checkout session' });
+    const stripeMessage = error?.raw?.message || error?.message || 'Unknown error';
+    console.error('Stripe error details:', {
+      type: error?.type,
+      code: error?.code,
+      message: stripeMessage,
+      statusCode: error?.statusCode,
+    });
+    res.status(500).json({ message: `Failed to create checkout session: ${stripeMessage}` });
   }
 });
 
@@ -1288,7 +1305,7 @@ subscriptionRoutes.post("/webhook", async (req: any, res) => {
 // Helper functions for webhook handling
 async function handleCheckoutSessionCompleted(session: any) {
   try {
-    const { tenantId, userId, planId, billingCycle } = session.metadata || {};
+    const { tenantId, userId, planId, billingCycle, setupType } = session.metadata || {};
 
     if (!tenantId || !planId) {
       console.error('Missing metadata in checkout session:', session.id);
@@ -1302,6 +1319,7 @@ async function handleCheckoutSessionCompleted(session: any) {
 
     const stripeCustomerId = session.customer;
     const isYearly = billingCycle === 'yearly';
+    const isUpgrade = setupType === 'upgrade';
 
     // Check if subscription already exists (confirm-checkout may have already created it)
     const existingSub = await db.query.subscriptions.findFirst({
@@ -1344,7 +1362,20 @@ async function handleCheckoutSessionCompleted(session: any) {
       // Paid plan — subscription mode
       const stripeSubscription = await stripe.subscriptions.retrieve(session.subscription) as any;
 
-      const subValues = {
+      // If this is an upgrade and there's an old Stripe subscription, cancel it
+      if (isUpgrade && existingSub && existingSub.stripeSubscriptionId &&
+        existingSub.stripeSubscriptionId !== stripeSubscription.id &&
+        !existingSub.stripeSubscriptionId.startsWith('free_') &&
+        !existingSub.stripeSubscriptionId.startsWith('manual_')) {
+        try {
+          await stripe.subscriptions.cancel(existingSub.stripeSubscriptionId);
+          console.log(`🗑️ [Webhook] Cancelled old Stripe subscription ${existingSub.stripeSubscriptionId} after upgrade`);
+        } catch (cancelError) {
+          console.warn(`⚠️ [Webhook] Failed to cancel old subscription ${existingSub.stripeSubscriptionId}:`, cancelError);
+        }
+      }
+
+      const subValues: any = {
         tenantId,
         userId: userId || 'unknown',
         planId,
@@ -1357,6 +1388,11 @@ async function handleCheckoutSessionCompleted(session: any) {
         isYearly,
       };
 
+      // Preserve old planId as previousPlanId for audit tracking on upgrades
+      if (isUpgrade && existingSub?.planId) {
+        subValues.previousPlanId = existingSub.planId;
+      }
+
       if (existingSub) {
         await db.update(subscriptions)
           .set({ ...subValues, updatedAt: new Date() })
@@ -1365,7 +1401,7 @@ async function handleCheckoutSessionCompleted(session: any) {
         await db.insert(subscriptions).values(subValues);
       }
 
-      console.log('✅ [Webhook] Paid subscription created for tenant:', tenantId);
+      console.log(`✅ [Webhook] ${isUpgrade ? 'Upgraded' : 'Paid'} subscription ${stripeSubscription.id} created for tenant:`, tenantId, `planId: ${planId}`);
     }
   } catch (error) {
     console.error('Error handling checkout session completed:', error);
@@ -1374,26 +1410,77 @@ async function handleCheckoutSessionCompleted(session: any) {
 
 async function handleSubscriptionUpdated(stripeSubscription: any) {
   try {
-    const dbSubscription = await db.query.subscriptions.findFirst({
+    // First try to find by stripeSubscriptionId
+    let dbSubscription = await db.query.subscriptions.findFirst({
       where: eq(subscriptions.stripeSubscriptionId, stripeSubscription.id),
     });
+
+    // If not found by stripeSubscriptionId, try to find by tenantId from metadata
+    // This handles the case where an upgrade creates a new Stripe subscription
+    if (!dbSubscription && stripeSubscription.metadata?.tenantId) {
+      dbSubscription = await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.tenantId, stripeSubscription.metadata.tenantId),
+      });
+      if (dbSubscription) {
+        console.log(`🔄 [Webhook] Found subscription by tenantId fallback for ${stripeSubscription.id}`);
+      }
+    }
 
     if (!dbSubscription) {
       console.error('Subscription not found in database:', stripeSubscription.id);
       return;
     }
 
+    const updateData: any = {
+      status: stripeSubscription.status,
+      stripeSubscriptionId: stripeSubscription.id, // Always keep in sync
+      currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
+      currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
+      cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+      updatedAt: new Date(),
+    };
+
+    // Resolve planId from Stripe's subscription metadata (set during checkout)
+    if (stripeSubscription.metadata?.planId) {
+      const newPlanId = stripeSubscription.metadata.planId;
+      if (newPlanId !== dbSubscription.planId) {
+        console.log(`📦 [Webhook] Plan changed: ${dbSubscription.planId} → ${newPlanId}`);
+        updateData.previousPlanId = dbSubscription.planId;
+        updateData.planId = newPlanId;
+      }
+    } else {
+      // Fallback: resolve planId from Stripe price items
+      try {
+        const items = stripeSubscription.items?.data;
+        if (items && items.length > 0) {
+          const stripePriceId = items[0].price?.id;
+          if (stripePriceId) {
+            // Look up which plan this price belongs to
+            const matchingPlan = await db.query.subscriptionPlans.findFirst({
+              where: or(
+                eq(subscriptionPlans.stripePriceId, stripePriceId),
+                eq(subscriptionPlans.stripeYearlyPriceId, stripePriceId)
+              ),
+            });
+            if (matchingPlan && matchingPlan.id !== dbSubscription.planId) {
+              console.log(`📦 [Webhook] Plan resolved from price ${stripePriceId}: ${dbSubscription.planId} → ${matchingPlan.id}`);
+              updateData.previousPlanId = dbSubscription.planId;
+              updateData.planId = matchingPlan.id;
+              // Also set isYearly based on which price matched
+              updateData.isYearly = matchingPlan.stripeYearlyPriceId === stripePriceId;
+            }
+          }
+        }
+      } catch (priceResolveError) {
+        console.warn('⚠️ [Webhook] Failed to resolve plan from price:', priceResolveError);
+      }
+    }
+
     await db.update(subscriptions)
-      .set({
-        status: stripeSubscription.status,
-        currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
-        cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(subscriptions.id, dbSubscription.id));
 
-    console.log('Subscription updated:', stripeSubscription.id);
+    console.log('Subscription updated:', stripeSubscription.id, updateData.planId ? `(new plan: ${updateData.planId})` : '');
   } catch (error) {
     console.error('Error handling subscription updated:', error);
   }

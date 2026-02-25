@@ -330,17 +330,45 @@ export default function Subscribe() {
     },
   });
 
-  // Handle return from Stripe Checkout (upgrade flow)
-  useEffect(() => {
-    if (checkoutSuccess) {
+  // Confirm upgrade checkout mutation (called after Stripe redirect back)
+  const confirmUpgradeMutation = useMutation({
+    mutationFn: async (data: { sessionId: string }) => {
+      const response = await apiRequest("POST", "/api/subscription/confirm-checkout", data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast({
+          title: "Plan Upgraded!",
+          description: "Your subscription has been updated successfully.",
+        });
+        // Clear subscription cache so ProtectedRoute re-checks
+        if (user?.id) {
+          localStorage.removeItem(`subscriptionActive:${user.id}`);
+        }
+        // Reload to show updated subscription data
+        setTimeout(() => {
+          window.location.href = '/subscribe';
+        }, 1000);
+      }
+    },
+    onError: (error: any) => {
       toast({
-        title: "Payment Successful!",
-        description: "Your subscription has been updated. Refreshing...",
+        title: "Confirmation Issue",
+        description: "Payment succeeded but we had trouble confirming. The page will refresh automatically.",
+        variant: "destructive",
       });
-      // Clean the URL and reload to show updated subscription
+      // Still reload — the webhook will likely handle it
       setTimeout(() => {
         window.location.href = '/subscribe';
-      }, 1500);
+      }, 2000);
+    },
+  });
+
+  // Handle return from Stripe Checkout (upgrade flow)
+  useEffect(() => {
+    if (checkoutSuccess && !confirmUpgradeMutation.isPending && !confirmUpgradeMutation.isSuccess) {
+      confirmUpgradeMutation.mutate({ sessionId: checkoutSuccess });
     }
   }, [checkoutSuccess]);
 
