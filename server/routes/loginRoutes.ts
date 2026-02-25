@@ -93,6 +93,8 @@ loginRoutes.post('/resend-verification', async (req, res) => {
       console.log('✅ [Resend Verification] Generated token for:', user.email);
 
       // Dispatch verification email via Trigger.dev + SES
+      // Failures are logged internally but never surfaced to the client to
+      // prevent account-existence enumeration via differing error responses.
       try {
         const triggerResult = await triggerTransactionalEmail({
           type: 'verification',
@@ -106,17 +108,9 @@ loginRoutes.post('/resend-verification', async (req, res) => {
           console.log('✅ [Resend Verification] Verification email task dispatched, runId:', triggerResult.runId);
         } else {
           console.error('❌ [Resend Verification] Failed to dispatch email task:', triggerResult.error);
-          return res.status(500).json({
-            message: 'Failed to send verification email. Please try again later.',
-            success: false
-          });
         }
       } catch (emailError) {
         console.error('❌ [Resend Verification] Failed to dispatch email task:', emailError);
-        return res.status(500).json({
-          message: 'Failed to send verification email. Please try again later.',
-          success: false
-        });
       }
 
       // Update rate limiting - 2 minutes cooldown between requests
@@ -1011,6 +1005,8 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
     );
 
     // Dispatch verification email
+    let emailSent = false;
+    let emailError: string | undefined;
     try {
       const triggerResult = await triggerTransactionalEmail({
         type: 'verification',
@@ -1022,12 +1018,15 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
       });
 
       if (triggerResult.success) {
+        emailSent = true;
         console.log('✅ [Change Email] Verification email dispatched, runId:', triggerResult.runId);
       } else {
+        emailError = triggerResult.error ? String(triggerResult.error) : 'Unknown dispatch error';
         console.error('❌ [Change Email] Failed to dispatch verification email:', triggerResult.error);
       }
-    } catch (emailError) {
-      console.error('❌ [Change Email] Failed to dispatch verification email:', emailError);
+    } catch (err) {
+      emailError = err instanceof Error ? err.message : String(err);
+      console.error('❌ [Change Email] Failed to dispatch verification email:', err);
       // Don't fail the overall operation – the email was changed successfully
     }
 
@@ -1038,8 +1037,14 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
 
     return res.json({
       success: true,
-      message: 'Email changed successfully. A new verification email has been sent.',
+      message: emailSent
+        ? 'Email changed successfully. A new verification email has been sent.'
+        : 'Email changed successfully. However, the verification email could not be sent.',
       email: normalizedEmail,
+      emailDispatch: {
+        sent: emailSent,
+        ...(emailError ? { error: emailError } : {}),
+      },
     });
   } catch (error) {
     console.error('❌ [Change Email] Error:', error);

@@ -179,8 +179,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, isEmailVerified, location, setLocation, isInitialized, user?.email]);
 
-  // Check onboarding status once per authenticated user
+  // Reset gating state on user transitions
   const userId = user?.id;
+  useEffect(() => {
+    setOnboardingChecked(false);
+    setSubscriptionChecked(false);
+    setNeedsOnboarding(false);
+  }, [userId]);
+
+  // Check onboarding status once per authenticated user
   useEffect(() => {
     if (!isAuthenticated || !isInitialized || !userId || isEmailVerified !== true) {
       return;
@@ -213,6 +220,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
             }
           } else {
             localStorage.setItem(cacheKey, 'true');
+            setNeedsOnboarding(false);
             // If on /onboarding but setup is done, redirect to plan selection
             if (location === '/onboarding') {
               setLocation('/select-plan');

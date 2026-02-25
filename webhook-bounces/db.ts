@@ -20,19 +20,22 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Use standard PostgreSQL (non-SSL by default)
-const ssl = process.env.DB_SSL === 'true' ? true : false;
+// SSL is enabled by default; only disable when DB_SSL is explicitly 'false'
+// or when running in a local development environment.
+const sslDisabled =
+  process.env.DB_SSL === 'false' ||
+  process.env.NODE_ENV === 'development';
 
 // Parse URL to safely manipulate params
 const dbUrl = new URL(process.env.DATABASE_URL!);
-if (!ssl) {
+if (sslDisabled) {
   dbUrl.searchParams.delete('sslmode');
 }
 
 const connectionString = dbUrl.toString();
 
 const client = postgres(connectionString, {
-  ssl: ssl ? 'require' : false,
+  ssl: sslDisabled ? false : 'require',
   max: 1,
 });
 

@@ -76,7 +76,7 @@ export const sendTransactionalEmailTask = task({
         htmlContent = buildVerificationEmailHtml(displayName, verificationUrl, appName);
         textContent = buildVerificationEmailText(displayName, verificationUrl, appName);
 
-        logger.info("Verification URL generated", { verificationUrl, recipientHash });
+        logger.info("Verification URL generated", { recipientHash, verificationUrl: verificationUrl.replace(/([?&]token=)[^&]+/, "$1[REDACTED]") });
         break;
       }
 
@@ -91,20 +91,26 @@ export const sendTransactionalEmailTask = task({
         throw new Error(`Unknown transactional email type: ${data.type}`);
     }
 
-    const result = await sendSESEmail({
-      from: {
-        email: fromEmail,
-        name: appName,
-      },
-      recipients: [{ email: data.recipientEmail }],
-      subject,
-      html_content: htmlContent,
-      text_content: textContent,
-      tags: {
-        type: `transactional-${data.type}`,
-        recipient: data.recipientEmail,
-      },
-    });
+    let result;
+    try {
+      result = await sendSESEmail({
+        from: {
+          email: fromEmail,
+          name: appName,
+        },
+        recipients: [{ email: data.recipientEmail }],
+        subject,
+        html_content: htmlContent,
+        text_content: textContent,
+        tags: {
+          type: `transactional-${data.type}`,
+          recipient: data.recipientEmail,
+        },
+      });
+    } catch (error) {
+      logger.error("Failed to send email via SES", { error });
+      throw error; // Re-throw to trigger Trigger.dev retries
+    }
 
     const messageId = result.data?.[0]?.id || "unknown";
 

@@ -64,7 +64,7 @@ export default function OnboardingPage() {
 
     const [formData, setFormData] = useState<OnboardingData>({
         geographicalLocation: '',
-        language: 'en',
+        language: '',
         businessDescription: '',
     });
 

@@ -708,6 +708,13 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
         });
       }
 
+      // Capture the old Stripe subscription ID before it gets overwritten by confirm-checkout
+      const previousStripeSubscriptionId = existingSubscription?.stripeSubscriptionId &&
+        !existingSubscription.stripeSubscriptionId.startsWith('free_') &&
+        !existingSubscription.stripeSubscriptionId.startsWith('manual_')
+        ? existingSubscription.stripeSubscriptionId
+        : undefined;
+
       const session = await stripe.checkout.sessions.create({
         customer: stripeCustomerId,
         mode: 'subscription',
@@ -725,6 +732,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
             planId: targetPlan.id,
             billingCycle: isYearly ? 'yearly' : 'monthly',
             setupType: 'upgrade',
+            ...(previousStripeSubscriptionId && { previousStripeSubscriptionId }),
           },
         },
         success_url: `${process.env.FRONTEND_URL || 'https://web.zendwise.work'}/subscribe?session_id={CHECKOUT_SESSION_ID}`,
@@ -735,6 +743,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
           planId: targetPlan.id,
           billingCycle: isYearly ? 'yearly' : 'monthly',
           setupType: 'upgrade',
+          ...(previousStripeSubscriptionId && { previousStripeSubscriptionId }),
         },
       });
 
@@ -999,6 +1008,10 @@ subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, r
       return res.status(401).json({ message: 'Authentication required' });
     }
 
+    if (req.user.role !== 'Owner') {
+      return res.status(403).json({ message: 'Only account owners can manage billing' });
+    }
+
     const { planId, billingCycle = 'monthly' } = req.body;
 
     if (!planId) {
@@ -1130,6 +1143,10 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
       return res.status(401).json({ message: 'Authentication required' });
     }
 
+    if (req.user.role !== 'Owner') {
+      return res.status(403).json({ message: 'Only account owners can manage billing' });
+    }
+
     const { sessionId } = req.body;
 
     if (!sessionId) {
@@ -1184,6 +1201,16 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
     }
 
     if (session.mode === 'setup') {
+      // Verify the SetupIntent succeeded before provisioning
+      if (session.setup_intent) {
+        const setupIntent = await stripe.setupIntents.retrieve(
+          typeof session.setup_intent === 'string' ? session.setup_intent : (session.setup_intent as any).id
+        );
+        if (setupIntent.status !== 'succeeded') {
+          return res.status(402).json({ message: `SetupIntent not succeeded (status: ${setupIntent.status})` });
+        }
+      }
+
       // Free plan — setup mode, no Stripe subscription created
       // Create a local subscription record
       const subValues = {
@@ -1209,6 +1236,11 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
 
       console.log(`✅ [Confirm Checkout] Free plan subscription created for tenant ${tenantId}`);
     } else {
+      // Paid plan — subscription mode: verify payment before provisioning
+      if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+        return res.status(402).json({ message: `Payment not completed (status: ${session.payment_status})` });
+      }
+
       // Paid plan — subscription mode
       const stripeSubscriptionId = typeof session.subscription === 'string'
         ? session.subscription
@@ -1340,7 +1372,22 @@ async function handleCheckoutSessionCompleted(session: any) {
     });
 
     if (session.mode === 'setup') {
-      // Free plan — setup mode, no Stripe subscription
+      // Free plan — setup mode: verify SetupIntent before provisioning
+      if (session.setup_intent) {
+        const setupIntent = await stripe.setupIntents.retrieve(
+          typeof session.setup_intent === 'string' ? session.setup_intent : (session.setup_intent as any).id
+        );
+        if (setupIntent.status !== 'succeeded') {
+          console.warn(`[Webhook] SetupIntent not succeeded (status: ${setupIntent.status}), skipping provisioning for session ${session.id}`);
+          return;
+        }
+      }
+
+      if (!userId) {
+        console.error('[Webhook] Missing userId in checkout session metadata, skipping subscription insert to avoid FK violation:', session.id);
+        return;
+      }
+
       const now = new Date();
       const periodEnd = new Date(now);
       if (isYearly) {
@@ -1351,7 +1398,7 @@ async function handleCheckoutSessionCompleted(session: any) {
 
       const subValues = {
         tenantId,
-        userId: userId || 'unknown',
+        userId,
         planId,
         stripeSubscriptionId: `free_${tenantId}_${Date.now()}`,
         stripeCustomerId,
@@ -1372,19 +1419,33 @@ async function handleCheckoutSessionCompleted(session: any) {
 
       console.log('✅ [Webhook] Free plan subscription created for tenant:', tenantId);
     } else {
+      // Paid plan — subscription mode: verify payment before provisioning
+      if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+        console.warn(`[Webhook] Payment not completed (status: ${session.payment_status}), skipping provisioning for session ${session.id}`);
+        return;
+      }
+
       // Paid plan — subscription mode
       const stripeSubscription = await stripe.subscriptions.retrieve(session.subscription) as any;
 
-      // If this is an upgrade and there's an old Stripe subscription, cancel it
-      if (isUpgrade && existingSub && existingSub.stripeSubscriptionId &&
-        existingSub.stripeSubscriptionId !== stripeSubscription.id &&
-        !existingSub.stripeSubscriptionId.startsWith('free_') &&
-        !existingSub.stripeSubscriptionId.startsWith('manual_')) {
+      // If this is an upgrade and there's an old Stripe subscription, cancel it.
+      // Use previousStripeSubscriptionId from metadata as the authoritative source —
+      // confirm-checkout may have already overwritten existingSub.stripeSubscriptionId
+      // by the time this webhook fires.
+      const previousStripeId = session.metadata?.previousStripeSubscriptionId
+        || stripeSubscription.metadata?.previousStripeSubscriptionId;
+      const oldStripeIdToCancel = previousStripeId
+        || (existingSub?.stripeSubscriptionId !== stripeSubscription.id ? existingSub?.stripeSubscriptionId : undefined);
+
+      if (isUpgrade && oldStripeIdToCancel &&
+        !oldStripeIdToCancel.startsWith('free_') &&
+        !oldStripeIdToCancel.startsWith('manual_') &&
+        oldStripeIdToCancel !== stripeSubscription.id) {
         try {
-          await stripe.subscriptions.cancel(existingSub.stripeSubscriptionId);
-          console.log(`🗑️ [Webhook] Cancelled old Stripe subscription ${existingSub.stripeSubscriptionId} after upgrade`);
+          await stripe.subscriptions.cancel(oldStripeIdToCancel);
+          console.log(`🗑️ [Webhook] Cancelled old Stripe subscription ${oldStripeIdToCancel} after upgrade`);
         } catch (cancelError) {
-          console.warn(`⚠️ [Webhook] Failed to cancel old subscription ${existingSub.stripeSubscriptionId}:`, cancelError);
+          console.warn(`⚠️ [Webhook] Failed to cancel old subscription ${oldStripeIdToCancel}:`, cancelError);
         }
       }
 
@@ -1392,9 +1453,14 @@ async function handleCheckoutSessionCompleted(session: any) {
       const fallbackEnd = new Date(now);
       if (isYearly) { fallbackEnd.setFullYear(fallbackEnd.getFullYear() + 1); } else { fallbackEnd.setMonth(fallbackEnd.getMonth() + 1); }
 
+      if (!userId) {
+        console.error('[Webhook] Missing userId in checkout session metadata, skipping subscription insert to avoid FK violation:', session.id);
+        return;
+      }
+
       const subValues: any = {
         tenantId,
-        userId: userId || 'unknown',
+        userId,
         planId,
         stripeCustomerId,
         stripeSubscriptionId: stripeSubscription.id,

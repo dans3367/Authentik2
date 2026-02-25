@@ -21,12 +21,17 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Use standard PostgreSQL (non-SSL by default)
-const ssl = process.env.DB_SSL === 'true' ? true : false;
-const connectionString = ssl
-  ? process.env.DATABASE_URL
-  : process.env.DATABASE_URL?.replace('?sslmode=require', '');
+const ssl = process.env.DB_SSL === 'true';
+let connectionString: string;
+if (ssl) {
+  connectionString = process.env.DATABASE_URL!;
+} else {
+  const dbUrl = new URL(process.env.DATABASE_URL!);
+  dbUrl.searchParams.delete('sslmode');
+  connectionString = dbUrl.toString();
+}
 
-const client = postgres(connectionString!, {
+const client = postgres(connectionString, {
   ssl: ssl ? 'require' : false,
   max: 1,
 });

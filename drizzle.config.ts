@@ -5,16 +5,18 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Use standard PostgreSQL configuration
-const ssl = process.env.DB_SSL === 'true' ? true : false;
-const connectionString = ssl
-  ? process.env.DATABASE_URL
-  : process.env.DATABASE_URL?.replace('?sslmode=require', '');
+const ssl = process.env.DB_SSL === 'true';
+const parsedUrl = new URL(process.env.DATABASE_URL);
+if (!ssl && parsedUrl.searchParams.get('sslmode') === 'require') {
+  parsedUrl.searchParams.delete('sslmode');
+}
+const connectionString = parsedUrl.toString();
 
 export default defineConfig({
   out: "./migrations",
   schema: "./shared/schema.ts",
   dialect: "postgresql",
   dbCredentials: {
-    url: connectionString || process.env.DATABASE_URL!,
+    url: connectionString,
   },
 });

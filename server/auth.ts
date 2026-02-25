@@ -37,7 +37,7 @@ const authInstance = betterAuth({
           console.log(`✅ [Auth] Verification email task dispatched, runId: ${result.runId}`);
         } else {
           console.error(`❌ [Auth] Failed to dispatch verification email task:`, result.error);
-          throw new Error(`Failed to dispatch verification email: ${result.error}`);
+          // Don't block signup — user can resend via /resend-verification
         }
       } catch (error) {
         console.error("Failed to send verification email:", error);

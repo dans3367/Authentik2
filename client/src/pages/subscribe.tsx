@@ -382,6 +382,13 @@ export default function Subscribe() {
     }
   }, [checkoutCanceled]);
 
+  // Redirect to plan selection when user has no subscription
+  useEffect(() => {
+    if (!subscriptionLoading && userSubscription && !userSubscription.subscription) {
+      setLocation('/select-plan');
+    }
+  }, [userSubscription, subscriptionLoading]);
+
   const handleUpgrade = (planId: string, billingCycle: 'monthly' | 'yearly') => {
     setSelectedPlanId(planId);
     upgradeSubscriptionMutation.mutate({ planId, billingCycle });
@@ -486,7 +493,6 @@ export default function Subscribe() {
     );
   }
 
-  // No subscription — redirect to plan selection page
-  setLocation('/select-plan');
+  // No subscription — redirect handled by useEffect above
   return null;
 }
