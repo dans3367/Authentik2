@@ -481,8 +481,8 @@ export class DatabaseStorage implements IStorage {
   async getAllUsers(tenantId: string, filters?: UserFilters): Promise<User[]> {
     const conditions = [eq(betterAuthUser.tenantId, tenantId)];
 
-    // Always exclude users suspended by downgrade from normal listing
-    conditions.push(or(eq(betterAuthUser.suspendedByDowngrade, false), isNull(betterAuthUser.suspendedByDowngrade))!);
+    // Users suspended by downgrade are shown as inactive (not hidden)
+    // They have isActive=false and suspendedByDowngrade=true
 
     if (filters?.search) {
       const searchTerm = `%${filters.search}%`;
@@ -1070,12 +1070,14 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Suspend excess users (LIFO — most recently created, excluding Owner role)
+    // Sets them as inactive rather than hiding them, so admins can see them
     if (maxUsers !== null) {
       const activeUsers = await db.select({ id: betterAuthUser.id })
         .from(betterAuthUser)
         .where(and(
           eq(betterAuthUser.tenantId, tenantId),
           ne(betterAuthUser.role, 'Owner'),
+          eq(betterAuthUser.isActive, true),
           or(eq(betterAuthUser.suspendedByDowngrade, false), isNull(betterAuthUser.suspendedByDowngrade))
         ))
         .orderBy(desc(betterAuthUser.createdAt));
@@ -1087,7 +1089,7 @@ export class DatabaseStorage implements IStorage {
         const idsToSuspend = usersToSuspend.map((u: { id: string }) => u.id);
 
         await db.update(betterAuthUser)
-          .set({ suspendedByDowngrade: true, suspendedAt: now, updatedAt: now })
+          .set({ isActive: false, suspendedByDowngrade: true, suspendedAt: now, updatedAt: now })
           .where(inArray(betterAuthUser.id, idsToSuspend));
 
         suspendedUsers = idsToSuspend.length;
@@ -1110,9 +1112,9 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning({ id: shops.id });
 
-    // Restore suspended users
+    // Restore suspended users (reactivate them)
     const userResult = await db.update(betterAuthUser)
-      .set({ suspendedByDowngrade: false, suspendedAt: null, updatedAt: now })
+      .set({ isActive: true, suspendedByDowngrade: false, suspendedAt: null, updatedAt: now })
       .where(and(
         eq(betterAuthUser.tenantId, tenantId),
         eq(betterAuthUser.suspendedByDowngrade, true)

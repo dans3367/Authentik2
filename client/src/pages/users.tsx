@@ -41,6 +41,7 @@ interface ExtendedUser {
   image?: string | null;
   isActive?: boolean;
   lastLoginAt?: Date;
+  suspendedByDowngrade?: boolean;
 }
 import { DataTable, DataTableColumnHeader, DataTableRowActions } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -100,7 +101,7 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "">("");
   const [showInactive, setShowInactive] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  
+
   // Store search params in a ref to use in query function without changing dependencies
   const searchParamsRef = useRef({
     search: "",
@@ -112,7 +113,7 @@ export default function UsersPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isViewMode, setIsViewMode] = useState(false);
-  
+
   // State for tracking unsaved changes in edit dialog
   const [hasUnsavedEditChanges, setHasUnsavedEditChanges] = useState(false);
   const [showEditConfirmDialog, setShowEditConfirmDialog] = useState(false);
@@ -127,7 +128,7 @@ export default function UsersPage() {
     queryFn: async () => {
       const params = new URLSearchParams();
       const currentParams = searchParamsRef.current;
-      
+
       if (currentParams.search) params.append('search', currentParams.search);
       if (currentParams.role) params.append('role', currentParams.role);
       if (currentParams.status) params.append('status', currentParams.status);
@@ -150,9 +151,9 @@ export default function UsersPage() {
   // Debounced search effect
   useEffect(() => {
     if (!currentUser || !hasAccess || !canManageUsers) return;
-    
+
     setIsSearching(true);
-    
+
     const timer = setTimeout(() => {
       searchParamsRef.current = {
         search: searchTerm,
@@ -228,13 +229,13 @@ export default function UsersPage() {
   const editFormValues = editForm.watch();
   useEffect(() => {
     if (initialEditValues && isEditDialogOpen) {
-      const hasChanges = 
+      const hasChanges =
         editFormValues.firstName !== initialEditValues.firstName ||
         editFormValues.lastName !== initialEditValues.lastName ||
         editFormValues.email !== initialEditValues.email ||
         editFormValues.role !== initialEditValues.role ||
         editFormValues.isActive !== initialEditValues.isActive;
-      
+
       setHasUnsavedEditChanges(hasChanges);
     }
   }, [editFormValues, initialEditValues, isEditDialogOpen]);
@@ -427,9 +428,9 @@ export default function UsersPage() {
                   {t('users.upgradeRequired', 'Upgrade Required')}
                 </h2>
                 <p className="mt-2 text-gray-600 dark:text-gray-300">
-                  {t('users.upgradeDescription', { 
-                    planName, 
-                    defaultValue: 'Your current plan ({{planName}}) does not include user management. Upgrade to Plus or Pro to add team members and manage roles.' 
+                  {t('users.upgradeDescription', {
+                    planName,
+                    defaultValue: 'Your current plan ({{planName}}) does not include user management. Upgrade to Plus or Pro to add team members and manage roles.'
                   })}
                 </p>
                 <Button
@@ -510,7 +511,7 @@ export default function UsersPage() {
       // Don't actually close the dialog yet
       return;
     }
-    
+
     // If opening or closing without unsaved changes, proceed normally
     setIsEditDialogOpen(open);
     if (!open) {
@@ -599,12 +600,28 @@ export default function UsersPage() {
       header: t('users.table.status'),
       cell: ({ row }) => {
         const isActive = row.getValue("isActive");
-        return isActive ? (
-          <div className="flex items-center space-x-1.5">
-            <UserCheck className="h-4 w-4 text-green-600" />
-            <span className="text-green-600 font-medium">{t('users.status.active')}</span>
-          </div>
-        ) : (
+        const user = row.original;
+        const isSuspendedByDowngrade = (user as any).suspendedByDowngrade === true;
+
+        if (isActive) {
+          return (
+            <div className="flex items-center space-x-1.5">
+              <UserCheck className="h-4 w-4 text-green-600" />
+              <span className="text-green-600 font-medium">{t('users.status.active')}</span>
+            </div>
+          );
+        }
+
+        if (isSuspendedByDowngrade) {
+          return (
+            <div className="flex items-center space-x-1.5">
+              <UserX className="h-4 w-4 text-amber-600" />
+              <span className="text-amber-600 font-medium">Suspended (plan limit)</span>
+            </div>
+          );
+        }
+
+        return (
           <div className="flex items-center space-x-1.5">
             <UserX className="h-4 w-4 text-red-600" />
             <span className="text-red-600 font-medium">{t('users.status.inactive')}</span>
@@ -680,7 +697,7 @@ export default function UsersPage() {
 
         // No actions for current non-owner
         if (user.id === currentUser.id) return null;
-        
+
         // Owner accounts (not current user) are view-only
         if (user.role === 'Owner') {
           return (
@@ -697,7 +714,7 @@ export default function UsersPage() {
             </div>
           );
         }
-        
+
         return (
           <div className="flex items-center space-x-2">
             <Button
@@ -730,16 +747,16 @@ export default function UsersPage() {
   // Filter users based on search and filters
   const filteredUsers = useMemo(() => {
     return users.filter((user: User) => {
-      const matchesSearch = searchTerm === "" || 
+      const matchesSearch = searchTerm === "" ||
         user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
       const matchesRole = roleFilter === "" || user.role === roleFilter;
-      const matchesStatus = statusFilter === "" || 
+      const matchesStatus = statusFilter === "" ||
         (statusFilter === "active" ? user.isActive : !user.isActive);
       const matchesInactive = showInactive || user.isActive;
-      
+
       return matchesSearch && matchesRole && matchesStatus && matchesInactive;
     });
   }, [users, searchTerm, roleFilter, statusFilter, showInactive]);
@@ -797,81 +814,583 @@ export default function UsersPage() {
                 </div>
               </div>
             </div>
-          {isAdmin && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button 
-                          disabled={!limits.canAddUser}
-                          className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          {t('users.addUser')}
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>{t('users.createDialog.title')}</DialogTitle>
-                  <DialogDescription>
-                    {t('users.createDialog.description')}
-                  </DialogDescription>
-                </DialogHeader>
-                <Form {...createForm}>
-                  <form onSubmit={createForm.handleSubmit(handleCreateUser)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={createForm.control}
-                        name="firstName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t('users.createDialog.firstName')}</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={createForm.control}
-                        name="lastName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t('users.createDialog.lastName')}</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+            {isAdmin && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button
+                            disabled={!limits.canAddUser}
+                            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            {t('users.addUser')}
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                          <DialogHeader>
+                            <DialogTitle>{t('users.createDialog.title')}</DialogTitle>
+                            <DialogDescription>
+                              {t('users.createDialog.description')}
+                            </DialogDescription>
+                          </DialogHeader>
+                          <Form {...createForm}>
+                            <form onSubmit={createForm.handleSubmit(handleCreateUser)} className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                  control={createForm.control}
+                                  name="firstName"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>{t('users.createDialog.firstName')}</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={createForm.control}
+                                  name="lastName"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>{t('users.createDialog.lastName')}</FormLabel>
+                                      <FormControl>
+                                        <Input {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                              <FormField
+                                control={createForm.control}
+                                name="email"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('users.createDialog.email')}</FormLabel>
+                                    <FormControl>
+                                      <Input type="email" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={createForm.control}
+                                name="role"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('users.createDialog.role')}</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder={t('users.createDialog.selectRole')} />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {nonOwnerRoles.map((role) => (
+                                          <SelectItem key={role} value={role}>
+                                            {t(getRoleTranslationKey(role))}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={createForm.control}
+                                name="password"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('users.createDialog.password')}</FormLabel>
+                                    <FormControl>
+                                      <Input type="password" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={createForm.control}
+                                name="confirmPassword"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>{t('users.createDialog.confirmPassword')}</FormLabel>
+                                    <FormControl>
+                                      <Input type="password" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={createForm.control}
+                                name="emailVerified"
+                                render={({ field }) => (
+                                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                    <div className="space-y-0.5">
+                                      <FormLabel className="text-base">{t('users.createDialog.emailVerified')}</FormLabel>
+                                      <div className="text-sm text-muted-foreground">
+                                        {t('users.createDialog.emailVerifiedDescription')}
+                                      </div>
+                                    </div>
+                                    <FormControl>
+                                      <Switch
+                                        checked={field.value ?? true}
+                                        onCheckedChange={field.onChange}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                              <DialogFooter>
+                                <Button
+                                  type="submit"
+                                  disabled={createUserMutation.isPending}
+                                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                                >
+                                  {createUserMutation.isPending ? t('users.createDialog.creating') : t('users.createDialog.createUser')}
+                                </Button>
+                              </DialogFooter>
+                            </form>
+                          </Form>
+                        </DialogContent>
+                      </Dialog>
+                    </span>
+                  </TooltipTrigger>
+                  {!limits.canAddUser && (
+                    <TooltipContent>
+                      <p>
+                        {t('users.userLimitReached', {
+                          current: limits.currentUsers,
+                          max: limits.maxUsers,
+                          plan: limits.planName
+                        })}
+                      </p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.totalUsers')}</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalUsers}</p>
+                  </div>
+                  <UsersIcon className="text-blue-500 w-8 h-8" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">{t('users.stats.acrossAllRoles')}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.activeUsers')}</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.activeUsers}</p>
+                  </div>
+                  <UserCheck className="text-green-500 w-8 h-8" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {stats.totalUsers > 0 ? Math.round((stats.activeUsers / stats.totalUsers) * 100) : 0}% {t('users.stats.ofTotalUsers')}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.roles')}</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{Object.keys(stats.usersByRole).length}</p>
+                  </div>
+                  <Shield className="text-purple-500 w-8 h-8" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">{t('users.stats.differentRoles')}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.planLimits')}</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {limits.currentUsers}{limits.maxUsers ? `/${limits.maxUsers}` : ''}
+                    </p>
+                  </div>
+                  <UsersIcon className="text-orange-500 w-8 h-8" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {limits.planName} {limits.maxUsers ? `(${limits.maxUsers - limits.currentUsers} ${t('users.stats.remaining')})` : `(${t('users.stats.unlimited')})`}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder={t('users.filters.searchPlaceholder')}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-10"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 h-4 w-4"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value === "all" ? "" : value as UserRole)}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder={t('users.filters.filterByRole')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('users.filters.allRoles')}</SelectItem>
+                {userRoles.map((role) => (
+                  <SelectItem key={role} value={role}>
+                    {t(getRoleTranslationKey(role))}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value as "active" | "inactive")}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder={t('users.filters.filterByStatus')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('users.filters.allStatus')}</SelectItem>
+                <SelectItem value="active">{t('users.filters.active')}</SelectItem>
+                <SelectItem value="inactive">{t('users.filters.inactive')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="show-inactive"
+                checked={showInactive}
+                onCheckedChange={setShowInactive}
+              />
+              <label htmlFor="show-inactive" className="text-sm font-medium">
+                {t('users.filters.showInactive')}
+              </label>
+            </div>
+          </div>
+
+          {/* Responsive Users Layout */}
+          <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg">
+            {/* Table View for Large Screens */}
+            <div className="hidden lg:block">
+              <DataTable
+                columns={columns}
+                data={filteredUsers}
+                showPagination={true}
+                pageSize={10}
+                showColumnVisibility={false}
+              />
+            </div>
+
+            {/* Card View for Tablets and Smaller */}
+            <div className="lg:hidden">
+              {filteredUsers.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400 py-12">
+                  <UsersIcon className="h-8 w-8" />
+                  <p>No users found</p>
+                  {(searchTerm || roleFilter || statusFilter) && (
+                    <p className="text-sm">Try adjusting your filters</p>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                  {filteredUsers.map((user: User) => (
+                    <Card
+                      key={user.id}
+                      className="transition-all duration-300 hover:border-blue-200 dark:hover:border-blue-700"
+                      data-testid={`card-user-${user.id}`}
+                    >
+                      <CardContent className="p-4">
+                        {/* User Header */}
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className="relative">
+                              <Avatar className="h-12 w-12">
+                                <AvatarImage src="" />
+                                <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-sm font-medium">
+                                  {getUserInitials(user.firstName || undefined, user.lastName || undefined)}
+                                </AvatarFallback>
+                              </Avatar>
+                              {user.isActive && (
+                                <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-800"></div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-medium text-gray-900 dark:text-white truncate" data-testid={`text-user-name-card-${user.id}`}>
+                                {user.role === 'Owner' && user.id === currentUser.id ? (
+                                  <Link href="/profile" className="text-blue-700 hover:underline">
+                                    {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'}
+                                  </Link>
+                                ) : (
+                                  user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'
+                                )}
+                              </h3>
+                              <p className="text-sm text-gray-500 dark:text-gray-400 truncate" data-testid={`text-user-email-card-${user.id}`}>
+                                {user.role === 'Owner' && user.id === currentUser.id ? (
+                                  <Link href="/profile" className="text-blue-600 hover:underline">{user.email}</Link>
+                                ) : (
+                                  user.email
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          {isAdmin && (
+                            <div className="flex items-center gap-1">
+                              {user.id === currentUser.id && user.role === 'Owner' ? (
+                                <Link href="/profile">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                                    data-testid={`button-profile-owner-card-${user.id}`}
+                                    title="Go to Profile"
+                                  >
+                                    <UserIcon className="h-4 w-4" />
+                                  </Button>
+                                </Link>
+                              ) : user.role === 'Owner' ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-950/20"
+                                  onClick={() => handleViewUser(user)}
+                                  data-testid={`button-view-user-card-${user.id}`}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              ) : user.id !== currentUser.id ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                                    onClick={() => handleEditUser(user)}
+                                    data-testid={`button-edit-user-card-${user.id}`}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                                        data-testid={`button-delete-user-card-${user.id}`}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Are you sure you want to delete {user.firstName} {user.lastName}? This action cannot be undone.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => handleDeleteUser(user.id)}
+                                          className="bg-red-600 hover:bg-red-700"
+                                        >
+                                          Delete
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* User Details */}
+                        <div className="space-y-3">
+                          {/* Role and Status Row */}
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">{t('users.cardView.role')}</span>
+                              <Badge
+                                variant="secondary"
+                                className={`${user.role === 'Owner' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400' :
+                                    user.role === 'Administrator' ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400' :
+                                      user.role === 'Manager' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' :
+                                        'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                                  } hover:bg-opacity-80 font-normal border-0`}
+                                data-testid={`badge-role-card-${user.id}`}
+                              >
+                                {t(getRoleTranslationKey(user.role || ''))}
+                              </Badge>
+                            </div>
+                            <div>
+                              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Status</span>
+                              {user.isActive ? (
+                                <div className="flex items-center space-x-1.5" data-testid={`status-active-card-${user.id}`}>
+                                  <UserCheck className="h-4 w-4 text-green-600" />
+                                  <span className="text-green-600 font-medium text-sm">Active</span>
+                                </div>
+                              ) : (user as any).suspendedByDowngrade ? (
+                                <div className="flex items-center space-x-1.5" data-testid={`status-suspended-card-${user.id}`}>
+                                  <UserX className="h-4 w-4 text-amber-600" />
+                                  <span className="text-amber-600 font-medium text-sm">Suspended (plan limit)</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center space-x-1.5" data-testid={`status-inactive-card-${user.id}`}>
+                                  <UserX className="h-4 w-4 text-red-600" />
+                                  <span className="text-red-600 font-medium text-sm">Inactive</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Last Login */}
+                          <div>
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Last Login</span>
+                            {user.lastLoginAt ? (
+                              <div className="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300" data-testid={`text-last-login-card-${user.id}`}>
+                                <Calendar className="h-4 w-4" />
+                                <span className="text-sm">{format(new Date(user.lastLoginAt), "MMM d, yyyy")}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center space-x-1.5 text-gray-500" data-testid={`text-never-logged-in-card-${user.id}`}>
+                                <Calendar className="h-4 w-4" />
+                                <span className="text-sm">Never</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Joined Date */}
+                          <div>
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Joined</span>
+                            {user.createdAt ? (
+                              <div className="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300" data-testid={`text-joined-date-card-${user.id}`}>
+                                <Calendar className="h-4 w-4" />
+                                <span className="text-sm">{format(new Date(user.createdAt), "MMM d, yyyy")}</span>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">—</span>
+                            )}
+                          </div>
+
+                          {/* Status Toggle for Admins */}
+                          {isAdmin && user.id !== currentUser.id && user.role !== 'Owner' && (
+                            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Account Status</span>
+                                <Switch
+                                  checked={user.isActive ?? true}
+                                  onCheckedChange={(checked) => handleToggleStatus(user.id, checked)}
+                                  disabled={toggleStatusMutation.isPending}
+                                  data-testid={`switch-status-card-${user.id}`}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Edit User Dialog */}
+          <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>{isViewMode ? 'View User' : 'Edit User'}</DialogTitle>
+                <DialogDescription>
+                  {isViewMode ? 'View user information.' : 'Update user information and permissions.'}
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...editForm}>
+                <form onSubmit={editForm.handleSubmit(handleUpdateUser)} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <FormField
-                      control={createForm.control}
-                      name="email"
+                      control={editForm.control}
+                      name="firstName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t('users.createDialog.email')}</FormLabel>
+                          <FormLabel>First Name</FormLabel>
                           <FormControl>
-                            <Input type="email" {...field} />
+                            <Input {...field} disabled={isViewMode} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                     <FormField
-                      control={createForm.control}
-                      name="role"
+                      control={editForm.control}
+                      name="lastName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t('users.createDialog.role')}</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} disabled={isViewMode} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={editForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" {...field} disabled={isViewMode} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Role</FormLabel>
+                        {isViewMode && selectedUser?.role === 'Owner' ? (
+                          <FormControl>
+                            <Input value="Owner" disabled />
+                          </FormControl>
+                        ) : (
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder={t('users.createDialog.selectRole')} />
+                              <SelectTrigger disabled={isViewMode}>
+                                <SelectValue placeholder="Select a role" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -882,563 +1401,65 @@ export default function UsersPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={createForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('users.createDialog.password')}</FormLabel>
-                          <FormControl>
-                            <Input type="password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={createForm.control}
-                      name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('users.createDialog.confirmPassword')}</FormLabel>
-                          <FormControl>
-                            <Input type="password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={createForm.control}
-                      name="emailVerified"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">{t('users.createDialog.emailVerified')}</FormLabel>
-                            <div className="text-sm text-muted-foreground">
-                              {t('users.createDialog.emailVerifiedDescription')}
-                            </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Active Status</FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Enable or disable this user account
                           </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value ?? true}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value ?? true}
+                            onCheckedChange={field.onChange}
+                            disabled={isViewMode}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  {!isViewMode && (
                     <DialogFooter>
-                      <Button 
-                        type="submit" 
-                        disabled={createUserMutation.isPending}
+                      <Button
+                        type="submit"
+                        disabled={updateUserMutation.isPending}
                         className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                       >
-                        {createUserMutation.isPending ? t('users.createDialog.creating') : t('users.createDialog.createUser')}
+                        {updateUserMutation.isPending ? "Updating..." : "Update User"}
                       </Button>
                     </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-                  </span>
-                </TooltipTrigger>
-                {!limits.canAddUser && (
-                  <TooltipContent>
-                    <p>
-                      {t('users.userLimitReached', { 
-                        current: limits.currentUsers, 
-                        max: limits.maxUsers,
-                        plan: limits.planName 
-                      })}
-                    </p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-          )}
-        </div>
-
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.totalUsers')}</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalUsers}</p>
-                </div>
-                <UsersIcon className="text-blue-500 w-8 h-8" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">{t('users.stats.acrossAllRoles')}</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.activeUsers')}</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.activeUsers}</p>
-                </div>
-                <UserCheck className="text-green-500 w-8 h-8" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {stats.totalUsers > 0 ? Math.round((stats.activeUsers / stats.totalUsers) * 100) : 0}% {t('users.stats.ofTotalUsers')}
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.roles')}</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{Object.keys(stats.usersByRole).length}</p>
-                </div>
-                <Shield className="text-purple-500 w-8 h-8" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">{t('users.stats.differentRoles')}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.planLimits')}</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    {limits.currentUsers}{limits.maxUsers ? `/${limits.maxUsers}` : ''}
-                  </p>
-                </div>
-                <UsersIcon className="text-orange-500 w-8 h-8" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {limits.planName} {limits.maxUsers ? `(${limits.maxUsers - limits.currentUsers} ${t('users.stats.remaining')})` : `(${t('users.stats.unlimited')})`}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder={t('users.filters.searchPlaceholder')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-10"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm("")}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 h-4 w-4"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value === "all" ? "" : value as UserRole)}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder={t('users.filters.filterByRole')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('users.filters.allRoles')}</SelectItem>
-              {userRoles.map((role) => (
-                <SelectItem key={role} value={role}>
-                  {t(getRoleTranslationKey(role))}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value as "active" | "inactive")}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder={t('users.filters.filterByStatus')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('users.filters.allStatus')}</SelectItem>
-              <SelectItem value="active">{t('users.filters.active')}</SelectItem>
-              <SelectItem value="inactive">{t('users.filters.inactive')}</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="show-inactive"
-              checked={showInactive}
-              onCheckedChange={setShowInactive}
-            />
-            <label htmlFor="show-inactive" className="text-sm font-medium">
-              {t('users.filters.showInactive')}
-            </label>
-          </div>
-        </div>
-
-        {/* Responsive Users Layout */}
-        <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg">
-          {/* Table View for Large Screens */}
-          <div className="hidden lg:block">
-            <DataTable
-              columns={columns}
-              data={filteredUsers}
-              showPagination={true}
-              pageSize={10}
-              showColumnVisibility={false}
-            />
-          </div>
-
-          {/* Card View for Tablets and Smaller */}
-          <div className="lg:hidden">
-            {filteredUsers.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400 py-12">
-                <UsersIcon className="h-8 w-8" />
-                <p>No users found</p>
-                {(searchTerm || roleFilter || statusFilter) && (
-                  <p className="text-sm">Try adjusting your filters</p>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-                {filteredUsers.map((user: User) => (
-                  <Card
-                    key={user.id}
-                    className="transition-all duration-300 hover:border-blue-200 dark:hover:border-blue-700"
-                    data-testid={`card-user-${user.id}`}
-                  >
-                    <CardContent className="p-4">
-                      {/* User Header */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3 flex-1">
-                          <div className="relative">
-                            <Avatar className="h-12 w-12">
-                              <AvatarImage src="" />
-                              <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-sm font-medium">
-                                {getUserInitials(user.firstName || undefined, user.lastName || undefined)}
-                              </AvatarFallback>
-                            </Avatar>
-                            {user.isActive && (
-                              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-800"></div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-gray-900 dark:text-white truncate" data-testid={`text-user-name-card-${user.id}`}>
-                              {user.role === 'Owner' && user.id === currentUser.id ? (
-                                <Link href="/profile" className="text-blue-700 hover:underline">
-                                  {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'}
-                                </Link>
-                              ) : (
-                                user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'
-                              )}
-                            </h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate" data-testid={`text-user-email-card-${user.id}`}>
-                              {user.role === 'Owner' && user.id === currentUser.id ? (
-                                <Link href="/profile" className="text-blue-600 hover:underline">{user.email}</Link>
-                              ) : (
-                                user.email
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* Actions */}
-                        {isAdmin && (
-                          <div className="flex items-center gap-1">
-                            {user.id === currentUser.id && user.role === 'Owner' ? (
-                              <Link href="/profile">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-                                  data-testid={`button-profile-owner-card-${user.id}`}
-                                  title="Go to Profile"
-                                >
-                                  <UserIcon className="h-4 w-4" />
-                                </Button>
-                              </Link>
-                            ) : user.role === 'Owner' ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-950/20"
-                                onClick={() => handleViewUser(user)}
-                                data-testid={`button-view-user-card-${user.id}`}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            ) : user.id !== currentUser.id ? (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20"
-                                  onClick={() => handleEditUser(user)}
-                                  data-testid={`button-edit-user-card-${user.id}`}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-                                      data-testid={`button-delete-user-card-${user.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete User</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to delete {user.firstName} {user.lastName}? This action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => handleDeleteUser(user.id)}
-                                        className="bg-red-600 hover:bg-red-700"
-                                      >
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* User Details */}
-                      <div className="space-y-3">
-                        {/* Role and Status Row */}
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">{t('users.cardView.role')}</span>
-                            <Badge 
-                              variant="secondary" 
-                              className={`${
-                                user.role === 'Owner' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400' :
-                                user.role === 'Administrator' ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400' :
-                                user.role === 'Manager' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' :
-                                'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                              } hover:bg-opacity-80 font-normal border-0`}
-                              data-testid={`badge-role-card-${user.id}`}
-                            >
-                              {t(getRoleTranslationKey(user.role || ''))}
-                            </Badge>
-                          </div>
-                          <div>
-                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Status</span>
-                            {user.isActive ? (
-                              <div className="flex items-center space-x-1.5" data-testid={`status-active-card-${user.id}`}>
-                                <UserCheck className="h-4 w-4 text-green-600" />
-                                <span className="text-green-600 font-medium text-sm">Active</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center space-x-1.5" data-testid={`status-inactive-card-${user.id}`}>
-                                <UserX className="h-4 w-4 text-red-600" />
-                                <span className="text-red-600 font-medium text-sm">Inactive</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Last Login */}
-                        <div>
-                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Last Login</span>
-                          {user.lastLoginAt ? (
-                            <div className="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300" data-testid={`text-last-login-card-${user.id}`}>
-                              <Calendar className="h-4 w-4" />
-                              <span className="text-sm">{format(new Date(user.lastLoginAt), "MMM d, yyyy")}</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center space-x-1.5 text-gray-500" data-testid={`text-never-logged-in-card-${user.id}`}>
-                              <Calendar className="h-4 w-4" />
-                              <span className="text-sm">Never</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Joined Date */}
-                        <div>
-                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Joined</span>
-                          {user.createdAt ? (
-                            <div className="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300" data-testid={`text-joined-date-card-${user.id}`}>
-                              <Calendar className="h-4 w-4" />
-                              <span className="text-sm">{format(new Date(user.createdAt), "MMM d, yyyy")}</span>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-500">—</span>
-                          )}
-                        </div>
-
-                        {/* Status Toggle for Admins */}
-                        {isAdmin && user.id !== currentUser.id && user.role !== 'Owner' && (
-                          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Account Status</span>
-                              <Switch
-                                checked={user.isActive ?? true}
-                                onCheckedChange={(checked) => handleToggleStatus(user.id, checked)}
-                                disabled={toggleStatusMutation.isPending}
-                                data-testid={`switch-status-card-${user.id}`}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Edit User Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>{isViewMode ? 'View User' : 'Edit User'}</DialogTitle>
-              <DialogDescription>
-                {isViewMode ? 'View user information.' : 'Update user information and permissions.'}
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...editForm}>
-              <form onSubmit={editForm.handleSubmit(handleUpdateUser)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={editForm.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} disabled={isViewMode} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={editForm.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} disabled={isViewMode} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={editForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input type="email" {...field} disabled={isViewMode} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
                   )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      {isViewMode && selectedUser?.role === 'Owner' ? (
-                        <FormControl>
-                          <Input value="Owner" disabled />
-                        </FormControl>
-                      ) : (
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger disabled={isViewMode}>
-                              <SelectValue placeholder="Select a role" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {nonOwnerRoles.map((role) => (
-                              <SelectItem key={role} value={role}>
-                                {t(getRoleTranslationKey(role))}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="isActive"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Active Status</FormLabel>
-                        <div className="text-sm text-muted-foreground">
-                          Enable or disable this user account
-                        </div>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value ?? true}
-                          onCheckedChange={field.onChange}
-                          disabled={isViewMode}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                {!isViewMode && (
-                  <DialogFooter>
-                    <Button 
-                      type="submit" 
-                      disabled={updateUserMutation.isPending}
-                      className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                    >
-                      {updateUserMutation.isPending ? "Updating..." : "Update User"}
-                    </Button>
-                  </DialogFooter>
-                )}
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
 
-        {/* Confirmation Dialog for Unsaved Changes */}
-        <AlertDialog open={showEditConfirmDialog} onOpenChange={setShowEditConfirmDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-              <AlertDialogDescription>
-                You have unsaved changes. Are you sure you want to discard them?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleEditConfirmDiscard}>
-                Discard Changes
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+          {/* Confirmation Dialog for Unsaved Changes */}
+          <AlertDialog open={showEditConfirmDialog} onOpenChange={setShowEditConfirmDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have unsaved changes. Are you sure you want to discard them?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleEditConfirmDiscard}>
+                  Discard Changes
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </div>

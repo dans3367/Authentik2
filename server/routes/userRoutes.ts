@@ -309,16 +309,39 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
       }
     }
 
+    // When activating a previously inactive user, check user limits
+    const targetIsActive = isActive ?? true;
+    const wasInactive = existingUser.isActive === false;
+    if (targetIsActive && wasInactive) {
+      try {
+        await storage.validateUserCreation(req.user.tenantId);
+      } catch (limitError: any) {
+        return res.status(403).json({
+          message: limitError.message || 'User limit reached for your current plan. Please upgrade to activate more users.',
+          code: 'USER_LIMIT_REACHED'
+        });
+      }
+    }
+
+    // Build update data
+    const updateData: Record<string, any> = {
+      firstName,
+      lastName,
+      email,
+      role,
+      isActive: targetIsActive,
+      updatedAt: new Date(),
+    };
+
+    // If activating a user that was suspended by downgrade, clear the suspension flag
+    if (targetIsActive && existingUser.suspendedByDowngrade) {
+      updateData.suspendedByDowngrade = false;
+      updateData.suspendedAt = null;
+    }
+
     // Update user
     await db.update(betterAuthUser)
-      .set({
-        firstName,
-        lastName,
-        email,
-        role,
-        isActive: isActive ?? true,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(and(
         eq(betterAuthUser.id, userId),
         eq(betterAuthUser.tenantId, req.user.tenantId)
@@ -378,12 +401,32 @@ userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Ad
       }
     }
 
+    // When activating a user, check if the user limit has been reached
+    if (isActive) {
+      try {
+        await storage.validateUserCreation(req.user.tenantId);
+      } catch (limitError: any) {
+        return res.status(403).json({
+          message: limitError.message || 'User limit reached for your current plan. Please upgrade to activate more users.',
+          code: 'USER_LIMIT_REACHED'
+        });
+      }
+    }
+
     // Update user status
+    const updateData: Record<string, any> = {
+      isActive,
+      updatedAt: new Date(),
+    };
+
+    // If activating a user that was suspended by downgrade, clear the suspension flag
+    if (isActive && user.suspendedByDowngrade) {
+      updateData.suspendedByDowngrade = false;
+      updateData.suspendedAt = null;
+    }
+
     await db.update(betterAuthUser)
-      .set({
-        isActive,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(and(
         eq(betterAuthUser.id, userId),
         eq(betterAuthUser.tenantId, req.user.tenantId)
