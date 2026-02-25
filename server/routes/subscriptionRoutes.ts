@@ -841,6 +841,31 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
         console.error('Failed to log upgrade audit event:', auditError);
       }
 
+      // Send plan change notification email to account owner
+      try {
+        const { sendPlanChangeNotificationTask } = await import('../../src/trigger/planChangeNotification');
+        await sendPlanChangeNotificationTask.trigger({
+          changeType: 'upgrade',
+          ownerEmail: req.user.email,
+          ownerName: req.user.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : null,
+          companyName: company?.name || null,
+          previousPlanName: currentPlan?.displayName || 'No Plan',
+          newPlanName: targetPlan.displayName,
+          previousPrice: currentPlan?.price || '0.00',
+          newPrice: isYearly && targetPlan.yearlyPrice ? targetPlan.yearlyPrice : targetPlan.price,
+          billingCycle: isYearly ? 'yearly' : 'monthly',
+          effectiveDate: upgradeStart.toISOString(),
+          periodEndDate: upgradeEnd.toISOString(),
+          restoredShops: restored.restoredShops || undefined,
+          restoredUsers: restored.restoredUsers || undefined,
+          featureChanges: buildFeatureChanges(currentPlan, targetPlan),
+        });
+        console.log('📧 [Upgrade] Plan change notification triggered for', req.user.email);
+      } catch (notifyError) {
+        console.error('Failed to trigger plan change notification:', notifyError);
+        // Non-blocking: the upgrade still goes through
+      }
+
       return res.json({
         message: `Successfully upgraded to ${targetPlan.displayName}`,
         plan: targetPlan.displayName,
@@ -918,6 +943,31 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
       );
     } catch (auditError) {
       console.error('Failed to log downgrade audit event:', auditError);
+    }
+
+    // Send plan change notification email to account owner
+    try {
+      const { sendPlanChangeNotificationTask } = await import('../../src/trigger/planChangeNotification');
+      await sendPlanChangeNotificationTask.trigger({
+        changeType: 'downgrade',
+        ownerEmail: req.user.email,
+        ownerName: req.user.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : null,
+        companyName: company?.name || null,
+        previousPlanName: currentPlan?.displayName || 'No Plan',
+        newPlanName: targetPlan.displayName,
+        previousPrice: currentPlan?.price || '0.00',
+        newPrice: isYearly && targetPlan.yearlyPrice ? targetPlan.yearlyPrice : targetPlan.price,
+        billingCycle: isYearly ? 'yearly' : 'monthly',
+        effectiveDate: downgradeStart.toISOString(),
+        periodEndDate: downgradeEnd.toISOString(),
+        suspendedShops: suspended.suspendedShops || undefined,
+        suspendedUsers: suspended.suspendedUsers || undefined,
+        featureChanges: buildFeatureChanges(currentPlan, targetPlan),
+      });
+      console.log('📧 [Downgrade] Plan change notification triggered for', req.user.email);
+    } catch (notifyError) {
+      console.error('Failed to trigger plan change notification:', notifyError);
+      // Non-blocking: the downgrade still goes through
     }
 
     res.json({
@@ -1289,6 +1339,42 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
       console.log(`✅ [Confirm Checkout] Paid subscription ${stripeSub.id} ${existingSub ? 'updated (upgrade)' : 'created'} for tenant ${tenantId}, planId: ${planId}`);
     }
 
+    // If this is a plan change (not initial signup), send notification email
+    if (existingSub && existingSub.planId !== planId) {
+      try {
+        const newPlan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, planId) });
+        const oldPlan = existingSub.planId
+          ? await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, existingSub.planId) })
+          : null;
+
+        if (newPlan) {
+          const isUpgrade = parseFloat(newPlan.price) > parseFloat(oldPlan?.price || '0');
+          const ownerUser = await db.query.betterAuthUser.findFirst({
+            where: eq(betterAuthUser.id, req.user.id),
+          });
+
+          const { sendPlanChangeNotificationTask } = await import('../../src/trigger/planChangeNotification');
+          await sendPlanChangeNotificationTask.trigger({
+            changeType: isUpgrade ? 'upgrade' : 'downgrade',
+            ownerEmail: ownerUser?.email || req.user.email,
+            ownerName: ownerUser?.firstName ? `${ownerUser.firstName} ${ownerUser.lastName || ''}`.trim() : null,
+            companyName: null,
+            previousPlanName: oldPlan?.displayName || 'Previous Plan',
+            newPlanName: newPlan.displayName,
+            previousPrice: oldPlan?.price || '0.00',
+            newPrice: isYearly && newPlan.yearlyPrice ? newPlan.yearlyPrice : newPlan.price,
+            billingCycle: isYearly ? 'yearly' : 'monthly',
+            effectiveDate: now.toISOString(),
+            periodEndDate: periodEnd.toISOString(),
+            featureChanges: buildFeatureChanges(oldPlan, newPlan),
+          });
+          console.log('📧 [Confirm Checkout] Plan change notification triggered for', ownerUser?.email || req.user.email);
+        }
+      } catch (notifyError) {
+        console.error('Failed to trigger plan change notification from confirm-checkout:', notifyError);
+      }
+    }
+
     res.json({
       message: 'Subscription activated successfully',
       success: true,
@@ -1490,6 +1576,45 @@ async function handleCheckoutSessionCompleted(session: any) {
       }
 
       console.log(`✅ [Webhook] ${isUpgrade ? 'Upgraded' : 'Paid'} subscription ${stripeSubscription.id} created for tenant:`, tenantId, `planId: ${planId}`);
+
+      // Send plan change notification for upgrades via webhook
+      if (isUpgrade && existingSub && existingSub.planId !== planId) {
+        try {
+          const newPlan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, planId) });
+          const oldPlan = existingSub.planId
+            ? await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, existingSub.planId) })
+            : null;
+
+          if (newPlan && userId) {
+            const ownerUser = await db.query.betterAuthUser.findFirst({
+              where: eq(betterAuthUser.id, userId),
+            });
+
+            if (ownerUser?.email) {
+              const { sendPlanChangeNotificationTask } = await import('../../src/trigger/planChangeNotification');
+              await sendPlanChangeNotificationTask.trigger({
+                changeType: 'upgrade',
+                ownerEmail: ownerUser.email,
+                ownerName: ownerUser.firstName ? `${ownerUser.firstName} ${ownerUser.lastName || ''}`.trim() : null,
+                companyName: null,
+                previousPlanName: oldPlan?.displayName || 'Previous Plan',
+                newPlanName: newPlan.displayName,
+                previousPrice: oldPlan?.price || '0.00',
+                newPrice: isYearly && newPlan.yearlyPrice ? newPlan.yearlyPrice : newPlan.price,
+                billingCycle: isYearly ? 'yearly' : 'monthly',
+                effectiveDate: new Date().toISOString(),
+                periodEndDate: stripeSubscription.current_period_end
+                  ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
+                  : undefined,
+                featureChanges: buildFeatureChanges(oldPlan, newPlan),
+              });
+              console.log('📧 [Webhook] Plan change notification triggered for', ownerUser.email);
+            }
+          }
+        } catch (notifyError) {
+          console.error('Failed to trigger plan change notification from webhook:', notifyError);
+        }
+      }
     }
   } catch (error) {
     console.error('Error handling checkout session completed:', error);
@@ -1659,4 +1784,62 @@ async function handlePaymentFailed(invoice: any) {
   } catch (error) {
     console.error('Error handling payment failed:', error);
   }
+}
+
+// ─── Plan Change Notification Helpers ────────────────────────────────────────
+
+/**
+ * Build an array of feature-level changes between two subscription plans.
+ * Returns a list of { name, oldValue, newValue } objects that are displayed
+ * in the plan change notification email.
+ */
+function buildFeatureChanges(
+  oldPlan: any | null | undefined,
+  newPlan: any | null | undefined,
+): Array<{ name: string; oldValue: string | number | null; newValue: string | number | null }> {
+  if (!newPlan) return [];
+
+  const changes: Array<{ name: string; oldValue: string | number | null; newValue: string | number | null }> = [];
+
+  const formatLimit = (val: number | null | undefined): string | number | null => {
+    if (val === null || val === undefined) return 'Unlimited';
+    return val;
+  };
+
+  // Max shops
+  const oldShops = formatLimit(oldPlan?.maxShops);
+  const newShops = formatLimit(newPlan.maxShops);
+  if (oldShops !== newShops) {
+    changes.push({ name: 'Shop Limit', oldValue: oldShops, newValue: newShops });
+  }
+
+  // Max users
+  const oldUsers = formatLimit(oldPlan?.maxUsers);
+  const newUsers = formatLimit(newPlan.maxUsers);
+  if (oldUsers !== newUsers) {
+    changes.push({ name: 'User Limit', oldValue: oldUsers, newValue: newUsers });
+  }
+
+  // Monthly email limit
+  const oldEmails = formatLimit(oldPlan?.monthlyEmailLimit);
+  const newEmails = formatLimit(newPlan.monthlyEmailLimit);
+  if (oldEmails !== newEmails) {
+    changes.push({ name: 'Monthly Emails', oldValue: oldEmails, newValue: newEmails });
+  }
+
+  // Storage limit
+  const oldStorage = formatLimit(oldPlan?.storageLimit);
+  const newStorage = formatLimit(newPlan.storageLimit);
+  if (oldStorage !== newStorage) {
+    changes.push({ name: 'Storage Limit', oldValue: oldStorage, newValue: newStorage });
+  }
+
+  // Support level
+  const oldSupport = oldPlan?.supportLevel || null;
+  const newSupport = newPlan.supportLevel || null;
+  if (oldSupport !== newSupport) {
+    changes.push({ name: 'Support Level', oldValue: oldSupport, newValue: newSupport });
+  }
+
+  return changes;
 }

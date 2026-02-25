@@ -5,10 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Check, Star, Loader2, CreditCard, Sparkles, Shield, Zap, Crown } from "lucide-react";
+import { Check, Star, Loader2, CreditCard, Sparkles, Shield, Zap, Crown, LogOut } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { useReduxAuth, useReduxLogout } from "@/hooks/useReduxAuth";
 
 interface SubscriptionPlan {
   id: string;
@@ -48,6 +48,7 @@ export default function SelectPlanPage() {
   const searchString = useSearch();
   const { toast } = useToast();
   const { user, isAuthenticated, isInitialized } = useReduxAuth();
+  const { logout } = useReduxLogout();
 
   // Parse search params
   const searchParams = new URLSearchParams(searchString);
@@ -221,6 +222,14 @@ export default function SelectPlanPage() {
           </div>
           <span className="text-white text-lg font-semibold tracking-tight">Zendwise</span>
         </div>
+        <Button
+          variant="ghost"
+          className="text-blue-200/70 hover:text-white hover:bg-white/10 gap-2"
+          onClick={logout}
+        >
+          <LogOut className="w-4 h-4" />
+          Log out
+        </Button>
       </header>
 
       {/* Main content */}
@@ -277,8 +286,8 @@ export default function SelectPlanPage() {
               <Card
                 key={plan.id}
                 className={`relative bg-white/5 backdrop-blur-sm border transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${plan.isPopular
-                    ? "border-blue-400/50 shadow-lg shadow-blue-500/10"
-                    : "border-white/10 hover:border-white/20"
+                  ? "border-blue-400/50 shadow-lg shadow-blue-500/10"
+                  : "border-white/10 hover:border-white/20"
                   }`}
               >
                 {plan.isPopular && (
@@ -327,10 +336,10 @@ export default function SelectPlanPage() {
                 <CardContent className="pt-0 pb-8 px-6">
                   <Button
                     className={`w-full mb-6 h-11 font-semibold ${plan.isPopular
-                        ? "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25"
-                        : isFree
-                          ? "bg-white/10 hover:bg-white/20 text-white border border-white/20"
-                          : "bg-white/10 hover:bg-white/20 text-white border border-white/20"
+                      ? "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25"
+                      : isFree
+                        ? "bg-white/10 hover:bg-white/20 text-white border border-white/20"
+                        : "bg-white/10 hover:bg-white/20 text-white border border-white/20"
                       }`}
                     onClick={() => handleSelectPlan(plan.id)}
                     disabled={checkoutMutation.isPending}
