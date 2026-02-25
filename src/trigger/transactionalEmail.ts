@@ -48,7 +48,7 @@ export const sendTransactionalEmailTask = task({
   run: async (payload: TransactionalEmailPayload) => {
     const data = transactionalEmailSchema.parse(payload);
 
-    const baseUrl = data.baseUrl || process.env.BASE_URL || "http://localhost:5002";
+    const baseUrl = data.baseUrl || process.env.BASE_URL || "http://localhost:5000";
     const appName = data.appName || process.env.APP_NAME || "Zendwise";
     const fromEmail = "noreply@zendwise.com";
     const displayName = data.recipientName ? ` ${data.recipientName}` : "";

@@ -99,7 +99,7 @@ loginRoutes.post('/resend-verification', async (req, res) => {
           recipientEmail: user.email,
           recipientName: user.firstName,
           verificationToken: verificationToken,
-          baseUrl: process.env.BASE_URL || 'http://localhost:5002',
+          baseUrl: process.env.BASE_URL || 'http://localhost:5000',
           appName: process.env.APP_NAME || 'Zendwise',
         });
         if (triggerResult.success) {
@@ -1017,7 +1017,7 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
         recipientEmail: normalizedEmail,
         recipientName: user.firstName || user.name?.split(' ')[0],
         verificationToken: verificationToken,
-        baseUrl: process.env.BASE_URL || 'http://localhost:5002',
+        baseUrl: process.env.BASE_URL || 'http://localhost:5000',
         appName: process.env.APP_NAME || 'Zendwise',
       });
 
