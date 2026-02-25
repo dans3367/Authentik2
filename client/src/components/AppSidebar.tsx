@@ -361,60 +361,64 @@ export function AppSidebar() {
 
                 </div>
 
-                <DropdownMenuSeparator />
+                {planName?.toLowerCase().includes('free') && (
+                  <>
+                    <DropdownMenuSeparator />
 
-                {/* Plan Section - Enhanced Upgrade */}
-                <div className="mx-3 my-2 rounded-xl overflow-hidden relative group/upgrade">
-                  <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 opacity-95" />
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.15),transparent_50%)]" />
-                  <div className="absolute top-1 right-2 opacity-10 group-hover/upgrade:opacity-20 transition-opacity duration-500">
-                    <Crown className="h-12 w-12 text-yellow-300" />
-                  </div>
-
-                  <div className="relative px-4 py-3.5 space-y-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-white/15 backdrop-blur-sm">
-                        <Zap className="h-3.5 w-3.5 text-yellow-300" />
+                    {/* Plan Section - Enhanced Upgrade */}
+                    <div className="mx-3 my-2 rounded-xl overflow-hidden relative group/upgrade">
+                      <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 opacity-95" />
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.15),transparent_50%)]" />
+                      <div className="absolute top-1 right-2 opacity-10 group-hover/upgrade:opacity-20 transition-opacity duration-500">
+                        <Crown className="h-12 w-12 text-yellow-300" />
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-white/90 tracking-wide uppercase">
-                          {planName}
+
+                      <div className="relative px-4 py-3.5 space-y-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-white/15 backdrop-blur-sm">
+                            <Zap className="h-3.5 w-3.5 text-yellow-300" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-white/90 tracking-wide uppercase">
+                              {planName}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <p className="text-[11px] text-white/70">
+                              12,000 / 50,000 views
+                            </p>
+                            <p className="text-[11px] text-white/50">24%</p>
+                          </div>
+                          <div className="w-full h-1.5 bg-white/15 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-400 rounded-full transition-all duration-1000 ease-out"
+                              style={{ width: '24%' }}
+                            />
+                          </div>
+                        </div>
+
+                        <Button
+                          onClick={() => setLocation('/profile?tab=subscription')}
+                          size="sm"
+                          data-testid="button-upgrade-plan"
+                          className="w-full relative overflow-hidden bg-white hover:bg-gray-50 text-indigo-700 font-bold text-xs py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] group/btn"
+                        >
+                          <span className="relative z-10 flex items-center justify-center gap-1.5">
+                            <Sparkles className="h-3.5 w-3.5 text-indigo-600 group-hover/btn:animate-spin" />
+                            <span>Upgrade to Pro</span>
+                          </span>
+                        </Button>
+
+                        <p className="text-[10px] text-center text-white/50">
+                          Unlock unlimited views & premium features
                         </p>
                       </div>
                     </div>
-
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[11px] text-white/70">
-                          12,000 / 50,000 views
-                        </p>
-                        <p className="text-[11px] text-white/50">24%</p>
-                      </div>
-                      <div className="w-full h-1.5 bg-white/15 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-400 rounded-full transition-all duration-1000 ease-out"
-                          style={{ width: '24%' }}
-                        />
-                      </div>
-                    </div>
-
-                    <Button
-                      onClick={() => setLocation('/profile?tab=subscription')}
-                      size="sm"
-                      data-testid="button-upgrade-plan"
-                      className="w-full relative overflow-hidden bg-white hover:bg-gray-50 text-indigo-700 font-bold text-xs py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] group/btn"
-                    >
-                      <span className="relative z-10 flex items-center justify-center gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-indigo-600 group-hover/btn:animate-spin" />
-                        <span>Upgrade to Pro</span>
-                      </span>
-                    </Button>
-
-                    <p className="text-[10px] text-center text-white/50">
-                      Unlock unlimited views & premium features
-                    </p>
-                  </div>
-                </div>
+                  </>
+                )}
 
                 <DropdownMenuSeparator />
 
