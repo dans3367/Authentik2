@@ -640,7 +640,8 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
     if (existingSubscription &&
       existingSubscription.status === 'active' &&
       existingSubscription.stripeSubscriptionId &&
-      !existingSubscription.stripeSubscriptionId.startsWith('manual_')) {
+      !existingSubscription.stripeSubscriptionId.startsWith('manual_') &&
+      !existingSubscription.stripeSubscriptionId.startsWith('free_')) {
 
       // Verify the Stripe subscription is actually active with Stripe
       // SECURITY: This check now applies to ANY existing Stripe subscription, not just same-plan changes
@@ -1159,14 +1160,17 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
       return res.status(400).json({ message: 'Plan ID not found in session metadata' });
     }
 
-    // Check if subscription already exists for this tenant (idempotency)
+    // Check if subscription already exists for this tenant
     const existingSub = await db.query.subscriptions.findFirst({
       where: eq(subscriptions.tenantId, tenantId),
     });
 
-    if (existingSub && existingSub.status === 'active') {
+    // Idempotency: only skip if the existing active subscription already has THIS plan
+    // If planId differs, this is an upgrade/change and must proceed
+    if (existingSub && existingSub.status === 'active' && existingSub.planId === planId) {
       return res.json({
         message: 'Subscription already active',
+        success: true,
         subscription: existingSub,
       });
     }
@@ -1217,16 +1221,25 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
       // Get subscription details from Stripe
       const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId) as any;
 
+      // Safe date parsing — fallback to computed period if Stripe timestamps are missing or invalid
+      console.log(`📅 [Confirm Checkout] Stripe sub dates: start=${stripeSub.current_period_start}, end=${stripeSub.current_period_end}, status=${stripeSub.status}`);
+      const safeDate = (ts: any, fallback: Date) => {
+        if (typeof ts === 'number' && isFinite(ts)) return new Date(ts * 1000);
+        return fallback;
+      };
+      const periodStart = safeDate(stripeSub.current_period_start, now);
+      const periodEndFromStripe = safeDate(stripeSub.current_period_end, periodEnd);
+
       const subValues = {
         tenantId,
         userId,
         planId,
         stripeSubscriptionId: stripeSub.id,
         stripeCustomerId,
-        status: stripeSub.status,
-        currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
-        currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
-        cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+        status: stripeSub.status || 'active',
+        currentPeriodStart: periodStart,
+        currentPeriodEnd: periodEndFromStripe,
+        cancelAtPeriodEnd: stripeSub.cancel_at_period_end || false,
         isYearly,
       };
 
@@ -1238,7 +1251,7 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
         await db.insert(subscriptions).values(subValues);
       }
 
-      console.log(`✅ [Confirm Checkout] Paid subscription ${stripeSub.id} created for tenant ${tenantId}`);
+      console.log(`✅ [Confirm Checkout] Paid subscription ${stripeSub.id} ${existingSub ? 'updated (upgrade)' : 'created'} for tenant ${tenantId}, planId: ${planId}`);
     }
 
     res.json({
@@ -1375,16 +1388,22 @@ async function handleCheckoutSessionCompleted(session: any) {
         }
       }
 
+      const now = new Date();
+      const fallbackEnd = new Date(now);
+      if (isYearly) { fallbackEnd.setFullYear(fallbackEnd.getFullYear() + 1); } else { fallbackEnd.setMonth(fallbackEnd.getMonth() + 1); }
+
       const subValues: any = {
         tenantId,
         userId: userId || 'unknown',
         planId,
         stripeCustomerId,
         stripeSubscriptionId: stripeSubscription.id,
-        status: stripeSubscription.status,
-        currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
-        cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+        status: stripeSubscription.status || 'active',
+        currentPeriodStart: stripeSubscription.current_period_start
+          ? new Date(stripeSubscription.current_period_start * 1000) : now,
+        currentPeriodEnd: stripeSubscription.current_period_end
+          ? new Date(stripeSubscription.current_period_end * 1000) : fallbackEnd,
+        cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end || false,
         isYearly,
       };
 
@@ -1431,13 +1450,16 @@ async function handleSubscriptionUpdated(stripeSubscription: any) {
       return;
     }
 
+    const now = new Date();
     const updateData: any = {
       status: stripeSubscription.status,
       stripeSubscriptionId: stripeSubscription.id, // Always keep in sync
-      currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
-      cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
-      updatedAt: new Date(),
+      currentPeriodStart: stripeSubscription.current_period_start
+        ? new Date(stripeSubscription.current_period_start * 1000) : now,
+      currentPeriodEnd: stripeSubscription.current_period_end
+        ? new Date(stripeSubscription.current_period_end * 1000) : now,
+      cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end || false,
+      updatedAt: now,
     };
 
     // Resolve planId from Stripe's subscription metadata (set during checkout)
