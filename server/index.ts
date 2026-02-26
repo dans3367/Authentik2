@@ -31,30 +31,52 @@ app.use(helmetMiddleware);
 // Static CORS and security headers
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  let allowedOrigin = process.env.CORS_ORIGIN || '*';
-
-  // Allow localhost, 127.0.0.1, and any IP address on the local network
-  if (origin && (
-    origin.startsWith('http://localhost:') ||
-    origin.startsWith('http://127.0.0.1:') ||
-    origin.startsWith('http://192.168.') ||
-    origin.startsWith('http://10.') ||
-    origin.startsWith('http://172.') ||
-    // Also allow HTTPS versions
-    origin.startsWith('https://localhost:') ||
-    origin.startsWith('https://127.0.0.1:') ||
-    origin.startsWith('https://192.168.') ||
-    origin.startsWith('https://10.') ||
-    origin.startsWith('https://172.')
-  )) {
-    allowedOrigin = origin;
+  // Build list of allowed origins from CORS_ORIGIN (comma-separated) and FRONTEND_URL
+  const corsOriginEnv = process.env.CORS_ORIGIN || '';
+  const frontendUrl = process.env.FRONTEND_URL || '';
+  const allowedOrigins = new Set<string>();
+  
+  // Add explicitly configured origins (comma-separated)
+  if (corsOriginEnv && corsOriginEnv !== '*') {
+    corsOriginEnv.split(',').map(o => o.trim()).filter(Boolean).forEach(o => allowedOrigins.add(o));
+  }
+  // Add frontend URL as allowed origin
+  if (frontendUrl) {
+    allowedOrigins.add(frontendUrl);
+  }
+  // Add BASE_URL if configured
+  if (process.env.BASE_URL) {
+    allowedOrigins.add(process.env.BASE_URL);
   }
 
-  res.header('Access-Control-Allow-Origin', allowedOrigin);
+  // Check if origin is allowed
+  let allowedOrigin: string | null = null;
+  
+  if (origin) {
+    // Check explicit allowlist first
+    if (allowedOrigins.has(origin)) {
+      allowedOrigin = origin;
+    }
+    // Allow localhost/127.0.0.1 in development only
+    else if (process.env.NODE_ENV === 'development' && (
+      origin.startsWith('http://localhost:') ||
+      origin.startsWith('http://127.0.0.1:') ||
+      origin.startsWith('https://localhost:') ||
+      origin.startsWith('https://127.0.0.1:')
+    )) {
+      allowedOrigin = origin;
+    }
+  }
+
+  // Only set CORS headers if origin is allowed
+  if (allowedOrigin) {
+    res.header('Access-Control-Allow-Origin', allowedOrigin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  // Always set Vary header for proper caching
   res.header('Vary', 'Origin');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Cookie, Set-Cookie, X-Internal-Service');
-  res.header('Access-Control-Allow-Credentials', 'true');
 
   // Keep existing security headers (static)
   res.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');

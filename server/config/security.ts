@@ -2,28 +2,31 @@ import { Request } from "express";
 
 // Security configuration
 export const securityConfig = {
-  // Rate limiting configurations - RELAXED FOR DEBUGGING
+  // Rate limiting disable flag - set to true to bypass all rate limiting
+  disableRateLimiting: process.env.DISABLE_RATE_LIMITING === 'true',
+  
+  // Rate limiting configurations - 10x RELAXED FOR DEBUGGING
   rateLimits: {
     general: {
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 1000, // Increased from 100 to 1000 for debugging
+      max: 10000, // 10x relaxed (was 1000)
     },
     auth: {
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 50, // Increased from 5 to 50 for debugging
+      max: 500, // 10x relaxed (was 50)
       skipSuccessfulRequests: true,
     },
     api: {
       windowMs: 1 * 60 * 1000, // 1 minute
-      max: 300, // Increased from 60 to 300 for debugging
+      max: 3000, // 10x relaxed (was 300)
     },
     passwordReset: {
       windowMs: 60 * 60 * 1000, // 1 hour
-      max: 20, // Increased from 3 to 20 for debugging
+      max: 200, // 10x relaxed (was 20)
     },
     registration: {
       windowMs: 60 * 60 * 1000, // 1 hour
-      max: 50, // Increased from 5 to 50 for debugging
+      max: 500, // 10x relaxed (was 50)
     },
   },
 

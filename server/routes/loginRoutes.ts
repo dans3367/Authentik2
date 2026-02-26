@@ -5,7 +5,7 @@ import { eq, and, sql, lt } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth-middleware';
-import { auth } from '../auth';
+import { auth, getAuthSecret } from '../auth';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { triggerTransactionalEmail } from '../lib/trigger';
@@ -80,7 +80,7 @@ loginRoutes.post('/resend-verification', async (req, res) => {
       }
 
       // Generate new verification token (JWT)
-      const secret = process.env.BETTER_AUTH_SECRET || 'fallback-secret-key-change-in-production';
+      const secret = getAuthSecret();
       const verificationToken = jwt.sign(
         {
           email: user.email,
@@ -91,6 +91,17 @@ loginRoutes.post('/resend-verification', async (req, res) => {
       );
 
       console.log('✅ [Resend Verification] Generated token for:', user.email);
+
+      // Persist the token on the user row so the verify-email endpoint can
+      // enforce single-use: only the latest token is valid, and it is
+      // cleared after consumption.
+      await db.update(betterAuthUser)
+        .set({
+          emailVerificationToken: verificationToken,
+          emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          updatedAt: new Date()
+        })
+        .where(eq(betterAuthUser.id, user.id));
 
       // Dispatch verification email via Trigger.dev + SES
       // Failures are logged internally but never surfaced to the client to
@@ -304,25 +315,6 @@ loginRoutes.post('/verify-login', async (req, res) => {
   }
 });
 
-// 2FA verification state storage (in production, use Redis)
-const twoFactorPendingVerifications = new Map<string, {
-  userId: string;
-  tenantId: string;
-  verified: boolean;
-  expiresAt: number;
-}>();
-
-// Clean up expired verifications every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  const entries = Array.from(twoFactorPendingVerifications.entries());
-  for (const [sessionToken, verification] of entries) {
-    if (verification.expiresAt < now) {
-      twoFactorPendingVerifications.delete(sessionToken);
-    }
-  }
-}, 5 * 60 * 1000);
-
 // Clean up expired temporary 2FA sessions every 5 minutes
 setInterval(async () => {
   try {
@@ -533,43 +525,40 @@ loginRoutes.post('/verify-2fa', async (req, res) => {
     await db.delete(temp2faSessions)
       .where(eq(temp2faSessions.id, tempSession.id));
 
-    // After successful 2FA verification, get user credentials and use Better Auth's signin
-    console.log('✅ [2FA] Creating Better Auth session after 2FA verification');
+    // After successful 2FA verification, create a database-backed session directly.
+    // Credentials were already validated at initial login; 2FA code was just verified above.
+    console.log('✅ [2FA] Creating database-backed session after 2FA verification');
 
-    // We need to get the email to sign in with Better Auth
-    const userEmail = user.email;
+    const sessionToken = randomBytes(32).toString('base64url');
+    const sessionId = randomBytes(16).toString('base64url');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    // Use Better Auth's signin to create a proper session
     try {
-      const loginResult = await auth.api.signInEmail({
-        body: {
-          email: userEmail,
-          password: 'bypass' // We already validated credentials, this is just for session creation
-        },
-        headers: req.headers as any
+      await db.insert(betterAuthSession).values({
+        id: sessionId,
+        token: sessionToken,
+        userId: user.id,
+        createdAt: now,
+        updatedAt: now,
+        expiresAt: expiresAt,
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        userAgent: req.headers['user-agent'] || null,
       });
 
-      if (loginResult && loginResult.token) {
-        // Set the session cookie from Better Auth
-        res.cookie('better-auth.session_token', loginResult.token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-          path: '/'
-        });
-        console.log('✅ [2FA] Better Auth session created successfully');
-      }
-    } catch (authError) {
-      console.error('❌ [2FA] Failed to create Better Auth session:', authError);
-      // Fallback: create manual session token (this might not work with frontend)
-      const manualToken = `auth_${user.id}_${Date.now()}_${randomBytes(16).toString('base64url')}`;
-      res.cookie('better-auth.session_token', manualToken, {
+      res.cookie('better-auth.session_token', sessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         path: '/'
+      });
+      console.log('✅ [2FA] Database session created successfully');
+    } catch (sessionError) {
+      console.error('❌ [2FA] Failed to create session in database:', sessionError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create session after 2FA verification. Please try logging in again.'
       });
     }
 
@@ -658,12 +647,14 @@ loginRoutes.post('/verify-session-2fa', authenticateToken, async (req: any, res)
       });
     }
 
-    twoFactorPendingVerifications.set(sessionToken, {
-      userId,
-      tenantId,
-      verified: true,
-      expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
-    });
+    // Update the temp 2FA session in database to mark as verified with extended expiry
+    const newExpiresAt = new Date(Date.now() + (24 * 60 * 60 * 1000)); // 24 hours
+    await db.update(temp2faSessions)
+      .set({
+        verified: true,
+        expiresAt: newExpiresAt
+      })
+      .where(eq(temp2faSessions.sessionToken, sessionToken));
 
     // Update last login time
     await db.update(betterAuthUser)
@@ -745,8 +736,14 @@ loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
       });
     }
 
-    const verification = twoFactorPendingVerifications.get(sessionToken);
-    const isVerified = verification && verification.verified && verification.expiresAt > Date.now();
+    // Query database for 2FA verification status
+    const verification = await db.query.temp2faSessions.findFirst({
+      where: and(
+        eq(temp2faSessions.sessionToken, sessionToken),
+        eq(temp2faSessions.verified, true)
+      )
+    });
+    const isVerified = verification && verification.expiresAt > new Date();
 
     console.log(`📊 [2FA Status] Session verification for ${user.email}:`, {
       sessionToken: sessionToken.substring(0, 8) + '...',
@@ -757,16 +754,7 @@ loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
     const response = {
       requiresTwoFactor: !isVerified,
       twoFactorEnabled: true,
-      verified: isVerified,
-      debug: {
-        userId,
-        tenantId,
-        userEmail: user.email,
-        sessionToken: sessionToken.substring(0, 8) + '...',
-        verification: verification ? 'found' : 'not found',
-        isVerified,
-        verificationExpiresAt: verification?.expiresAt
-      }
+      verified: isVerified
     };
 
     console.log(`📊 [2FA Status] Response:`, response);
@@ -779,7 +767,7 @@ loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
 });
 
 // Middleware to require 2FA verification for protected routes
-export function requireTwoFactorVerification(req: any, res: any, next: any) {
+export async function requireTwoFactorVerification(req: any, res: any, next: any) {
   const sessionToken = req.cookies?.['better-auth.session_token'];
 
   if (!sessionToken) {
@@ -789,21 +777,33 @@ export function requireTwoFactorVerification(req: any, res: any, next: any) {
     });
   }
 
-  // Check if this session needs 2FA and if it's verified
-  const verification = twoFactorPendingVerifications.get(sessionToken);
+  try {
+    // Query database for 2FA verification status
+    const verification = await db.query.temp2faSessions.findFirst({
+      where: and(
+        eq(temp2faSessions.sessionToken, sessionToken),
+        eq(temp2faSessions.verified, true)
+      )
+    });
 
-  // If there's no verification record, or it's not verified, or it's expired
-  if (!verification || !verification.verified || verification.expiresAt < Date.now()) {
-    // We need to check if the user has 2FA enabled
-    // This will be done by the frontend calling /check-2fa-requirement
-    return res.status(403).json({
-      message: '2FA verification required',
-      requiresTwoFactor: true,
-      code: 'TWO_FACTOR_REQUIRED'
+    // If there's no verification record, or it's expired
+    if (!verification || verification.expiresAt < new Date()) {
+      // We need to check if the user has 2FA enabled
+      // This will be done by the frontend calling /check-2fa-requirement
+      return res.status(403).json({
+        message: '2FA verification required',
+        requiresTwoFactor: true,
+        code: 'TWO_FACTOR_REQUIRED'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('2FA verification middleware error:', error);
+    return res.status(500).json({
+      message: 'Internal server error'
     });
   }
-
-  next();
 }
 
 // Custom email verification endpoint that creates a session automatically
@@ -823,8 +823,8 @@ loginRoutes.get('/verify-email', async (req, res) => {
     let email: string;
     try {
       const jwt = await import('jsonwebtoken');
-      const secret = process.env.BETTER_AUTH_SECRET || 'fallback-secret-key-change-in-production';
-      const decoded = jwt.default.verify(token, secret) as { email: string; iat: number; exp: number };
+      const secret = getAuthSecret();
+      const decoded = jwt.default.verify(token, secret, { algorithms: ['HS256'] }) as { email: string; iat: number; exp: number };
       email = decoded.email;
       console.log('✅ [Verify Email] JWT decoded, email:', email);
     } catch (jwtError: any) {
@@ -848,15 +848,39 @@ loginRoutes.get('/verify-email', async (req, res) => {
 
     console.log('✅ [Verify Email] Found user:', user.email);
 
+    // Enforce single-use: the presented token must match the one stored on
+    // the user row. After successful verification the stored token is
+    // cleared, so any replay of the same (or an older) token is rejected.
+    if (!user.emailVerificationToken || user.emailVerificationToken !== token) {
+      console.log('❌ [Verify Email] Token already used or does not match stored token for:', user.email);
+      return res.status(400).json({
+        message: 'Verification token has already been used or is invalid'
+      });
+    }
+
     // Check if user is already verified
     if (user.emailVerified) {
       console.log('ℹ️ [Verify Email] User already verified:', user.email);
-      // Still create a session so they can proceed
+      // Clear the stale token but do not create a new session
+      await db.update(betterAuthUser)
+        .set({
+          emailVerificationToken: null,
+          emailVerificationExpires: null,
+          updatedAt: new Date()
+        })
+        .where(eq(betterAuthUser.id, user.id));
+      return res.json({
+        message: 'Email already verified',
+        success: true,
+        alreadyVerified: true
+      });
     } else {
-      // Update user to mark email as verified
+      // Mark email as verified and clear the single-use token atomically
       await db.update(betterAuthUser)
         .set({
           emailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationExpires: null,
           updatedAt: new Date()
         })
         .where(eq(betterAuthUser.id, user.id));
@@ -900,6 +924,7 @@ loginRoutes.get('/verify-email', async (req, res) => {
     console.log('✅ [Verify Email] Session cookie set');
 
     // Return success response with user info
+    // Note: Session token is set via httpOnly cookie only - not exposed in response body
     res.json({
       message: 'Email verified successfully',
       success: true,
@@ -908,8 +933,7 @@ loginRoutes.get('/verify-email', async (req, res) => {
         email: user.email,
         name: user.name,
         emailVerified: true
-      },
-      accessToken: sessionToken // Include token for frontend compatibility
+      }
     });
 
   } catch (error) {
@@ -997,7 +1021,7 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
       .where(eq(betterAuthUser.id, userId));
 
     // Generate new verification token
-    const secret = process.env.BETTER_AUTH_SECRET || 'fallback-secret-key-change-in-production';
+    const secret = getAuthSecret();
     const verificationToken = jwt.sign(
       { email: normalizedEmail, iat: Math.floor(Date.now() / 1000) },
       secret,

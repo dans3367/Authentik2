@@ -5,6 +5,14 @@ import { betterAuthUser, betterAuthSession, betterAuthAccount, betterAuthVerific
 import { triggerTransactionalEmail } from "./lib/trigger";
 import { eq, sql } from "drizzle-orm";
 
+export function getAuthSecret(): string {
+  const secret = process.env.BETTER_AUTH_SECRET;
+  if (!secret) {
+    throw new Error("BETTER_AUTH_SECRET environment variable is not set. Refusing to start with an insecure fallback.");
+  }
+  return secret;
+}
+
 const authInstance = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -24,6 +32,16 @@ const authInstance = betterAuth({
     sendOnSignUp: true,
     sendVerificationEmail: async ({ user, url, token }) => {
       try {
+        // Persist the token on the user row so the verify-email endpoint can
+        // enforce single-use (cleared after consumption).
+        await db.update(betterAuthUser)
+          .set({
+            emailVerificationToken: token,
+            emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            updatedAt: new Date(),
+          })
+          .where(eq(betterAuthUser.id, user.id));
+
         console.log(`📧 [Auth] Dispatching verification email via Trigger.dev + SES for: ${user.email}`);
         const result = await triggerTransactionalEmail({
           type: "verification",
@@ -50,7 +68,7 @@ const authInstance = betterAuth({
     // Example: google, github, etc.
   },
   baseURL: process.env.BASE_URL || `http://localhost:${process.env.PORT || "5002"}`,
-  secret: process.env.BETTER_AUTH_SECRET || "fallback-secret-key-change-in-production",
+  secret: getAuthSecret(),
   trustedOrigins: [
     `http://localhost:${process.env.PORT || "5002"}`,
     "http://localhost:5173",

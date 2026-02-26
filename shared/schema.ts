@@ -340,6 +340,7 @@ export const temp2faSessions = pgTable("temp_2fa_sessions", {
   sessionToken: text("session_token").notNull().unique(), // Better Auth session token
   userId: text("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  verified: boolean("verified").default(false), // Whether 2FA code has been verified
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });

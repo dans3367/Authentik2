@@ -110,7 +110,7 @@ export const requireRole = (requiredRole: string | string[]) => {
 
     if (!hasAccess) {
       return res.status(403).json({
-        message: `Insufficient permissions. Required role(s): ${requiredRoles.join(', ')}, your role: ${req.user.role}`
+        message: 'Insufficient permissions for this action'
       });
     }
 
@@ -271,7 +271,7 @@ export const requirePermission = (permission: string | string[]) => {
 
     if (!hasPermission) {
       return res.status(403).json({
-        message: `Insufficient permissions. Required: ${requiredPermissions.join(' or ')}, your role: ${userRole}`,
+        message: 'Insufficient permissions for this action'
       });
     }
 

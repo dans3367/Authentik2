@@ -3093,9 +3093,14 @@ emailManagementRoutes.post("/birthday-invitation/:contactId", authenticateToken,
     }
 
     // Create profile update URL with token
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('❌ [Security] JWT_SECRET environment variable is not set');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
     const profileUpdateToken = jwt.sign(
       { contactId, action: 'update_birthday' },
-      process.env.JWT_SECRET!,
+      jwtSecret,
       { expiresIn: '30d' }
     );
 
@@ -3183,9 +3188,14 @@ emailManagementRoutes.post("/update-profile", async (req: any, res) => {
     }
 
     // Verify the token
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('❌ [Security] JWT_SECRET environment variable is not set');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
     let decoded: any;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET!);
+      decoded = jwt.verify(token, jwtSecret);
     } catch (error) {
       return res.status(401).json({ message: 'Invalid or expired token' });
     }
@@ -3245,9 +3255,14 @@ emailManagementRoutes.get("/profile-form", async (req: any, res) => {
     }
 
     // Verify the token
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('❌ [Security] JWT_SECRET environment variable is not set');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
     let decoded: any;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET!);
+      decoded = jwt.verify(token, jwtSecret);
     } catch (error) {
       return res.status(401).json({ message: 'Invalid or expired token' });
     }

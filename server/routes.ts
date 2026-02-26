@@ -25,6 +25,7 @@ import { userRoutes } from "./routes/userRoutes";
 import { authRoutes } from "./routes/authRoutes";
 import { twoFactorRoutes } from "./routes/twoFactorRoutes";
 import { loginRoutes } from "./routes/loginRoutes";
+import { getAuthSecret } from "./auth";
 import { tenantLimitsRoutes } from "./routes/tenantLimitsRoutes";
 import { promotionRoutes } from "./routes/promotionRoutes";
 import customCardsRoutes from "./routes/customCardsRoutes";
@@ -329,12 +330,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate external service token endpoint
   app.post("/api/external-token", authenticateToken, jwtTokenRateLimiter, async (req: any, res) => {
     try {
-      // Validate JWT secret exists - CRITICAL SECURITY FIX
-      const jwtSecret = process.env.JWT_SECRET;
-      if (!jwtSecret) {
-        console.error('❌ [Security] JWT_SECRET environment variable is not set');
-        return res.status(500).json({ message: 'Server configuration error' });
-      }
+      // Use consistent auth secret (same as loginRoutes.ts)
+      const jwtSecret = getAuthSecret();
 
       const jwt = await import('jsonwebtoken');
 

@@ -96,28 +96,28 @@ export const createRateLimiter = (options: {
   });
 };
 
-// Default rate limiters - RELAXED FOR DEBUGGING
+// Default rate limiters - 10x RELAXED FOR DEBUGGING
 export const generalRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Increased from 100 to 1000 for debugging
+  max: 10000, // 10x relaxed (was 1000)
 });
 
 export const authRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50, // Increased from 5 to 50 for debugging
+  max: 500, // 10x relaxed (was 50)
   message: "Too many authentication attempts, please try again later.",
   skipSuccessfulRequests: true,
 });
 
 export const apiRateLimiter = createRateLimiter({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 300, // Increased from 60 to 300 for debugging
+  max: 3000, // 10x relaxed (was 300)
 });
 
-// JWT Token generation rate limiter - more restrictive
+// JWT Token generation rate limiter - 10x relaxed
 export const jwtTokenRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Only 10 token requests per user per 15 minutes
+  max: 100, // 10x relaxed (was 10)
   message: "Too many token generation requests. Please try again later.",
   skipSuccessfulRequests: false, // Count both successful and failed attempts
 });
