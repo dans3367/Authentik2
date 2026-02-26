@@ -19,6 +19,7 @@ interface FormWizardProps {
     id: string;
     title: string;
     description: string;
+    category?: string;
     formData: string;
     theme: string;
     isActive: boolean;
@@ -102,6 +103,7 @@ const [, setLocation] = useLocation();
       const formDataToSave = {
         title: wizardState.formData.title,
         description: wizardState.formData.settings?.description || '',
+        category: wizardState.formData.category || 'intake',
         formData: JSON.stringify({
           elements: wizardState.formData.elements,
           settings: wizardState.formData.settings || {}
@@ -294,6 +296,7 @@ const [, setLocation] = useLocation();
             initialElements={wizardState.formData.elements}
             initialSettings={wizardState.formData.settings}
             initialTags={wizardState.formData.tags}
+            initialCategory={wizardState.formData.category}
             isEditMode={editMode}
           />
         )}

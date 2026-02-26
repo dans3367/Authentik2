@@ -379,6 +379,13 @@
       "when": 1771622670444,
       "tag": "0053_omniscient_iron_monger",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1772145392305,
+      "tag": "0054_curly_spot",
+      "breakpoints": true
     }
   ]
 }

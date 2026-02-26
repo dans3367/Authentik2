@@ -7,20 +7,21 @@ import { FormCanvas } from '@/components/form-builder/form-canvas';
 import { PropertiesPanel } from '@/components/form-builder/properties-panel';
 import { FormProperties } from '@/components/form-builder/form-properties';
 
-import { FormElementType, DragItem } from '@/types/form-builder';
+import { FormElementType, DragItem, FormCategory } from '@/types/form-builder';
 import { Button } from '@/components/ui/button';
 
 
 interface BuildStepProps {
-  onDataChange: (title: string, elements: any[], settings?: any, tags?: string[]) => void;
+  onDataChange: (title: string, elements: any[], settings?: any, tags?: string[], category?: FormCategory) => void;
   initialTitle?: string;
   initialElements?: any[];
   initialSettings?: any;
   initialTags?: string[];
+  initialCategory?: FormCategory;
   isEditMode?: boolean;
 }
 
-export function BuildStep({ onDataChange, initialTitle, initialElements, initialSettings, initialTags, isEditMode = false }: BuildStepProps) {
+export function BuildStep({ onDataChange, initialTitle, initialElements, initialSettings, initialTags, initialCategory = 'intake', isEditMode = false }: BuildStepProps) {
   const {
     formTitle,
     elements,
@@ -43,6 +44,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
 
   const [showMobileAdd, setShowMobileAdd] = useState(false);
   const [showMobileProperties, setShowMobileProperties] = useState(false);
+  const [formCategory, setFormCategory] = useState<FormCategory>(initialCategory);
   const [draggedType, setDraggedType] = useState<FormElementType | null>(null);
   const [draggedElementId, setDraggedElementId] = useState<string | null>(null);
   const [isDraggingElement, setIsDraggingElement] = useState(false);
@@ -132,7 +134,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   const selectedElement = elements.find(el => el.id === selectedElementId) || null;
   
   // Use refs to track data and initialization
-  const lastSentData = useRef<{title: string, elements: any[], settings: any, tags: string[]}>({ title: '', elements: [], settings: {}, tags: [] });
+  const lastSentData = useRef<{title: string, elements: any[], settings: any, tags: string[], category: FormCategory}>({ title: '', elements: [], settings: {}, tags: [], category: initialCategory });
   const hasInitialized = useRef(false);
   
   // Initialize form data from props on first mount only
@@ -172,17 +174,18 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
                            elements.length !== lastSentData.current.elements.length ||
                            JSON.stringify(elements) !== JSON.stringify(lastSentData.current.elements) ||
                            JSON.stringify(formSettings) !== JSON.stringify(lastSentData.current.settings) ||
-                           JSON.stringify(formTags) !== JSON.stringify(lastSentData.current.tags);
+                           JSON.stringify(formTags) !== JSON.stringify(lastSentData.current.tags) ||
+                           formCategory !== lastSentData.current.category;
         
         if (dataChanged) {
-          onDataChange(formTitle, elements, formSettings, formTags);
-          lastSentData.current = { title: formTitle, elements: [...elements], settings: { ...formSettings }, tags: [...formTags] };
+          onDataChange(formTitle, elements, formSettings, formTags, formCategory);
+          lastSentData.current = { title: formTitle, elements: [...elements], settings: { ...formSettings }, tags: [...formTags], category: formCategory };
         }
       }, 100); // 100ms debounce
       
       return () => clearTimeout(timeoutId);
     }
-  }, [formTitle, elements, formSettings, formTags, onDataChange]);
+  }, [formTitle, elements, formSettings, formTags, formCategory, onDataChange]);
 
   // Drag handlers
   const handleDragStart = (event: DragStartEvent) => {
@@ -352,6 +355,8 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
             settings={formSettings}
             tags={formTags}
             onUpdateTags={updateFormTags}
+            category={formCategory}
+            onUpdateCategory={setFormCategory}
             onUpdateSettings={(newSettings) => {
               // Update the entire settings object
               Object.keys(newSettings).forEach(key => {

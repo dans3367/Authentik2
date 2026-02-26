@@ -19,6 +19,7 @@ import {
   Megaphone,
   Bell,
   FileText,
+  FileQuestion,
   Target,
   Sparkles,
   Zap,
@@ -77,7 +78,10 @@ const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, max
     { name: t?.('navigation.dashboard') || "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: t?.('navigation.newsletter') || "Newsletter", href: "/newsletter", icon: Newspaper },
     { name: t?.('navigation.promotions') || "Promotions", href: "/promotions", icon: Megaphone },
-    { name: t?.('navigation.forms') || "Forms", href: "/forms", icon: ClipboardList },
+    { name: t?.('navigation.forms') || "Forms", href: "/forms", icon: ClipboardList, children: [
+      { name: t?.('navigation.intakeForms') || "Intake Forms", href: "/forms", icon: ClipboardList },
+      { name: t?.('navigation.surveyForms') || "Survey Forms", href: "/forms", icon: FileQuestion },
+    ] },
     { name: t?.('navigation.templates') || "Templates", href: "/templates", icon: FileText },
     { name: t?.('navigation.emailCampaigns') || "Email Campaigns", href: "/email-campaigns", icon: Mail },
     { name: t?.('navigation.cards') || "e-Cards", href: "/cards", icon: Gift },
@@ -210,8 +214,6 @@ export function AppSidebar() {
                 const Icon = item.icon;
 
                 if (hasChildren) {
-                  // Only show submenu when sidebar is collapsed (icon mode)
-                  const showSubmenu = isCollapsed;
                   return (
                     <SidebarMenuItem key={item.name} className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
                       <SidebarMenuButton
@@ -228,24 +230,22 @@ export function AppSidebar() {
                           <span className="group-data-[collapsible=icon]:hidden font-medium">{item.name}</span>
                         </Link>
                       </SidebarMenuButton>
-                      {showSubmenu && (
-                        <SidebarMenuSub>
-                          {item.children.map((child: any) => {
-                            const ChildIcon = child.icon;
-                            const childActive = location === child.href;
-                            return (
-                              <SidebarMenuSubItem key={child.name}>
-                                <SidebarMenuSubButton asChild isActive={childActive}>
-                                  <Link href={child.href} className="flex items-center gap-2" onClick={handleMobileNavClick}>
-                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                    <span>{child.name}</span>
-                                  </Link>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            );
-                          })}
-                        </SidebarMenuSub>
-                      )}
+                      <SidebarMenuSub>
+                        {item.children.map((child: any) => {
+                          const ChildIcon = child.icon;
+                          const childActive = location === child.href;
+                          return (
+                            <SidebarMenuSubItem key={child.name}>
+                              <SidebarMenuSubButton asChild isActive={childActive}>
+                                <Link href={child.href} className="flex items-center gap-2" onClick={handleMobileNavClick}>
+                                  {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                  <span>{child.name}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
                     </SidebarMenuItem>
                   );
                 }

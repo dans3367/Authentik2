@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Calendar, User, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText } from 'lucide-react';
+import { Plus, Loader2, Calendar, User, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText, ClipboardList, FileQuestion } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -20,6 +20,7 @@ interface Form {
   id: string;
   title: string;
   description: string;
+  category?: string;
   formData: string;
   theme: string;
   tags?: string[];
@@ -303,6 +304,165 @@ export default function Forms2() {
     }
   };
 
+  // Helper function to render a form card (used in both sections)
+  const renderFormCard = (form: Form) => {
+    // Parse theme data to get theme info
+    let themeData: { id: string; name: string; preview?: string } = { id: 'minimal', name: 'Unknown' };
+    try {
+      const parsed = JSON.parse(form.theme);
+      themeData = {
+        id: parsed.id || 'minimal',
+        name: parsed.name || parsed.id || 'Unknown',
+        preview: getThemePreview(parsed.id || 'minimal')
+      };
+    } catch (e) {
+      themeData = { id: 'minimal', name: form.theme || 'Unknown', preview: getThemePreview('minimal') };
+    }
+
+    // Parse form data to get element count
+    let elementCount = 0;
+    try {
+      const formDataParsed = JSON.parse(form.formData);
+      elementCount = formDataParsed.elements?.length || 0;
+    } catch (e) {
+      elementCount = 0;
+    }
+
+    return (
+      <Card key={form.id} className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300 group overflow-hidden rounded-none">
+        {/* Theme Preview Header */}
+        <div className={`h-20 relative flex items-center justify-center overflow-hidden ${themeData.preview} rounded-none`}>
+          <div className="text-center px-4">
+            {getThemePreviewContent(themeData.id)}
+          </div>
+          {/* Dropdown Menu positioned over theme preview */}
+          <div className="absolute top-2 right-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0 bg-black/20 hover:bg-black/30 text-white/90 hover:text-white backdrop-blur-sm rounded-full opacity-70 group-hover:opacity-100 transition-opacity">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleViewForm(form.id)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleQRForm(form.id)}>
+                  <QrCode className="mr-2 h-4 w-4" />
+                  QR
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleViewResponses(form.id)}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Responses ({form.responseCount})
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleEditForm(form.id)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <DropdownMenuItem
+                      onSelect={(e) => e.preventDefault()}
+                      className="text-red-600 dark:text-red-400 cursor-pointer"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the form "{form.title}" and all its responses.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDeleteForm(form.id)}
+                        className="bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
+                        disabled={deleteFormMutation.isPending}
+                      >
+                        {deleteFormMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          'Delete Form'
+                        )}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <CardHeader className="pb-3">
+          <CardTitle className="text-gray-900 dark:text-gray-100 text-lg font-semibold">
+            {form.title}
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {themeData.name}
+            </span>
+            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${form.isActive
+              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+              : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+              }`}>
+              {form.isActive ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-0">
+          {form.description && (
+            <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2">
+              {form.description}
+            </p>
+          )}
+
+          {/* Tags */}
+          {form.tags && form.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {form.tags.slice(0, 3).map((tagId) => (
+                <span
+                  key={tagId}
+                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                >
+                  Tag {tagId.slice(0, 8)}
+                </span>
+              ))}
+              {form.tags.length > 3 && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                  +{form.tags.length - 3}
+                </span>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center space-x-4">
+              <span className="flex items-center">
+                <User className="mr-1 h-3 w-3" />
+                {elementCount} field{elementCount !== 1 ? 's' : ''}
+              </span>
+              <span className="flex items-center">
+                <Calendar className="mr-1 h-3 w-3" />
+                {new Date(form.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {form.responseCount} response{form.responseCount !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   // Handle authentication errors after forms query fails (if any)
   if (isInitialized && formsError && (formsError.message?.includes('401') || formsError.message?.includes('Authentication failed'))) {
     setLocation('/auth');
@@ -447,165 +607,72 @@ export default function Forms2() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {forms.map((form) => {
-              // Parse theme data to get theme info
-              let themeData: { id: string; name: string; preview?: string } = { id: 'minimal', name: 'Unknown' };
-              try {
-                const parsed = JSON.parse(form.theme);
-                themeData = {
-                  id: parsed.id || 'minimal',
-                  name: parsed.name || parsed.id || 'Unknown',
-                  preview: getThemePreview(parsed.id || 'minimal')
-                };
-              } catch (e) {
-                themeData = { id: 'minimal', name: form.theme || 'Unknown', preview: getThemePreview('minimal') };
-              }
-
-              // Parse form data to get element count
-              let elementCount = 0;
-              try {
-                const formData = JSON.parse(form.formData);
-                elementCount = formData.elements?.length || 0;
-              } catch (e) {
-                elementCount = 0;
-              }
-
+          <div className="space-y-10">
+            {/* Intake Forms Section */}
+            {(() => {
+              const intakeForms = forms.filter(f => !f.category || f.category === 'intake');
               return (
-                <Card key={form.id} className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300 group overflow-hidden rounded-none">
-                  {/* Theme Preview Header */}
-                  <div className={`h-20 relative flex items-center justify-center overflow-hidden ${themeData.preview} rounded-none`}>
-                    <div className="text-center px-4">
-                      {/* Theme-specific preview content */}
-                      {getThemePreviewContent(themeData.id)}
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                      <ClipboardList className="h-5 w-5" />
+                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Intake Forms</h2>
                     </div>
-                    {/* Dropdown Menu positioned over theme preview */}
-                    <div className="absolute top-2 right-2">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0 bg-black/20 hover:bg-black/30 text-white/90 hover:text-white backdrop-blur-sm rounded-full opacity-70 group-hover:opacity-100 transition-opacity">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewForm(form.id)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleQRForm(form.id)}>
-                            <QrCode className="mr-2 h-4 w-4" />
-                            QR
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleViewResponses(form.id)}>
-                            <FileText className="mr-2 h-4 w-4" />
-                            Responses ({form.responseCount})
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditForm(form.id)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem
-                                onSelect={(e) => e.preventDefault()}
-                                className="text-red-600 dark:text-red-400 cursor-pointer"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the form "{form.title}" and all its responses.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteForm(form.id)}
-                                  className="bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
-                                  disabled={deleteFormMutation.isPending}
-                                >
-                                  {deleteFormMutation.isPending ? (
-                                    <>
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                      Deleting...
-                                    </>
-                                  ) : (
-                                    'Delete Form'
-                                  )}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Sign-ups, newsletters, lead capture
+                    </span>
+                    <span className="ml-auto text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
+                      {intakeForms.length} form{intakeForms.length !== 1 ? 's' : ''}
+                    </span>
                   </div>
-
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-gray-900 dark:text-gray-100 text-lg font-semibold">
-                      {form.title}
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {themeData.name}
-                      </span>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${form.isActive
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                        }`}>
-                        {form.isActive ? 'Active' : 'Inactive'}
-                      </span>
+                  {intakeForms.length === 0 ? (
+                    <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 border-dashed">
+                      <CardContent className="text-center py-8">
+                        <ClipboardList className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">No intake forms yet</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {intakeForms.map((form) => renderFormCard(form))}
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 pt-0">
-                    {form.description && (
-                      <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2">
-                        {form.description}
-                      </p>
-                    )}
-
-                    {/* Tags */}
-                    {form.tags && form.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {form.tags.slice(0, 3).map((tagId) => (
-                          <span
-                            key={tagId}
-                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                          >
-                            Tag {tagId.slice(0, 8)}
-                          </span>
-                        ))}
-                        {form.tags.length > 3 && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                            +{form.tags.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center space-x-4">
-                        <span className="flex items-center">
-                          <User className="mr-1 h-3 w-3" />
-                          {elementCount} field{elementCount !== 1 ? 's' : ''}
-                        </span>
-                        <span className="flex items-center">
-                          <Calendar className="mr-1 h-3 w-3" />
-                          {new Date(form.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {form.responseCount} response{form.responseCount !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
+                  )}
+                </div>
               );
-            })}
+            })()}
+
+            {/* Survey Forms Section */}
+            {(() => {
+              const surveyForms = forms.filter(f => f.category === 'survey');
+              return (
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
+                      <FileQuestion className="h-5 w-5" />
+                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Survey Forms</h2>
+                    </div>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Questionnaires, reviews, feedback
+                    </span>
+                    <span className="ml-auto text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
+                      {surveyForms.length} form{surveyForms.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  {surveyForms.length === 0 ? (
+                    <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 border-dashed">
+                      <CardContent className="text-center py-8">
+                        <FileQuestion className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">No survey forms yet</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {surveyForms.map((form) => renderFormCard(form))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

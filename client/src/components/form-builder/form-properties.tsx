@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Trash2, X, Plus, ChevronDown } from 'lucide-react';
+import { Trash2, X, Plus, ChevronDown, ClipboardList, FileQuestion } from 'lucide-react';
+import { FormCategory } from '@/types/form-builder';
 import { apiRequest } from '@/lib/queryClient';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +25,8 @@ interface FormPropertiesProps {
   elements?: any[];
   tags?: string[];
   onUpdateTags?: (tags: string[]) => void;
+  category?: FormCategory;
+  onUpdateCategory?: (category: FormCategory) => void;
   onClearForm?: () => void;
   hideClearButton?: boolean;
 }
@@ -36,6 +39,8 @@ export function FormProperties({
   elements = [],
   tags = [],
   onUpdateTags,
+  category = 'intake',
+  onUpdateCategory,
   onClearForm,
   hideClearButton = false
 }: FormPropertiesProps) {
@@ -132,6 +137,44 @@ export function FormProperties({
 placeholder={t('formBuilder.properties.formTitlePlaceholder','Enter form title...')}
                 className="focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+
+            {/* Form Category */}
+            <div>
+              <Label className="text-sm font-medium text-neutral-700 mb-2">
+                {t('formBuilder.properties.formCategory', 'Form Type')}
+              </Label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() => onUpdateCategory?.('intake')}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all duration-200 ${
+                    category === 'intake'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                      : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50'
+                  }`}
+                >
+                  <ClipboardList className="w-5 h-5" />
+                  <span className="text-xs font-medium">{t('formBuilder.properties.intakeForms', 'Intake')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onUpdateCategory?.('survey')}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all duration-200 ${
+                    category === 'survey'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm'
+                      : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50'
+                  }`}
+                >
+                  <FileQuestion className="w-5 h-5" />
+                  <span className="text-xs font-medium">{t('formBuilder.properties.surveyForms', 'Survey')}</span>
+                </button>
+              </div>
+              <p className="text-[10px] text-neutral-400 mt-1">
+                {category === 'intake'
+                  ? t('formBuilder.properties.intakeHint', 'Sign-ups, newsletters, lead capture')
+                  : t('formBuilder.properties.surveyHint', 'Questionnaires, reviews, feedback')}
+              </p>
             </div>
 
             {/* Form Description */}

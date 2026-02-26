@@ -10,7 +10,7 @@ export const formsRoutes = Router();
 // Get all forms for the user's company
 formsRoutes.get("/", authenticateToken, async (req: any, res) => {
   try {
-    const { page = 1, limit = 50, search, published } = req.query;
+    const { page = 1, limit = 50, search, published, category } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
     let whereClause = sql`${forms.tenantId} = ${req.user.tenantId}`;
@@ -25,6 +25,11 @@ formsRoutes.get("/", authenticateToken, async (req: any, res) => {
 
     if (published !== undefined) {
       whereClause = sql`${whereClause} AND ${forms.isActive} = ${published === 'true'}`;
+    }
+
+    if (category) {
+      const sanitizedCategory = sanitizeString(category as string);
+      whereClause = sql`${whereClause} AND ${forms.category} = ${sanitizedCategory}`;
     }
 
     const formsList = await db.query.forms.findMany({
@@ -81,7 +86,7 @@ formsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
 // Create new form
 formsRoutes.post("/", authenticateToken, async (req: any, res) => {
   try {
-const { title, description, formData, theme } = req.body;
+const { title, description, formData, theme, category } = req.body;
 
     if (!title || !formData) {
       return res.status(400).json({ message: 'Title and formData are required' });
@@ -93,6 +98,7 @@ const { title, description, formData, theme } = req.body;
     const newForm = await db.insert(forms).values({
       title: sanitizedTitle,
       description: sanitizedDescription,
+      category: (category as string) || 'intake',
       formData: formData, // Already a JSON string from client
       theme: theme, // Already a string from client
       tenantId: req.user.tenantId,
@@ -111,7 +117,7 @@ const { title, description, formData, theme } = req.body;
 formsRoutes.put("/:id", authenticateToken, async (req: any, res) => {
   try {
     const { id } = req.params;
-const { title, description, schema, settings, theme, published } = req.body;
+const { title, description, schema, settings, theme, published, category } = req.body;
 
     // Check if form exists and belongs to user's company
     const existingForm = await db.query.forms.findFirst({
@@ -149,6 +155,10 @@ const { title, description, schema, settings, theme, published } = req.body;
 
     if (published !== undefined) {
       updateData.published = published;
+    }
+
+    if (category !== undefined) {
+      updateData.category = category;
     }
 
     const updatedForm = await db.update(forms)

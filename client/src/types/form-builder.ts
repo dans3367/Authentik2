@@ -85,6 +85,8 @@ export interface FormBuilderState {
 
 export type WizardStep = 'build' | 'style' | 'preview';
 
+export type FormCategory = 'intake' | 'survey';
+
 export interface CustomColors {
   text: string;
   textGradient?: string;
@@ -138,7 +140,9 @@ export interface WizardState {
   currentStep: WizardStep;
   formData: {
     title: string;
+    category: FormCategory;
     elements: FormElement[];
+    tags?: string[];
     settings?: {
       description?: string;
       submitButtonText?: string;

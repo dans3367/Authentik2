@@ -466,6 +466,7 @@ export const forms = pgTable("forms", {
   userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   title: text("title").notNull(),
   description: text("description"),
+  category: text("category").notNull().default('intake'), // 'intake' for sign-ups/newsletters, 'survey' for questionnaires/feedback
   formData: text("form_data").notNull(), // JSON string of form structure
   theme: text("theme").default('modern'),
   isActive: boolean("is_active").default(true),
@@ -1197,6 +1198,7 @@ export const updateTenantSchema = z.object({
 export const createFormSchema = z.object({
   title: z.string().min(1, "Form title is required"),
   description: z.string().optional(),
+  category: z.enum(['intake', 'survey']).default('intake'),
   formData: z.string().min(1, "Form structure is required"),
   theme: z.string().default('modern'),
   isEmbeddable: z.boolean().default(true),
@@ -1205,6 +1207,7 @@ export const createFormSchema = z.object({
 export const updateFormSchema = z.object({
   title: z.string().min(1, "Form title is required"),
   description: z.string().optional(),
+  category: z.enum(['intake', 'survey']).optional(),
   formData: z.string().min(1, "Form structure is required"),
   theme: z.string(),
   isActive: z.boolean(),

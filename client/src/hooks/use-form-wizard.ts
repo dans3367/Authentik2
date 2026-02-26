@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { WizardStep, WizardState, FormTheme, FormElement, CustomColors } from '@/types/form-builder';
+import { WizardStep, WizardState, FormTheme, FormElement, CustomColors, FormCategory } from '@/types/form-builder';
 import { applyCustomColors, extractThemeColors } from '@/utils/theme-color-utils';
 
 export const defaultThemes: FormTheme[] = [
@@ -566,6 +566,7 @@ export function useFormWizard(existingForm?: ExistingFormData) {
           currentStep: 'build',
           formData: {
             title: existingForm.title,
+            category: (existingForm as any).category || 'intake',
             elements: parsedFormData.elements || [],
             tags: existingForm.tags || [],
             settings: {
@@ -594,6 +595,7 @@ export function useFormWizard(existingForm?: ExistingFormData) {
       currentStep: 'build',
       formData: {
         title: 'Untitled Form',
+        category: 'intake' as FormCategory,
         elements: [],
         tags: [],
         settings: {
@@ -641,12 +643,13 @@ export function useFormWizard(existingForm?: ExistingFormData) {
     });
   };
 
-  const updateFormData = (title: string, elements: FormElement[], settings?: any, tags?: string[]) => {
+  const updateFormData = (title: string, elements: FormElement[], settings?: any, tags?: string[], category?: FormCategory) => {
     setWizardState(prev => {
       const newState = {
         ...prev,
         formData: { 
           title, 
+          category: category !== undefined ? category : prev.formData.category || 'intake',
           elements,
           tags: tags !== undefined ? tags : prev.formData.tags || [],
           settings: settings || prev.formData.settings
@@ -711,6 +714,7 @@ export function useFormWizard(existingForm?: ExistingFormData) {
       currentStep: 'build' as const,
       formData: {
         title: 'Untitled Form',
+        category: 'intake' as FormCategory,
         elements: [],
         tags: [],
         settings: {
