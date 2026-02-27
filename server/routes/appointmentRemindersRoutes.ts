@@ -734,40 +734,27 @@ router.put('/:id/reschedule', async (req: Request, res: Response) => {
 });
 
 // PUT /api/appointment-reminders/:id/status - Update reminder status
+// Security: Requires authenticated user with tenant ownership (internal services must use /internal/:id/status with HMAC)
 router.put('/:id/status', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, errorMessage } = req.body;
-
-    // Check for internal service call (from Trigger.dev or legacy Inngest)
-    const internalHeader = req.headers['x-internal-service'];
-    const isInternalService = internalHeader === 'trigger' || internalHeader === 'trigger.dev' || internalHeader === 'inngest';
+    const user = (req as any).user;
+    const tenantId = user.tenantId;
 
     if (!['pending', 'sent', 'failed', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    // For internal service calls, just verify the reminder exists
-    // For user calls, verify tenant ownership
-    let existingReminder;
-    if (isInternalService) {
-      existingReminder = await db
-        .select()
-        .from(appointmentReminders)
-        .where(eq(appointmentReminders.id, id))
-        .limit(1);
-    } else {
-      const user = (req as any).user;
-      const tenantId = user.tenantId;
-      existingReminder = await db
-        .select()
-        .from(appointmentReminders)
-        .where(and(
-          eq(appointmentReminders.id, id),
-          eq(appointmentReminders.tenantId, tenantId)
-        ))
-        .limit(1);
-    }
+    // Always verify tenant ownership - internal services must use the HMAC-secured /internal/:id/status endpoint
+    const existingReminder = await db
+      .select()
+      .from(appointmentReminders)
+      .where(and(
+        eq(appointmentReminders.id, id),
+        eq(appointmentReminders.tenantId, tenantId)
+      ))
+      .limit(1);
 
     if (existingReminder.length === 0) {
       return res.status(404).json({ error: 'Reminder not found' });
@@ -791,13 +778,13 @@ router.put('/:id/status', async (req: Request, res: Response) => {
       }
     }
 
-    // Update reminder status
+    // Update reminder status - preserve sentAt if already set
     const updatedReminder = await db
       .update(appointmentReminders)
       .set({
         status,
         errorMessage: status === 'failed' ? errorMessage : null,
-        sentAt: status === 'sent' ? new Date() : null,
+        sentAt: status === 'sent' ? new Date() : reminder.sentAt,
         updatedAt: new Date(),
       })
       .where(eq(appointmentReminders.id, id))

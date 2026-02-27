@@ -123,6 +123,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     // Fetch appointments with customer details
+    // Note: confirmationToken intentionally excluded from list response for security
     let query = db
       .select({
         id: appointments.id,
@@ -140,7 +141,6 @@ router.get('/', async (req: Request, res: Response) => {
         reminderSentAt: appointments.reminderSentAt,
         confirmationReceived: appointments.confirmationReceived,
         confirmationReceivedAt: appointments.confirmationReceivedAt,
-        confirmationToken: appointments.confirmationToken,
         reminderSettings: appointments.reminderSettings,
         createdAt: appointments.createdAt,
         updatedAt: appointments.updatedAt,
@@ -470,24 +470,41 @@ router.put('/:id', async (req: Request, res: Response) => {
 });
 
 // PATCH /api/appointments/:id - Partial update appointment
+// Security: Only whitelisted fields can be updated to prevent mass assignment
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const user = (req as any).user;
     const tenantId = user.tenantId;
 
-    // For PATCH, we accept partial updates but need to convert date strings
-    const updateData: any = { ...req.body };
+    // Whitelist of allowed fields for PATCH updates - prevents mass assignment attacks
+    const allowedFields = [
+      'title', 'description', 'appointmentDate', 'duration', 'location',
+      'serviceType', 'status', 'notes', 'customerId', 'reminderSettings'
+    ];
+
+    // Build sanitized update data with only allowed fields
+    const updateData: Record<string, any> = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+
+    // Validate status if provided
+    if (updateData.status) {
+      const validStatuses = ['scheduled', 'confirmed', 'cancelled', 'completed', 'no_show'];
+      if (!validStatuses.includes(updateData.status)) {
+        return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+      }
+    }
 
     // Convert date strings to Date objects if present
     if (updateData.appointmentDate) {
       updateData.appointmentDate = new Date(updateData.appointmentDate);
-    }
-    if (updateData.reminderSentAt) {
-      updateData.reminderSentAt = new Date(updateData.reminderSentAt);
-    }
-    if (updateData.confirmationReceivedAt) {
-      updateData.confirmationReceivedAt = new Date(updateData.confirmationReceivedAt);
+      if (isNaN(updateData.appointmentDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid appointmentDate format' });
+      }
     }
 
     // Check if appointment exists and belongs to tenant
@@ -641,7 +658,9 @@ router.delete('/:id', requireRole(['Owner', 'Administrator', 'Manager']), async 
   }
 });
 
-// POST /api/appointments/:id/confirm - Confirm appointment (public endpoint for customers)
+// POST /api/appointments/:id/confirm - Confirm appointment via API (requires auth + valid token)
+// Note: This endpoint is behind authenticateToken middleware. For public customer confirmation,
+// use GET /api/appointments/:id/confirm?token=xxx from appointmentConfirmationRoutes
 router.post('/:id/confirm', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
