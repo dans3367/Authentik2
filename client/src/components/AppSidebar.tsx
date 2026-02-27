@@ -25,6 +25,7 @@ import {
   Zap,
   Crown,
   Scale,
+  ChevronRight,
 } from "lucide-react";
 import logoUrl from "@assets/logo.png";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,11 @@ import {
 } from "@/hooks/useReduxAuth";
 import { useTenantPlan } from "@/hooks/useTenantPlan";
 import { useState } from "react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 // Extended user type to include custom fields
 interface ExtendedUser {
@@ -216,38 +222,42 @@ export function AppSidebar() {
 
                 if (hasChildren) {
                   return (
-                    <SidebarMenuItem key={item.name} className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive}
-                        className={cn(
-                          "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0",
-                          isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
-                        )}
-                        tooltip={item.name}
-                      >
-                        <Link href={item.href} className="flex items-center gap-3 w-full group-data-[collapsible=icon]:justify-center" onClick={handleMobileNavClick}>
-                          <Icon className="h-5 w-5 flex-shrink-0" />
-                          <span className="group-data-[collapsible=icon]:hidden font-medium">{item.name}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                      <SidebarMenuSub>
-                        {item.children.map((child: any) => {
-                          const ChildIcon = child.icon;
-                          const childActive = location === child.href;
-                          return (
-                            <SidebarMenuSubItem key={child.name}>
-                              <SidebarMenuSubButton asChild isActive={childActive}>
-                                <Link href={child.href} className="flex items-center gap-2" onClick={handleMobileNavClick}>
-                                  {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                  <span>{child.name}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
-                    </SidebarMenuItem>
+                    <Collapsible key={item.name} asChild defaultOpen={isActive} className="group/collapsible">
+                      <SidebarMenuItem className="w-full flex flex-col group-data-[collapsible=icon]:justify-center">
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuButton
+                            isActive={isActive}
+                            className={cn(
+                              "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0 hover:!bg-[#e1fce9] data-[active=true]:!bg-[#e1fce9] hover:!text-gray-800 data-[active=true]:!text-gray-800",
+                              isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
+                            )}
+                            tooltip={item.name}
+                          >
+                            <Icon className="h-5 w-5 flex-shrink-0" />
+                            <span className="group-data-[collapsible=icon]:hidden font-medium">{item.name}</span>
+                            <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[collapsible=icon]:hidden group-data-[state=open]/collapsible:rotate-90" />
+                          </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <SidebarMenuSub>
+                            {item.children.map((child: any) => {
+                              const ChildIcon = child.icon;
+                              const childActive = location === child.href;
+                              return (
+                                <SidebarMenuSubItem key={child.name}>
+                                  <SidebarMenuSubButton asChild isActive={childActive}>
+                                    <Link href={child.href} className="flex items-center gap-2" onClick={handleMobileNavClick}>
+                                      {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                      <span>{child.name}</span>
+                                    </Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              );
+                            })}
+                          </SidebarMenuSub>
+                        </CollapsibleContent>
+                      </SidebarMenuItem>
+                    </Collapsible>
                   );
                 }
 
