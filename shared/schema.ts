@@ -801,11 +801,19 @@ export const tenantRelations = relations(tenants, ({ many }) => ({
   birthdaySettings: many(birthdaySettings),
 }));
 
+export const betterAuthSessionRelations = relations(betterAuthSession, ({ one }) => ({
+  user: one(betterAuthUser, {
+    fields: [betterAuthSession.userId],
+    references: [betterAuthUser.id],
+  }),
+}));
+
 export const betterAuthUserRelations = relations(betterAuthUser, ({ one, many }) => ({
   tenant: one(tenants, {
     fields: [betterAuthUser.tenantId],
     references: [tenants.id],
   }),
+  sessions: many(betterAuthSession),
   refreshTokens: many(refreshTokens),
   forms: many(forms),
   verificationTokens: many(verificationTokens),
