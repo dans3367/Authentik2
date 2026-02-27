@@ -202,7 +202,7 @@ companyRoutes.get("/stats", authenticateToken, async (req: any, res) => {
 });
 
 // Get company users
-companyRoutes.get("/users", authenticateToken, async (req: any, res) => {
+companyRoutes.get("/users", authenticateToken, requireRole(["Owner", "Administrator", "Manager"]), async (req: any, res) => {
   try {
     const { page = 1, limit = 50, role, search } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
@@ -288,12 +288,17 @@ companyRoutes.patch("/users/:userId/role", authenticateToken, requireRole(["Owne
       return res.status(400).json({ message: 'Cannot change your own role' });
     }
 
+    // Prevent Administrators from modifying other Administrators' roles
+    if (user.role === 'Administrator' && req.user.role === 'Administrator') {
+      return res.status(403).json({ message: 'Administrators cannot modify other administrators. Contact an Owner.' });
+    }
+
     await db.update(betterAuthUser)
       .set({
         role,
         updatedAt: new Date(),
       })
-      .where(sql`${betterAuthUser.id} = ${userId}`);
+      .where(sql`${betterAuthUser.id} = ${userId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`);
 
     res.json({ message: 'User role updated successfully' });
   } catch (error) {
@@ -328,7 +333,7 @@ companyRoutes.delete("/users/:userId", authenticateToken, requireRole(["Owner", 
 
     // Delete user (this will cascade to related records)
     await db.delete(betterAuthUser)
-      .where(sql`${betterAuthUser.id} = ${userId}`);
+      .where(sql`${betterAuthUser.id} = ${userId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`);
 
     res.json({ message: 'User removed from company successfully' });
   } catch (error) {
@@ -401,8 +406,7 @@ companyRoutes.post("/complete-onboarding", authenticateToken, async (req: any, r
   } catch (error) {
     console.error('❌ [Onboarding] Unexpected error:', error);
     res.status(500).json({
-      message: 'Failed to complete onboarding',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      message: 'Failed to complete onboarding'
     });
   }
 });

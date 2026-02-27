@@ -61,6 +61,11 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       lastName = nameParts.slice(1).join(' ') || undefined;
     }
 
+    // Check if user account is active
+    if (user.isActive === false) {
+      return res.status(403).json({ message: 'Account is deactivated. Please contact your administrator.' });
+    }
+
     // Create authenticated user object
     const authUser: AuthUser = {
       id: user.id,
@@ -69,7 +74,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       firstName,
       lastName,
       role: user.role || 'Employee',
-      tenantId: user.tenantId || 'default'
+      tenantId: user.tenantId || ''
     };
 
     req.user = authUser;

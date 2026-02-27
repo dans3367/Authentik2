@@ -81,99 +81,16 @@ subscriptionRoutes.get("/tenant-plan", authenticateToken, async (req: any, res) 
   }
 });
 
-// Free trial signup
+// Free trial signup - DEPRECATED
+// This endpoint creates users without passwords which is a security risk.
+// Users should sign up via Better Auth's standard signup flow instead.
+// The signup hook in auth.ts will automatically create their tenant.
 subscriptionRoutes.post("/free-trial-signup", async (req: any, res) => {
-  try {
-    const { email, firstName, lastName, companyName } = req.body;
-
-    if (!email || !firstName || !lastName || !companyName) {
-      return res.status(400).json({ message: 'All fields are required' });
-    }
-
-    // Check if user already exists
-    const existingUser = await db.query.betterAuthUser.findFirst({
-      where: sql`${betterAuthUser.email} = ${email}`,
-    });
-
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
-
-    // Create user with free trial
-    // Note: Password handling removed - better-auth handles authentication
-    // Users will need to set their password through better-auth registration
-
-    const newUser = await db.insert(betterAuthUser).values({
-      email,
-      firstName,
-      lastName,
-      // Note: password field removed - better-auth handles authentication
-      role: 'Owner',
-      tenantId: 'default-tenant-id', // Will be updated after tenant creation
-      emailVerified: true, // Auto-verify for free trial
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning();
-
-    // Create company/tenant
-    const newCompany = await db.insert(tenants).values({
-      name: companyName,
-      slug: companyName.toLowerCase().replace(/\s+/g, '-'),
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).returning();
-
-    // Update user with correct tenant ID
-    await db.update(betterAuthUser)
-      .set({
-        tenantId: newCompany[0].id,
-        updatedAt: new Date(),
-      })
-      .where(eq(betterAuthUser.id, newUser[0].id));
-
-    // Sync tenant information with Better Auth user table
-    try {
-      // Check if Better Auth user exists (they might have signed up via Better Auth first)
-      const existingBetterAuthUser = await db.query.betterAuthUser.findFirst({
-        where: eq(betterAuthUser.email, email),
-      });
-
-      if (existingBetterAuthUser) {
-        // Update Better Auth user with tenant information
-        await db.update(betterAuthUser)
-          .set({
-            tenantId: newCompany[0].id,
-            role: 'Owner',
-            updatedAt: new Date(),
-          })
-          .where(eq(betterAuthUser.id, existingBetterAuthUser.id));
-
-        console.log('✅ Synced tenant info to Better Auth user during free trial signup:', {
-          userId: existingBetterAuthUser.id,
-          email,
-          tenantId: newCompany[0].id
-        });
-      } else {
-        console.warn('⚠️ No Better Auth user found for free trial signup:', email);
-        console.log('🏢 User should sign up via Better Auth first, then use this endpoint');
-      }
-    } catch (error) {
-      console.error('❌ Failed to sync tenant info during free trial signup:', error);
-      // Don't fail the signup, just log the error
-    }
-
-
-    res.status(201).json({
-      message: 'Free trial account created successfully',
-      userId: newUser[0].id,
-      tenantId: newCompany[0].id,
-      tenantSlug: newCompany[0].slug,
-    });
-  } catch (error) {
-    console.error('Free trial signup error:', error);
-    res.status(500).json({ message: 'Free trial signup failed' });
-  }
+  // Return 410 Gone to indicate this endpoint is no longer available
+  return res.status(410).json({
+    message: 'This endpoint is deprecated. Please use the standard signup flow at /api/auth/sign-up/email',
+    redirectTo: '/signup'
+  });
 });
 
 // Get user's subscription

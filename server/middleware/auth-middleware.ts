@@ -41,6 +41,11 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       return res.status(401).json({ message: 'User not found' });
     }
 
+    // Check if user account is active
+    if (userRecord.isActive === false) {
+      return res.status(403).json({ message: 'Account is deactivated. Please contact your administrator.' });
+    }
+
     // Parse user name for firstName/lastName
     let firstName: string | undefined = userRecord.firstName || undefined;
     let lastName: string | undefined = userRecord.lastName || undefined;

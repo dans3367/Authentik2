@@ -5,28 +5,28 @@ export const securityConfig = {
   // Rate limiting disable flag - set to true to bypass all rate limiting
   disableRateLimiting: process.env.DISABLE_RATE_LIMITING === 'true',
   
-  // Rate limiting configurations - 10x RELAXED FOR DEBUGGING
+  // Rate limiting configurations
   rateLimits: {
     general: {
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 10000, // 10x relaxed (was 1000)
+      max: 1000,
     },
     auth: {
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 500, // 10x relaxed (was 50)
+      max: 50,
       skipSuccessfulRequests: true,
     },
     api: {
       windowMs: 1 * 60 * 1000, // 1 minute
-      max: 3000, // 10x relaxed (was 300)
+      max: 300,
     },
     passwordReset: {
       windowMs: 60 * 60 * 1000, // 1 hour
-      max: 200, // 10x relaxed (was 20)
+      max: 20,
     },
     registration: {
       windowMs: 60 * 60 * 1000, // 1 hour
-      max: 500, // 10x relaxed (was 50)
+      max: 50,
     },
   },
 

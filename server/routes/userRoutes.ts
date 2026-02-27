@@ -295,20 +295,6 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
       }
     }
 
-    // Prevent owner from being demoted if they're the only owner
-    if (existingUser.role === 'Owner' && role !== 'Owner') {
-      const ownerCount = await db.select({
-        count: sql<number>`count(*)`,
-      }).from(betterAuthUser).where(and(
-        eq(betterAuthUser.role, 'Owner'),
-        eq(betterAuthUser.tenantId, req.user.tenantId)
-      ));
-
-      if (ownerCount[0].count <= 1) {
-        return res.status(400).json({ message: 'Cannot demote the only owner' });
-      }
-    }
-
     // When activating a previously inactive user, check user limits
     const targetIsActive = isActive ?? true;
     const wasInactive = existingUser.isActive === false;
@@ -384,21 +370,6 @@ userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Ad
     // Disallow changing status for Owner accounts
     if (user.role === 'Owner') {
       return res.status(403).json({ message: 'Owner account status cannot be changed' });
-    }
-
-    // Prevent deactivating the only owner
-    if (user.role === 'Owner' && !isActive) {
-      const ownerCount = await db.select({
-        count: sql<number>`count(*)`,
-      }).from(betterAuthUser).where(and(
-        eq(betterAuthUser.role, 'Owner'),
-        eq(betterAuthUser.tenantId, req.user.tenantId),
-        eq(betterAuthUser.isActive, true)
-      ));
-
-      if (ownerCount[0].count <= 1) {
-        return res.status(400).json({ message: 'Cannot deactivate the only active owner' });
-      }
     }
 
     // When activating a user, check if the user limit has been reached
