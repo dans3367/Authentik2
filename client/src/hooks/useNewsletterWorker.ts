@@ -37,7 +37,7 @@ export function useNewsletterWorker() {
         requestBody
       );
       
-      return response;
+      return response.json();
     },
     onSuccess: (data, variables) => {
       if (variables.testEmail) {
@@ -78,7 +78,7 @@ export function useNewsletterWorker() {
         'POST',
         `/api/newsletter-worker/jobs/${jobId}/cancel`
       );
-      return response;
+      return response.json();
     },
     onSuccess: () => {
       toast({
@@ -99,7 +99,7 @@ export function useNewsletterWorker() {
   const getWorkerStatsMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('GET', '/api/newsletter-worker/workers/stats');
-      return response;
+      return response.json();
     },
   });
 
@@ -111,7 +111,7 @@ export function useNewsletterWorker() {
         '/api/newsletter-worker/workers/scale',
         { workerCount }
       );
-      return response;
+      return response.json();
     },
     onSuccess: (data) => {
       toast({
@@ -132,7 +132,7 @@ export function useNewsletterWorker() {
   const emergencyStopMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest('POST', '/api/newsletter-worker/workers/emergency-stop');
-      return response;
+      return response.json();
     },
     onSuccess: () => {
       toast({

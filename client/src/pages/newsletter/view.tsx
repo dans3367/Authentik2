@@ -507,7 +507,8 @@ export default function NewsletterViewPage() {
       tasksInitializedRef.current = true;
       initializeTasksMutation.mutate();
     }
-  }, [newsletter, taskStatuses.length, isTaskStatusLoading, initializeTasksMutation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newsletter, taskStatuses.length, isTaskStatusLoading]);
 
   // Mock timeline events
   const mockTimelineEvents: TimelineEvent[] = [
@@ -540,7 +541,7 @@ export default function NewsletterViewPage() {
       type: 'opened' as const,
       title: 'Email Opens Detected',
       description: `${newsletter.opens || 0} unique opens, ${newsletter.totalOpens || 0} total opens`,
-      timestamp: new Date(Date.now() - Math.random() * 86400000),
+      timestamp: newsletter?.sentAt ? new Date(new Date(newsletter.sentAt).getTime() + 3600000) : new Date(),
       status: 'success' as const
     }] : []),
     ...(newsletter?.clickCount && newsletter.clickCount > 0 ? [{
@@ -548,7 +549,7 @@ export default function NewsletterViewPage() {
       type: 'clicked' as const,
       title: 'Link Clicks Detected',
       description: `${newsletter.clickCount} total clicks recorded`,
-      timestamp: new Date(Date.now() - Math.random() * 43200000),
+      timestamp: newsletter?.sentAt ? new Date(new Date(newsletter.sentAt).getTime() + 7200000) : new Date(),
       status: 'success' as const
     }] : [])
   ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());

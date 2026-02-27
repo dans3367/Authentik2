@@ -221,21 +221,43 @@ export function AppSidebar() {
                 const Icon = item.icon;
 
                 if (hasChildren) {
+                  // When collapsed, navigate to parent href; when expanded, toggle submenu
+                  if (isCollapsed) {
+                    return (
+                      <SidebarMenuItem key={item.name} className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive}
+                          className={cn(
+                            "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0 hover:!bg-[#e1fce9] data-[active=true]:!bg-[#e1fce9] hover:!text-gray-800 data-[active=true]:!text-gray-800",
+                            isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
+                          )}
+                          tooltip={item.name}
+                        >
+                          <Link href={item.children[0]?.href || item.href} className="flex items-center gap-3 w-full group-data-[collapsible=icon]:justify-center" onClick={handleMobileNavClick}>
+                            <Icon className="h-5 w-5 flex-shrink-0" />
+                            <span className="group-data-[collapsible=icon]:hidden font-medium">{item.name}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  }
+
                   return (
                     <Collapsible key={item.name} asChild defaultOpen={isActive} className="group/collapsible">
-                      <SidebarMenuItem className="w-full flex flex-col group-data-[collapsible=icon]:justify-center">
+                      <SidebarMenuItem className="w-full flex flex-col">
                         <CollapsibleTrigger asChild>
                           <SidebarMenuButton
                             isActive={isActive}
                             className={cn(
-                              "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0 hover:!bg-[#e1fce9] data-[active=true]:!bg-[#e1fce9] hover:!text-gray-800 data-[active=true]:!text-gray-800",
+                              "w-full justify-start hover:!bg-[#e1fce9] data-[active=true]:!bg-[#e1fce9] hover:!text-gray-800 data-[active=true]:!text-gray-800",
                               isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
                             )}
                             tooltip={item.name}
                           >
                             <Icon className="h-5 w-5 flex-shrink-0" />
-                            <span className="group-data-[collapsible=icon]:hidden font-medium">{item.name}</span>
-                            <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[collapsible=icon]:hidden group-data-[state=open]/collapsible:rotate-90" />
+                            <span className="font-medium">{item.name}</span>
+                            <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                           </SidebarMenuButton>
                         </CollapsibleTrigger>
                         <CollapsibleContent>

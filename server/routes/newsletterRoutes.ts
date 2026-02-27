@@ -8,7 +8,7 @@ import { sanitizeString } from '../utils/sanitization';
 import { sanitizeEmailHtml } from './emailManagementRoutes';
 import { emailService, enhancedEmailService } from '../emailService';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
-import { initNewsletterTracking, trackNewsletterEmailSend } from '../utils/convexNewsletterTracker';
+import { initNewsletterTracking, trackNewsletterEmailSend, getNewsletterStats, getNewsletterSends, getNewsletterEvents } from '../utils/convexNewsletterTracker';
 import { logActivity, computeChanges, NEWSLETTER_TRACKED_FIELDS } from '../utils/activityLogger';
 import { buildReactionButtonsHtml } from '../utils/newsletterReactionHtml';
 // Temporal service removed - now using server-node proxy
@@ -924,23 +924,58 @@ newsletterRoutes.get("/:id/detailed-stats", authenticateToken, requireTenant, as
       return res.status(404).json({ message: 'Newsletter not found' });
     }
 
-    // Get newsletter statistics (placeholder - you might have more specific metrics)
-    const stats = {
-      newsletterId: id,
-      totalSent: 0, // Placeholder
-      totalDelivered: 0, // Placeholder
-      totalOpened: 0, // Placeholder
-      totalClicked: 0, // Placeholder
-      totalBounced: 0, // Placeholder
-      totalUnsubscribed: 0, // Placeholder
-      openRate: 0, // Placeholder
-      clickRate: 0, // Placeholder
-      bounceRate: 0, // Placeholder
-      createdAt: newsletter.createdAt,
-      sentAt: newsletter.sentAt,
-    };
+    // Get real stats from Convex
+    const convexStats = await getNewsletterStats(id);
+    const sends = await getNewsletterSends(id, 200);
 
-    res.json(stats);
+    // Calculate rates
+    const totalSent = convexStats?.sent ?? newsletter.recipientCount ?? 0;
+    const totalDelivered = convexStats?.delivered ?? 0;
+    const totalOpened = convexStats?.uniqueOpens ?? newsletter.uniqueOpenCount ?? 0;
+    const totalClicked = convexStats?.uniqueClicks ?? newsletter.clickCount ?? 0;
+    const totalBounced = convexStats?.bounced ?? 0;
+    const totalUnsubscribed = convexStats?.unsubscribed ?? 0;
+
+    const openRate = totalDelivered > 0 ? Math.round((totalOpened / totalDelivered) * 1000) / 10 : 0;
+    const clickRate = totalDelivered > 0 ? Math.round((totalClicked / totalDelivered) * 1000) / 10 : 0;
+    const bounceRate = totalSent > 0 ? Math.round((totalBounced / totalSent) * 1000) / 10 : 0;
+
+    // Build per-email data with events
+    const emails = sends.map((send: any) => ({
+      id: send._id || send.recipientId || send.recipientEmail,
+      recipientEmail: send.recipientEmail,
+      recipientId: send.recipientId,
+      status: send.status,
+      sentAt: send.sentAt ? new Date(send.sentAt).toISOString() : null,
+      deliveredAt: send.deliveredAt ? new Date(send.deliveredAt).toISOString() : null,
+      openedAt: send.firstOpenedAt ? new Date(send.firstOpenedAt).toISOString() : null,
+      clickedAt: send.firstClickedAt ? new Date(send.firstClickedAt).toISOString() : null,
+      openCount: send.openCount ?? 0,
+      clickCount: send.clickCount ?? 0,
+      error: send.error,
+    }));
+
+    res.json({
+      newsletter,
+      totalEmails: sends.length,
+      emails,
+      stats: {
+        newsletterId: id,
+        totalSent,
+        totalDelivered,
+        totalOpened,
+        totalClicked,
+        totalBounced,
+        totalUnsubscribed,
+        totalFailed: convexStats?.failed ?? 0,
+        totalSuppressed: convexStats?.suppressed ?? 0,
+        openRate,
+        clickRate,
+        bounceRate,
+        createdAt: newsletter.createdAt,
+        sentAt: newsletter.sentAt,
+      },
+    });
   } catch (error) {
     console.error('Get detailed newsletter stats error:', error);
     res.status(500).json({ message: 'Failed to get detailed newsletter statistics' });
@@ -952,22 +987,28 @@ newsletterRoutes.get("/emails/:resendId/trajectory", authenticateToken, requireT
   try {
     const { resendId } = req.params;
 
-    // This is a placeholder for email trajectory tracking
-    // You would typically fetch this data from your email service provider
+    // Fetch real events from Convex using the provider message ID
+    const events = await getNewsletterEvents(resendId, 50);
+
+    // If no events found, try to look up by the resendId as a newsletter send ID
+    if (events.length === 0) {
+      // Return empty trajectory if no data found
+      return res.json({
+        resendId,
+        events: [],
+        message: 'No events found for this email',
+      });
+    }
+
+    // Transform Convex events to trajectory format
     const trajectory = {
       resendId,
-      events: [
-        {
-          type: 'sent',
-          timestamp: new Date().toISOString(),
-          status: 'success',
-        },
-        {
-          type: 'delivered',
-          timestamp: new Date(Date.now() + 1000).toISOString(),
-          status: 'success',
-        },
-      ],
+      events: events.map((event: any) => ({
+        type: event.eventType,
+        timestamp: event.occurredAt ? new Date(event.occurredAt).toISOString() : new Date().toISOString(),
+        status: 'success',
+        metadata: event.metadata,
+      })),
     };
 
     res.json(trajectory);
@@ -993,20 +1034,58 @@ newsletterRoutes.get("/:id/task-status", authenticateToken, requireTenant, async
       return res.status(404).json({ message: 'Newsletter not found' });
     }
 
-    // Get task status (placeholder)
-    const taskStatus = {
-      newsletterId: id,
-      status: 'pending', // pending, processing, completed, failed
-      progress: 0,
-      totalRecipients: 0,
-      processedRecipients: 0,
-      failedRecipients: 0,
-      startedAt: null,
-      completedAt: null,
-      error: null,
-    };
+    // Get actual task statuses from database
+    const dbTaskStatuses = await db.query.newsletterTaskStatus.findMany({
+      where: and(
+        eq(newsletterTaskStatus.newsletterId, id),
+        eq(newsletterTaskStatus.tenantId, req.user.tenantId)
+      ),
+    });
 
-    res.json(taskStatus);
+    // If no task statuses exist, derive from newsletter status and Convex stats
+    if (dbTaskStatuses.length === 0) {
+      const convexStats = await getNewsletterStats(id);
+      const taskStatuses = [];
+
+      // Derive status based on newsletter state
+      if (newsletter.status === 'sent' || newsletter.status === 'sending') {
+        const totalRecipients = convexStats?.totalRecipients ?? newsletter.recipientCount ?? 0;
+        const sent = convexStats?.sent ?? 0;
+        const failed = convexStats?.failed ?? 0;
+        const processed = sent + failed;
+        const progress = totalRecipients > 0 ? Math.round((processed / totalRecipients) * 100) : 0;
+
+        taskStatuses.push({
+          id: `${id}-sending`,
+          newsletterId: id,
+          tenantId: req.user.tenantId,
+          taskType: 'sending',
+          taskName: 'Sending Emails',
+          status: newsletter.status === 'sent' ? 'completed' : 'in_progress',
+          progress: newsletter.status === 'sent' ? 100 : progress,
+          startedAt: newsletter.sentAt,
+          completedAt: newsletter.status === 'sent' ? newsletter.sentAt : null,
+          metadata: { sent, failed, total: totalRecipients },
+        });
+
+        // Analytics task
+        taskStatuses.push({
+          id: `${id}-analytics`,
+          newsletterId: id,
+          tenantId: req.user.tenantId,
+          taskType: 'analytics',
+          taskName: 'Analytics Collection',
+          status: newsletter.status === 'sent' ? 'in_progress' : 'pending',
+          progress: newsletter.status === 'sent' ? 50 : 0,
+          startedAt: newsletter.status === 'sent' ? newsletter.sentAt : null,
+          completedAt: null,
+        });
+      }
+
+      return res.json({ taskStatuses });
+    }
+
+    res.json({ taskStatuses: dbTaskStatuses });
   } catch (error) {
     console.error('Get newsletter task status error:', error);
     res.status(500).json({ message: 'Failed to get newsletter task status' });
@@ -1328,11 +1407,10 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
       return;
     }
 
-    // Save Newsletter to DB (update status)
+    // Save Newsletter to DB (update status) - don't set sentAt yet, only when actually sent
     await db.update(newsletters)
       .set({
         status: 'sending',
-        sentAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(newsletters.id, id));
@@ -1476,6 +1554,27 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
         // Wrap newsletter content in the tenant's global email design template
         const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
 
+        // Generate unsubscribe tokens for all recipients
+        const recipientsWithTokens = await Promise.all(
+          allowedRecipients.map(async (contact: { id: string; email: string; firstName?: string; lastName?: string }) => {
+            let unsub = await db.query.unsubscribeTokens.findFirst({
+              where: and(eq(unsubscribeTokens.tenantId, req.user.tenantId), eq(unsubscribeTokens.contactId, contact.id), sql`${unsubscribeTokens.usedAt} IS NULL`),
+            });
+            if (!unsub) {
+              const token = crypto.randomBytes(24).toString('base64url');
+              const created = await db.insert(unsubscribeTokens).values({ tenantId: req.user.tenantId, contactId: contact.id, token }).returning();
+              unsub = created[0];
+            }
+            return {
+              id: contact.id,
+              email: contact.email,
+              firstName: contact.firstName || '',
+              lastName: contact.lastName || '',
+              unsubscribeToken: unsub.token,
+            };
+          })
+        );
+
         // Import and trigger the Trigger.dev task
         const { sendNewsletterTask } = await import('../../src/trigger/newsletter');
 
@@ -1487,12 +1586,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           groupUUID,
           subject: newsletter.subject,
           content: wrappedContent,
-          recipients: allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
-            id: contact.id,
-            email: contact.email,
-            firstName: contact.firstName || '',
-            lastName: contact.lastName || ''
-          })),
+          recipients: recipientsWithTokens,
           batchSize: 25,
           priority: 'normal' as const,
           reactionsEnabled: newsletter.reactionsEnabled ?? true,
@@ -1643,12 +1737,11 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           failed
         });
 
-        const totalSent = successful + failed;
-
         await db.update(newsletters)
           .set({
             status: 'sent',
-            recipientCount: totalSent,
+            recipientCount: successful,
+            sentAt: new Date(),
             updatedAt: new Date(),
           })
           .where(eq(newsletters.id, id));
@@ -1668,10 +1761,11 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
     } catch (sendError) {
       console.error(`[Newsletter] Failed to send newsletter ${id}:`, sendError);
 
-      // Update newsletter status back to draft on failure
+      // Update newsletter status back to draft on failure, clear sentAt if it was set
       await db.update(newsletters)
         .set({
           status: 'draft',
+          sentAt: null,
           updatedAt: new Date(),
         })
         .where(eq(newsletters.id, id));
@@ -2112,16 +2206,39 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
       ? buildReactionButtonsHtml(`${req.protocol}://${req.get('host')}`, id, recipient.id)
       : '';
 
+    // Helper to inject content before the footer marker (inside the document body)
+    const injectBeforeFooterSingle = (htmlContent: string, injection: string): string => {
+      const footerMarker = '<!-- Footer -->';
+      if (htmlContent.includes(footerMarker)) {
+        return htmlContent.replace(footerMarker, `${injection}\n\n      ${footerMarker}`);
+      }
+      // Fallback: insert before closing </div></body>
+      const closingMatch = htmlContent.lastIndexOf('</div>\n  </body>');
+      if (closingMatch !== -1) {
+        return htmlContent.slice(0, closingMatch) + injection + '\n' + htmlContent.slice(closingMatch);
+      }
+      // Last resort: insert before </body>
+      return htmlContent.replace('</body>', `${injection}\n</body>`);
+    };
+
+    // Build unsubscribe block
+    const unsubscribeBlock = `<div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+        <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+          <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+        </p>
+      </div>`;
+
+    // Inject reaction buttons and unsubscribe block inside the document body
+    let finalHtml = wrappedSingleContent;
+    if (singleReactionHtml) {
+      finalHtml = injectBeforeFooterSingle(finalHtml, singleReactionHtml);
+    }
+    finalHtml = injectBeforeFooterSingle(finalHtml, unsubscribeBlock);
+
     const email = {
       to: recipient.email,
       subject: subject,
-      html: `${wrappedSingleContent}
-        ${singleReactionHtml}
-        <div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
-          <p style="margin: 0; font-size: 12px; color: #94a3b8;">
-            <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
-          </p>
-        </div>`,
+      html: finalHtml,
       from: process.env.EMAIL_FROM || 'noreply@saas-app.com',
       tags: [
         { name: 'type', value: 'newsletter' },

@@ -34,23 +34,41 @@ interface BulkSendResult {
 }
 
 /**
+ * Helper to inject content before the footer marker (inside the document body)
+ */
+function injectBeforeFooter(htmlContent: string, injection: string): string {
+  const footerMarker = '<!-- Footer -->';
+  if (htmlContent.includes(footerMarker)) {
+    return htmlContent.replace(footerMarker, `${injection}\n\n      ${footerMarker}`);
+  }
+  // Fallback: insert before closing </div></body>
+  const closingMatch = htmlContent.lastIndexOf('</div>\n  </body>');
+  if (closingMatch !== -1) {
+    return htmlContent.slice(0, closingMatch) + injection + '\n' + htmlContent.slice(closingMatch);
+  }
+  // Last resort: insert before </body>
+  return htmlContent.replace('</body>', `${injection}\n</body>`);
+}
+
+/**
  * Inject per-recipient reaction bar into the email HTML content.
  * Inserts the reaction bar just before the footer section.
  */
 function injectReactionBar(content: string, baseUrl: string, newsletterId: string, recipientId: string): string {
   const reactionHtml = buildReactionButtonsHtml(baseUrl, newsletterId, recipientId);
-  // Insert before the footer (<!-- Footer --> comment or the footer div)
-  const footerMarker = '<!-- Footer -->';
-  if (content.includes(footerMarker)) {
-    return content.replace(footerMarker, `${reactionHtml}\n\n      ${footerMarker}`);
-  }
-  // Fallback: insert before closing </div></body>
-  const closingMatch = content.lastIndexOf('</div>\n  </body>');
-  if (closingMatch !== -1) {
-    return content.slice(0, closingMatch) + reactionHtml + '\n' + content.slice(closingMatch);
-  }
-  // Last resort: append before </body>
-  return content.replace('</body>', `${reactionHtml}\n</body>`);
+  return injectBeforeFooter(content, reactionHtml);
+}
+
+/**
+ * Inject unsubscribe link into the email HTML content.
+ */
+function injectUnsubscribeLink(content: string, unsubscribeUrl: string): string {
+  const unsubscribeBlock = `<div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+      <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+        <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+      </p>
+    </div>`;
+  return injectBeforeFooter(content, unsubscribeBlock);
 }
 
 /**
@@ -77,9 +95,21 @@ async function sendBulkEmails(opts: {
   const resendBatchPayload = recipients.map((r) => {
     const emailTrackingId = randomUUID();
     // Inject per-recipient reaction bar if enabled
-    const recipientHtml = (reactionsEnabled && baseUrl)
-      ? injectReactionBar(content, baseUrl, newsletterId, r.id)
-      : content;
+    let recipientHtml = content;
+    if (reactionsEnabled && baseUrl) {
+      recipientHtml = injectReactionBar(recipientHtml, baseUrl, newsletterId, r.id);
+    }
+    // Inject unsubscribe link if token is available
+    if (r.unsubscribeToken && baseUrl) {
+      const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(r.unsubscribeToken)}&type=newsletters`;
+      recipientHtml = injectUnsubscribeLink(recipientHtml, unsubscribeUrl);
+    }
+    
+    // Build List-Unsubscribe header
+    const unsubscribeUrl = r.unsubscribeToken && baseUrl
+      ? `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(r.unsubscribeToken)}&type=newsletters`
+      : undefined;
+    
     return {
       from: fromEmail,
       to: r.email,
@@ -87,6 +117,10 @@ async function sendBulkEmails(opts: {
       html: recipientHtml,
       text: content.replace(/<[^>]*>/g, ""),
       replyTo,
+      headers: unsubscribeUrl ? {
+        'List-Unsubscribe': `<${unsubscribeUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      } : undefined,
       tags: [
         { name: "type", value: "newsletter" },
         { name: "newsletterId", value: newsletterId },
@@ -243,6 +277,7 @@ const recipientSchema = z.object({
   email: z.string().email(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
+  unsubscribeToken: z.string().optional(),
 });
 
 // Schema for newsletter job payload
