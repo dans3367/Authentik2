@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/AppSidebar";
+import { AppFooter } from "@/components/AppFooter";
 import { useLanguage } from "@/hooks/useLanguage";
 import { PageTitleProvider, usePageTitle } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
@@ -303,6 +304,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="flex flex-1 flex-col">
             {children}
           </div>
+          {!hideSidebar && <AppFooter />}
         </SidebarInset>
       </SidebarProvider>
     </PageTitleProvider>

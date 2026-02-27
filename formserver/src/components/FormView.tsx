@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { parseTheme, ThemeStyles } from '../themes';
 import { FullName } from './ui/FullName';
+import PrivacyStatement from './PrivacyStatement';
 
 interface FormElement {
   id: string;
@@ -339,6 +340,8 @@ const FormView: React.FC<FormViewProps> = ({ formId }) => {
             </form>
           </div>
         </div>
+
+        <PrivacyStatement />
       </div>
     </div>
   );

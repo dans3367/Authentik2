@@ -67,6 +67,12 @@ const SegmentationPage = lazy(() => import("@/pages/segmentation"));
 const ManagementPage = lazy(() => import("@/pages/management"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding"));
 const SelectPlanPage = lazy(() => import("@/pages/select-plan"));
+const PrivacySecurityPage = lazy(() => import("@/pages/privacy-security"));
+const TermsOfServicePage = lazy(() => import("@/pages/terms-of-service"));
+const AcceptableUsePage = lazy(() => import("@/pages/acceptable-use"));
+const DataProcessingPage = lazy(() => import("@/pages/data-processing"));
+const CookiePolicyPage = lazy(() => import("@/pages/cookie-policy"));
+const LegalAgreementsPage = lazy(() => import("@/pages/legal-agreements"));
 
 // Redirect components for legacy routes
 function BirthdaysRedirect() {
@@ -407,6 +413,12 @@ function Router() {
                   <Route path="/users" component={UsersPage} />
                   <Route path="/table-example" component={TableExamplePage} />
                   <Route path="/subscribe" component={Subscribe} />
+                  <Route path="/privacy-security" component={PrivacySecurityPage} />
+                  <Route path="/terms-of-service" component={TermsOfServicePage} />
+                  <Route path="/acceptable-use" component={AcceptableUsePage} />
+                  <Route path="/data-processing" component={DataProcessingPage} />
+                  <Route path="/cookie-policy" component={CookiePolicyPage} />
+                  <Route path="/legal-agreements" component={LegalAgreementsPage} />
 
                   <Route component={NotFound} />
                 </Switch>
