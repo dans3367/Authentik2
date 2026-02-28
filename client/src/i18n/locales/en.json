@@ -1946,8 +1946,8 @@
     }
   },
   "segmentation": {
-    "title": "Segmentation",
-    "subtitle": "Create and manage customer segments for targeted email campaigns",
+    "title": "Customer Segmentation",
+    "subtitle": "Create and manage segment lists for targeted email campaigns",
     "createSegment": "Create Segment",
     "stats": {
       "totalSegments": "Total Segments",
@@ -2009,7 +2009,7 @@
     },
     "deleteModal": {
       "title": "Delete Segment List",
-      "description": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+      "description": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone. Contacts/emails in this list will not be deleted.",
       "cancel": "Cancel",
       "delete": "Delete",
       "deleting": "Deleting..."

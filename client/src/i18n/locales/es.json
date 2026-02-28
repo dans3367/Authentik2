@@ -1892,8 +1892,8 @@
     }
   },
   "segmentation": {
-    "title": "Segmentación",
-    "subtitle": "Crea y administra segmentos de clientes para campañas de correo dirigidas",
+    "title": "Segmentación de Clientes",
+    "subtitle": "Crea y administra listas de segmentación para campañas de correo dirigidas",
     "createSegment": "Crear Segmento",
     "stats": {
       "totalSegments": "Total de Segmentos",
@@ -1955,7 +1955,7 @@
     },
     "deleteModal": {
       "title": "Eliminar Lista de Segmentos",
-      "description": "¿Estás seguro de que quieres eliminar \"{{name}}\"? Esta acción no se puede deshacer.",
+      "description": "¿Estás seguro de que quieres eliminar \"{{name}}\"? Esta acción no se puede deshacer. Los contactos/correos de esta lista no se eliminarán.",
       "cancel": "Cancelar",
       "delete": "Eliminar",
       "deleting": "Eliminando..."

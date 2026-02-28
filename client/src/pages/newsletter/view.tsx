@@ -513,7 +513,7 @@ export default function NewsletterViewPage() {
       id: '1',
       type: 'created' as const,
       title: 'Newsletter Created',
-      description: `Created by ${newsletter?.user.firstName} ${newsletter?.user.lastName}`,
+      description: `Created by ${newsletter?.user?.firstName || ''} ${newsletter?.user?.lastName || ''}`.trim() || 'Unknown',
       timestamp: newsletter?.createdAt ? new Date(newsletter.createdAt) : new Date(),
       status: 'success' as const
     },
@@ -1230,10 +1230,10 @@ export default function NewsletterViewPage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {newsletter.user.firstName} {newsletter.user.lastName}
+                          {newsletter.user?.firstName || ''} {newsletter.user?.lastName || ''}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {newsletter.user.email}
+                          {newsletter.user?.email || 'Unknown'}
                         </p>
                       </div>
                     </div>
@@ -1914,7 +1914,7 @@ export default function NewsletterViewPage() {
                               {/* Avatar */}
                               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 flex items-center justify-center shrink-0">
                                 <span className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase">
-                                  {email.recipient.charAt(0)}
+                                  {(email.recipient || '?').charAt(0)}
                                 </span>
                               </div>
 
@@ -1922,11 +1922,11 @@ export default function NewsletterViewPage() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                                    {email.recipient}
+                                    {email.recipient || 'Unknown'}
                                   </p>
-                                  <Badge className={`text-[10px] px-1.5 py-0 h-5 gap-1 ${getStatusColor(email.status)}`}>
-                                    {getStatusIcon(email.status)}
-                                    {email.status.charAt(0).toUpperCase() + email.status.slice(1)}
+                                  <Badge className={`text-[10px] px-1.5 py-0 h-5 gap-1 ${getStatusColor(email.status || 'sent')}`}>
+                                    {getStatusIcon(email.status || 'sent')}
+                                    {(email.status || 'sent').charAt(0).toUpperCase() + (email.status || 'sent').slice(1)}
                                   </Badge>
                                 </div>
                                 <div className="flex items-center gap-3 mt-1">

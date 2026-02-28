@@ -6,6 +6,7 @@ import { authenticateToken } from '../middleware/auth-middleware';
 import { avatarUpload, handleUploadError } from '../middleware/upload';
 import { uploadToR2, deleteImageFromR2, R2_CONFIG } from '../config/r2';
 import { optimizeAvatar } from '../lib/imageOptimizer';
+import { auth } from '../auth';
 import crypto from 'crypto';
 
 export const authRoutes = Router();
@@ -26,17 +27,43 @@ authRoutes.get("/user-sessions", authenticateToken, async (req: any, res) => {
     const userId = req.user.id;
     console.log('📊 [Sessions] Fetching sessions for user:', userId);
 
+    // Use Better Auth's getSession to reliably identify the current session
+    let currentSessionId: string | null = null;
+    try {
+      const sessionResult = await auth.api.getSession({
+        headers: req.headers as any,
+      });
+      console.log('🔍 [Sessions] getSession result keys:', sessionResult ? Object.keys(sessionResult) : 'null');
+      currentSessionId = sessionResult?.session?.id || null;
+      console.log('🔍 [Sessions] Current session ID from Better Auth:', currentSessionId);
+    } catch (e) {
+      console.warn('⚠️ [Sessions] Could not determine current session via Better Auth API:', e);
+    }
+
+    // Fallback: match session token from cookie if getSession didn't return an ID
+    if (!currentSessionId) {
+      const cookieToken = extractBaseToken(req.cookies?.['better-auth.session_token']);
+      if (cookieToken) {
+        const matchedSession = await db.query.betterAuthSession.findFirst({
+          where: and(
+            eq(betterAuthSession.userId, userId),
+            eq(betterAuthSession.token, cookieToken)
+          ),
+        });
+        if (matchedSession) {
+          currentSessionId = matchedSession.id;
+          console.log('🔍 [Sessions] Current session ID from cookie fallback:', currentSessionId);
+        }
+      }
+    }
+
     // Get all Better Auth sessions for this user
     const userSessions = await db.query.betterAuthSession.findMany({
       where: eq(betterAuthSession.userId, userId),
       orderBy: (sessions: any, { desc }: any) => [desc(sessions.createdAt)],
     });
     
-    console.log(`📊 [Sessions] Found ${userSessions.length} sessions for user ${userId}`);
-
-    // Log the current session token from cookies for debugging
-    const currentToken = req.cookies?.['better-auth.session_token'];
-    console.log('🔍 [Sessions] Current session token from cookie:', currentToken ? `${currentToken.substring(0, 8)}...` : 'None');
+    console.log(`� [Sessions] Found ${userSessions.length} sessions for user ${userId}`);
     
     // Format sessions for frontend (adapt Better Auth data structure)
     const sessions = userSessions.map((session: any) => {
@@ -62,10 +89,9 @@ authRoutes.get("/user-sessions", authenticateToken, async (req: any, res) => {
         deviceId: session.id, // Use session ID as device ID
         deviceName: deviceName,
         ipAddress: session.ipAddress || 'Unknown',
+        userAgent: userAgent,
         location: null, // Better Auth doesn't store location data
-        // Better Auth stores the session token in the cookie, not the session ID
-        // Check both token and ID for compatibility
-        isCurrent: session.token === extractBaseToken(req.cookies?.['better-auth.session_token']),
+        isCurrent: session.id === currentSessionId,
         createdAt: session.createdAt.toISOString(),
         expiresAt: session.expiresAt.toISOString(),
       };
@@ -101,15 +127,35 @@ authRoutes.delete("/user-sessions", authenticateToken, async (req: any, res) => 
       return res.status(404).json({ message: 'Session not found' });
     }
 
-    // Prevent deleting current session using Better Auth cookie
-    const currentSessionToken = req.cookies?.['better-auth.session_token'];
-    
-    console.log('🔍 [Session Delete] Session to delete:', sessionId);
-    console.log('🔍 [Session Delete] Session token to delete:', session.token.substring(0, 8) + '...');
-    console.log('🔍 [Session Delete] Current session token:', currentSessionToken ? currentSessionToken.substring(0, 8) + '...' : 'None');
-    console.log('🔍 [Session Delete] Is current session?:', session.token === currentSessionToken);
+    // Prevent deleting current session - use Better Auth's getSession for reliable detection
+    let currentSessionId: string | null = null;
+    try {
+      const sessionResult = await auth.api.getSession({
+        headers: req.headers as any,
+      });
+      currentSessionId = sessionResult?.session?.id || null;
+    } catch (e) {
+      console.warn('⚠️ [Session Delete] Could not determine current session via API:', e);
+    }
 
-    if (session.token === extractBaseToken(currentSessionToken)) {
+    // Fallback: match session token from cookie
+    if (!currentSessionId) {
+      const cookieToken = extractBaseToken(req.cookies?.['better-auth.session_token']);
+      if (cookieToken) {
+        const matchedSession = await db.query.betterAuthSession.findFirst({
+          where: and(
+            eq(betterAuthSession.userId, userId),
+            eq(betterAuthSession.token, cookieToken)
+          ),
+        });
+        currentSessionId = matchedSession?.id || null;
+      }
+    }
+
+    console.log('🔍 [Session Delete] Session to delete:', sessionId);
+    console.log('🔍 [Session Delete] Current session ID:', currentSessionId);
+
+    if (currentSessionId && sessionId === currentSessionId) {
       console.log('❌ [Session Delete] Prevented deletion of current session');
       return res.status(400).json({ message: 'Cannot delete current session. Use logout instead.' });
     }
@@ -139,37 +185,40 @@ authRoutes.post("/logout-all", authenticateToken, async (req: any, res) => {
     // Get the actual user ID from the authenticated session
     const userId = req.user.id;
 
-    // Get current session token from Better Auth cookie
-    const currentSessionToken = req.cookies?.['better-auth.session_token'];
-
-    if (!currentSessionToken) {
-      return res.status(400).json({ message: 'No current session found' });
+    // Use Better Auth's getSession for reliable current session detection
+    let currentSessionId: string | null = null;
+    try {
+      const sessionResult = await auth.api.getSession({
+        headers: req.headers as any,
+      });
+      currentSessionId = sessionResult?.session?.id || null;
+    } catch (e) {
+      console.warn('⚠️ [Logout All] Could not determine current session via API:', e);
     }
 
-    // Find current session to exclude it from deletion
-    // Extract base token from cookie (Better Auth cookies have format: token.signature)
-    const baseToken = extractBaseToken(currentSessionToken);
-    
-    if (!baseToken) {
-      return res.status(400).json({ message: 'Invalid session token format' });
+    // Fallback: match session token from cookie
+    if (!currentSessionId) {
+      const cookieToken = extractBaseToken(req.cookies?.['better-auth.session_token']);
+      if (cookieToken) {
+        const matchedSession = await db.query.betterAuthSession.findFirst({
+          where: and(
+            eq(betterAuthSession.userId, userId),
+            eq(betterAuthSession.token, cookieToken)
+          ),
+        });
+        currentSessionId = matchedSession?.id || null;
+      }
     }
-    
-    const currentSession = await db.query.betterAuthSession.findFirst({
-      where: and(
-        eq(betterAuthSession.userId, userId),
-        eq(betterAuthSession.token, baseToken)
-      ),
-    });
 
-    if (!currentSession) {
-      return res.status(400).json({ message: 'Current session not found' });
+    if (!currentSessionId) {
+      return res.status(400).json({ message: 'Could not identify current session' });
     }
 
     // Delete all sessions except the current one
     const deletedSessions = await db.delete(betterAuthSession)
       .where(and(
         eq(betterAuthSession.userId, userId),
-        not(eq(betterAuthSession.id, currentSession.id)) // Don't delete current session
+        not(eq(betterAuthSession.id, currentSessionId))
       ))
       .returning({ id: betterAuthSession.id });
 

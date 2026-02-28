@@ -825,13 +825,13 @@ export default function SegmentationPage() {
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <div className="p-1.5 bg-red-50 dark:bg-red-900/20 rounded-md">
                 <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
               </div>
-              {t("segmentation.deleteModal.title")}
-            </DialogTitle>
-            <DialogDescription>
+              <DialogTitle>{t("segmentation.deleteModal.title")}</DialogTitle>
+            </div>
+            <DialogDescription className="pt-2">
               {t("segmentation.deleteModal.description", {
                 name: selectedList?.name,
               })}

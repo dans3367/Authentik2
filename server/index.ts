@@ -16,6 +16,7 @@ import {
 import { auth } from "./auth";
 import { toNodeHandler } from "better-auth/node";
 import { serverLogger } from "./logger";
+import { startSessionCleanupWorker, stopSessionCleanupWorker } from "./workers/SessionCleanupWorker";
 
 const app = express();
 
@@ -241,5 +242,13 @@ app.use((req, res, next) => {
   const port = parseInt(process.env.PORT || "5002", 10);
   server.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
+    startSessionCleanupWorker();
   });
+
+  // Graceful shutdown
+  const shutdown = () => {
+    stopSessionCleanupWorker();
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 })();

@@ -17,6 +17,7 @@ interface Session {
   deviceId: string;
   deviceName: string;
   ipAddress: string;
+  userAgent?: string;
   location?: string;
   isCurrent: boolean;
   createdAt: string;
@@ -159,8 +160,11 @@ export default function Sessions() {
     );
   }
 
-  const currentSession = sessions.find((s: Session) => s.isCurrent);
-  const otherSessions = sessions.filter((s: Session) => !s.isCurrent);
+  const apiCurrentSession = sessions.find((s: Session) => s.isCurrent);
+  // If the API didn't flag any session as current (e.g. token matching issue),
+  // fall back to the most recent session as a best guess
+  const currentSession = apiCurrentSession || (sessions.length > 0 ? sessions[0] : null);
+  const otherSessions = sessions.filter((s: Session) => s.id !== currentSession?.id);
   
   console.log('🎯 [SessionsPage] Current session:', currentSession);
   console.log('📱 [SessionsPage] Other sessions:', otherSessions);
@@ -217,40 +221,44 @@ export default function Sessions() {
           </div>
 
           {/* Current Session */}
-          {betterAuthSession && (
-            <div>
-              <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">Current Session</h2>
-              <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-green-200/50 dark:border-green-700/30 hover:shadow-lg transition-all duration-300">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="text-green-600 dark:text-green-500 w-8 h-8 flex items-center justify-center">
-                        <Monitor className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base text-gray-900 dark:text-gray-100">
-                          {betterAuthSession.user?.email || 'Current Device'}
-                        </CardTitle>
-                        <CardDescription className="flex items-center space-x-4 mt-1">
-                          <span className="flex items-center">
-                            <Globe className="h-3 w-3 mr-1" />
-                            Active Session
-                          </span>
-                        </CardDescription>
-                      </div>
+          <div>
+            <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">Current Session</h2>
+            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-green-200/50 dark:border-green-700/30 hover:shadow-lg transition-all duration-300">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="text-green-600 dark:text-green-500 w-8 h-8 flex items-center justify-center">
+                      {currentSession ? getDeviceIcon(currentSession.deviceName) : <Monitor className="h-5 w-5" />}
                     </div>
-                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200 border-green-200 dark:border-green-700">Current</Badge>
+                    <div>
+                      <CardTitle className="text-base text-gray-900 dark:text-gray-100">
+                        {currentSession?.deviceName || betterAuthSession?.user?.email || 'Current Device'}
+                      </CardTitle>
+                      <CardDescription className="flex items-center space-x-4 mt-1">
+                        <span className="flex items-center">
+                          <Globe className="h-3 w-3 mr-1" />
+                          {currentSession?.ipAddress || 'Active Session'}
+                        </span>
+                        {currentSession?.createdAt && (
+                          <span className="flex items-center">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Started {formatDistanceToNow(new Date(currentSession.createdAt), { addSuffix: true })}
+                          </span>
+                        )}
+                      </CardDescription>
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Clock className="h-3 w-3 mr-1" />
-                    Active session managed by Better Auth
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200 border-green-200 dark:border-green-700">Current</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <Clock className="h-3 w-3 mr-1" />
+                  This is your active session — it cannot be ended from here. Use logout instead.
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Other Sessions */}
           {otherSessions.length > 0 ? (

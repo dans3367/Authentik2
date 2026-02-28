@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { createAuthMiddleware } from "better-auth/api";
 import { db } from "./db";
 import { betterAuthUser, betterAuthSession, betterAuthAccount, betterAuthVerification, tenants, companies } from "@shared/schema";
 import { triggerTransactionalEmail } from "./lib/trigger";
@@ -162,21 +163,21 @@ const authInstance = betterAuth({
   },
   // Hooks to create tenant automatically on user signup
   hooks: {
-    after: async (ctx: any) => {
+    after: createAuthMiddleware(async (ctx) => {
       // Declare variables outside try block for accessibility in catch
       let userRecord: any = null;
       let email = '';
 
       try {
         // Only run after sign-up endpoints
-        const path = ctx?.path || "";
-        if (!path.includes("sign-up")) return {};
+        const path = ctx.path || "";
+        if (!path.includes("sign-up")) return;
 
         // Determine user email
-        email = ctx?.body?.email || ctx?.context?.returned?.user?.email;
+        email = ctx.body?.email || (ctx.context.returned as any)?.user?.email;
         if (!email) {
           console.log('⚠️  [Signup Hook] No email found in context');
-          return {};
+          return;
         }
 
         // Fetch the created user
@@ -186,7 +187,7 @@ const authInstance = betterAuth({
 
         if (!userRecord) {
           console.log(`⚠️  [Signup Hook] User not found: ${email}`);
-          return {};
+          return;
         }
 
         // Check if user already has a valid tenant (not a placeholder)
@@ -198,7 +199,7 @@ const authInstance = betterAuth({
 
         if (userRecord.tenantId && !placeholderTenantIds.includes(userRecord.tenantId)) {
           console.log(`✅ [Signup Hook] User ${userRecord.email} already has valid tenant: ${userRecord.tenantId}`);
-          return {};
+          return;
         }
 
         console.log(`🔧 [Signup Hook] Creating NEW tenant and company for user: ${userRecord.email}`);
@@ -288,16 +289,14 @@ const authInstance = betterAuth({
           companyId: newCompany.id,
           companyName: companyName,
         });
-        return {};
       } catch (error) {
         console.error('❌ ❌ ❌ [Signup Hook] CRITICAL ERROR - Failed to create tenant for new user:', error);
         console.error('❌ [Signup Hook] User email:', userRecord?.email || email || 'unknown');
         console.error('❌ [Signup Hook] Error details:', error);
         // Don't throw - allow signup to complete even if tenant creation fails
         // User will be assigned to default tenant and can be manually migrated later
-        return {};
       }
-    },
+    }),
   },
 });
 
