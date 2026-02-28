@@ -287,6 +287,14 @@ export function AppointmentDetailsSheet({
                         <p className="text-xs text-foreground">{formatDateTime(appointment.confirmationReceivedAt)}</p>
                       </div>
                     )}
+                    {appointment.declineReason && (
+                      <div className="pt-2 mt-2 border-t border-dashed">
+                        <p className="text-xs text-muted-foreground mb-1">Decline Reason</p>
+                        <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-md px-3 py-2">
+                          <p className="text-sm text-red-700 dark:text-red-400 whitespace-pre-wrap">{appointment.declineReason}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
