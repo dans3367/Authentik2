@@ -1,17 +1,98 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { forms, formResponses } from '@shared/schema';
-import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requireRole, requireTenant } from '../middleware/auth-middleware';
 import { sanitizeString } from '../utils/sanitization';
+import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 
 export const formsRoutes = Router();
 
-// Get all forms for the user's company
-formsRoutes.get("/", authenticateToken, async (req: any, res) => {
+// ─── Constants ───────────────────────────────────────────────────────────────
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ALLOWED_CATEGORIES = ['intake', 'survey', 'email-signup'] as const;
+const MAX_PAGE_LIMIT = 100;
+const MAX_RESPONSE_DATA_BYTES = 512 * 1024; // 512 KB per submission
+
+// ─── Rate limiter for public submission endpoint ──────────────────────────────
+const publicSubmitLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  message: { message: 'Too many form submissions from this IP, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// ─── Zod schema for public form submission ────────────────────────────────────
+const publicSubmitSchema = z.object({
+  data: z.record(z.unknown()).refine(
+    (val) => JSON.stringify(val).length <= MAX_RESPONSE_DATA_BYTES,
+    { message: `Response data must not exceed ${MAX_RESPONSE_DATA_BYTES / 1024} KB` }
+  ),
+});
+
+// ─── Middleware: validate :id is a UUID ───────────────────────────────────────
+function validateUuidParam(req: Request, res: Response, next: NextFunction) {
+  const { id } = req.params;
+  if (!id || !UUID_REGEX.test(id)) {
+    return res.status(400).json({ message: 'Invalid form ID format' });
+  }
+  next();
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function parsePagination(page: unknown, limit: unknown) {
+  const p = Math.max(1, parseInt(String(page ?? 1), 10) || 1);
+  const l = Math.min(MAX_PAGE_LIMIT, Math.max(1, parseInt(String(limit ?? 50), 10) || 50));
+  return { page: p, limit: l, offset: (p - 1) * l };
+}
+
+function sanitizeFormData(formData: unknown): string | null {
+  if (!formData) return null;
+  // Ensure it is valid JSON; reject if not
   try {
-    const { page = 1, limit = 50, search, published, category } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const parsed = typeof formData === 'string' ? JSON.parse(formData) : formData;
+    // Recursively sanitize all string leaf values
+    const sanitize = (obj: unknown): unknown => {
+      if (typeof obj === 'string') return sanitizeString(obj) ?? '';
+      if (Array.isArray(obj)) return obj.map(sanitize);
+      if (obj !== null && typeof obj === 'object') {
+        return Object.fromEntries(
+          Object.entries(obj as Record<string, unknown>).map(([k, v]) => [k, sanitize(v)])
+        );
+      }
+      return obj;
+    };
+    return JSON.stringify(sanitize(parsed));
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeTheme(theme: unknown): string | null {
+  if (!theme) return null;
+  try {
+    const parsed = typeof theme === 'string' ? JSON.parse(theme) : theme;
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    // Only keep safe known keys
+    const safe: Record<string, unknown> = {};
+    if (typeof parsed.id === 'string') safe.id = sanitizeString(parsed.id) ?? '';
+    if (typeof parsed.name === 'string') safe.name = sanitizeString(parsed.name) ?? '';
+    if (parsed.customColors !== undefined) safe.customColors = parsed.customColors;
+    return JSON.stringify(safe);
+  } catch {
+    return null;
+  }
+}
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
+
+// Get all forms for the user's company
+formsRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const { page: rawPage, limit: rawLimit, search, published, category } = req.query;
+    const { page, limit, offset } = parsePagination(rawPage, rawLimit);
 
     let whereClause = sql`${forms.tenantId} = ${req.user.tenantId}`;
 
@@ -35,28 +116,23 @@ formsRoutes.get("/", authenticateToken, async (req: any, res) => {
     const formsList = await db.query.forms.findMany({
       where: whereClause,
       orderBy: sql`${forms.updatedAt} DESC`,
-      limit: Number(limit),
+      limit,
       offset,
     });
-
-    console.log('FormsRoutes: Retrieved forms list:', formsList?.length || 0, 'forms');
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
     }).from(forms).where(whereClause);
 
-    const response = {
+    res.json({
       forms: formsList,
       pagination: {
-        page: Number(page),
-        limit: Number(limit),
+        page,
+        limit,
         total: totalCount[0].count,
-        pages: Math.ceil(totalCount[0].count / Number(limit)),
+        pages: Math.ceil(totalCount[0].count / limit),
       },
-    };
-
-    console.log('FormsRoutes: Sending response with', response.forms?.length || 0, 'forms');
-    res.json(response);
+    });
   } catch (error) {
     console.error('Get forms error:', error);
     res.status(500).json({ message: 'Failed to get forms' });
@@ -64,7 +140,7 @@ formsRoutes.get("/", authenticateToken, async (req: any, res) => {
 });
 
 // Get specific form
-formsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
+formsRoutes.get("/:id", authenticateToken, requireTenant, validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -84,23 +160,32 @@ formsRoutes.get("/:id", authenticateToken, async (req: any, res) => {
 });
 
 // Create new form
-formsRoutes.post("/", authenticateToken, async (req: any, res) => {
+formsRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-const { title, description, formData, theme, category } = req.body;
+    const { title, description, formData, theme, category } = req.body;
 
     if (!title || !formData) {
       return res.status(400).json({ message: 'Title and formData are required' });
     }
 
-    const sanitizedTitle = sanitizeString(title);
+    // Validate category against allowed values
+    const safeCategory = ALLOWED_CATEGORIES.includes(category) ? category : 'intake';
+
+    const sanitizedTitle = sanitizeString(title) ?? title.trim();
     const sanitizedDescription = description ? sanitizeString(description) : null;
+    const sanitizedFormData = sanitizeFormData(formData);
+    const sanitizedTheme = sanitizeTheme(theme);
+
+    if (!sanitizedFormData) {
+      return res.status(400).json({ message: 'Invalid formData: must be valid JSON' });
+    }
 
     const newForm = await db.insert(forms).values({
       title: sanitizedTitle,
       description: sanitizedDescription,
-      category: (category as string) || 'intake',
-      formData: formData, // Already a JSON string from client
-      theme: theme, // Already a string from client
+      category: safeCategory,
+      formData: sanitizedFormData,
+      theme: sanitizedTheme || 'modern',
       tenantId: req.user.tenantId,
       userId: req.user.id,
       isActive: true,
@@ -114,19 +199,10 @@ const { title, description, formData, theme, category } = req.body;
 });
 
 // Update form
-formsRoutes.put("/:id", authenticateToken, async (req: any, res) => {
+formsRoutes.put("/:id", authenticateToken, requireTenant, validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
-const { title, description, schema, settings, theme, published, category } = req.body;
-
-    // Check if form exists and belongs to user's company
-    const existingForm = await db.query.forms.findFirst({
-      where: sql`${forms.id} = ${id} AND ${forms.tenantId} = ${req.user.tenantId}`,
-    });
-
-    if (!existingForm) {
-      return res.status(404).json({ message: 'Form not found' });
-    }
+    const { title, description, formData, schema, settings, theme, published, category } = req.body;
 
     const updateData: any = {
       updatedAt: new Date(),
@@ -140,6 +216,14 @@ const { title, description, schema, settings, theme, published, category } = req
       updateData.description = description ? sanitizeString(description) : null;
     }
 
+    if (formData !== undefined) {
+      const sanitizedFormData = sanitizeFormData(formData);
+      if (!sanitizedFormData) {
+        return res.status(400).json({ message: 'Invalid formData: must be valid JSON' });
+      }
+      updateData.formData = sanitizedFormData;
+    }
+
     if (schema !== undefined) {
       updateData.schema = JSON.stringify(schema);
     }
@@ -149,22 +233,26 @@ const { title, description, schema, settings, theme, published, category } = req
     }
 
     if (theme !== undefined) {
-      updateData.theme = theme; // Already a string from client
+      updateData.theme = sanitizeTheme(theme);
     }
-
 
     if (published !== undefined) {
       updateData.published = published;
     }
 
     if (category !== undefined) {
-      updateData.category = category;
+      updateData.category = ALLOWED_CATEGORIES.includes(category) ? category : undefined;
     }
 
+    // Include tenantId in WHERE to prevent TOCTOU cross-tenant update
     const updatedForm = await db.update(forms)
       .set(updateData)
-      .where(sql`${forms.id} = ${id}`)
+      .where(sql`${forms.id} = ${id} AND ${forms.tenantId} = ${req.user.tenantId}`)
       .returning();
+
+    if (updatedForm.length === 0) {
+      return res.status(404).json({ message: 'Form not found' });
+    }
 
     res.json(updatedForm[0]);
   } catch (error) {
@@ -174,22 +262,18 @@ const { title, description, schema, settings, theme, published, category } = req
 });
 
 // Delete form
-formsRoutes.delete("/:id", authenticateToken, async (req: any, res) => {
+formsRoutes.delete("/:id", authenticateToken, requireTenant, validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
 
-    // Check if form exists and belongs to user's company
-    const existingForm = await db.query.forms.findFirst({
-      where: sql`${forms.id} = ${id} AND ${forms.tenantId} = ${req.user.tenantId}`,
-    });
+    // Include tenantId in WHERE to prevent TOCTOU cross-tenant delete
+    const deleted = await db.delete(forms)
+      .where(sql`${forms.id} = ${id} AND ${forms.tenantId} = ${req.user.tenantId}`)
+      .returning({ id: forms.id });
 
-    if (!existingForm) {
+    if (deleted.length === 0) {
       return res.status(404).json({ message: 'Form not found' });
     }
-
-    // Delete form (this will cascade to form responses)
-    await db.delete(forms)
-      .where(sql`${forms.id} = ${id}`);
 
     res.json({ message: 'Form deleted successfully' });
   } catch (error) {
@@ -199,11 +283,11 @@ formsRoutes.delete("/:id", authenticateToken, async (req: any, res) => {
 });
 
 // Get form responses
-formsRoutes.get("/:id/responses", authenticateToken, async (req: any, res) => {
+formsRoutes.get("/:id/responses", authenticateToken, requireTenant, validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { page = 1, limit = 50 } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const { page: rawPage, limit: rawLimit } = req.query;
+    const { page, limit, offset } = parsePagination(rawPage, rawLimit);
 
     // Check if form exists and belongs to user's company
     const form = await db.query.forms.findFirst({
@@ -217,7 +301,7 @@ formsRoutes.get("/:id/responses", authenticateToken, async (req: any, res) => {
     const responses = await db.query.formResponses.findMany({
       where: sql`${formResponses.formId} = ${id}`,
       orderBy: sql`${formResponses.submittedAt} DESC`,
-      limit: Number(limit),
+      limit,
       offset,
     });
 
@@ -228,10 +312,10 @@ formsRoutes.get("/:id/responses", authenticateToken, async (req: any, res) => {
     res.json({
       responses,
       pagination: {
-        page: Number(page),
-        limit: Number(limit),
+        page,
+        limit,
         total: totalCount[0].count,
-        pages: Math.ceil(totalCount[0].count / Number(limit)),
+        pages: Math.ceil(totalCount[0].count / limit),
       },
     });
   } catch (error) {
@@ -241,7 +325,7 @@ formsRoutes.get("/:id/responses", authenticateToken, async (req: any, res) => {
 });
 
 // Get form statistics
-formsRoutes.get("/:id/stats", authenticateToken, async (req: any, res) => {
+formsRoutes.get("/:id/stats", authenticateToken, requireTenant, validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -269,7 +353,7 @@ formsRoutes.get("/:id/stats", authenticateToken, async (req: any, res) => {
 });
 
 // Public form access (no authentication required)
-formsRoutes.get("/public/:id", async (req: any, res) => {
+formsRoutes.get("/public/:id", validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -296,14 +380,17 @@ formsRoutes.get("/public/:id", async (req: any, res) => {
 });
 
 // Submit form response (public endpoint)
-formsRoutes.post("/public/:id/submit", async (req: any, res) => {
+formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { data } = req.body;
 
-    if (!data) {
-      return res.status(400).json({ message: 'Form data is required' });
+    // Validate and bound the request body with Zod
+    const parsed = publicSubmitSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Invalid submission data', details: parsed.error.errors });
     }
+
+    const { data } = parsed.data;
 
     // Check if form exists and is active
     const form = await db.query.forms.findFirst({

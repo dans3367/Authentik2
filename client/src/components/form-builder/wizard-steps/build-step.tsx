@@ -45,6 +45,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   const [showMobileAdd, setShowMobileAdd] = useState(false);
   const [showMobileProperties, setShowMobileProperties] = useState(false);
   const [formCategory, setFormCategory] = useState<FormCategory>(initialCategory);
+  const isEmailSignup = formCategory === 'email-signup';
   const [draggedType, setDraggedType] = useState<FormElementType | null>(null);
   const [draggedElementId, setDraggedElementId] = useState<string | null>(null);
   const [isDraggingElement, setIsDraggingElement] = useState(false);
@@ -302,6 +303,22 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
     addElement(type);
   };
 
+  // Handle category change - auto-populate email field for email-signup
+  const handleCategoryChange = (newCategory: FormCategory) => {
+    setFormCategory(newCategory);
+    if (newCategory === 'email-signup') {
+      // Clear existing elements and add a single required email field
+      const hasEmailField = elements.some(el => el.type === 'email-input');
+      if (!hasEmailField) {
+        resetFormData(formTitle || 'Email Signup', []);
+        // Add email field after reset
+        setTimeout(() => {
+          addElement('email-input');
+        }, 50);
+      }
+    }
+  };
+
   const handleDeselectElement = () => {
     selectElement(null);
     setShowMobileProperties(false);
@@ -321,10 +338,12 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       onDragCancel={handleDragCancel}
     >
       <div className="flex relative">
-        {/* Left Sidebar - Component Palette */}
+        {/* Left Sidebar - Component Palette (hidden for email-signup) */}
+        {!isEmailSignup && (
         <div className="hidden lg:block flex-none relative z-20 sticky top-0 self-start max-h-screen overflow-y-auto">
           <ComponentPalette onAddElement={handleAddElement} />
         </div>
+        )}
         
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 relative z-10">
@@ -356,7 +375,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
             tags={formTags}
             onUpdateTags={updateFormTags}
             category={formCategory}
-            onUpdateCategory={setFormCategory}
+            onUpdateCategory={handleCategoryChange}
             onUpdateSettings={(newSettings) => {
               // Update the entire settings object
               Object.keys(newSettings).forEach(key => {
@@ -390,8 +409,8 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
           )}
         </div>
 
-        {/* Mobile Floating Add Button */}
-        {!previewMode && (
+        {/* Mobile Floating Add Button (hidden for email-signup) */}
+        {!previewMode && !isEmailSignup && (
         <div className="lg:hidden fixed bottom-6 left-6 z-50">
           <Button
             size="lg"
@@ -407,8 +426,8 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
 
 
 
-        {/* Mobile Add Components Modal */}
-        {showMobileAdd && (
+        {/* Mobile Add Components Modal (hidden for email-signup) */}
+        {showMobileAdd && !isEmailSignup && (
           <div className="lg:hidden fixed inset-0 bg-black/50 z-[300] flex items-end">
             <div className="bg-white w-full max-h-[70vh] rounded-t-2xl flex flex-col">
               <div className="flex-shrink-0 p-4 border-b border-gray-200">

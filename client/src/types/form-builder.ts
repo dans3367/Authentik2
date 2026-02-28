@@ -58,7 +58,8 @@ export type FormElementType =
   | 'boolean-switch'
   | 'datetime-picker'
   | 'full-name'
-  | 'label';
+  | 'label'
+  | 'spacer';
 
 export interface ComponentPaletteItem {
   type: FormElementType;
@@ -85,7 +86,7 @@ export interface FormBuilderState {
 
 export type WizardStep = 'build' | 'style' | 'preview';
 
-export type FormCategory = 'intake' | 'survey';
+export type FormCategory = 'intake' | 'survey' | 'email-signup';
 
 export interface CustomColors {
   text: string;

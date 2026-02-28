@@ -1,4 +1,4 @@
-import { FormElement, FormTheme, CustomColors } from '@/types/form-builder';
+import { FormElement, FormTheme, CustomColors, FormCategory } from '@/types/form-builder';
 import { ThemedFormRenderer } from '@/components/form-builder/themed-form-renderer';
 import { CustomThemedForm } from '@/components/form-builder/custom-themed-form';
 import { ColorCustomizer } from '@/components/form-builder/color-customizer';
@@ -58,6 +58,7 @@ interface PreviewStepProps {
     showFormTitle?: boolean;
     compactMode?: boolean;
   };
+  formCategory?: FormCategory;
   onSave: () => void;
   onExport: () => void;
   onCustomizeColors: (colors: CustomColors) => void;
@@ -70,6 +71,7 @@ export function PreviewStep({
   elements, 
   selectedTheme, 
   formSettings = {},
+  formCategory = 'intake',
   onSave, 
   onExport,
   onCustomizeColors,
@@ -597,6 +599,17 @@ export function PreviewStep({
               ))
             )}
             
+            {formCategory === 'email-signup' && (
+              <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  By submitting this form, you agree to receive email and phone communications from us, 
+                  including marketing messages, updates, and promotional offers. Standard message and data 
+                  rates may apply to phone communications. You can opt out at any time by following the 
+                  unsubscribe instructions in our emails or by contacting us directly.
+                </p>
+              </div>
+            )}
+
             {elements.length === 0 && (
               <div className="text-center py-12 text-slate-500">
                 <div className="text-lg font-medium mb-2">No form elements</div>

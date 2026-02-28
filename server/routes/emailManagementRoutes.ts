@@ -6,7 +6,7 @@ import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import { type ContactFilters, type BouncedEmailFilters } from '@shared/schema';
-import { sanitizeString, sanitizeEmail } from '../utils/sanitization';
+import { sanitizeString, sanitizeEmail, escapeLikePattern } from '../utils/sanitization';
 import { storage } from '../storage';
 import jwt from 'jsonwebtoken';
 import { enhancedEmailService } from '../emailService';
@@ -415,12 +415,14 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, r
       return res.json({ stats });
     }
 
-    const offset = (Number(page) - 1) * Number(limit);
+    const parsedPage = Math.max(1, Math.floor(Number(page)) || 1);
+    const parsedLimit = Math.min(200, Math.max(1, Math.floor(Number(limit)) || 50));
+    const offset = (parsedPage - 1) * parsedLimit;
 
     let whereClause = sql`${emailContacts.tenantId} = ${req.user.tenantId}`;
 
     if (search) {
-      const sanitizedSearch = sanitizeString(search as string);
+      const sanitizedSearch = escapeLikePattern(sanitizeString(search as string) || '');
       whereClause = sql`${whereClause} AND (
         ${emailContacts.email} ILIKE ${`%${sanitizedSearch}%`} OR
         ${emailContacts.firstName} ILIKE ${`%${sanitizedSearch}%`} OR
@@ -429,6 +431,10 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, r
     }
 
     if (status) {
+      const allowedStatuses = ['active', 'unsubscribed', 'bounced', 'pending', 'suppressed'];
+      if (!allowedStatuses.includes(status as string)) {
+        return res.status(400).json({ message: `Invalid status. Must be one of: ${allowedStatuses.join(', ')}` });
+      }
       whereClause = sql`${whereClause} AND ${emailContacts.status} = ${status}`;
     }
 
@@ -494,7 +500,7 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, r
         },
       },
       orderBy: sql`${emailContacts.createdAt} DESC`,
-      limit: Number(limit),
+      limit: parsedLimit,
       offset,
     });
 
@@ -521,10 +527,10 @@ emailManagementRoutes.get("/email-contacts", authenticateToken, requireTenant, r
     res.json({
       contacts: transformedContacts,
       pagination: {
-        page: Number(page),
-        limit: Number(limit),
+        page: parsedPage,
+        limit: parsedLimit,
         total: totalCountResult.count,
-        pages: Math.ceil(totalCountResult.count / Number(limit)),
+        pages: Math.ceil(totalCountResult.count / parsedLimit),
       },
     });
   } catch (error) {
@@ -770,8 +776,8 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
     try {
       const clickedResult = await db
         .select({ count: sql<number>`cast(count(*) as int)` })
-        .from(db.emailActivity)
-        .where(sql`${db.emailActivity.contactId} = ${id} AND ${db.emailActivity.activityType} = 'clicked'`);
+        .from(emailActivity)
+        .where(and(eq(emailActivity.contactId, id), eq(emailActivity.activityType, 'clicked')));
       emailsClicked = clickedResult?.[0]?.count ?? 0;
     } catch (e) {
       // Fallback silently if emailActivity is unavailable
@@ -783,10 +789,13 @@ emailManagementRoutes.get("/email-contacts/:id/stats", authenticateToken, requir
     let emailsBounced = 0;
     try {
       if (contact.email) {
-        const bounceCheck = await db.query.bouncedEmails?.findFirst?.({
-          where: sql`${db.bouncedEmails.email} = ${contact.email}`,
-        });
-        emailsBounced = bounceCheck ? 1 : 0;
+        const bounceCheck = await db
+          .select()
+          .from(bouncedEmails)
+          .where(eq(bouncedEmails.email, contact.email))
+          .limit(1);
+        const bounceRecord = bounceCheck[0] || null;
+        emailsBounced = bounceRecord ? 1 : 0;
       }
     } catch (e) {
       emailsBounced = 0;
@@ -892,18 +901,25 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
         userExists = false;
       }
 
+      // Validate status if provided
+      const contactStatus = status || 'active';
+      const allowedStatuses = ['active', 'unsubscribed', 'bounced', 'pending', 'suppressed'];
+      if (!allowedStatuses.includes(contactStatus)) {
+        throw new Error(`Invalid status. Must be one of: ${allowedStatuses.join(', ')}`);
+      }
+
       // Create the contact
       const newContact = await tx.insert(emailContacts).values({
         tenantId: req.user.tenantId,
         email: sanitizedEmail,
         firstName: sanitizedFirstName,
         lastName: sanitizedLastName,
-        status: status || 'active',
+        status: contactStatus,
         consentGiven: consentGiven || false,
         consentMethod: consentMethod || null,
         consentDate: consentGiven ? now : null,
-        consentIpAddress: consentIpAddress || null,
-        consentUserAgent: consentUserAgent || null,
+        consentIpAddress: consentGiven ? (req.ip || req.headers['x-forwarded-for']?.split(',')[0] || null) : null,
+        consentUserAgent: consentGiven ? (req.headers['user-agent'] || null) : null,
         addedByUserId: userExists ? req.user.id : null,
         address: sanitizedAddress,
         city: sanitizedCity,
@@ -993,7 +1009,7 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
 
       // Check if new email is already taken by another contact
       const existingContact = await db.query.emailContacts.findFirst({
-        where: sql`${emailContacts.email} = ${sanitizedEmail} AND ${emailContacts.id} != ${id}`,
+        where: sql`${emailContacts.email} = ${sanitizedEmail} AND ${emailContacts.id} != ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
       });
 
       if (existingContact) {
@@ -1012,6 +1028,10 @@ emailManagementRoutes.put("/email-contacts/:id", authenticateToken, requireTenan
     }
 
     if (status !== undefined) {
+      const allowedStatuses = ['active', 'unsubscribed', 'bounced', 'pending', 'suppressed'];
+      if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({ message: `Invalid status. Must be one of: ${allowedStatuses.join(', ')}` });
+      }
       updateData.status = status;
     }
 
@@ -1240,12 +1260,15 @@ emailManagementRoutes.post("/email-lists", authenticateToken, requireTenant, asy
     const sanitizedName = sanitizeString(name);
     const sanitizedDescription = description ? sanitizeString(description) : null;
 
+    // Additional validation after sanitization
+    if (!sanitizedName) {
+      return res.status(400).json({ message: 'Name cannot be empty or contain only whitespace' });
+    }
+
     const newList = await db.insert(emailLists).values({
-      tenantId: req.user.tenantId,
-      name: sanitizedName,
+      tenantId: req.user!.tenantId,
+      name: sanitizedName!,
       description: sanitizedDescription,
-      createdAt: new Date(),
-      updatedAt: new Date(),
     }).returning();
 
     res.status(201).json(newList[0]);
@@ -1432,10 +1455,12 @@ emailManagementRoutes.post("/bounced-emails", authenticateToken, requireTenant, 
     }
 
     const newBouncedEmail = await db.insert(bouncedEmails).values({
-      email: sanitizedEmail,
-      reason: sanitizedReason,
-      description: sanitizedDescription,
-      bouncedAt: new Date(),
+      email: sanitizedEmail!,
+      bounceType: 'hard',
+      bounceReason: sanitizedReason,
+      firstBouncedAt: new Date(),
+      lastBouncedAt: new Date(),
+      bounceCount: 1,
     }).returning();
 
     res.status(201).json(newBouncedEmail[0]);
@@ -1456,7 +1481,7 @@ emailManagementRoutes.get("/bounced-emails/stats", authenticateToken, requireTen
       hardBounces: sql<number>`count(*) filter (where reason = 'hard_bounce')`,
       softBounces: sql<number>`count(*) filter (where reason = 'soft_bounce')`,
       spamComplaints: sql<number>`count(*) filter (where reason = 'spam_complaint')`,
-    }).from(db.bouncedEmails);
+    }).from(bouncedEmails);
 
     res.json(stats[0]);
   } catch (error) {
@@ -1503,13 +1528,16 @@ emailManagementRoutes.post("/contact-tags", authenticateToken, requireTenant, re
     const sanitizedColor = color ? sanitizeString(color) : '#3B82F6';
     const sanitizedDescription = description ? sanitizeString(description) : null;
 
+    // Additional validation after sanitization
+    if (!sanitizedName) {
+      return res.status(400).json({ message: 'Name cannot be empty or contain only whitespace' });
+    }
+
     const newTag = await db.insert(contactTags).values({
-      tenantId: req.user.tenantId,
-      name: sanitizedName,
+      tenantId: req.user!.tenantId,
+      name: sanitizedName!,
       color: sanitizedColor,
       description: sanitizedDescription,
-      createdAt: new Date(),
-      updatedAt: new Date(),
     }).returning();
 
     res.status(201).json(newTag[0]);
@@ -1807,7 +1835,7 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       secondaryColor: emailDesign?.secondaryColor || '#1E40AF',
       accentColor: emailDesign?.accentColor || '#10B981',
       fontFamily: sanitizeFontFamily(emailDesign?.fontFamily),
-      logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
+      logoUrl: emailDesign?.logoUrl || null,
       headerText: emailDesign?.headerText || null,
       footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),
       socialLinks: null as null | {
@@ -2192,7 +2220,9 @@ emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateTok
   try {
     const { contactId } = req.params;
     const { page = 1, limit = 50, from, to } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const parsedPage = Math.max(1, Math.floor(Number(page)) || 1);
+    const parsedLimit = Math.min(200, Math.max(1, Math.floor(Number(limit)) || 50));
+    const offset = (parsedPage - 1) * parsedLimit;
 
     // Verify contact belongs to this tenant
     const contact = await db.query.emailContacts.findFirst({
@@ -2246,12 +2276,12 @@ emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateTok
         newsletter: {
           columns: {
             id: true,
-            name: true,
+            title: true,
           }
         }
       },
       orderBy: sql`${emailActivity.occurredAt} DESC`,
-      limit: Number(limit),
+      limit: parsedLimit,
       offset,
     });
 
@@ -2278,10 +2308,10 @@ emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateTok
     res.json({
       activities: transformedActivities,
       pagination: {
-        page: Number(page),
-        limit: Number(limit),
+        page: parsedPage,
+        limit: parsedLimit,
         total: totalCountResult.count,
-        pages: Math.ceil(totalCountResult.count / Number(limit)),
+        pages: Math.ceil(totalCountResult.count / parsedLimit),
       },
     });
   } catch (error) {
@@ -2290,53 +2320,7 @@ emailManagementRoutes.get("/email-contacts/:contactId/activity", authenticateTok
   }
 });
 
-// Update contact's birthday email preference
-emailManagementRoutes.patch("/email-contacts/:contactId/birthday-email", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
-  try {
-    const { contactId } = req.params;
-    const { enabled } = req.body;
-
-    if (typeof enabled !== 'boolean') {
-      return res.status(400).json({ message: 'enabled field must be a boolean' });
-    }
-
-    // Verify contact exists and belongs to tenant
-    const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
-    });
-
-    if (!contact) {
-      return res.status(404).json({ message: 'Contact not found' });
-    }
-
-    // Check if contact has unsubscribed from birthday emails
-    if (enabled && contact.birthdayUnsubscribedAt) {
-      return res.status(403).json({
-        message: 'Cannot re-enable birthday emails for a contact who has unsubscribed. The customer must opt-in again through the unsubscribe link.',
-        reason: 'unsubscribed'
-      });
-    }
-
-    // Update birthday email preference
-    const updatedContact = await db.update(emailContacts)
-      .set({
-        birthdayEmailEnabled: enabled,
-        updatedAt: new Date(),
-      })
-      .where(sql`${emailContacts.id} = ${contactId}`)
-      .returning();
-
-    res.json({
-      message: `Birthday email preference ${enabled ? 'enabled' : 'disabled'} successfully`,
-      contact: updatedContact[0]
-    });
-  } catch (error) {
-    console.error('Update birthday email preference error:', error);
-    res.status(500).json({ message: 'Failed to update birthday email preference' });
-  }
-});
-
-// Bulk update birthday email preferences
+// Bulk update birthday email preferences (must be registered BEFORE the :contactId route)
 emailManagementRoutes.patch("/email-contacts/birthday-email/bulk", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { contactIds, enabled } = req.body;
@@ -2376,7 +2360,7 @@ emailManagementRoutes.patch("/email-contacts/birthday-email/bulk", authenticateT
         birthdayEmailEnabled: enabled,
         updatedAt: new Date(),
       })
-      .where(sql`${emailContacts.id} = ANY(${contactIds})`)
+      .where(sql`${emailContacts.id} = ANY(${contactIds}) AND ${emailContacts.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     res.json({
@@ -2386,6 +2370,52 @@ emailManagementRoutes.patch("/email-contacts/birthday-email/bulk", authenticateT
   } catch (error) {
     console.error('Bulk update birthday email preferences error:', error);
     res.status(500).json({ message: 'Failed to update birthday email preferences' });
+  }
+});
+
+// Update contact's birthday email preference
+emailManagementRoutes.patch("/email-contacts/:contactId/birthday-email", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
+  try {
+    const { contactId } = req.params;
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: 'enabled field must be a boolean' });
+    }
+
+    // Verify contact exists and belongs to tenant
+    const contact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+    });
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    // Check if contact has unsubscribed from birthday emails
+    if (enabled && contact.birthdayUnsubscribedAt) {
+      return res.status(403).json({
+        message: 'Cannot re-enable birthday emails for a contact who has unsubscribed. The customer must opt-in again through the unsubscribe link.',
+        reason: 'unsubscribed'
+      });
+    }
+
+    // Update birthday email preference
+    const updatedContact = await db.update(emailContacts)
+      .set({
+        birthdayEmailEnabled: enabled,
+        updatedAt: new Date(),
+      })
+      .where(sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`)
+      .returning();
+
+    res.json({
+      message: `Birthday email preference ${enabled ? 'enabled' : 'disabled'} successfully`,
+      contact: updatedContact[0]
+    });
+  } catch (error) {
+    console.error('Update birthday email preference error:', error);
+    res.status(500).json({ message: 'Failed to update birthday email preference' });
   }
 });
 
@@ -2915,7 +2945,7 @@ emailManagementRoutes.get("/master-email-design", authenticateToken, requireTena
         tenantId: req.user.tenantId,
         companyName: company?.name || '',
         headerMode: 'logo',
-        logoUrl: company?.logoUrl || null,
+        logoUrl: null,
         logoSize: 'medium',
         logoAlignment: 'center',
         bannerUrl: null,
@@ -3912,11 +3942,11 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           // Wait 20 seconds before sending promotional email
           // Send promotional email separately (queued)
           // Sanitize promotion fields to prevent XSS/HTML injection
-          const safePromoTitle = sanitizeEmailHtml(settings.promotion.title || 'Special Birthday Offer!');
-          const safePromoDescription = settings.promotion.description ? sanitizeEmailHtml(settings.promotion.description) : '';
-          const safePromoContent = sanitizeEmailHtml(settings.promotion.content || '');
+          const safePromoTitle = sanitizeEmailHtml(settings.promotion?.title || 'Special Birthday Offer!');
+          const safePromoDescription = settings.promotion?.description ? sanitizeEmailHtml(settings.promotion.description) : '';
+          const safePromoContent = sanitizeEmailHtml(settings.promotion?.content || '');
 
-          const promoSubject = sanitizeEmailHtml(settings.promotion.title || 'Special Birthday Offer!');
+          const promoSubject = sanitizeEmailHtml(settings.promotion?.title || 'Special Birthday Offer!');
           const htmlPromo = `
             <html>
               <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
@@ -3987,7 +4017,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           senderName: resolvedSenderName,
           promotionContent: settings.promotion?.content,
           promotionTitle: settings.promotion?.title,
-          promotionDescription: settings.promotion?.description,
+          promotionDescription: settings.promotion?.description || undefined,
           unsubscribeToken,
         });
 
@@ -4574,7 +4604,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
       secondaryColor: emailDesign?.secondaryColor || '#1E40AF',
       accentColor: emailDesign?.accentColor || '#10B981',
       fontFamily: sanitizeFontFamily(emailDesign?.fontFamily),
-      logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
+      logoUrl: emailDesign?.logoUrl || null,
       headerText: emailDesign?.headerText || null,
       footerText: emailDesign?.footerText || (companyName ? `© ${new Date().getFullYear()} ${companyName}. All rights reserved.` : ''),
       socialLinks: null as null | {
@@ -4626,6 +4656,13 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
     const resolvedContent = replaceEmailPlaceholders(content, contact, companyName);
     const resolvedSubject = replaceEmailPlaceholders(subject, contact, companyName);
 
+    // Sanitize user-provided HTML content to prevent XSS
+    const sanitizedContent = sanitizeEmailHtml(resolvedContent.replace(/\n/g, '<br>'));
+    // Escape text fields to prevent XSS in display names and text content
+    const safeDisplayCompanyName = escapeHtml(design.displayCompanyName || '');
+    const safeHeaderText = design.headerText ? escapeHtml(design.headerText) : null;
+    const safeFooterText = design.footerText ? escapeHtml(design.footerText) : null;
+
     // Format content as HTML using master email design
     const htmlContent = `
       <!DOCTYPE html>
@@ -4640,18 +4677,18 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
             <!-- Hero Header -->
             <div style="padding: 40px 32px; text-align: center; background-color: ${design.primaryColor}; color: #ffffff;">
               ${design.logoUrl ? `
-                <img src="${design.logoUrl}" alt="${design.displayCompanyName}" style="height: 48px; width: auto; margin-bottom: 20px; object-fit: contain;" />
+                <img src="${escapeHtml(design.logoUrl)}" alt="${safeDisplayCompanyName}" style="height: 48px; width: auto; margin-bottom: 20px; object-fit: contain;" />
               ` : `
                 <div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 auto 16px auto; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">
-                  ${(design.displayCompanyName || 'C').charAt(0)}
+                  ${escapeHtml((design.displayCompanyName || 'C').charAt(0))}
                 </div>
               `}
               <h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">
-                ${design.displayCompanyName}
+                ${safeDisplayCompanyName}
               </h1>
-              ${design.headerText ? `
+              ${safeHeaderText ? `
                 <p style="margin: 0 auto; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">
-                  ${design.headerText}
+                  ${safeHeaderText}
                 </p>
               ` : ''}
             </div>
@@ -4659,7 +4696,7 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
             <!-- Body Content -->
             <div style="padding: 64px 48px; min-height: 200px;">
               <div style="font-size: 16px; line-height: 1.625; color: #334155;">
-                ${sanitizeEmailHtml(resolvedContent.replace(/\n/g, '<br>'))}
+                ${sanitizedContent}
               </div>
             </div>
 
@@ -4668,13 +4705,13 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
               
               ${socialLinksHtml}
               
-              ${design.footerText ? `
-                <p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${design.footerText}</p>
+              ${safeFooterText ? `
+                <p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${safeFooterText}</p>
               ` : ''}
               
               <div style="font-size: 12px; line-height: 1.5; color: #94a3b8;">
                 <p style="margin: 0;">
-                  Sent via ${design.displayCompanyName}
+                  Sent via ${safeDisplayCompanyName}
                 </p>
               </div>
             </div>

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Calendar, User, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText, ClipboardList, FileQuestion } from 'lucide-react';
+import { Plus, Loader2, Calendar, User, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText, ClipboardList, FileQuestion, Mail } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -215,10 +215,8 @@ export default function Forms2() {
   const { data: formsData, isLoading: formsLoading, error: formsError, refetch } = useQuery({
     queryKey: ['/api/forms'],
     queryFn: async () => {
-      console.log('Forms: Fetching forms from API...');
       const response = await apiRequest('GET', '/api/forms');
       const data = await response.json();
-      console.log('Forms: Received forms data:', data);
       return data;
     },
     enabled: isAuthenticated && isInitialized, // Wait for both authentication and initialization
@@ -252,14 +250,10 @@ export default function Forms2() {
   // Handle form actions
   const handleViewForm = (formId: string) => {
     const form = forms.find(f => f.id === formId);
-    console.log('Forms: handleViewForm called with formId:', formId);
-    console.log('Forms: Found form:', form);
-
     if (form) {
       setPreviewForm(form);
       setIsPreviewModalOpen(true);
     } else {
-      console.error('Forms: Form not found for ID:', formId);
       toast({
         title: "Error",
         description: "Form not found",
@@ -463,11 +457,12 @@ export default function Forms2() {
     );
   };
 
-  // Handle authentication errors after forms query fails (if any)
-  if (isInitialized && formsError && (formsError.message?.includes('401') || formsError.message?.includes('Authentication failed'))) {
-    setLocation('/auth');
-    return null;
-  }
+  // Handle authentication errors after forms query fails (moved to useEffect to avoid render-time side effects)
+  useEffect(() => {
+    if (isInitialized && formsError && (formsError.message?.includes('401') || formsError.message?.includes('Authentication failed'))) {
+      setLocation('/auth');
+    }
+  }, [isInitialized, formsError, setLocation]);
 
   // Show loading while authentication is being determined
   if (!isInitialized || authLoading) {
@@ -668,6 +663,39 @@ export default function Forms2() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {surveyForms.map((form) => renderFormCard(form))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Email Signup Forms Section */}
+            {(() => {
+              const emailSignupForms = forms.filter(f => f.category === 'email-signup');
+              return (
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                      <Mail className="h-5 w-5" />
+                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Email Signup Forms</h2>
+                    </div>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Email collection with communication consent
+                    </span>
+                    <span className="ml-auto text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
+                      {emailSignupForms.length} form{emailSignupForms.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  {emailSignupForms.length === 0 ? (
+                    <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 border-dashed">
+                      <CardContent className="text-center py-8">
+                        <Mail className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">No email signup forms yet</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {emailSignupForms.map((form) => renderFormCard(form))}
                     </div>
                   )}
                 </div>

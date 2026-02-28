@@ -9,10 +9,10 @@ import {
   bouncedEmails,
   createAppointmentReminderSchema,
 } from '@shared/schema';
-import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import { logActivity } from '../utils/activityLogger';
-import { triggerSendReminder, triggerScheduleReminder, cancelReminderRun } from '../lib/trigger';
+import { triggerSendReminder, triggerScheduleReminder, triggerBulkReminders, cancelReminderRun } from '../lib/trigger';
 import type { ReminderPayload } from '../../src/trigger/reminders';
 
 const router = Router();
@@ -31,7 +31,7 @@ const checkEmailSuppression = async (email: string): Promise<{ isSuppressed: boo
   if (suppression) {
     return {
       isSuppressed: true,
-      reason: suppression.reason || suppression.bounceType || 'Email is suppressed'
+      reason: suppression.bounceReason || suppression.bounceType || 'Email is suppressed'
     };
   }
 
@@ -49,7 +49,16 @@ router.put('/internal/:id/status', authenticateInternalService, async (req: Inte
 
   try {
     const { id } = req.params;
-    const { status, errorMessage } = req.body;
+
+    // Validate ID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ error: 'Invalid reminder ID format' });
+    }
+
+    const { status, errorMessage: rawErrorMessage } = req.body;
+    // Cap errorMessage length to prevent abuse
+    const errorMessage = typeof rawErrorMessage === 'string' ? rawErrorMessage.slice(0, 1000) : undefined;
 
     if (!['pending', 'sent', 'failed', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
@@ -89,15 +98,21 @@ router.put('/internal/:id/status', authenticateInternalService, async (req: Inte
   }
 });
 
-// Apply authentication to all routes below this point
+// Apply authentication and tenant isolation to all routes below this point
 router.use(authenticateToken);
+router.use(requireTenant);
 
 // GET /api/appointment-reminders - List reminders
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { appointmentId, status, dateFrom, dateTo } = req.query;
+    const { appointmentId, status, dateFrom, dateTo, page, limit: limitParam } = req.query;
     const user = (req as any).user;
     const tenantId = user.tenantId;
+
+    // Pagination defaults
+    const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
+    const pageSize = Math.min(200, Math.max(1, parseInt(limitParam as string, 10) || 50));
+    const offset = (pageNum - 1) * pageSize;
 
     // Build where conditions
     const conditions = [eq(appointmentReminders.tenantId, tenantId)];
@@ -111,11 +126,19 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     if (dateFrom) {
-      conditions.push(gte(appointmentReminders.scheduledFor, new Date(dateFrom as string)));
+      const fromDate = new Date(dateFrom as string);
+      if (isNaN(fromDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid dateFrom parameter' });
+      }
+      conditions.push(gte(appointmentReminders.scheduledFor, fromDate));
     }
 
     if (dateTo) {
-      conditions.push(lte(appointmentReminders.scheduledFor, new Date(dateTo as string)));
+      const toDate = new Date(dateTo as string);
+      if (isNaN(toDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid dateTo parameter' });
+      }
+      conditions.push(lte(appointmentReminders.scheduledFor, toDate));
     }
 
     // Fetch reminders with appointment details
@@ -153,11 +176,15 @@ router.get('/', async (req: Request, res: Response) => {
       .leftJoin(appointments, eq(appointmentReminders.appointmentId, appointments.id))
       .leftJoin(emailContacts, eq(appointmentReminders.customerId, emailContacts.id))
       .where(and(...conditions))
-      .orderBy(desc(appointmentReminders.scheduledFor));
+      .orderBy(desc(appointmentReminders.scheduledFor))
+      .limit(pageSize)
+      .offset(offset);
 
     res.json({
       reminders: remindersList,
-      total: remindersList.length
+      total: remindersList.length,
+      page: pageNum,
+      limit: pageSize,
     });
   } catch (error) {
     console.error('Failed to fetch reminders:', error);
@@ -166,7 +193,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // POST /api/appointment-reminders - Create reminder
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requirePermission('appointments.manage_reminders'), async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
     const tenantId = user.tenantId;
@@ -293,6 +320,7 @@ router.post('/', async (req: Request, res: Response) => {
       try {
         const triggerPayload: ReminderPayload = {
           ...reminderPayload,
+          customerEmail: appointment.customer?.email || '',
           scheduledFor: isSendNow ? undefined : validatedData.scheduledFor.toISOString(),
         };
 
@@ -386,7 +414,7 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // POST /api/appointment-reminders/send - Send reminders for appointments
-router.post('/send', async (req: Request, res: Response) => {
+router.post('/send', requirePermission('appointments.manage_reminders'), async (req: Request, res: Response) => {
   try {
     const { appointmentIds, reminderType = 'email' } = req.body;
     const user = (req as any).user;
@@ -394,6 +422,23 @@ router.post('/send', async (req: Request, res: Response) => {
 
     if (!appointmentIds || !Array.isArray(appointmentIds) || appointmentIds.length === 0) {
       return res.status(400).json({ error: 'appointmentIds array is required' });
+    }
+
+    // Validate array bounds and UUID format
+    if (appointmentIds.length > 100) {
+      return res.status(400).json({ error: 'Maximum 100 appointment IDs allowed per request' });
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const invalidIds = appointmentIds.filter((id: any) => typeof id !== 'string' || !uuidRegex.test(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({ error: 'All appointmentIds must be valid UUIDs' });
+    }
+
+    // Validate reminderType
+    const validReminderTypes = ['email', 'sms', 'push'];
+    if (!validReminderTypes.includes(reminderType)) {
+      return res.status(400).json({ error: 'Invalid reminderType. Must be one of: email, sms, push' });
     }
 
     // Fetch appointments with customer details
@@ -408,7 +453,6 @@ router.post('/send', async (req: Request, res: Response) => {
         location: appointments.location,
         serviceType: appointments.serviceType,
         reminderSent: appointments.reminderSent,
-        confirmationToken: appointments.confirmationToken,
         customer: {
           id: emailContacts.id,
           email: emailContacts.email,
@@ -437,6 +481,15 @@ router.post('/send', async (req: Request, res: Response) => {
         const customerName = appointment.customer?.firstName
           ? `${appointment.customer.firstName} ${appointment.customer?.lastName || ''}`.trim()
           : appointment.customer?.email || 'Valued Customer';
+
+        // Skip appointments with no customer
+        if (!appointment.customerId) {
+          errors.push({
+            appointmentId: appointment.id,
+            error: 'No customer assigned to this appointment'
+          });
+          continue;
+        }
 
         // For email reminders, check if the recipient is suppressed
         if (reminderType === 'email' && appointment.customer?.email) {
@@ -480,9 +533,6 @@ This is a reminder about your upcoming appointment:
 ${appointment.location ? `📍 ${appointment.location}` : ''}
 ${appointment.duration ? `⏱️ Duration: ${appointment.duration} minutes` : ''}
 
-Please confirm your attendance by clicking the link below:
-${process.env.FRONTEND_URL || 'https://your-domain.com'}/confirm-appointment/${appointment.id}?token=${appointment.confirmationToken}
-
 If you need to reschedule or have any questions, please contact us.
 
 Best regards,
@@ -504,7 +554,7 @@ Your Team`;
         const minutesBefore = timingMinutes[reminderTiming] || 60;
         const reminderTime = new Date(appointmentTime.getTime() - (minutesBefore * 60 * 1000));
 
-        // Create reminder record
+        // Create reminder record with 'pending' status until Trigger.dev confirms delivery
         const newReminder = await db
           .insert(appointmentReminders)
           .values({
@@ -514,9 +564,8 @@ Your Team`;
             reminderType: reminderType as 'email' | 'sms' | 'push',
             reminderTiming: reminderTiming,
             scheduledFor: reminderTime,
-            status: 'sent', // Mark as sent immediately for now
+            status: 'pending',
             content,
-            sentAt: new Date(),
           })
           .returning();
 
@@ -532,20 +581,72 @@ Your Team`;
 
         remindersCreated.push(newReminder[0]);
 
-        // TODO: Integrate with actual email/SMS service here
-        // For now, we'll just log the reminder
-        console.log(`📧 Reminder sent for appointment ${appointment.id}:`, {
-          to: appointment.customer?.email,
-          subject: `Reminder: ${appointment.title}`,
-          content: content.substring(0, 100) + '...'
-        });
-
       } catch (reminderError) {
         console.error(`Failed to send reminder for appointment ${appointment.id}:`, reminderError);
         errors.push({
           appointmentId: appointment.id,
           error: reminderError instanceof Error ? reminderError.message : 'Unknown error'
         });
+      }
+    }
+
+    // Send all created reminders via Trigger.dev bulk send
+    if (remindersCreated.length > 0) {
+      const reminderPayloads = remindersCreated
+        .map(reminder => {
+          const matchingAppt = appointmentsList.find(a => a.id === reminder.appointmentId);
+          if (!matchingAppt || !matchingAppt.customer?.email) return null;
+
+          const appointmentDate = new Date(matchingAppt.appointmentDate);
+          const cName = matchingAppt.customer?.firstName
+            ? `${matchingAppt.customer.firstName} ${matchingAppt.customer?.lastName || ''}`.trim()
+            : matchingAppt.customer?.email || 'Valued Customer';
+
+          return {
+            reminderId: reminder.id,
+            appointmentId: matchingAppt.id,
+            customerId: matchingAppt.customerId!,
+            customerEmail: matchingAppt.customer.email,
+            customerName: cName,
+            appointmentTitle: matchingAppt.title,
+            appointmentDate: appointmentDate.toLocaleDateString('en-US', {
+              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            }),
+            appointmentTime: appointmentDate.toLocaleTimeString('en-US', {
+              hour: 'numeric', minute: '2-digit', hour12: true,
+            }),
+            location: matchingAppt.location || undefined,
+            reminderType: reminderType as 'email' | 'sms' | 'push',
+            content: reminder.content || undefined,
+            tenantId,
+          };
+        })
+        .filter((p): p is NonNullable<typeof p> => p !== null);
+
+      if (reminderPayloads.length > 0) {
+        try {
+          const bulkResult = await triggerBulkReminders(reminderPayloads as ReminderPayload[]);
+          if (bulkResult.success) {
+            console.log(`📧 [Trigger.dev] Bulk reminders triggered, runId: ${bulkResult.runId}`);
+          } else {
+            console.error(`📧 [Trigger.dev] Bulk reminders failed: ${bulkResult.error}`);
+            // Mark all as failed
+            for (const reminder of remindersCreated) {
+              await db
+                .update(appointmentReminders)
+                .set({ status: 'failed', errorMessage: `Trigger.dev bulk send failed: ${bulkResult.error}`, updatedAt: new Date() })
+                .where(eq(appointmentReminders.id, reminder.id));
+            }
+          }
+        } catch (triggerError) {
+          console.error('📧 [Trigger.dev] Error triggering bulk reminders:', triggerError);
+          for (const reminder of remindersCreated) {
+            await db
+              .update(appointmentReminders)
+              .set({ status: 'failed', errorMessage: triggerError instanceof Error ? triggerError.message : 'Unknown error', updatedAt: new Date() })
+              .where(eq(appointmentReminders.id, reminder.id));
+          }
+        }
       }
     }
 
@@ -566,7 +667,7 @@ Your Team`;
 });
 
 // PUT /api/appointment-reminders/:id/reschedule - Reschedule a pending reminder
-router.put('/:id/reschedule', async (req: Request, res: Response) => {
+router.put('/:id/reschedule', requirePermission('appointments.manage_reminders'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { scheduledFor, timezone } = req.body;
@@ -735,12 +836,14 @@ router.put('/:id/reschedule', async (req: Request, res: Response) => {
 
 // PUT /api/appointment-reminders/:id/status - Update reminder status
 // Security: Requires authenticated user with tenant ownership (internal services must use /internal/:id/status with HMAC)
-router.put('/:id/status', async (req: Request, res: Response) => {
+router.put('/:id/status', requirePermission('appointments.manage_reminders'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { status, errorMessage } = req.body;
+    const { status, errorMessage: rawErrorMessage } = req.body;
     const user = (req as any).user;
     const tenantId = user.tenantId;
+    // Cap errorMessage length to prevent abuse
+    const errorMessage = typeof rawErrorMessage === 'string' ? rawErrorMessage.slice(0, 1000) : undefined;
 
     if (!['pending', 'sent', 'failed', 'cancelled'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });

@@ -106,6 +106,7 @@ import {
 import { db } from "./db";
 import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray, not, isNull } from "drizzle-orm";
 import { storageLogger } from "./logger";
+import { escapeLikePattern } from "./utils/sanitization";
 
 export interface IStorage {
   // Tenant management
@@ -1324,10 +1325,11 @@ export class DatabaseStorage implements IStorage {
   async getAllEmailContacts(tenantId: string, filters?: ContactFilters): Promise<EmailContactWithDetails[]> {
     const conditions = [eq(emailContacts.tenantId, tenantId)];
     if (filters?.search) {
+      const safeSearch = escapeLikePattern(filters.search);
       conditions.push(or(
-        ilike(emailContacts.email, `%${filters.search}%`),
-        ilike(emailContacts.firstName, `%${filters.search}%`),
-        ilike(emailContacts.lastName, `%${filters.search}%`)
+        ilike(emailContacts.email, `%${safeSearch}%`),
+        ilike(emailContacts.firstName, `%${safeSearch}%`),
+        ilike(emailContacts.lastName, `%${safeSearch}%`)
       )!);
     }
     return await db.select().from(emailContacts)
@@ -1494,6 +1496,7 @@ export class DatabaseStorage implements IStorage {
       tenantId: contactTags.tenantId,
       name: contactTags.name,
       color: contactTags.color,
+      description: contactTags.description,
       createdAt: contactTags.createdAt,
     })
       .from(contactTagAssignments)
@@ -1579,17 +1582,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNewsletter(newsletterData: CreateNewsletterData, userId: string, tenantId: string): Promise<Newsletter> {
-    const [newsletter] = await db.insert(newsletters).values({
+    const insertData: any = {
       ...newsletterData,
       userId,
       tenantId,
-    }).returning();
+    };
+
+    // Handle scheduledAt conversion from string to Date
+    if (newsletterData.scheduledAt !== undefined && newsletterData.scheduledAt !== null) {
+      if (typeof newsletterData.scheduledAt === 'string') {
+        insertData.scheduledAt = new Date(newsletterData.scheduledAt);
+      }
+    }
+
+    const [newsletter] = await db.insert(newsletters).values(insertData).returning();
     return newsletter;
   }
 
   async updateNewsletter(id: string, updates: UpdateNewsletterData, tenantId: string): Promise<Newsletter | undefined> {
+    const updateData: any = {
+      ...updates,
+      updatedAt: new Date(),
+    };
+
+    // Handle scheduledAt conversion from string to Date
+    if (updates.scheduledAt !== undefined && updates.scheduledAt !== null) {
+      if (typeof updates.scheduledAt === 'string') {
+        updateData.scheduledAt = new Date(updates.scheduledAt);
+      }
+    }
+
     const [newsletter] = await db.update(newsletters)
-      .set({ ...updates, updatedAt: new Date() })
+      .set(updateData)
       .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)))
       .returning();
     return newsletter;
@@ -1909,14 +1933,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePromotion(id: string, updates: UpdatePromotionData, tenantId: string): Promise<Promotion | undefined> {
-    const updateData = {
+    const updateData: any = {
       ...updates,
       updatedAt: new Date(),
     };
 
     // Handle promotional codes JSON serialization
     if (updates.promotionalCodes !== undefined) {
-      (updateData as any).promotionalCodes = updates.promotionalCodes ? JSON.stringify(updates.promotionalCodes) : null;
+      updateData.promotionalCodes = updates.promotionalCodes ? JSON.stringify(updates.promotionalCodes) : null;
     }
 
     const [updated] = await db.update(promotions)

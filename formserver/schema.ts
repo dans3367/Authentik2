@@ -11,6 +11,7 @@ export const forms = pgTable("forms", {
   userId: varchar("user_id").notNull(),
   title: text("title").notNull(),
   description: text("description"),
+  category: text("category").notNull().default('intake'), // 'intake', 'survey', or 'email-signup'
   formData: text("form_data").notNull(), // JSON string of form structure
   theme: text("theme").default('modern'),
   isActive: boolean("is_active").default(true),

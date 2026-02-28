@@ -17,6 +17,7 @@ interface FormData {
   id: string;
   title: string;
   description?: string;
+  category?: string;
   formData: {
     elements: FormElement[];
   };
@@ -330,6 +331,17 @@ const FormView: React.FC<FormViewProps> = ({ formId }) => {
             <form onSubmit={handleSubmit} className="space-y-6">
               {form.formData.elements?.map(renderFormElement)}
               
+              {form.category === 'email-signup' && (
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    By submitting this form, you agree to receive email and phone communications from us, 
+                    including marketing messages, updates, and promotional offers. Standard message and data 
+                    rates may apply to phone communications. You can opt out at any time by following the 
+                    unsubscribe instructions in our emails or by contacting us directly.
+                  </p>
+                </div>
+              )}
+
               <button 
                 type="submit" 
                 disabled={submitting}

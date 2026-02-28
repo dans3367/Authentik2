@@ -35,10 +35,10 @@
   };
 
   // Utility functions
-  function createElement(tag, className, innerHTML) {
+  function createElement(tag, className, textContent) {
     const element = document.createElement(tag);
     if (className) element.className = className;
-    if (innerHTML) element.innerHTML = innerHTML;
+    if (textContent) element.textContent = textContent;
     return element;
   }
 
@@ -382,13 +382,15 @@
       // Add title if enabled
       let titleNode = null;
       if (this.options.showTitle && this.formData.title) {
-        titleNode = createElement('h2', themeStyles.header, this.formData.title);
+        titleNode = createElement('h2', themeStyles.header);
+        titleNode.textContent = this.formData.title;
         formContainer.appendChild(titleNode);
       }
 
       // Add description if enabled
       if (this.options.showDescription && this.formData.description) {
-        const description = createElement('p', 'text-gray-600 mb-6', this.formData.description);
+        const description = createElement('p', 'text-gray-600 mb-6');
+        description.textContent = this.formData.description;
         formContainer.appendChild(description);
       }
 
@@ -474,9 +476,13 @@
       // Add label for most field types
       if (element.type !== 'submit-button' && element.type !== 'reset-button' && element.type !== 'spacer') {
         if (element.label) {
-          const label = createElement('label', themeStyles.label, element.label);
+          const label = createElement('label', themeStyles.label);
+          label.textContent = element.label;
           if (element.required) {
-            label.innerHTML += '<span style="color: red;">*</span>';
+            const asterisk = document.createElement('span');
+            asterisk.style.color = 'red';
+            asterisk.textContent = '*';
+            label.appendChild(asterisk);
           }
           fieldContainer.appendChild(label);
         }
@@ -490,7 +496,8 @@
 
       // Add help text if present
       if (element.helpText) {
-        const helpText = createElement('p', 'text-sm text-gray-500 mt-1', element.helpText);
+        const helpText = createElement('p', 'text-sm text-gray-500 mt-1');
+        helpText.textContent = element.helpText;
         fieldContainer.appendChild(helpText);
       }
 
@@ -550,7 +557,8 @@
           // Add options
           if (element.options && Array.isArray(element.options)) {
             element.options.forEach(option => {
-              const optionElement = createElement('option', '', option.label || option.value);
+              const optionElement = createElement('option');
+              optionElement.textContent = option.label || option.value;
               optionElement.value = option.value;
               inputElement.appendChild(optionElement);
             });
@@ -563,7 +571,8 @@
           inputElement.type = 'checkbox';
           inputElement.className = themeStyles.checkbox;
           
-          const checkboxLabel = createElement('label', 'text-gray-700', element.label || '');
+          const checkboxLabel = createElement('label', 'text-gray-700');
+          checkboxLabel.textContent = element.label || '';
           checkboxContainer.appendChild(inputElement);
           checkboxContainer.appendChild(checkboxLabel);
           return checkboxContainer;
@@ -579,7 +588,8 @@
               radioInput.value = option.value;
               radioInput.className = themeStyles.radio;
               
-              const radioLabel = createElement('label', 'text-gray-700', option.label || option.value);
+              const radioLabel = createElement('label', 'text-gray-700');
+              radioLabel.textContent = option.label || option.value;
               optionContainer.appendChild(radioInput);
               optionContainer.appendChild(radioLabel);
               radioContainer.appendChild(optionContainer);
@@ -607,14 +617,14 @@
           inputElement = createElement('button');
           inputElement.type = 'submit';
           inputElement.className = themeStyles.button;
-          inputElement.textContent = element.label || 'Submit';
+          inputElement.textContent = String(element.label || 'Submit').replace(/[<>"'&]/g, '');
           return inputElement;
 
         case 'reset-button':
           inputElement = createElement('button');
           inputElement.type = 'reset';
           inputElement.className = themeStyles.button.replace('bg-gray-900', 'bg-gray-600');
-          inputElement.textContent = element.label || 'Reset';
+          inputElement.textContent = String(element.label || 'Reset').replace(/[<>"'&]/g, '');
           return inputElement;
 
         case 'spacer':
@@ -716,7 +726,8 @@
         type === 'success' 
           ? 'bg-green-100 border border-green-400 text-green-700' 
           : 'bg-red-100 border border-red-400 text-red-700'
-      }`, message);
+      }`);
+      messageElement.textContent = message;
 
       if (rootNode.firstChild) {
         rootNode.insertBefore(messageElement, rootNode.firstChild);

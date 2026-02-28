@@ -26,6 +26,7 @@ interface FormPreviewModalProps {
     id: string;
     title: string;
     description?: string;
+    category?: string;
     formData: string;
     theme: string;
   };
@@ -181,7 +182,6 @@ export function FormPreviewModal({ isOpen, onClose, form, formSettings = {} }: F
   // Parse form data and theme on mount
   useEffect(() => {
     if (!form) {
-      console.log('FormPreviewModal: No form data received');
       return;
     }
 
@@ -193,52 +193,33 @@ export function FormPreviewModal({ isOpen, onClose, form, formSettings = {} }: F
       return;
     }
 
-    console.log('FormPreviewModal: Received form data:', form);
-
     try {
       // Parse form data
       let parsedFormData;
-      console.log('FormPreviewModal: Raw form.formData type:', typeof form.formData);
-      console.log('FormPreviewModal: Raw form.formData value:', form.formData);
-      
       try {
         // Check if formData is already an object or needs parsing
         if (typeof form.formData === 'string') {
           parsedFormData = JSON.parse(form.formData);
-          console.log('FormPreviewModal: Parsed formData from string:', parsedFormData);
         } else {
           parsedFormData = form.formData;
-          console.log('FormPreviewModal: Using formData as object:', parsedFormData);
         }
       } catch (parseError) {
-        console.error('FormPreviewModal: Failed to parse formData:', parseError, 'Raw formData:', form.formData);
+        console.error('FormPreviewModal: Failed to parse formData:', parseError);
         parsedFormData = { elements: [], settings: {} };
       }
 
       const elements = parsedFormData.elements || [];
-      console.log('FormPreviewModal: parsedFormData.elements:', parsedFormData.elements);
-      console.log('FormPreviewModal: elements type:', typeof elements, 'isArray:', Array.isArray(elements));
-      console.log('FormPreviewModal: elements value before setState:', elements);
       setElements(elements);
-      console.log('FormPreviewModal: Extracted elements:', elements.length, 'elements');
 
       // Parse and store form settings from the database
       const storedSettings = parsedFormData.settings || {};
       setParsedFormSettings(storedSettings);
-      console.log('FormPreviewModal: Parsed settings:', storedSettings);
-
-      // Check if we have any elements
-      if (elements.length === 0) {
-        console.warn('FormPreviewModal: No form elements found in parsed data');
-      }
 
       // Parse theme
       let themeData: { id: string; name: string; customColors?: CustomColors } = { id: 'minimal', name: 'Minimal' };
       try {
         themeData = JSON.parse(form.theme);
-        console.log('FormPreviewModal: Parsed theme:', themeData);
       } catch (themeParseError) {
-        console.warn('FormPreviewModal: Failed to parse theme, using fallback:', themeParseError, 'Raw theme:', form.theme);
         // If theme parsing fails, use string as theme ID
         themeData = { id: form.theme || 'minimal', name: form.theme || 'Minimal' };
       }
@@ -257,22 +238,15 @@ export function FormPreviewModal({ isOpen, onClose, form, formSettings = {} }: F
         setSelectedTheme(matchedTheme);
       }
     } catch (error) {
-      console.error('Error parsing form data:', error);
+      console.error('FormPreviewModal: Error parsing form data:', error);
       // Fallback to minimal theme
       setSelectedTheme(fallbackThemes[0]);
     }
   }, [form]);
 
-  // Debug: Monitor elements state changes
-  useEffect(() => {
-    console.log('FormPreviewModal: Elements state changed:', elements, 'length:', elements.length);
-  }, [elements]);
-
   // Create enhanced elements list with automatic buttons
   const elementsWithButtons: PreviewFormElement[] = useMemo(() => {
-    console.log('FormPreviewModal: Creating elementsWithButtons, elements:', elements, 'length:', elements.length);
     if (!elements.length) {
-      console.log('FormPreviewModal: No elements found, returning empty array');
       return [];
     }
 
@@ -627,6 +601,17 @@ export function FormPreviewModal({ isOpen, onClose, form, formSettings = {} }: F
                     />
                   </div>
                 ))
+              )}
+
+              {form.category === 'email-signup' && (
+                <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    By submitting this form, you agree to receive email and phone communications from us, 
+                    including marketing messages, updates, and promotional offers. Standard message and data 
+                    rates may apply to phone communications. You can opt out at any time by following the 
+                    unsubscribe instructions in our emails or by contacting us directly.
+                  </p>
+                </div>
               )}
             </form>
 

@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { db } from '../database.js';
 import { forms, formResponses } from '../schema.js';
 import { eq, and, sql } from 'drizzle-orm';
@@ -6,25 +6,38 @@ import { z } from 'zod';
 
 const router = express.Router();
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_RESPONSE_DATA_BYTES = 512 * 1024; // 512 KB
+
+// ─── Middleware: validate :id is a UUID ───────────────────────────────────────
+function validateUuidParam(req: Request, res: Response, next: NextFunction) {
+  const { id } = req.params;
+  if (!id || !UUID_REGEX.test(id)) {
+    return res.status(400).json({ error: 'Invalid form ID format' });
+  }
+  next();
+}
+
 // Schema for form response submission
 const formResponseSchema = z.object({
-  responseData: z.record(z.any())
+  responseData: z.record(z.unknown()).refine(
+    (val) => JSON.stringify(val).length <= MAX_RESPONSE_DATA_BYTES,
+    { message: `Response data must not exceed ${MAX_RESPONSE_DATA_BYTES / 1024} KB` }
+  )
 });
 
 // GET /api/forms/:id - Get a specific form by UUID
-router.get('/:id', async (req, res) => {
+router.get('/:id', validateUuidParam, async (req, res) => {
   try {
     const formId = req.params.id;
-
-    if (!formId) {
-      return res.status(400).json({ error: 'Form ID is required' });
-    }
 
     // Get form data, only if it's active
     const form = await db.select({
       id: forms.id,
       title: forms.title,
       description: forms.description,
+      category: forms.category,
       formData: forms.formData,
       theme: forms.theme
     })
@@ -50,6 +63,7 @@ router.get('/:id', async (req, res) => {
       id: formRecord.id,
       title: formRecord.title,
       description: formRecord.description,
+      category: formRecord.category || 'intake',
       formData: parsedFormData,
       theme: formRecord.theme || 'modern'
     });
@@ -61,13 +75,9 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/forms/:id/submit - Submit a form response
-router.post('/:id/submit', async (req, res) => {
+router.post('/:id/submit', validateUuidParam, async (req, res) => {
   try {
     const formId = req.params.id;
-
-    if (!formId) {
-      return res.status(400).json({ error: 'Form ID is required' });
-    }
 
     // Validate request body
     const validation = formResponseSchema.safeParse(req.body);

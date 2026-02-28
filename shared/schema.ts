@@ -2583,16 +2583,22 @@ export const createAppointmentReminderSchema = z.object({
   reminderType: z.enum(['email', 'sms', 'push']).default('email'),
   reminderTiming: z.enum(['now', '5m', '30m', '1h', '5h', '10h', 'custom']).default('1h'),
   customMinutesBefore: z.number().min(1).max(10080).optional(), // Up to 1 week before
-  scheduledFor: z.coerce.date().refine(
-    (date) => {
-      const now = new Date();
-      now.setSeconds(0, 0); // Round down to the minute
-      return date >= now;
-    },
-    { message: "Reminder scheduled time must be in the future" }
-  ),
+  scheduledFor: z.coerce.date(),
   timezone: z.string().default('America/Chicago'), // IANA timezone identifier
-  content: z.string().optional(),
+  content: z.string().max(5000).optional(),
+}).superRefine((data, ctx) => {
+  // Only enforce future-date validation when not sending immediately
+  if (data.reminderTiming !== 'now') {
+    const now = new Date();
+    now.setSeconds(0, 0); // Round down to the minute
+    if (data.scheduledFor < now) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Reminder scheduled time must be in the future",
+        path: ["scheduledFor"],
+      });
+    }
+  }
 });
 
 // Appointment types

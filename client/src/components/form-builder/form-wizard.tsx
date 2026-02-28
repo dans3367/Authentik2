@@ -315,6 +315,7 @@ const [, setLocation] = useLocation();
             elements={wizardState.formData.elements}
             selectedTheme={wizardState.selectedTheme}
             formSettings={wizardState.formData.settings}
+            formCategory={wizardState.formData.category}
             onSave={handleSave}
             onExport={handleExport}
             onCustomizeColors={customizeThemeColors}

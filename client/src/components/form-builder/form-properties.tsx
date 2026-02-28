@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Trash2, X, Plus, ChevronDown, ClipboardList, FileQuestion } from 'lucide-react';
+import { Trash2, X, Plus, ChevronDown, ClipboardList, FileQuestion, Mail } from 'lucide-react';
 import { FormCategory } from '@/types/form-builder';
 import { apiRequest } from '@/lib/queryClient';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -144,7 +144,7 @@ placeholder={t('formBuilder.properties.formTitlePlaceholder','Enter form title..
               <Label className="text-sm font-medium text-neutral-700 mb-2">
                 {t('formBuilder.properties.formCategory', 'Form Type')}
               </Label>
-              <div className="grid grid-cols-2 gap-2 mt-1">
+              <div className="grid grid-cols-3 gap-2 mt-1">
                 <button
                   type="button"
                   onClick={() => onUpdateCategory?.('intake')}
@@ -169,11 +169,25 @@ placeholder={t('formBuilder.properties.formTitlePlaceholder','Enter form title..
                   <FileQuestion className="w-5 h-5" />
                   <span className="text-xs font-medium">{t('formBuilder.properties.surveyForms', 'Survey')}</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => onUpdateCategory?.('email-signup')}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all duration-200 ${
+                    category === 'email-signup'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+                      : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50'
+                  }`}
+                >
+                  <Mail className="w-5 h-5" />
+                  <span className="text-xs font-medium">{t('formBuilder.properties.emailSignupForms', 'Email Signup')}</span>
+                </button>
               </div>
               <p className="text-[10px] text-neutral-400 mt-1">
                 {category === 'intake'
                   ? t('formBuilder.properties.intakeHint', 'Sign-ups, newsletters, lead capture')
-                  : t('formBuilder.properties.surveyHint', 'Questionnaires, reviews, feedback')}
+                  : category === 'survey'
+                  ? t('formBuilder.properties.surveyHint', 'Questionnaires, reviews, feedback')
+                  : t('formBuilder.properties.emailSignupHint', 'Email-only collection with communication consent')}
               </p>
             </div>
 

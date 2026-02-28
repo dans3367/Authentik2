@@ -125,6 +125,14 @@ export function clearRateLimit(ip: string): void {
 }
 
 /**
+ * Escapes LIKE/ILIKE wildcard characters (% and _) in a search string
+ * so they are treated as literal characters in SQL LIKE patterns.
+ */
+export function escapeLikePattern(input: string): string {
+  return input.replace(/[%_\\]/g, '\\$&');
+}
+
+/**
  * Get client IP address from request
  */
 export function getClientIP(req: any): string {
