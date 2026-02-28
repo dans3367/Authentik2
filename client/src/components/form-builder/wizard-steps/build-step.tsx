@@ -211,6 +211,9 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
 
     if (!over) return;
 
+    // Block all drag-and-drop in email-signup mode
+    if (isEmailSignup) return;
+
     // Handle dropping new component from palette
     if (active.data.current?.isNew) {
       const type = active.id.toString().replace('palette-', '') as FormElementType;
@@ -300,6 +303,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   };
 
   const handleAddElement = (type: FormElementType) => {
+    if (isEmailSignup) return; // Block adding elements in email-signup mode
     addElement(type);
   };
 
@@ -307,15 +311,15 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   const handleCategoryChange = (newCategory: FormCategory) => {
     setFormCategory(newCategory);
     if (newCategory === 'email-signup') {
-      // Clear existing elements and add a single required email field
-      const hasEmailField = elements.some(el => el.type === 'email-input');
-      if (!hasEmailField) {
-        resetFormData(formTitle || 'Email Signup', []);
-        // Add email field after reset
-        setTimeout(() => {
-          addElement('email-input');
-        }, 50);
-      }
+      // Clear ALL existing elements and add a single required email field
+      resetFormData(formTitle || 'Email Signup', []);
+      setTimeout(() => {
+        addElement('email-input');
+      }, 50);
+
+      // Force disable compactMode and showProgressBar as they are hidden in this mode
+      updateFormSettings('compactMode', false);
+      updateFormSettings('showProgressBar', false);
     }
   };
 
@@ -354,7 +358,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
             previewMode={previewMode}
             draggedType={draggedType}
             onSelectElement={selectElement}
-            onRemoveElement={removeElement}
+            onRemoveElement={isEmailSignup ? () => {} : removeElement}
             onUpdateElement={updateElement}
             onUpdateFormTitle={updateFormTitle}
             onTogglePreview={togglePreview}

@@ -604,6 +604,7 @@ export function useFormWizard(existingForm?: ExistingFormData) {
           allowSaveProgress: false,
           showFormTitle: true,
           compactMode: false,
+          language: 'en',
         }
       },
       selectedTheme: null,

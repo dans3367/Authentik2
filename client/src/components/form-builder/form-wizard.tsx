@@ -2,7 +2,7 @@ import { useFormWizard } from '@/hooks/use-form-wizard';
 import { BuildStep } from './wizard-steps/build-step';
 import { StyleStep } from './wizard-steps/style-step';
 import { PreviewStep } from './wizard-steps/preview-step';
-import { FormSuccessDialog } from './form-success-dialog';
+import { FormQRCode } from './form-qr-code';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
@@ -36,7 +36,6 @@ const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdFormData, setCreatedFormData] = useState<{ id: string; title: string } | null>(null);
 
   // Redirect unauthenticated users immediately
@@ -158,7 +157,6 @@ const [, setLocation] = useLocation();
       
       // Complete the wizard and show success dialog
       completeWizard();
-      setShowSuccessDialog(true);
     } catch (error: any) {
       console.error('Error saving form:', error);
       toast({
@@ -171,25 +169,11 @@ const [, setLocation] = useLocation();
     }
   };
 
-  const handleExport = () => {
-    // TODO: Implement export functionality
-    console.log('Exporting form:', wizardState);
-  };
-
   // Development helper to test storage functionality
   const handleTestStorage = () => {
     console.log('🧪 Testing storage functionality...');
     checkStorageState();
   };
-
-  // Handle success dialog close
-  const handleSuccessDialogClose = () => {
-    setShowSuccessDialog(false);
-    setCreatedFormData(null);
-    setLocation('/forms'); // Redirect to forms list
-  };
-
-
 
   const getStepTitle = () => {
     switch (wizardState.currentStep) {
@@ -219,14 +203,50 @@ const [, setLocation] = useLocation();
 
   if (wizardState.isComplete) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-neutral-50">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Check className="w-8 h-8 text-white" />
+      <div className="min-h-screen flex flex-col items-center py-12 bg-neutral-50 overflow-y-auto">
+        <div className="w-full max-w-2xl bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Check className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-3xl font-bold text-slate-800 mb-4">
+              {editMode ? 'Form Updated Successfully!' : 'Form Saved Successfully!'}
+            </h2>
+            <p className="text-lg text-slate-600">
+              {editMode 
+                ? `Your form has been updated and is ready to receive responses.`
+                : `Your form has been created and saved.`
+              }
+            </p>
           </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Form Saved Successfully!</h2>
-          <p className="text-slate-600 mb-6">Your form has been created and saved.</p>
-          <Button onClick={resetWizard}>Create Another Form</Button>
+
+          {createdFormData && (
+            <div className="border-t border-slate-200 pt-8 mb-8">
+              <div className="text-center mb-6">
+                <h3 className="text-xl font-semibold text-slate-800">Share Your Form</h3>
+                <p className="text-slate-600 mt-2">
+                  Use the QR code below or share the direct URL to collect responses
+                </p>
+              </div>
+              <FormQRCode formId={createdFormData.id} formTitle={createdFormData.title} />
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8 border-t border-slate-200">
+            <Button 
+              variant="outline" 
+              onClick={() => setLocation('/forms')}
+              className="px-8 py-6 text-lg"
+            >
+              Return to Forms
+            </Button>
+            <Button 
+              onClick={resetWizard}
+              className="px-8 py-6 text-lg"
+            >
+              Create Another Form
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -317,7 +337,6 @@ const [, setLocation] = useLocation();
             formSettings={wizardState.formData.settings}
             formCategory={wizardState.formData.category}
             onSave={handleSave}
-            onExport={handleExport}
             onCustomizeColors={customizeThemeColors}
             onResetColors={resetThemeColors}
             isSaving={isSaving}
@@ -371,17 +390,6 @@ const [, setLocation] = useLocation();
           </div>
         </div>
       </footer>
-
-      {/* Success Dialog with QR Code */}
-      {showSuccessDialog && createdFormData && (
-        <FormSuccessDialog
-          isOpen={showSuccessDialog}
-          onClose={handleSuccessDialogClose}
-          formId={createdFormData.id}
-          formTitle={createdFormData.title}
-          isEditMode={editMode}
-        />
-      )}
     </div>
   );
 }

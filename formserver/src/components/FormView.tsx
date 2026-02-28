@@ -13,6 +13,21 @@ interface FormElement {
   options?: string[];
 }
 
+// Form language translations for button texts
+type FormLanguage = 'en' | 'es';
+const formButtonTranslations: Record<FormLanguage, { submit: string; submitting: string; disclaimer: string }> = {
+  en: { 
+    submit: 'Submit Form', 
+    submitting: 'Submitting...',
+    disclaimer: 'By submitting this form, you agree to receive email and phone communications from us, including marketing messages, updates, and promotional offers. Standard message and data rates may apply to phone communications. You can opt out at any time by following the unsubscribe instructions in our emails or by contacting us directly.'
+  },
+  es: { 
+    submit: 'Enviar Formulario', 
+    submitting: 'Enviando...',
+    disclaimer: 'Al enviar este formulario, aceptas recibir comunicaciones por correo electrónico y teléfono de nuestra parte, incluidos mensajes de marketing, actualizaciones y ofertas promocionales. Se pueden aplicar tarifas estándar de mensajes y datos a las comunicaciones telefónicas. Puedes darte de baja en cualquier momento siguiendo las instrucciones de cancelación de suscripción en nuestros correos electrónicos o contactándonos directamente.'
+  },
+};
+
 interface FormData {
   id: string;
   title: string;
@@ -20,6 +35,10 @@ interface FormData {
   category?: string;
   formData: {
     elements: FormElement[];
+    settings?: {
+      language?: FormLanguage;
+      [key: string]: any;
+    };
   };
   theme: string;
 }
@@ -334,10 +353,11 @@ const FormView: React.FC<FormViewProps> = ({ formId }) => {
               {form.category === 'email-signup' && (
                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    By submitting this form, you agree to receive email and phone communications from us, 
-                    including marketing messages, updates, and promotional offers. Standard message and data 
-                    rates may apply to phone communications. You can opt out at any time by following the 
-                    unsubscribe instructions in our emails or by contacting us directly.
+                    {(() => {
+                      const lang = (form?.formData?.settings?.language || 'en') as FormLanguage;
+                      const t = formButtonTranslations[lang] || formButtonTranslations.en;
+                      return t.disclaimer;
+                    })()}
                   </p>
                 </div>
               )}
@@ -347,7 +367,11 @@ const FormView: React.FC<FormViewProps> = ({ formId }) => {
                 disabled={submitting}
                 className={theme?.button || 'w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed'}
               >
-                {submitting ? 'Submitting...' : 'Submit Form'}
+                {(() => {
+                  const lang = (form?.formData?.settings?.language || 'en') as FormLanguage;
+                  const t = formButtonTranslations[lang] || formButtonTranslations.en;
+                  return submitting ? t.submitting : t.submit;
+                })()}
               </button>
             </form>
           </div>

@@ -34,6 +34,26 @@
     }
   };
 
+  // Form language translations for button texts
+  const FORM_TRANSLATIONS = {
+    en: { 
+      submit: 'Submit', 
+      submitting: 'Submitting...', 
+      reset: 'Reset',
+      disclaimer: 'By submitting this form, you agree to receive email and phone communications from us, including marketing messages, updates, and promotional offers. Standard message and data rates may apply to phone communications. You can opt out at any time by following the unsubscribe instructions in our emails or by contacting us directly.'
+    },
+    es: { 
+      submit: 'Enviar', 
+      submitting: 'Enviando...', 
+      reset: 'Restablecer',
+      disclaimer: 'Al enviar este formulario, aceptas recibir comunicaciones por correo electrónico y teléfono de nuestra parte, incluidos mensajes de marketing, actualizaciones y ofertas promocionales. Se pueden aplicar tarifas estándar de mensajes y datos a las comunicaciones telefónicas. Puedes darte de baja en cualquier momento siguiendo las instrucciones de cancelación de suscripción en nuestros correos electrónicos o contactándonos directamente.'
+    },
+  };
+
+  function getFormTranslation(language) {
+    return FORM_TRANSLATIONS[language] || FORM_TRANSLATIONS.en;
+  }
+
   // Utility functions
   function createElement(tag, className, textContent) {
     const element = document.createElement(tag);
@@ -408,13 +428,26 @@
         });
       }
 
+      // Store form language for button translations
+      this.formLanguage = formElements.settings?.language || 'en';
+      const formTrans = getFormTranslation(this.formLanguage);
+
+      // Add disclaimer for email-signup category
+      if (this.formData.category === 'email-signup') {
+        const disclaimerContainer = createElement('div', 'p-4 bg-gray-50 border border-gray-200 rounded-lg mb-4');
+        const disclaimerText = createElement('p', 'text-xs text-gray-500 leading-relaxed');
+        disclaimerText.textContent = formTrans.disclaimer;
+        disclaimerContainer.appendChild(disclaimerText);
+        this.form.appendChild(disclaimerContainer);
+      }
+
       // Add submit button if not present
       const hasSubmitButton = formElements.elements?.some(el => el.type === 'submit-button');
       if (!hasSubmitButton) {
         const submitButton = createElement('button');
         submitButton.type = 'submit';
         submitButton.className = themeStyles.button;
-        submitButton.textContent = 'Submit';
+        submitButton.textContent = formTrans.submit;
         
         const buttonContainer = createElement('div', themeStyles.field);
         buttonContainer.appendChild(submitButton);
@@ -687,28 +720,31 @@
     }
 
     showLoading() {
+      const formTrans = getFormTranslation(this.formLanguage || 'en');
       const submitButton = this.form.querySelector('button[type="submit"]');
       if (submitButton) {
         submitButton.disabled = true;
-        submitButton.textContent = 'Submitting...';
+        submitButton.textContent = formTrans.submitting;
       }
     }
 
     showSuccess(message) {
+      const formTrans = getFormTranslation(this.formLanguage || 'en');
       const submitButton = this.form.querySelector('button[type="submit"]');
       if (submitButton) {
         submitButton.disabled = false;
-        submitButton.textContent = 'Submit';
+        submitButton.textContent = formTrans.submit;
       }
 
       this.showMessage(message, 'success');
     }
 
     showError(message) {
+      const formTrans = getFormTranslation(this.formLanguage || 'en');
       const submitButton = this.form.querySelector('button[type="submit"]');
       if (submitButton) {
         submitButton.disabled = false;
-        submitButton.textContent = 'Submit';
+        submitButton.textContent = formTrans.submit;
       }
 
       this.showMessage(message, 'error');

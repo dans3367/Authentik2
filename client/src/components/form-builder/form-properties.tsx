@@ -9,7 +9,9 @@ import { Trash2, X, Plus, ChevronDown, ClipboardList, FileQuestion, Mail } from 
 import { FormCategory } from '@/types/form-builder';
 import { apiRequest } from '@/lib/queryClient';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useTranslation } from 'react-i18next';
+import { FormLanguage, languageOptions } from '@/utils/form-translations';
 
 interface FormPropertiesProps {
   formTitle: string;
@@ -21,6 +23,7 @@ interface FormPropertiesProps {
     allowSaveProgress?: boolean;
     showFormTitle?: boolean;
     compactMode?: boolean;
+    language?: FormLanguage;
   };
   elements?: any[];
   tags?: string[];
@@ -48,6 +51,8 @@ export function FormProperties({
   const [isOpen, setIsOpen] = useState(true);
   const [availableTags, setAvailableTags] = useState<Array<{id: string, name: string, color: string}>>([]);
   const [isLoadingTags, setIsLoadingTags] = useState(false);
+  const [isWarningOpen, setIsWarningOpen] = useState(false);
+  const [pendingCategory, setPendingCategory] = useState<FormCategory | null>(null);
   
   const {
     description = '',
@@ -55,6 +60,7 @@ export function FormProperties({
     allowSaveProgress = false,
     showFormTitle = true,
     compactMode = false,
+    language = 'en' as FormLanguage,
   } = settings;
 
   const handleSettingChange = (key: string, value: any) => {
@@ -104,8 +110,40 @@ export function FormProperties({
     return availableTags.find(tag => tag.id === tagId);
   };
 
+  const handleCategoryClick = (newCategory: FormCategory) => {
+    if (newCategory === 'email-signup' && elements.length > 0 && category !== 'email-signup') {
+      setPendingCategory(newCategory);
+      setIsWarningOpen(true);
+    } else {
+      onUpdateCategory?.(newCategory);
+    }
+  };
+
+  const confirmCategoryChange = () => {
+    if (pendingCategory) {
+      onUpdateCategory?.(pendingCategory);
+      setPendingCategory(null);
+    }
+    setIsWarningOpen(false);
+  };
+
   return (
     <Card className="w-80 border-l border-neutral-200">
+      <AlertDialog open={isWarningOpen} onOpenChange={setIsWarningOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('formBuilder.properties.categoryChangeTitle', 'Change Form Type?')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('formBuilder.properties.categoryChangeWarning', 'Switching to Email Signup will clear all existing form elements. This action cannot be undone. Are you sure you want to continue?')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingCategory(null)}>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCategoryChange} className="bg-red-600 hover:bg-red-700">{t('common.continue', 'Continue')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-neutral-50 transition-colors">
@@ -147,7 +185,7 @@ placeholder={t('formBuilder.properties.formTitlePlaceholder','Enter form title..
               <div className="grid grid-cols-3 gap-2 mt-1">
                 <button
                   type="button"
-                  onClick={() => onUpdateCategory?.('intake')}
+                  onClick={() => handleCategoryClick('intake')}
                   className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all duration-200 ${
                     category === 'intake'
                       ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
@@ -159,7 +197,7 @@ placeholder={t('formBuilder.properties.formTitlePlaceholder','Enter form title..
                 </button>
                 <button
                   type="button"
-                  onClick={() => onUpdateCategory?.('survey')}
+                  onClick={() => handleCategoryClick('survey')}
                   className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all duration-200 ${
                     category === 'survey'
                       ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm'
@@ -171,7 +209,7 @@ placeholder={t('formBuilder.properties.formTitlePlaceholder','Enter form title..
                 </button>
                 <button
                   type="button"
-                  onClick={() => onUpdateCategory?.('email-signup')}
+                  onClick={() => handleCategoryClick('email-signup')}
                   className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all duration-200 ${
                     category === 'email-signup'
                       ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
@@ -188,6 +226,27 @@ placeholder={t('formBuilder.properties.formTitlePlaceholder','Enter form title..
                   : category === 'survey'
                   ? t('formBuilder.properties.surveyHint', 'Questionnaires, reviews, feedback')
                   : t('formBuilder.properties.emailSignupHint', 'Email-only collection with communication consent')}
+              </p>
+            </div>
+
+            {/* Form Language */}
+            <div>
+              <Label className="text-sm font-medium text-neutral-700 mb-2">
+                {t('formBuilder.properties.formLanguage', 'Form Language')}
+              </Label>
+              <select
+                value={language}
+                onChange={(e) => handleSettingChange('language', e.target.value as FormLanguage)}
+                className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+              >
+                {languageOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-neutral-400 mt-1">
+                {t('formBuilder.properties.formLanguageHint', 'Changes button texts (Submit, Reset) to the selected language')}
               </p>
             </div>
 
@@ -286,6 +345,7 @@ placeholder={t('formBuilder.properties.formDescriptionPlaceholder','Add a descri
             <div className="space-y-3">
 <h4 className="text-sm font-medium text-neutral-700">{t('formBuilder.properties.formOptions','Form Options')}</h4>
               
+              {category !== 'email-signup' && (
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -294,10 +354,11 @@ placeholder={t('formBuilder.properties.formDescriptionPlaceholder','Add a descri
                   onChange={(e) => handleSettingChange('compactMode', e.target.checked)}
                   className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
                 />
-<Label htmlFor="compact-mode" className="text-xs text-neutral-600">
+                <Label htmlFor="compact-mode" className="text-xs text-neutral-600">
                   {t('formBuilder.properties.compactMode','Compact Mode (2 fields per row)')}
                 </Label>
               </div>
+              )}
               
               <div className="flex items-center space-x-2">
                 <input
@@ -312,6 +373,7 @@ placeholder={t('formBuilder.properties.formDescriptionPlaceholder','Add a descri
                 </Label>
               </div>
 
+              {category !== 'email-signup' && (
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -320,10 +382,11 @@ placeholder={t('formBuilder.properties.formDescriptionPlaceholder','Add a descri
                   onChange={(e) => handleSettingChange('showProgressBar', e.target.checked)}
                   className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
                 />
-<Label htmlFor="show-progress" className="text-xs text-neutral-600">
+                <Label htmlFor="show-progress" className="text-xs text-neutral-600">
                   {t('formBuilder.properties.showProgressBar','Show progress bar')}
                 </Label>
               </div>
+              )}
 
               
             </div>

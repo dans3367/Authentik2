@@ -4,9 +4,10 @@ import { CustomThemedForm } from '@/components/form-builder/custom-themed-form';
 import { ColorCustomizer } from '@/components/form-builder/color-customizer';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Save, Download, Code, Mail, Clock, User, Loader2 } from 'lucide-react';
+import { Save, Code, Mail, Clock, User, Loader2 } from 'lucide-react';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { lightenColor } from '@/utils/theme-color-utils';
+import { FormLanguage, getFormTranslations } from '@/utils/form-translations';
 
 // Extended type for preview elements that includes buttons and spacer
 type PreviewFormElement = FormElement | {
@@ -57,10 +58,10 @@ interface PreviewStepProps {
     allowSaveProgress?: boolean;
     showFormTitle?: boolean;
     compactMode?: boolean;
+    language?: FormLanguage;
   };
   formCategory?: FormCategory;
   onSave: () => void;
-  onExport: () => void;
   onCustomizeColors: (colors: CustomColors) => void;
   onResetColors: () => void;
   isSaving?: boolean;
@@ -73,7 +74,6 @@ export function PreviewStep({
   formSettings = {},
   formCategory = 'intake',
   onSave, 
-  onExport,
   onCustomizeColors,
   onResetColors,
   isSaving = false
@@ -227,6 +227,10 @@ export function PreviewStep({
     );
   }
 
+  // Get translations based on form language setting
+  const formLanguage = (formSettings.language || 'en') as FormLanguage;
+  const formT = getFormTranslations(formLanguage);
+
   // Create enhanced elements list with automatic buttons
   const baseTimestamp = Date.now();
   const elementsWithButtons: PreviewFormElement[] = [
@@ -247,7 +251,7 @@ export function PreviewStep({
     {
       id: `auto-submit-${baseTimestamp}-1`,
       type: 'submit-button',
-      label: 'Submit',
+      label: formT.submit,
       name: 'submit',
       required: false,
       styling: {
@@ -259,7 +263,7 @@ export function PreviewStep({
     {
       id: `auto-reset-${baseTimestamp}-2`,
       type: 'reset-button', 
-      label: 'Reset',
+      label: formT.reset,
       name: 'reset',
       required: false,
       styling: {
@@ -360,7 +364,7 @@ export function PreviewStep({
       <div className="mb-6">
         <div className="flex justify-between items-center mb-2">
           <span className={`text-sm font-medium ${selectedTheme.id === 'elegant' || selectedTheme.id === 'neon' || selectedTheme.id === 'luxury' ? 'text-gray-300' : 'text-gray-700'}`}>
-            Form Progress
+            {formT.formProgress}
           </span>
            <span className={`text-sm font-medium ${selectedTheme.id === 'elegant' || selectedTheme.id === 'neon' || selectedTheme.id === 'luxury' ? 'text-gray-300' : 'text-gray-700'}`}>
              {progressPercentage}%
@@ -480,10 +484,6 @@ export function PreviewStep({
                 />
               </div>
             )}
-            <Button variant="outline" onClick={onExport} className="flex items-center space-x-2">
-              <Download className="w-4 h-4" />
-              <span>Export</span>
-            </Button>
             <Button 
               onClick={onSave} 
               disabled={isSaving}
@@ -602,10 +602,7 @@ export function PreviewStep({
             {formCategory === 'email-signup' && (
               <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  By submitting this form, you agree to receive email and phone communications from us, 
-                  including marketing messages, updates, and promotional offers. Standard message and data 
-                  rates may apply to phone communications. You can opt out at any time by following the 
-                  unsubscribe instructions in our emails or by contacting us directly.
+                  {formT.disclaimer}
                 </p>
               </div>
             )}

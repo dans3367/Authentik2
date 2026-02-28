@@ -152,6 +152,7 @@ export interface WizardState {
       allowSaveProgress?: boolean;
       showFormTitle?: boolean;
       compactMode?: boolean;
+      language?: string;
     };
   };
   selectedTheme: FormTheme | null;
