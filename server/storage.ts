@@ -977,12 +977,15 @@ export class DatabaseStorage implements IStorage {
       periodStart = new Date(subscription.currentPeriodStart);
     }
 
-    // Count emails sent in this period
+    // Count emails sent in this period (exclude failed/bounced/suppressed — only count dispatched emails)
     const usageResult = await db.select({ count: count() })
       .from(emailSends)
       .where(and(
         eq(emailSends.tenantId, tenantId),
-        gte(emailSends.createdAt, periodStart)
+        gte(emailSends.createdAt, periodStart),
+        ne(emailSends.status, 'failed'),
+        ne(emailSends.status, 'bounced'),
+        ne(emailSends.status, 'suppressed')
       ));
 
     const currentUsage = usageResult[0]?.count || 0;

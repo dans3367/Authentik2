@@ -496,6 +496,10 @@ export default function ShopsPage() {
   const deleteShopMutation = useMutation({
     mutationFn: async (shopId: string) => {
       const response = await apiRequest('DELETE', `/api/shops/${shopId}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ message: 'Failed to delete shop' }));
+        throw new Error(err.message || 'Failed to delete shop');
+      }
       return response.json();
     },
     onSuccess: () => {

@@ -22,8 +22,8 @@ const reviewNotificationSchema = z.object({
   reviewerName: z.string(),
   // When it was submitted
   submittedAt: z.string(),
-  // 5-digit approval code for verification
-  approvalCode: z.string().length(5),
+  // 6-digit approval code for verification
+  approvalCode: z.string().length(6),
 });
 
 export type ReviewNotificationPayload = z.infer<typeof reviewNotificationSchema>;

@@ -293,12 +293,12 @@ export default function ManagementRolesPermissions() {
       .filter((cat) => cat.permissions.length > 0);
   }, [permissionCategories, searchTerm]);
 
-  // Count pending changes
+  // Count pending changes — only compare keys that exist in the role's permission set
   const pendingChangeCount = useMemo(() => {
     if (!editingRole) return 0;
     const role = roles.find((r) => r.name === editingRole);
     if (!role) return 0;
-    return Object.keys(pendingChanges).filter(
+    return Object.keys(role.permissions).filter(
       (k) => pendingChanges[k] !== role.permissions[k]
     ).length;
   }, [pendingChanges, editingRole, roles]);
@@ -390,6 +390,9 @@ export default function ManagementRolesPermissions() {
   };
 
   const startEditing = (roleName: string) => {
+    if (isEditing && pendingChangeCount > 0) {
+      if (!window.confirm('You have unsaved changes. Discard and edit a different role?')) return;
+    }
     const role = roles.find((r) => r.name === roleName);
     if (!role) return;
     setIsEditing(true);
@@ -405,6 +408,11 @@ export default function ManagementRolesPermissions() {
 
   const togglePermission = (permKey: string) => {
     setPendingChanges((prev) => ({ ...prev, [permKey]: !prev[permKey] }));
+  };
+
+  const resetEditingRole = () => {
+    if (!editingRole) return;
+    setResetDialog({ open: true, role: editingRole, resetAll: false });
   };
 
   const savePermissions = () => {
@@ -625,6 +633,15 @@ export default function ManagementRolesPermissions() {
                         {pendingChangeCount} {t("management.rolesPermissions.changes", "changes")}
                       </Badge>
                     )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={resetEditingRole}
+                      className="text-xs"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                      {t("management.rolesPermissions.resetRole", "Reset to Defaults")}
+                    </Button>
                     <Button variant="outline" size="sm" onClick={cancelEditing}>
                       {t("management.rolesPermissions.cancel", "Cancel")}
                     </Button>
@@ -791,8 +808,8 @@ export default function ManagementRolesPermissions() {
                                     {roles.map((role) => {
                                       const isEditingThis = isEditing && editingRole === role.name;
                                       const currentValue = isEditingThis
-                                        ? pendingChanges[perm.key]
-                                        : role.permissions[perm.key];
+                                        ? !!pendingChanges[perm.key]
+                                        : !!role.permissions[perm.key];
                                       const hasChanged = isEditingThis && pendingChanges[perm.key] !== role.permissions[perm.key];
 
                                       return (

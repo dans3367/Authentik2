@@ -115,11 +115,12 @@ authRoutes.delete("/user-sessions", authenticateToken, async (req: any, res) => 
     }
 
     // Delete the session from Better Auth table
-    const deleteResult = await db.delete(betterAuthSession)
-      .where(eq(betterAuthSession.id, sessionId));
+    const deletedSession = await db.delete(betterAuthSession)
+      .where(eq(betterAuthSession.id, sessionId))
+      .returning({ id: betterAuthSession.id });
 
     console.log('✅ [Session Delete] Successfully deleted session:', sessionId);
-    console.log('📊 [Session Delete] Rows affected:', deleteResult.rowCount || 0);
+    console.log('📊 [Session Delete] Rows affected:', deletedSession.length);
 
     res.json({ 
       message: 'Session ended successfully',
@@ -165,13 +166,14 @@ authRoutes.post("/logout-all", authenticateToken, async (req: any, res) => {
     }
 
     // Delete all sessions except the current one
-    const result = await db.delete(betterAuthSession)
+    const deletedSessions = await db.delete(betterAuthSession)
       .where(and(
         eq(betterAuthSession.userId, userId),
         not(eq(betterAuthSession.id, currentSession.id)) // Don't delete current session
-      ));
+      ))
+      .returning({ id: betterAuthSession.id });
 
-    const deletedCount = result.rowCount || 0;
+    const deletedCount = deletedSessions.length;
 
     res.json({
       message: `Successfully logged out ${deletedCount} other session${deletedCount !== 1 ? 's' : ''}`,
@@ -192,13 +194,18 @@ authRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
     // Validate the update data
     const validatedData = updateProfileSchema.partial().parse(updateData);
 
+    const tenantId = req.user.tenantId;
+
     // Update the user's profile
     const updatedUser = await db.update(betterAuthUser)
       .set({
         ...validatedData,
         updatedAt: new Date(),
       })
-      .where(eq(betterAuthUser.id, userId))
+      .where(and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, tenantId)
+      ))
       .returning();
 
     if (updatedUser.length === 0) {

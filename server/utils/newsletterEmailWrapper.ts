@@ -36,16 +36,22 @@ function isValidHttpUrl(url: string): boolean {
 function sanitizeFontFamily(fontFamily: string | undefined | null): string {
   if (!fontFamily) return 'Arial, sans-serif';
   const allowedFonts = [
+    'Arial, sans-serif',
     'Arial, Helvetica, sans-serif',
+    'Helvetica, sans-serif',
     'Georgia, serif',
-    'Tahoma, Geneva, sans-serif',
-    'Verdana, Geneva, sans-serif',
+    "'Times New Roman', serif",
     'Times New Roman, Times, serif',
+    "'Courier New', monospace",
     'Courier New, Courier, monospace',
+    'Verdana, sans-serif',
+    'Verdana, Geneva, sans-serif',
+    "'Trebuchet MS', sans-serif",
     'Trebuchet MS, Helvetica, sans-serif',
+    "'Inter', sans-serif",
+    'Tahoma, Geneva, sans-serif',
     'Impact, Charcoal, sans-serif',
     'Lucida Console, Monaco, monospace',
-    'Arial, sans-serif',
   ];
   const normalized = fontFamily.trim();
   const match = allowedFonts.find(f => f.toLowerCase() === normalized.toLowerCase());

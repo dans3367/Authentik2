@@ -274,10 +274,9 @@ export default function ManagementEmailDesign() {
   });
 
   const handleSave = () => {
-    updateMutation.mutate({
-      ...draft,
-      updatedAt: new Date().toISOString(),
-    });
+    // Do not send updatedAt - server controls the timestamp
+    const { updatedAt, id, ...payload } = draft;
+    updateMutation.mutate(payload);
   };
 
   const handleReset = () => {
@@ -444,7 +443,7 @@ export default function ManagementEmailDesign() {
                             onChange={(e) => updateField("logoUrl", e.target.value)}
                             placeholder="https://..."
                           />
-                          {draft.logoUrl && (
+                          {draft.logoUrl && isSafeUrl(draft.logoUrl) && (
                             <div className="w-10 h-10 rounded border bg-white p-1 flex items-center justify-center shrink-0">
                               <img src={draft.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
                             </div>
@@ -516,7 +515,7 @@ export default function ManagementEmailDesign() {
                           />
                         </div>
                         <p className="text-xs text-muted-foreground">Recommended size: 600 x 200px. The image will span the full width of the email.</p>
-                        {draft.bannerUrl && (
+                        {draft.bannerUrl && isSafeUrl(draft.bannerUrl) && (
                           <div className="mt-2 rounded-md border overflow-hidden bg-white">
                             <img
                               src={draft.bannerUrl}
@@ -729,7 +728,7 @@ export default function ManagementEmailDesign() {
                 <div className="min-h-[500px] flex flex-col" style={{ fontFamily: draft.fontFamily }}>
 
                   {/* HERO HEADER */}
-                  {(draft.headerMode || 'logo') === 'banner' && draft.bannerUrl ? (
+                  {(draft.headerMode || 'logo') === 'banner' && draft.bannerUrl && isSafeUrl(draft.bannerUrl) ? (
                     <div>
                       <img
                         src={draft.bannerUrl}
@@ -764,7 +763,7 @@ export default function ManagementEmailDesign() {
                         textAlign: (draft.logoAlignment as 'left' | 'center' | 'right') || 'center',
                       }}
                     >
-                      {draft.logoUrl ? (
+                      {draft.logoUrl && isSafeUrl(draft.logoUrl) ? (
                         <img
                           src={draft.logoUrl}
                           alt="Logo"

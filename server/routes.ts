@@ -137,7 +137,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api/campaigns", campaignRoutes);
   app.use("/api/webhooks", webhookRoutes);
-  app.use("/api/dev", devRoutes);
+  if (process.env.NODE_ENV !== 'production') {
+    app.use("/api/dev", devRoutes);
+  }
   app.use("/api/email", emailRoutes);
   app.use("/api/users", userRoutes);
   app.use("/api/roles", roleRoutes);

@@ -22,10 +22,16 @@ shopsRoutes.get("/limits", authenticateToken, requirePermission('shops.view'), a
 });
 
 // Get all shops for the company
-shopsRoutes.get("/", authenticateToken, requirePermission('shops.view'), async (req: any, res) => {
+shopsRoutes.get("/", authenticateToken, requireShopAccess, requirePermission('shops.view'), async (req: any, res) => {
   try {
-    const { page = 1, limit = 50, search, status, managerId } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const rawPage = Math.max(1, parseInt(req.query.page as string) || 1);
+    const rawLimit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const { search, status, managerId } = req.query;
+    const offset = (rawPage - 1) * rawLimit;
+
+    // Validate status enum to prevent injection
+    const allowedStatuses = ['active', 'inactive', 'maintenance'];
+    const safeStatus = status && allowedStatuses.includes(status as string) ? status as string : null;
 
     let whereClause = sql`${shops.tenantId} = ${req.user.tenantId}`;
 
@@ -38,12 +44,15 @@ shopsRoutes.get("/", authenticateToken, requirePermission('shops.view'), async (
       )`;
     }
 
-    if (status) {
-      whereClause = sql`${whereClause} AND ${shops.status} = ${status}`;
+    if (safeStatus) {
+      whereClause = sql`${whereClause} AND ${shops.status} = ${safeStatus}`;
     }
 
     if (managerId) {
-      whereClause = sql`${whereClause} AND ${shops.managerId} = ${managerId}`;
+      const safeManagerId = sanitizeString(managerId as string);
+      if (safeManagerId) {
+        whereClause = sql`${whereClause} AND ${shops.managerId} = ${safeManagerId}`;
+      }
     }
 
     const shopsData = await db.select({
@@ -77,7 +86,7 @@ shopsRoutes.get("/", authenticateToken, requirePermission('shops.view'), async (
       .leftJoin(betterAuthUser, sql`${shops.managerId} = ${betterAuthUser.id}`)
       .where(whereClause)
       .orderBy(sql`${shops.createdAt} DESC`)
-      .limit(Number(limit))
+      .limit(rawLimit)
       .offset(offset);
 
     // Transform the data to include manager object
@@ -105,10 +114,10 @@ shopsRoutes.get("/", authenticateToken, requirePermission('shops.view'), async (
     const response = {
       shops: shopsWithManager,
       pagination: {
-        page: Number(page),
-        limit: Number(limit),
+        page: rawPage,
+        limit: rawLimit,
         total: totalCountResult.count,
-        pages: Math.ceil(totalCountResult.count / Number(limit)),
+        pages: Math.ceil(totalCountResult.count / rawLimit),
       },
       limits,
       stats,
@@ -125,18 +134,7 @@ shopsRoutes.get("/", authenticateToken, requirePermission('shops.view'), async (
       tenantId: req.user?.tenantId
     });
 
-    const errorResponse = {
-      message: 'Failed to get shops',
-      debug: {
-        errorMessage: error instanceof Error ? error.message : String(error),
-        tenantId: req.user?.tenantId,
-        userId: req.user?.id,
-        timestamp: new Date().toISOString()
-      }
-    };
-
-    console.error('❌ [Shops API] Sending error response:', errorResponse);
-    res.status(500).json(errorResponse);
+    res.status(500).json({ message: 'Failed to get shops' });
   }
 });
 
@@ -401,7 +399,7 @@ shopsRoutes.put("/:id", authenticateToken, requireShopAccess, requirePermission(
 
     const updatedShop = await db.update(shops)
       .set(updateData)
-      .where(sql`${shops.id} = ${id}`)
+      .where(sql`${shops.id} = ${id} AND ${shops.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     // Compute and log changes
@@ -448,7 +446,7 @@ shopsRoutes.patch("/:id/toggle-status", authenticateToken, requireShopAccess, re
         status: newStatus,
         updatedAt: new Date(),
       })
-      .where(sql`${shops.id} = ${id}`)
+      .where(sql`${shops.id} = ${id} AND ${shops.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     // Log activity for status change
@@ -497,7 +495,7 @@ shopsRoutes.delete("/:id", authenticateToken, requireShopAccess, requirePermissi
 
     // Delete shop
     await db.delete(shops)
-      .where(sql`${shops.id} = ${id}`);
+      .where(sql`${shops.id} = ${id} AND ${shops.tenantId} = ${req.user.tenantId}`);
 
     // Log activity
     await logActivity({

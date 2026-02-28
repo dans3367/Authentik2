@@ -29,7 +29,8 @@ async function throwIfResNotOk(res: Response) {
       }, 100);
     }
     
-    throw new Error(errorMessage);
+    // Prefix message with status code so components can detect specific errors (e.g. '403:' for permission denied)
+    throw new Error(`${res.status}: ${errorMessage}`);
   }
 }
 

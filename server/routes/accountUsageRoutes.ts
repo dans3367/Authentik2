@@ -51,14 +51,16 @@ accountUsageRoutes.get('/', authenticateToken, requirePermission('account_usage.
     let periodStart = new Date();
     periodStart.setDate(1);
     periodStart.setHours(0, 0, 0, 0);
-    
+
     let periodEnd = new Date(periodStart);
     periodEnd.setMonth(periodEnd.getMonth() + 1);
     periodEnd.setDate(0); // Last day of current month
+    periodEnd.setHours(23, 59, 59, 999); // End of that day
 
     if (subscription?.currentPeriodStart && subscription?.currentPeriodEnd) {
       periodStart = new Date(subscription.currentPeriodStart);
       periodEnd = new Date(subscription.currentPeriodEnd);
+      periodEnd.setHours(23, 59, 59, 999); // Ensure end-of-day
     }
 
     res.json({

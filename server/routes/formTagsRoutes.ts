@@ -35,19 +35,26 @@ formTagsRoutes.post("/", authenticateToken, requirePermission('tags.create'), as
     }
 
     const sanitizedName = sanitizeString(name);
+    if (!sanitizedName) {
+      return res.status(400).json({ message: 'Tag name cannot be empty or contain only whitespace' });
+    }
+
+    // Validate color is a safe hex value
+    const hexColorRegex = /^#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?$/;
+    const sanitizedColor = color && hexColorRegex.test(color) ? color : '#3B82F6';
 
     // Check if tag with same name already exists for this tenant
-const existingTag = await db.query.contactTags.findFirst({
-      where: sql`${contactTags.tenantId} = ${req.user.tenantId} AND ${contactTags.name} = ${sanitizedName}`,
+    const existingTag = await db.query.contactTags.findFirst({
+      where: sql`${contactTags.tenantId} = ${req.user.tenantId} AND lower(${contactTags.name}) = lower(${sanitizedName})`,
     });
 
     if (existingTag) {
       return res.status(400).json({ message: 'A tag with this name already exists' });
     }
 
-const newTag = await db.insert(contactTags).values({
+    const newTag = await db.insert(contactTags).values({
       name: sanitizedName,
-      color: color || '#3B82F6',
+      color: sanitizedColor,
       tenantId: req.user.tenantId,
     }).returning();
 
@@ -73,7 +80,7 @@ const existingTag = await db.query.contactTags.findFirst({
     }
 
 await db.delete(contactTags)
-      .where(sql`${contactTags.id} = ${id}`);
+      .where(sql`${contactTags.id} = ${id} AND ${contactTags.tenantId} = ${req.user.tenantId}`);
 
     res.json({ message: 'Tag deleted successfully' });
   } catch (error) {

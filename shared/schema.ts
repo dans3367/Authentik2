@@ -513,7 +513,7 @@ export const newsletters = pgTable("newsletters", {
   reviewStatus: text("review_status").default('pending'), // pending, approved, rejected
   reviewedAt: timestamp("reviewed_at"),
   reviewNotes: text("review_notes"),
-  reviewerApprovalCode: varchar("reviewer_approval_code", { length: 5 }), // Random 5-digit code for reviewer to confirm approval
+  reviewerApprovalCode: text("reviewer_approval_code"), // SHA-256 hash of the 6-digit approval code (plaintext sent via email only)
   triggerRunId: text("trigger_run_id"), // Trigger.dev run ID for scheduled sends (used for cancellation)
   deletedAt: timestamp("deleted_at"), // Soft delete: when set, newsletter is hidden from UI but preserved for analytics
   reactionsEnabled: boolean("reactions_enabled").notNull().default(true), // Enable/disable emoji reactions for this newsletter

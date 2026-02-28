@@ -155,16 +155,25 @@ function sanitizeFontFamily(fontFamily: string | undefined | null): string {
   // Strict allowlist of safe font stacks
   // This prevents CSS injection by rejecting any input containing dangerous characters
   // (quotes, semicolons, parentheses, URL-like patterns) that wouldn't match these exact strings.
+  // Includes both client-side quote variants (e.g. "'Times New Roman', serif")
+  // and traditional variants (e.g. "Times New Roman, Times, serif").
   const allowedFonts = [
+    'Arial, sans-serif',
     'Arial, Helvetica, sans-serif',
+    'Helvetica, sans-serif',
     'Georgia, serif',
-    'Tahoma, Geneva, sans-serif',
-    'Verdana, Geneva, sans-serif',
+    "'Times New Roman', serif",
     'Times New Roman, Times, serif',
+    "'Courier New', monospace",
     'Courier New, Courier, monospace',
+    'Verdana, sans-serif',
+    'Verdana, Geneva, sans-serif',
+    "'Trebuchet MS', sans-serif",
     'Trebuchet MS, Helvetica, sans-serif',
+    "'Inter', sans-serif",
+    'Tahoma, Geneva, sans-serif',
     'Impact, Charcoal, sans-serif',
-    'Lucida Console, Monaco, monospace'
+    'Lucida Console, Monaco, monospace',
   ];
 
   const normalized = fontFamily.trim();
@@ -1525,12 +1534,24 @@ emailManagementRoutes.post("/contact-tags", authenticateToken, requireTenant, re
     }
 
     const sanitizedName = sanitizeString(name);
-    const sanitizedColor = color ? sanitizeString(color) : '#3B82F6';
     const sanitizedDescription = description ? sanitizeString(description) : null;
 
     // Additional validation after sanitization
     if (!sanitizedName) {
       return res.status(400).json({ message: 'Name cannot be empty or contain only whitespace' });
+    }
+
+    // Validate color is a safe hex value
+    const hexColorRegex = /^#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?$/;
+    const sanitizedColor = color && hexColorRegex.test(color) ? color : '#3B82F6';
+
+    // Check for duplicate name within tenant
+    const existingTag = await db.query.contactTags.findFirst({
+      where: sql`${contactTags.tenantId} = ${req.user.tenantId} AND lower(${contactTags.name}) = lower(${sanitizedName})`,
+      columns: { id: true },
+    });
+    if (existingTag) {
+      return res.status(400).json({ message: 'A tag with this name already exists' });
     }
 
     const newTag = await db.insert(contactTags).values({
@@ -1570,7 +1591,8 @@ emailManagementRoutes.put("/contact-tags/:id", authenticateToken, requireTenant,
     }
 
     if (color !== undefined) {
-      updateData.color = sanitizeString(color);
+      const hexColorRegex = /^#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?$/;
+      updateData.color = color && hexColorRegex.test(color) ? color : '#3B82F6';
     }
 
     if (description !== undefined) {
@@ -2172,7 +2194,7 @@ emailManagementRoutes.delete("/email-contacts/:contactId/tags/:tagId", authentic
 });
 
 // Add contacts to tag (bulk)
-emailManagementRoutes.post("/contact-tags/:tagId/contacts", authenticateToken, requireTenant, async (req: any, res) => {
+emailManagementRoutes.post("/contact-tags/:tagId/contacts", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { tagId } = req.params;
     const { contactIds } = req.body;
@@ -2971,6 +2993,80 @@ emailManagementRoutes.get("/master-email-design", authenticateToken, requireTena
   }
 });
 
+// ── Validation helpers for master email design ──────────────────────────
+
+const ALLOWED_HEADER_MODES = ['logo', 'banner'] as const;
+const ALLOWED_LOGO_SIZES = ['small', 'medium', 'large', 'xlarge'] as const;
+const ALLOWED_LOGO_ALIGNMENTS = ['left', 'center', 'right'] as const;
+const ALLOWED_FONT_FAMILIES = [
+  'Arial, sans-serif',
+  'Arial, Helvetica, sans-serif',
+  'Helvetica, sans-serif',
+  'Georgia, serif',
+  "'Times New Roman', serif",
+  'Times New Roman, Times, serif',
+  "'Courier New', monospace",
+  'Courier New, Courier, monospace',
+  'Verdana, sans-serif',
+  'Verdana, Geneva, sans-serif',
+  "'Trebuchet MS', sans-serif",
+  'Trebuchet MS, Helvetica, sans-serif',
+  "'Inter', sans-serif",
+  'Tahoma, Geneva, sans-serif',
+  'Impact, Charcoal, sans-serif',
+  'Lucida Console, Monaco, monospace',
+] as const;
+
+function validateDesignColor(color: unknown): string | null {
+  if (typeof color !== 'string') return null;
+  const normalized = color.trim();
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(normalized)) return normalized;
+  return null;
+}
+
+function validateDesignUrl(url: unknown): string | null {
+  if (url === null || url === '') return null;
+  if (typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return trimmed;
+  } catch { /* invalid URL */ }
+  return null;
+}
+
+function sanitizeDesignText(text: unknown, maxLength: number = 500): string | null {
+  if (text === null || text === undefined) return null;
+  if (typeof text !== 'string') return null;
+  return sanitizeString(text.slice(0, maxLength)) || null;
+}
+
+function validateSocialLinks(raw: unknown): Record<string, string> | null {
+  let obj: Record<string, unknown>;
+  if (raw === null) return null;
+  if (typeof raw === 'string') {
+    try { obj = JSON.parse(raw); } catch { return null; }
+  } else if (typeof raw === 'object' && !Array.isArray(raw)) {
+    obj = raw as Record<string, unknown>;
+  } else {
+    return null;
+  }
+  const allowed = ['facebook', 'twitter', 'instagram', 'linkedin'];
+  const result: Record<string, string> = {};
+  for (const key of allowed) {
+    const val = obj[key];
+    if (typeof val === 'string' && val.trim()) {
+      const validated = validateDesignUrl(val);
+      if (validated) {
+        result[key] = validated;
+      }
+      // Silently drop invalid URLs rather than rejecting the whole save
+    }
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
 // Update master email design settings
 emailManagementRoutes.put("/master-email-design", authenticateToken, requireTenant, requirePermission('emails.manage_design'), async (req: any, res) => {
   try {
@@ -2993,6 +3089,74 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
 
     console.log('🎨 [Master Email Design PUT] Received:', { companyName, headerMode, logoUrl, logoSize, logoAlignment, bannerUrl, headerText, primaryColor, tenantId: req.user.tenantId });
 
+    // ── Validate all inputs ──────────────────────────────────────────────
+
+    // Enum fields
+    if (headerMode !== undefined && !ALLOWED_HEADER_MODES.includes(headerMode)) {
+      return res.status(400).json({ message: `Invalid headerMode. Must be one of: ${ALLOWED_HEADER_MODES.join(', ')}` });
+    }
+    if (logoSize !== undefined && !ALLOWED_LOGO_SIZES.includes(logoSize)) {
+      return res.status(400).json({ message: `Invalid logoSize. Must be one of: ${ALLOWED_LOGO_SIZES.join(', ')}` });
+    }
+    if (logoAlignment !== undefined && !ALLOWED_LOGO_ALIGNMENTS.includes(logoAlignment)) {
+      return res.status(400).json({ message: `Invalid logoAlignment. Must be one of: ${ALLOWED_LOGO_ALIGNMENTS.join(', ')}` });
+    }
+    if (showCompanyName !== undefined && showCompanyName !== 'true' && showCompanyName !== 'false') {
+      return res.status(400).json({ message: 'showCompanyName must be "true" or "false"' });
+    }
+
+    // Font family: match case-insensitively against allowlist, fall back to Arial
+    let safeFontFamily: string | undefined;
+    if (fontFamily !== undefined && fontFamily !== null) {
+      const normalized = String(fontFamily).trim();
+      const match = ALLOWED_FONT_FAMILIES.find(f => f.toLowerCase() === normalized.toLowerCase());
+      safeFontFamily = match || 'Arial, sans-serif';
+    }
+
+    // Colors: validate hex format
+    const safeColors: Record<string, string | undefined> = {};
+    if (primaryColor !== undefined) {
+      const validated = validateDesignColor(primaryColor);
+      if (!validated) return res.status(400).json({ message: 'Invalid primaryColor. Must be a hex color (e.g. #3B82F6)' });
+      safeColors.primaryColor = validated;
+    }
+    if (secondaryColor !== undefined) {
+      const validated = validateDesignColor(secondaryColor);
+      if (!validated) return res.status(400).json({ message: 'Invalid secondaryColor. Must be a hex color (e.g. #1E40AF)' });
+      safeColors.secondaryColor = validated;
+    }
+    if (accentColor !== undefined) {
+      const validated = validateDesignColor(accentColor);
+      if (!validated) return res.status(400).json({ message: 'Invalid accentColor. Must be a hex color (e.g. #10B981)' });
+      safeColors.accentColor = validated;
+    }
+
+    // URLs: validate http(s) only, reject javascript:/data:/etc.
+    const safeLogoUrl = logoUrl !== undefined ? validateDesignUrl(logoUrl) : undefined;
+    const safeBannerUrl = bannerUrl !== undefined ? validateDesignUrl(bannerUrl) : undefined;
+    // If a non-empty URL was provided but failed validation, reject
+    if (logoUrl !== undefined && logoUrl !== null && logoUrl !== '' && safeLogoUrl === null) {
+      return res.status(400).json({ message: 'Invalid logoUrl. Must be a valid http(s) URL.' });
+    }
+    if (bannerUrl !== undefined && bannerUrl !== null && bannerUrl !== '' && safeBannerUrl === null) {
+      return res.status(400).json({ message: 'Invalid bannerUrl. Must be a valid http(s) URL.' });
+    }
+
+    // Text fields: sanitize and length-limit
+    const safeCompanyName = companyName !== undefined ? sanitizeDesignText(companyName, 200) : undefined;
+    const safeHeaderText = headerText !== undefined ? sanitizeDesignText(headerText, 500) : undefined;
+    const safeFooterText = footerText !== undefined ? sanitizeDesignText(footerText, 1000) : undefined;
+
+    // Social links: validate each URL
+    const hasSocialLinks = Object.prototype.hasOwnProperty.call(req.body, 'socialLinks');
+    let safeSocialLinksStr: string | null | undefined;
+    if (hasSocialLinks) {
+      const validated = validateSocialLinks(socialLinks);
+      safeSocialLinksStr = validated ? JSON.stringify(validated) : null;
+    }
+
+    // ── Persist ──────────────────────────────────────────────────────────
+
     // Check if design already exists
     const existingDesign = await db.query.masterEmailDesign.findFirst({
       where: sql`${masterEmailDesign.tenantId} = ${req.user.tenantId}`,
@@ -3000,47 +3164,27 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
 
     let updatedDesign;
 
-    const hasSocialLinks = Object.prototype.hasOwnProperty.call(req.body, 'socialLinks');
-    let socialLinksStr: string | null | undefined;
-
-    if (hasSocialLinks) {
-      if (socialLinks === null) {
-        socialLinksStr = null;
-      } else if (typeof socialLinks === 'string') {
-        try {
-          JSON.parse(socialLinks);
-        } catch (e) {
-          return res.status(400).json({ message: 'Invalid socialLinks JSON' });
-        }
-        socialLinksStr = socialLinks;
-      } else if (typeof socialLinks === 'object') {
-        socialLinksStr = JSON.stringify(socialLinks);
-      } else {
-        return res.status(400).json({ message: 'Invalid socialLinks type' });
-      }
-    }
-
     if (existingDesign) {
       // Update existing design
       const updateSet: Record<string, unknown> = {
-        companyName: companyName ?? existingDesign.companyName,
+        companyName: safeCompanyName !== undefined ? (safeCompanyName ?? '') : existingDesign.companyName,
         headerMode: headerMode !== undefined ? headerMode : existingDesign.headerMode,
-        logoUrl: logoUrl !== undefined ? logoUrl : existingDesign.logoUrl,
+        logoUrl: logoUrl !== undefined ? (safeLogoUrl ?? null) : existingDesign.logoUrl,
         logoSize: logoSize !== undefined ? logoSize : existingDesign.logoSize,
         logoAlignment: logoAlignment !== undefined ? logoAlignment : existingDesign.logoAlignment,
-        bannerUrl: bannerUrl !== undefined ? bannerUrl : existingDesign.bannerUrl,
+        bannerUrl: bannerUrl !== undefined ? (safeBannerUrl ?? null) : existingDesign.bannerUrl,
         showCompanyName: showCompanyName !== undefined ? showCompanyName : existingDesign.showCompanyName,
-        primaryColor: primaryColor ?? existingDesign.primaryColor,
-        secondaryColor: secondaryColor ?? existingDesign.secondaryColor,
-        accentColor: accentColor ?? existingDesign.accentColor,
-        fontFamily: fontFamily ?? existingDesign.fontFamily,
-        headerText: headerText !== undefined ? headerText : existingDesign.headerText,
-        footerText: footerText !== undefined ? footerText : existingDesign.footerText,
+        primaryColor: safeColors.primaryColor ?? existingDesign.primaryColor,
+        secondaryColor: safeColors.secondaryColor ?? existingDesign.secondaryColor,
+        accentColor: safeColors.accentColor ?? existingDesign.accentColor,
+        fontFamily: safeFontFamily ?? existingDesign.fontFamily,
+        headerText: headerText !== undefined ? safeHeaderText : existingDesign.headerText,
+        footerText: footerText !== undefined ? safeFooterText : existingDesign.footerText,
         updatedAt: new Date(),
       };
 
       if (hasSocialLinks) {
-        updateSet.socialLinks = socialLinksStr;
+        updateSet.socialLinks = safeSocialLinksStr;
       }
 
       updatedDesign = await db.update(masterEmailDesign)
@@ -3052,20 +3196,20 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
       updatedDesign = await db.insert(masterEmailDesign)
         .values({
           tenantId: req.user.tenantId,
-          companyName: companyName || '',
+          companyName: safeCompanyName || '',
           headerMode: headerMode || 'logo',
-          logoUrl: logoUrl || null,
+          logoUrl: safeLogoUrl || null,
           logoSize: logoSize || 'medium',
           logoAlignment: logoAlignment || 'center',
-          bannerUrl: bannerUrl || null,
+          bannerUrl: safeBannerUrl || null,
           showCompanyName: showCompanyName || 'true',
-          primaryColor: primaryColor || '#3B82F6',
-          secondaryColor: secondaryColor || '#1E40AF',
-          accentColor: accentColor || '#10B981',
-          fontFamily: fontFamily || 'Arial, sans-serif',
-          headerText: headerText || null,
-          footerText: footerText || null,
-          socialLinks: hasSocialLinks ? socialLinksStr : null,
+          primaryColor: safeColors.primaryColor || '#3B82F6',
+          secondaryColor: safeColors.secondaryColor || '#1E40AF',
+          accentColor: safeColors.accentColor || '#10B981',
+          fontFamily: safeFontFamily || 'Arial, sans-serif',
+          headerText: safeHeaderText || null,
+          footerText: safeFooterText || null,
+          socialLinks: hasSocialLinks ? safeSocialLinksStr : null,
         })
         .returning();
     }

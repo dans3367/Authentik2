@@ -223,7 +223,7 @@ export default function ManagementNewsletterReviewer() {
                     </Button>
                     <Button
                         onClick={handleSave}
-                        disabled={!hasChanges || saveMutation.isPending}
+                        disabled={!hasChanges || saveMutation.isPending || (enabled && selectedReviewerId === currentUser?.id)}
                         className="flex-1 sm:flex-none"
                     >
                         {saveMutation.isPending ? (

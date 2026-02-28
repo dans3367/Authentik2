@@ -190,13 +190,10 @@ export default function NewsletterViewPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       setApprovalCodeError("");
-      // After approval, auto-trigger the send
-      if (data.sendReady && id) {
-        sendNowMutation.mutate(id);
-      }
+      setApprovalCode("");
       toast({
         title: "Newsletter Approved & Sending",
-        description: "The newsletter has been approved and is now being sent.",
+        description: data.sendMessage || "The newsletter has been approved and is now being sent.",
       });
     },
     onError: (error: any) => {
@@ -831,7 +828,7 @@ export default function NewsletterViewPage() {
                 {t("newsletter.view.edit", "Edit")}
               </Button>
             )}
-            {reviewerEnabled && (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && (newsletter as any).reviewStatus !== 'approved' && (
+            {reviewerEnabled && (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && newsletter.reviewStatus !== 'approved' && (
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -875,13 +872,13 @@ export default function NewsletterViewPage() {
                 <div>
                   <h3 className="font-semibold text-orange-900 dark:text-orange-100">{t("newsletter.view.awaitingApproval", "Awaiting Reviewer Approval")}</h3>
                   <p className="text-sm text-orange-700 dark:text-orange-300 mt-0.5">
-                    {(newsletter as any).reviewerId === currentUserId ? t("newsletter.view.awaitingApprovalDescReviewer", "This newsletter has been submitted for review. Enter the 5-digit approval code to approve and send.") : t("newsletter.view.awaitingApprovalDescOther", "This newsletter has been submitted for review. Waiting for the designated reviewer to approve or reject it.")}
+                    {newsletter.reviewerId === currentUserId ? t("newsletter.view.awaitingApprovalDescReviewer", "This newsletter has been submitted for review. Enter the 6-digit approval code to approve and send.") : t("newsletter.view.awaitingApprovalDescOther", "This newsletter has been submitted for review. Waiting for the designated reviewer to approve or reject it.")}
                   </p>
                 </div>
               </div>
 
               {/* Reviewer Actions - Only show to the assigned reviewer */}
-              {(newsletter as any).reviewerId === currentUserId && (
+              {newsletter.reviewerId === currentUserId && (
                 <div className="space-y-4">
                   {/* Approval Code Section */}
                   <div className="rounded-lg border border-amber-200 bg-amber-50/80 dark:bg-amber-950/30 dark:border-amber-800/40 p-4">
@@ -898,17 +895,17 @@ export default function NewsletterViewPage() {
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                          maxLength={5}
+                          maxLength={6}
                           value={approvalCode}
                           onChange={(e) => {
-                            const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 5);
+                            const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
                             setApprovalCode(val);
                             setApprovalCodeError('');
                           }}
-                          placeholder="00000"
+                          placeholder="000000"
                           className={`pl-9 text-center text-xl font-bold tracking-[0.3em] font-mono h-12 border-2 ${approvalCodeError
                             ? 'border-red-400 focus-visible:ring-red-400'
-                            : approvalCode.length === 5
+                            : approvalCode.length === 6
                               ? 'border-emerald-400 focus-visible:ring-emerald-400'
                               : 'border-amber-300 focus-visible:ring-amber-400'
                             }`}
@@ -917,14 +914,14 @@ export default function NewsletterViewPage() {
                       </div>
                       <Button
                         onClick={() => {
-                          if (approvalCode.length !== 5) {
-                            setApprovalCodeError(t("newsletter.view.approvalCodeError", "Please enter a valid 5-digit code"));
+                          if (approvalCode.length !== 6) {
+                            setApprovalCodeError(t("newsletter.view.approvalCodeError", "Please enter a valid 6-digit code"));
                             return;
                           }
                           approveAndSendMutation.mutate({ id: newsletter.id, approvalCode });
                         }}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white h-12 px-6"
-                        disabled={approvalCode.length !== 5 || approveAndSendMutation.isPending || approveMutation.isPending}
+                        disabled={approvalCode.length !== 6 || approveAndSendMutation.isPending || approveMutation.isPending}
                         data-testid="button-approve-and-send"
                       >
                         {approveAndSendMutation.isPending ? (
@@ -942,7 +939,7 @@ export default function NewsletterViewPage() {
                     )}
                     {!isReviewerFromEmail && (
                       <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                        {t("newsletter.view.checkEmailForCode", "Check your email for the 5-digit code that was sent when this newsletter was submitted for review.")}
+                        {t("newsletter.view.checkEmailForCode", "Check your email for the 6-digit code that was sent when this newsletter was submitted for review.")}
                       </p>
                     )}
                   </div>
@@ -951,8 +948,8 @@ export default function NewsletterViewPage() {
                   <div className="flex items-center gap-3">
                     <Button
                       onClick={() => {
-                        if (approvalCode.length !== 5) {
-                          setApprovalCodeError(t("newsletter.view.approvalCodeError", "Please enter a valid 5-digit code"));
+                        if (approvalCode.length !== 6) {
+                          setApprovalCodeError(t("newsletter.view.approvalCodeError", "Please enter a valid 6-digit code"));
                           return;
                         }
                         approveMutation.mutate({ id: newsletter.id, approvalCode });
@@ -960,7 +957,7 @@ export default function NewsletterViewPage() {
                       size="sm"
                       variant="outline"
                       className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
-                      disabled={approvalCode.length !== 5 || approveMutation.isPending || approveAndSendMutation.isPending}
+                      disabled={approvalCode.length !== 6 || approveMutation.isPending || approveAndSendMutation.isPending}
                       data-testid="button-approve-only"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" strokeWidth={1.5} />
@@ -985,35 +982,35 @@ export default function NewsletterViewPage() {
         )}
 
         {/* Review status info (for approved/rejected newsletters) */}
-        {(newsletter as any).reviewStatus === 'approved' && (newsletter as any).reviewedAt && (
+        {newsletter.reviewStatus === 'approved' && newsletter.reviewedAt && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800/40 p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <div>
                 <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">{t("newsletter.view.approvedByReviewer", "Approved by reviewer")}</p>
                 <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                  {format(new Date((newsletter as any).reviewedAt), 'PPP p')}
-                  {(newsletter as any).reviewNotes && ` — "${(newsletter as any).reviewNotes}"`}
+                  {format(new Date(newsletter.reviewedAt), 'PPP p')}
+                  {newsletter.reviewNotes && ` — "${newsletter.reviewNotes}"`}
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {(newsletter as any).reviewStatus === 'rejected' && (newsletter as any).reviewedAt && (
+        {newsletter.reviewStatus === 'rejected' && newsletter.reviewedAt && (
           <div className="rounded-xl border border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-800/40 p-4 shadow-sm">
             <div className="flex items-start gap-3">
               <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-red-900 dark:text-red-100">{t("newsletter.view.rejectedByReviewer", "Rejected by reviewer")}</p>
                 <p className="text-xs text-red-700 dark:text-red-300">
-                  {format(new Date((newsletter as any).reviewedAt), 'PPP p')}
+                  {format(new Date(newsletter.reviewedAt), 'PPP p')}
                 </p>
-                {(newsletter as any).reviewNotes && (
+                {newsletter.reviewNotes && (
                   <div className="mt-2 p-2 rounded-md bg-red-100/50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30">
                     <div className="flex items-start gap-2">
                       <MessageSquare className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />
-                      <p className="text-xs text-red-800 dark:text-red-200 italic">"{(newsletter as any).reviewNotes}"</p>
+                      <p className="text-xs text-red-800 dark:text-red-200 italic">"{newsletter.reviewNotes}"</p>
                     </div>
                   </div>
                 )}

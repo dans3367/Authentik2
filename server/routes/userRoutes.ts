@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticateToken, requireRole, requirePlanFeature } from '../middleware/auth-middleware';
 import { storage } from '../storage';
 import { db } from '../db';
-import { betterAuthUser, subscriptionPlans } from '@shared/schema';
+import { betterAuthUser, subscriptionPlans, createUserSchema } from '@shared/schema';
 import { sql, eq, and, count } from 'drizzle-orm';
 
 export const userRoutes = Router();
@@ -45,6 +45,11 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Build update object
+    const updateData: Record<string, any> = {
+      updatedAt: new Date(),
+    };
+
     // Check if email is already taken by another user
     if (email && email !== existingUser.email) {
       const emailCheck = await db.query.betterAuthUser.findFirst({
@@ -57,12 +62,10 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
       if (emailCheck) {
         return res.status(400).json({ message: 'Email is already in use' });
       }
-    }
 
-    // Build update object
-    const updateData: Record<string, any> = {
-      updatedAt: new Date(),
-    };
+      // Email changed — require re-verification
+      updateData.emailVerified = false;
+    }
 
     if (firstName !== undefined && firstName.trim()) updateData.firstName = firstName.trim();
     if (lastName !== undefined && lastName.trim()) updateData.lastName = lastName.trim();
@@ -165,13 +168,21 @@ userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']),
       return res.status(403).json({ message: limitError.message });
     }
 
+    // Validate and sanitize input via schema (prevents mass-assignment of sensitive fields)
+    let parsedBody: any;
+    try {
+      parsedBody = createUserSchema.parse(req.body);
+    } catch (validationError: any) {
+      return res.status(400).json({ message: validationError.errors?.[0]?.message || 'Invalid input' });
+    }
+
     // Check for duplicate email within the tenant
-    const existingUser = await storage.getUserByEmail(req.body.email, tenantId);
+    const existingUser = await storage.getUserByEmail(parsedBody.email, tenantId);
     if (existingUser) {
       return res.status(400).json({ message: "User's email is already registered" });
     }
 
-    const user = await storage.createUserAsAdmin(req.body, tenantId);
+    const user = await storage.createUserAsAdmin(parsedBody, tenantId);
 
     res.status(201).json({
       message: 'User created successfully',
@@ -279,6 +290,16 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
     // Disallow editing Owner accounts via this endpoint
     if (existingUser.role === 'Owner') {
       return res.status(403).json({ message: 'Owner account is view-only and cannot be edited' });
+    }
+
+    // Only Owners can assign the Owner role
+    if (role === 'Owner' && req.user.role !== 'Owner') {
+      return res.status(403).json({ message: 'Only owners can promote users to the Owner role' });
+    }
+
+    // Administrators cannot edit other Administrators (prevent horizontal privilege abuse)
+    if (req.user.role === 'Administrator' && existingUser.role === 'Administrator') {
+      return res.status(403).json({ message: 'Administrators cannot edit other administrator accounts' });
     }
 
     // Check if email is already taken by another user in the same tenant

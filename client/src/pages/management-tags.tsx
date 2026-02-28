@@ -136,6 +136,10 @@ export default function ManagementTags() {
         description: newDesc.trim() || undefined,
       };
       const res = await apiRequest("POST", "/api/contact-tags", payload);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Failed to create tag' }));
+        throw new Error(err.message || 'Failed to create tag');
+      }
       return res.json();
     },
     onSuccess: async () => {
@@ -165,6 +169,10 @@ export default function ManagementTags() {
         description: editDesc.trim() || null,
       };
       const res = await apiRequest("PUT", `/api/contact-tags/${editingTag.id}`, payload);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Failed to update tag' }));
+        throw new Error(err.message || 'Failed to update tag');
+      }
       return res.json();
     },
     onSuccess: async () => {
@@ -183,7 +191,11 @@ export default function ManagementTags() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/contact-tags/${id}`);
+      const res = await apiRequest("DELETE", `/api/contact-tags/${id}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Failed to delete tag' }));
+        throw new Error(err.message || 'Failed to delete tag');
+      }
     },
     onSuccess: async () => {
       setDeleteOpen(false);

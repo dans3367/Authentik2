@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, ne, and, like, desc, inArray } from 'drizzle-orm';
-import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requireRole, requirePermission } from '../middleware/auth-middleware';
 import { authenticateInternalService } from '../middleware/internal-service-auth';
 import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, newsletterTaskStatus, newsletterReviewerSettings, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
@@ -17,6 +17,7 @@ import crypto from 'crypto';
 export const newsletterRoutes = Router();
 
 // Rate limiting for approval code attempts
+const MAX_APPROVAL_CODE_ATTEMPTS = 5;
 const approvalCodeRateLimit = new Map<string, { count: number; resetAt: number; nextAllowedAt: number }>();
 
 // Clean up expired rate limit entries every 5 minutes
@@ -34,12 +35,17 @@ setInterval(() => {
  * Check rate limiting for approval code attempts
  * Key format: "userId:newsletterId"
  */
-function checkApprovalCodeRateLimit(userId: string, newsletterId: string): { allowed: boolean; retryAfter?: number; nextAllowedAt?: Date } {
+function checkApprovalCodeRateLimit(userId: string, newsletterId: string): { allowed: boolean; retryAfter?: number; nextAllowedAt?: Date; exhausted?: boolean } {
   const key = `${userId}:${newsletterId}`;
   const now = Date.now();
   const rateLimitData = approvalCodeRateLimit.get(key);
 
   if (rateLimitData) {
+    // Check if max attempts exceeded — code must be invalidated
+    if (rateLimitData.count >= MAX_APPROVAL_CODE_ATTEMPTS) {
+      return { allowed: false, exhausted: true };
+    }
+
     // Check if we're still in cooldown period
     if (now < rateLimitData.nextAllowedAt) {
       const retryAfterMinutes = Math.ceil((rateLimitData.nextAllowedAt - now) / 60000);
@@ -69,7 +75,8 @@ function recordFailedApprovalCodeAttempt(userId: string, newsletterId: string): 
 
   approvalCodeRateLimit.set(key, {
     count: (currentData?.count || 0) + 1,
-    resetAt: now + (15 * 60 * 1000), // 15 minutes window
+    // Only set resetAt on first attempt so the window doesn't keep sliding forward
+    resetAt: currentData?.resetAt ?? now + (15 * 60 * 1000),
     nextAllowedAt: now + (2 * 60 * 1000), // 2 minutes cooldown after failed attempt
   });
 }
@@ -306,7 +313,7 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, as
 });
 
 // Send preview email via Trigger.dev + Resend (supports up to 5 recipients)
-newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, requirePermission('newsletters.send'), async (req: any, res) => {
   try {
     const { to, subject, html } = req.body;
 
@@ -395,7 +402,7 @@ newsletterRoutes.get('/internal/suppression-list', authenticateInternalService, 
 });
 
 // Get all newsletters
-newsletterRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.get("/", authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
     const { page = 1, limit = 50, search, status } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
@@ -448,7 +455,7 @@ newsletterRoutes.get("/", authenticateToken, requireTenant, async (req: any, res
 // "/reviewer-settings" as a newsletter ID parameter.
 
 // Get tenant reviewer settings
-newsletterRoutes.get("/reviewer-settings", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.get("/reviewer-settings", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -467,6 +474,7 @@ newsletterRoutes.get("/reviewer-settings", authenticateToken, requireTenant, asy
 
     // Fetch reviewer details if set
     let reviewer = null;
+    let reviewerMissing = false;
     if (settings.reviewerId) {
       const reviewerUser = await db.query.betterAuthUser.findFirst({
         where: and(
@@ -484,12 +492,16 @@ newsletterRoutes.get("/reviewer-settings", authenticateToken, requireTenant, asy
         },
       });
       reviewer = reviewerUser || null;
+      if (!reviewer && settings.enabled) {
+        reviewerMissing = true;
+      }
     }
 
     res.json({
       enabled: settings.enabled,
       reviewerId: settings.reviewerId,
       reviewer,
+      reviewerMissing,
     });
   } catch (error) {
     console.error('Get reviewer settings error:', error);
@@ -516,7 +528,7 @@ newsletterRoutes.put("/reviewer-settings", authenticateToken, requireTenant, asy
     // Compute effective reviewerId (use incoming if provided, otherwise existing)
     const effectiveReviewerId = reviewerId !== undefined ? (reviewerId || null) : (existing?.reviewerId || null);
 
-    // If enabling, validate reviewer exists and belongs to tenant
+    // If enabling, validate reviewer exists, belongs to tenant, and has an eligible role
     if (enabled && effectiveReviewerId) {
       const reviewerUser = await db.query.betterAuthUser.findFirst({
         where: and(
@@ -527,6 +539,16 @@ newsletterRoutes.put("/reviewer-settings", authenticateToken, requireTenant, asy
 
       if (!reviewerUser) {
         return res.status(400).json({ message: 'Selected reviewer not found in your organization' });
+      }
+
+      // Ensure reviewer has an eligible role (Owner, Administrator, or Manager only)
+      if (!['Owner', 'Administrator', 'Manager'].includes(reviewerUser.role || '')) {
+        return res.status(400).json({ message: 'Reviewer must have Owner, Administrator, or Manager role' });
+      }
+
+      // Prevent admins from setting themselves as the reviewer
+      if (effectiveReviewerId === req.user.id) {
+        return res.status(400).json({ message: 'You cannot set yourself as the designated reviewer' });
       }
     }
 
@@ -558,11 +580,14 @@ newsletterRoutes.put("/reviewer-settings", authenticateToken, requireTenant, asy
       result = inserted;
     }
 
-    // Fetch reviewer details for response
+    // Fetch reviewer details for response (scoped to tenant to prevent cross-tenant leakage)
     let reviewer = null;
     if (result.reviewerId) {
       const reviewerUser = await db.query.betterAuthUser.findFirst({
-        where: eq(betterAuthUser.id, result.reviewerId),
+        where: and(
+          eq(betterAuthUser.id, result.reviewerId),
+          eq(betterAuthUser.tenantId, tenantId)
+        ),
         columns: {
           id: true,
           email: true,
@@ -601,7 +626,7 @@ newsletterRoutes.put("/reviewer-settings", authenticateToken, requireTenant, asy
 });
 
 // Get specific newsletter
-newsletterRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.get("/:id", authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -624,7 +649,7 @@ newsletterRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, 
   }
 });
 
-newsletterRoutes.get("/:id/recipients", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.get("/:id/recipients", authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -656,7 +681,7 @@ newsletterRoutes.get("/:id/recipients", authenticateToken, requireTenant, async 
 });
 
 // Create newsletter
-newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.post("/", authenticateToken, requireTenant, requirePermission('newsletters.create'), async (req: any, res) => {
   try {
     const validatedData = createNewsletterSchema.parse(req.body);
     const { title, subject, content, puckData, scheduledAt, status } = validatedData;
@@ -711,7 +736,7 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, async (req: any, re
   }
 });
 
-newsletterRoutes.post("/:id/clone", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.post("/:id/clone", authenticateToken, requireTenant, requirePermission('newsletters.create'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -767,7 +792,7 @@ newsletterRoutes.post("/:id/clone", authenticateToken, requireTenant, async (req
 });
 
 // Update newsletter
-newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission('newsletters.create'), async (req: any, res) => {
   try {
     const { id } = req.params;
     const validatedData = updateNewsletterSchema.parse(req.body);
@@ -856,7 +881,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, 
 });
 
 // Delete newsletter (soft delete — preserves analytics and task data)
-newsletterRoutes.delete("/:id", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.delete("/:id", authenticateToken, requireTenant, requirePermission('newsletters.create'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -909,7 +934,7 @@ newsletterRoutes.delete("/:id", authenticateToken, requireTenant, async (req: an
 
 
 // Get detailed newsletter statistics
-newsletterRoutes.get("/:id/detailed-stats", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.get("/:id/detailed-stats", authenticateToken, requireTenant, requirePermission('newsletters.view_stats'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -1334,7 +1359,7 @@ newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, requireTenant,
 });
 
 // Send newsletter - Updated to follow the flowchart
-newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePermission('newsletters.send'), async (req: any, res) => {
   try {
     const { id } = req.params;
     const { testEmail } = req.body;
@@ -1752,7 +1777,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
           status: 'sent',
           successful,
           failed,
-          total: totalSent,
+          total: successful + failed,
           groupUUID,
           note: 'Temporal server was unavailable, sent directly'
         });
@@ -1797,7 +1822,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, async (req:
 });
 
 // Schedule newsletter for future sending
-newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, requirePermission('newsletters.send'), async (req: any, res) => {
   try {
     const { id } = req.params;
     const { scheduledAt } = req.body;
@@ -2000,7 +2025,7 @@ newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, async (
 });
 
 // Cancel a scheduled newsletter
-newsletterRoutes.post("/:id/cancel-schedule", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.post("/:id/cancel-schedule", authenticateToken, requireTenant, requirePermission('newsletters.send'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -2294,7 +2319,7 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
 });
 
 // Submit newsletter for review
-newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant, requirePermission(['newsletters.create', 'newsletters.send']), async (req: any, res) => {
   try {
     const { id } = req.params;
     const tenantId = req.user.tenantId;
@@ -2305,6 +2330,15 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
 
     if (!newsletter) {
       return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    if (newsletter.status === 'pending_review') {
+      return res.status(400).json({ message: 'Newsletter is already pending review. It cannot be re-submitted until the current review is resolved.' });
+    }
+
+    // Prevent re-submission of an already-approved newsletter (would void the approval)
+    if (newsletter.reviewStatus === 'approved') {
+      return res.status(400).json({ message: 'This newsletter has already been approved. Submit for review is not allowed.' });
     }
 
     if (newsletter.status !== 'draft' && newsletter.status !== 'ready_to_send') {
@@ -2325,8 +2359,10 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
       return res.status(400).json({ message: 'You cannot submit a newsletter for review when you are the designated reviewer. This would allow self-approval and bypass the review workflow.' });
     }
 
-    // Generate a random 5-digit numeric approval code
-    const approvalCode = String(crypto.randomInt(10000, 100000));
+    // Generate a random 6-digit numeric approval code (900k possible values)
+    const approvalCode = String(crypto.randomInt(100000, 1000000));
+    // Store only the SHA-256 hash in the database — the plaintext code is sent via email
+    const approvalCodeHash = crypto.createHash('sha256').update(approvalCode).digest('hex');
 
     // Update newsletter status
     const [updated] = await db.update(newsletters)
@@ -2337,7 +2373,7 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
         reviewStatus: 'pending',
         reviewedAt: null,
         reviewNotes: null,
-        reviewerApprovalCode: approvalCode,
+        reviewerApprovalCode: approvalCodeHash,
         updatedAt: new Date(),
       })
       .where(eq(newsletters.id, id))
@@ -2396,7 +2432,7 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
   }
 });
 
-// Approve newsletter (requires 5-digit approval code verification)
+// Approve newsletter (requires 6-digit approval code verification)
 newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
@@ -2420,9 +2456,28 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
       return res.status(403).json({ message: 'Only the assigned reviewer can approve this newsletter' });
     }
 
+    // Cross-check: verify the user is still the current designated reviewer in tenant settings
+    const currentSettings = await db.query.newsletterReviewerSettings.findFirst({
+      where: eq(newsletterReviewerSettings.tenantId, tenantId),
+    });
+    if (currentSettings?.enabled && currentSettings.reviewerId !== req.user.id) {
+      return res.status(403).json({ message: 'You are no longer the designated reviewer. The reviewer settings have been updated since this newsletter was submitted.' });
+    }
+
     // Check rate limiting for approval code attempts
     const rateLimitCheck = checkApprovalCodeRateLimit(req.user.id, id);
     if (!rateLimitCheck.allowed) {
+      if (rateLimitCheck.exhausted) {
+        // Max attempts exceeded — invalidate the code and force re-submission
+        await db.update(newsletters)
+          .set({ reviewerApprovalCode: null, status: 'draft', reviewStatus: 'pending', updatedAt: new Date() })
+          .where(eq(newsletters.id, id));
+        clearApprovalCodeRateLimit(req.user.id, id);
+        return res.status(403).json({
+          message: 'Too many failed approval code attempts. The approval code has been invalidated. The newsletter must be re-submitted for review.',
+          codeInvalidated: true,
+        });
+      }
       return res.status(429).json({
         message: `Too many incorrect approval code attempts. Please wait ${rateLimitCheck.retryAfter || 1} minute${(rateLimitCheck.retryAfter || 1) > 1 ? 's' : ''} before trying again.`,
         retryAfter: rateLimitCheck.retryAfter,
@@ -2430,20 +2485,25 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
       });
     }
 
-    // Verify the 5-digit approval code using constant-time comparison
-    if (!approvalCode) {
+    // Strict server-side validation: code must be exactly 6 digits
+    const codeStr = String(approvalCode || '').trim();
+    if (!codeStr || !/^\d{6}$/.test(codeStr)) {
       recordFailedApprovalCodeAttempt(req.user.id, id);
-      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
+      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 6-digit code.' });
     }
 
-    const providedCode = Buffer.from(String(approvalCode).trim(), 'utf8');
-    const expectedCode = Buffer.from(String(newsletter.reviewerApprovalCode), 'utf8');
+    // Compare provided code hash against stored hash (approval codes are stored hashed)
+    const providedCodeHash = crypto.createHash('sha256').update(codeStr).digest('hex');
+    const expectedCodeHash = String(newsletter.reviewerApprovalCode || '');
+
+    const providedBuf = Buffer.from(providedCodeHash, 'utf8');
+    const expectedBuf = Buffer.from(expectedCodeHash, 'utf8');
 
     // Use constant-time comparison to prevent timing attacks
-    if (providedCode.length !== expectedCode.length || !crypto.timingSafeEqual(providedCode, expectedCode)) {
+    if (providedBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(providedBuf, expectedBuf)) {
       // Record failed attempt for rate limiting
       recordFailedApprovalCodeAttempt(req.user.id, id);
-      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
+      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 6-digit code.' });
     }
 
     // Clear rate limit after successful approval
@@ -2485,7 +2545,7 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
 newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { approvalCode } = req.body;
+    const { approvalCode, notes } = req.body;
     const tenantId = req.user.tenantId;
 
     const newsletter = await db.query.newsletters.findFirst({
@@ -2505,9 +2565,28 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
       return res.status(403).json({ message: 'Only the assigned reviewer can approve this newsletter' });
     }
 
+    // Cross-check: verify the user is still the current designated reviewer in tenant settings
+    const currentSettings = await db.query.newsletterReviewerSettings.findFirst({
+      where: eq(newsletterReviewerSettings.tenantId, tenantId),
+    });
+    if (currentSettings?.enabled && currentSettings.reviewerId !== req.user.id) {
+      return res.status(403).json({ message: 'You are no longer the designated reviewer. The reviewer settings have been updated since this newsletter was submitted.' });
+    }
+
     // Check rate limiting for approval code attempts
     const rateLimitCheck = checkApprovalCodeRateLimit(req.user.id, id);
     if (!rateLimitCheck.allowed) {
+      if (rateLimitCheck.exhausted) {
+        // Max attempts exceeded — invalidate the code and force re-submission
+        await db.update(newsletters)
+          .set({ reviewerApprovalCode: null, status: 'draft', reviewStatus: 'pending', updatedAt: new Date() })
+          .where(eq(newsletters.id, id));
+        clearApprovalCodeRateLimit(req.user.id, id);
+        return res.status(403).json({
+          message: 'Too many failed approval code attempts. The approval code has been invalidated. The newsletter must be re-submitted for review.',
+          codeInvalidated: true,
+        });
+      }
       return res.status(429).json({
         message: `Too many incorrect approval code attempts. Please wait ${rateLimitCheck.retryAfter || 1} minute${(rateLimitCheck.retryAfter || 1) > 1 ? 's' : ''} before trying again.`,
         retryAfter: rateLimitCheck.retryAfter,
@@ -2515,20 +2594,25 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
       });
     }
 
-    // Verify the 5-digit approval code using constant-time comparison
-    if (!approvalCode) {
+    // Strict server-side validation: code must be exactly 6 digits
+    const codeStrAS = String(approvalCode || '').trim();
+    if (!codeStrAS || !/^\d{6}$/.test(codeStrAS)) {
       recordFailedApprovalCodeAttempt(req.user.id, id);
-      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
+      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 6-digit code.' });
     }
 
-    const providedCode = Buffer.from(String(approvalCode).trim(), 'utf8');
-    const expectedCode = Buffer.from(String(newsletter.reviewerApprovalCode), 'utf8');
+    // Compare provided code hash against stored hash (approval codes are stored hashed)
+    const providedCodeHashAS = crypto.createHash('sha256').update(codeStrAS).digest('hex');
+    const expectedCodeHashAS = String(newsletter.reviewerApprovalCode || '');
+
+    const providedBufAS = Buffer.from(providedCodeHashAS, 'utf8');
+    const expectedBufAS = Buffer.from(expectedCodeHashAS, 'utf8');
 
     // Use constant-time comparison to prevent timing attacks
-    if (providedCode.length !== expectedCode.length || !crypto.timingSafeEqual(providedCode, expectedCode)) {
+    if (providedBufAS.length !== expectedBufAS.length || !crypto.timingSafeEqual(providedBufAS, expectedBufAS)) {
       // Record failed attempt for rate limiting
       recordFailedApprovalCodeAttempt(req.user.id, id);
-      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 5-digit code.' });
+      return res.status(400).json({ message: 'Invalid approval code. Please enter the correct 6-digit code.' });
     }
 
     // Clear rate limit after successful approval
@@ -2540,6 +2624,7 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
         status: 'ready_to_send',
         reviewStatus: 'approved',
         reviewedAt: new Date(),
+        reviewNotes: notes || null,
         reviewerApprovalCode: null, // Clear the code after use
         updatedAt: new Date(),
       })
@@ -2559,7 +2644,30 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
       req,
     });
 
-    res.json({ message: 'Newsletter approved and ready to send', newsletter: updated, sendReady: true });
+    // Immediately trigger the send server-side so the client doesn't need to fire a second request.
+    // This prevents a race condition where a network failure would leave the newsletter stuck at ready_to_send.
+    try {
+      // Use hardcoded localhost to prevent SSRF via Host header manipulation
+      const port = process.env.PORT || 5002;
+      const sendResponse = await fetch(`http://127.0.0.1:${port}/api/newsletters/${id}/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cookie': req.headers.cookie || '',
+          'Authorization': req.headers.authorization || '',
+        },
+        body: JSON.stringify({}),
+      });
+      const sendData = await sendResponse.json() as any;
+      if (!sendResponse.ok) {
+        console.warn(`[Newsletter] approve-and-send: send triggered but returned ${sendResponse.status}:`, sendData?.message);
+      }
+      res.json({ message: 'Newsletter approved and sending', newsletter: updated, sendReady: true, sendTriggered: sendResponse.ok, sendMessage: sendData?.message });
+    } catch (sendErr) {
+      console.error('[Newsletter] approve-and-send: failed to auto-trigger send:', sendErr);
+      // Non-fatal: newsletter is approved and in ready_to_send state; user can manually send
+      res.json({ message: 'Newsletter approved and ready to send', newsletter: updated, sendReady: true, sendTriggered: false });
+    }
   } catch (error) {
     console.error('Approve and send newsletter error:', error);
     res.status(500).json({ message: 'Failed to approve and send newsletter' });
@@ -2573,8 +2681,16 @@ newsletterRoutes.post("/:id/reject", authenticateToken, requireTenant, async (re
     const { notes } = req.body;
     const tenantId = req.user.tenantId;
 
-    if (!notes) {
+    if (!notes || typeof notes !== 'string') {
       return res.status(400).json({ message: 'Rejection notes are required' });
+    }
+
+    const sanitizedNotes = sanitizeString(notes.trim()) || '';
+    if (sanitizedNotes.length === 0) {
+      return res.status(400).json({ message: 'Rejection notes cannot be empty' });
+    }
+    if (sanitizedNotes.length > 2000) {
+      return res.status(400).json({ message: 'Rejection notes must be 2000 characters or less' });
     }
 
     const newsletter = await db.query.newsletters.findFirst({
@@ -2594,12 +2710,20 @@ newsletterRoutes.post("/:id/reject", authenticateToken, requireTenant, async (re
       return res.status(403).json({ message: 'Only the assigned reviewer can reject this newsletter' });
     }
 
+    // Cross-check: verify the user is still the current designated reviewer in tenant settings
+    const currentSettings = await db.query.newsletterReviewerSettings.findFirst({
+      where: eq(newsletterReviewerSettings.tenantId, tenantId),
+    });
+    if (currentSettings?.enabled && currentSettings.reviewerId !== req.user.id) {
+      return res.status(403).json({ message: 'You are no longer the designated reviewer. The reviewer settings have been updated since this newsletter was submitted.' });
+    }
+
     const [updated] = await db.update(newsletters)
       .set({
         status: 'draft', // Send back to draft for edits
         reviewStatus: 'rejected',
         reviewedAt: new Date(),
-        reviewNotes: notes,
+        reviewNotes: sanitizedNotes,
         reviewerApprovalCode: null, // Invalidate the code on rejection
         updatedAt: new Date(),
       })
@@ -2615,7 +2739,7 @@ newsletterRoutes.post("/:id/reject", authenticateToken, requireTenant, async (re
       entityName: newsletter.title,
       activityType: 'rejected',
       description: `Rejected newsletter "${newsletter.title}"`,
-      metadata: { reviewStatus: 'rejected', reviewNotes: notes },
+      metadata: { reviewStatus: 'rejected', reviewNotes: sanitizedNotes },
       req,
     });
 
