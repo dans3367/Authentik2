@@ -5,7 +5,6 @@
 
 // Get the API server port from environment or default
 const API_PORT = import.meta.env.VITE_API_PORT || '5002';
-const FORMS_PORT = import.meta.env.VITE_FORMS_PORT || '3004';
 const CARDPROCESSOR_PORT = import.meta.env.VITE_CARDPROCESSOR_PORT || '5004';
 
 /**
@@ -45,23 +44,10 @@ export const getApiBaseUrl = (): string => {
 
 /**
  * Gets the base URL for the forms server
+ * NOTE: Forms are now served by the main server — this returns the main API URL.
  */
 export const getFormsServerUrl = (): string => {
-  if (import.meta.env.VITE_FORMS_URL) {
-    return import.meta.env.VITE_FORMS_URL;
-  }
-  
-  if (typeof window === 'undefined') {
-    return `http://localhost:${FORMS_PORT}`;
-  }
-  
-  const { hostname, protocol } = window.location;
-  
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return `http://localhost:${FORMS_PORT}`;
-  }
-  
-  return `${protocol}//${hostname}:${FORMS_PORT}`;
+  return getApiBaseUrl();
 };
 
 /**

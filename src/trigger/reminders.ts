@@ -62,6 +62,7 @@ const reminderPayloadSchema = z.object({
   appointmentTitle: z.string(),
   appointmentDate: z.string(),
   appointmentTime: z.string(),
+  duration: z.number().optional(),
   location: z.string().optional(),
   reminderType: z.enum(["email", "sms", "push"]),
   content: z.string().optional(),
@@ -70,6 +71,7 @@ const reminderPayloadSchema = z.object({
   from: z.string().optional(),
   replyTo: z.string().optional(),
   scheduledFor: z.string().optional(),
+  confirmationToken: z.string().optional(),
 });
 
 export type ReminderPayload = z.infer<typeof reminderPayloadSchema>;
@@ -341,49 +343,56 @@ async function generateReminderEmailHtml(data: ReminderPayload): Promise<string>
     ? `<p style="margin: 0 0 10px 0;"><strong>Location:</strong> ${data.location}</p>`
     : "";
 
+  const durationSection = data.duration
+    ? `<p style="margin: 0 0 10px 0;"><strong>Duration:</strong> ${data.duration} minutes</p>`
+    : "";
+
   const customMessageSection = data.content
     ? `<div style="margin-top: 20px; padding: 15px; background-color: #f0f9ff; border-radius: 8px;">
-        <p style="margin: 0; color: #1e40af;">${data.content}</p>
+        <p style="margin: 0; color: #1e40af;">${data.content.replace(/\n/g, '<br/>')}</p>
       </div>`
     : "";
 
-  const baseUrl = process.env.API_URL || 'http://localhost:5002';
-  const confirmUrl = `${baseUrl}/api/appointments/${data.appointmentId}/confirm`;
-  const declineUrl = `${baseUrl}/api/appointments/${data.appointmentId}/decline`;
+  const baseUrl = process.env.BASE_URL || process.env.API_URL || 'http://localhost:5002';
+  const tokenParam = data.confirmationToken ? `?token=${encodeURIComponent(data.confirmationToken)}` : '';
+  const confirmUrl = `${baseUrl}/api/appointments/${data.appointmentId}/confirm${tokenParam}`;
+  const declineUrl = `${baseUrl}/api/appointments/${data.appointmentId}/decline${tokenParam}`;
 
   const bodyContent = `
-    <h2 style="margin: 0 0 20px 0; color: #1f2937; font-size: 22px; text-align: center;">Appointment Reminder</h2>
+    <h2 style="margin: 0 0 10px 0; color: #1f2937; font-size: 20px;">Reminder: ${data.appointmentTitle}</h2>
     
-    <p style="margin: 0 0 20px 0;">Hi ${data.customerName},</p>
+    <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px;">This is a friendly reminder about your upcoming appointment.</p>
     
-    <p style="margin: 0 0 20px 0;">This is a friendly reminder about your upcoming appointment:</p>
-    
-    <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-      <h3 style="margin: 0 0 15px 0; color: #1f2937; font-size: 18px;">${data.appointmentTitle}</h3>
-      <p style="margin: 0 0 10px 0;"><strong>Date:</strong> ${data.appointmentDate}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Time:</strong> ${data.appointmentTime}</p>
+    <div style="background-color: #f9fafb; padding: 24px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #f3f4f6;">
+      <h3 style="margin: 0 0 20px 0; color: #1f2937; font-size: 18px; font-weight: 700;">${data.appointmentTitle}</h3>
+      <p style="margin: 0 0 12px 0; font-size: 16px;"><strong style="color: #374151;">Date:</strong> <span style="color: #4b5563; border-bottom: 1px dashed #9ca3af; padding-bottom: 2px;">${data.appointmentDate}</span></p>
+      <p style="margin: 0 0 12px 0; font-size: 16px;"><strong style="color: #374151;">Time:</strong> <span style="color: #4b5563;">${data.appointmentTime}</span></p>
+      ${durationSection}
       ${locationSection}
     </div>
     
+    <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.5;">
+      Hi ${data.customerName},<br/><br/>
+      This is a reminder about your upcoming appointment.<br/><br/>
+      If you need to reschedule or have any questions, please contact us.<br/><br/>
+      Best regards,<br/>
+      Your Team
+    </p>
+
     ${customMessageSection}
     
-    <div style="margin: 30px 0; text-align: center;">
-      <p style="margin: 0 0 15px 0; font-size: 16px; font-weight: 600; color: #1f2937;">Will you be attending?</p>
-      <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
+    <div style="margin: 30px 0;">
+      <table cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td style="padding: 0 8px;">
-            <a href="${confirmUrl}" style="display: inline-block; padding: 12px 32px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">Confirm</a>
+          <td style="padding-right: 12px;">
+            <a href="${confirmUrl}" style="display: inline-block; padding: 10px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Confirm</a>
           </td>
-          <td style="padding: 0 8px;">
-            <a href="${declineUrl}" style="display: inline-block; padding: 12px 32px; background-color: #ef4444; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">Not attending</a>
+          <td>
+            <a href="${declineUrl}" style="display: inline-block; padding: 10px 24px; background-color: white; color: #ef4444; border: 1px solid #ef4444; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Not attending</a>
           </td>
         </tr>
       </table>
     </div>
-    
-    <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px;">
-      If you need to reschedule or cancel, please contact us as soon as possible.
-    </p>
   `;
 
   return wrapInEmailDesign(data.tenantId, bodyContent);

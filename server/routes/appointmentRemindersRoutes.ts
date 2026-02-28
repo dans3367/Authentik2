@@ -209,6 +209,7 @@ router.post('/', requirePermission('appointments.manage_reminders'), async (req:
         title: appointments.title,
         appointmentDate: appointments.appointmentDate,
         location: appointments.location,
+        confirmationToken: appointments.confirmationToken,
         customer: {
           id: emailContacts.id,
           email: emailContacts.email,
@@ -322,6 +323,7 @@ router.post('/', requirePermission('appointments.manage_reminders'), async (req:
           ...reminderPayload,
           customerEmail: appointment.customer?.email || '',
           scheduledFor: isSendNow ? undefined : validatedData.scheduledFor.toISOString(),
+          confirmationToken: appointment.confirmationToken || undefined,
         };
 
         let result;
@@ -453,6 +455,7 @@ router.post('/send', requirePermission('appointments.manage_reminders'), async (
         location: appointments.location,
         serviceType: appointments.serviceType,
         reminderSent: appointments.reminderSent,
+        confirmationToken: appointments.confirmationToken,
         customer: {
           id: emailContacts.id,
           email: emailContacts.email,
@@ -514,30 +517,6 @@ router.post('/send', requirePermission('appointments.manage_reminders'), async (
           }
         }
 
-        const appointmentDateTime = new Date(appointment.appointmentDate).toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        });
-
-        const content = `Hi ${customerName},
-
-This is a reminder about your upcoming appointment:
-
-📅 ${appointment.title}
-🕐 ${appointmentDateTime}
-${appointment.location ? `📍 ${appointment.location}` : ''}
-${appointment.duration ? `⏱️ Duration: ${appointment.duration} minutes` : ''}
-
-If you need to reschedule or have any questions, please contact us.
-
-Best regards,
-Your Team`;
-
         // Calculate when to send the reminder based on reminder timing
         const appointmentTime = new Date(appointment.appointmentDate);
 
@@ -565,7 +544,6 @@ Your Team`;
             reminderTiming: reminderTiming,
             scheduledFor: reminderTime,
             status: 'pending',
-            content,
           })
           .returning();
 
@@ -619,6 +597,7 @@ Your Team`;
             reminderType: reminderType as 'email' | 'sms' | 'push',
             content: reminder.content || undefined,
             tenantId,
+            confirmationToken: matchingAppt.confirmationToken || undefined,
           };
         })
         .filter((p): p is NonNullable<typeof p> => p !== null);
@@ -738,6 +717,7 @@ router.put('/:id/reschedule', requirePermission('appointments.manage_reminders')
         title: appointments.title,
         appointmentDate: appointments.appointmentDate,
         location: appointments.location,
+        confirmationToken: appointments.confirmationToken,
         customer: {
           id: emailContacts.id,
           email: emailContacts.email,
@@ -791,6 +771,7 @@ router.put('/:id/reschedule', requirePermission('appointments.manage_reminders')
         tenantId,
         timezone: reminderTimezone,
         scheduledFor: newScheduledTime.toISOString(),
+        confirmationToken: appointment.confirmationToken || undefined,
       };
 
       try {

@@ -209,7 +209,7 @@ app.use((req, res, next) => {
   serverLogger.info('🔄 Service Architecture:');
   serverLogger.info('   🌐 Main Server: localhost:5002 (Authentication & API)');
   serverLogger.info('   🎂 cardprocessor-go: localhost:5004 (Birthday Cards, Email Tracking & Unsubscribe)');
-  serverLogger.info('   📝 Form Server: localhost:3004 (Form Serving)');
+  serverLogger.info('   📝 Public Forms: Merged into Main Server (/form/:id)');
   serverLogger.info('   🪝 Webhook Server: localhost:3505 (Webhook Handling)');
   serverLogger.info('   ⚡ Temporal Server: localhost:50051 (GRPC Bridge - Optional)');
   serverLogger.info('');

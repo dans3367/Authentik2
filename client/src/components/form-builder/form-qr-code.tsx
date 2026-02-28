@@ -15,22 +15,18 @@ export function FormQRCode({ formId, formTitle }: FormQRCodeProps) {
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement | null>(null);
   
-  // Use the form server URL - dynamically determine based on access method
-  const getFormServerUrl = () => {
+  // Forms are now served by the main server at /form/:id
+  const getFormUrl = () => {
     if (import.meta.env.VITE_FORMS_URL) {
-      return import.meta.env.VITE_FORMS_URL;
+      return `${import.meta.env.VITE_FORMS_URL}/form/${formId}`;
     }
     if (typeof window !== 'undefined') {
-      const { hostname, protocol } = window.location;
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return 'http://localhost:3004';
-      }
-      return `${protocol}//${hostname}:3004`;
+      // Use current origin - forms are served by the main server
+      return `${window.location.origin}/form/${formId}`;
     }
-    return 'http://localhost:3004';
+    return `http://localhost:5002/form/${formId}`;
   };
-  const formServerUrl = getFormServerUrl();
-  const formUrl = `${formServerUrl}/form/${formId}`;
+  const formUrl = getFormUrl();
 
   useEffect(() => {
     const generateQRCode = async () => {
@@ -66,7 +62,7 @@ export function FormQRCode({ formId, formTitle }: FormQRCodeProps) {
     if (formId) {
       generateQRCode();
     }
-  }, [formId, formServerUrl, toast]);
+  }, [formId, formUrl, toast]);
 
   const fallbackCopy = (text: string) => {
     // Prefer copying from the visible input to give visual feedback

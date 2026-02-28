@@ -73,6 +73,7 @@ const AcceptableUsePage = lazy(() => import("@/pages/acceptable-use"));
 const DataProcessingPage = lazy(() => import("@/pages/data-processing"));
 const CookiePolicyPage = lazy(() => import("@/pages/cookie-policy"));
 const LegalAgreementsPage = lazy(() => import("@/pages/legal-agreements"));
+const PublicFormPage = lazy(() => import("@/pages/public-form"));
 
 // Redirect components for legacy routes
 function BirthdaysRedirect() {
@@ -335,11 +336,23 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function Router() {
   const { isAuthenticated, isLoading, user, isInitialized } = useReduxAuth();
   const { handleAuthError } = useAuthErrorHandler();
+  const [currentLocation] = useLocation();
 
   // Set up global auth error handler
   useEffect(() => {
     setGlobalAuthErrorHandler(handleAuthError);
   }, [handleAuthError]);
+
+  // Render public form page outside of ProtectedRoute — no auth required
+  if (currentLocation.startsWith('/form/')) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Switch>
+          <Route path="/form/:id" component={PublicFormPage} />
+        </Switch>
+      </Suspense>
+    );
+  }
 
   if (isLoading && !isInitialized) {
     return (

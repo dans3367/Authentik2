@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db';
-import { sql } from 'drizzle-orm';
-import { forms, formResponses } from '@shared/schema';
+import { sql, eq } from 'drizzle-orm';
+import { forms, formResponses, masterEmailDesign, companies } from '@shared/schema';
 import { authenticateToken, requireRole, requireTenant } from '../middleware/auth-middleware';
 import { sanitizeString } from '../utils/sanitization';
 import { z } from 'zod';
@@ -365,13 +365,44 @@ formsRoutes.get("/public/:id", validateUuidParam, async (req: any, res) => {
       return res.status(404).json({ message: 'Form not found or not active' });
     }
 
+    // Fetch company logo from email design settings and company name
+    let logoUrl: string | null = null;
+    let companyName: string | null = null;
+
+    try {
+      const emailDesign = await db.query.masterEmailDesign.findFirst({
+        where: eq(masterEmailDesign.tenantId, form.tenantId),
+      });
+
+      if (emailDesign?.logoUrl) {
+        logoUrl = emailDesign.logoUrl;
+      }
+
+      // Use companyName from email design first, then fall back to companies table
+      if (emailDesign?.companyName) {
+        companyName = emailDesign.companyName;
+      } else {
+        const company = await db.query.companies.findFirst({
+          where: eq(companies.tenantId, form.tenantId),
+        });
+        if (company?.name) {
+          companyName = company.name;
+        }
+      }
+    } catch (e) {
+      // Non-critical: proceed without logo/company name
+    }
+
     // Return only the necessary data for public access
     res.json({
       id: form.id,
       title: form.title,
       description: form.description,
+      category: form.category,
       formData: form.formData ? JSON.parse(form.formData) : null,
       theme: form.theme || 'modern',
+      logoUrl,
+      companyName,
     });
   } catch (error) {
     console.error('Get public form error:', error);
@@ -410,6 +441,14 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
       ipAddress: req.ip,
       userAgent: req.get('User-Agent'),
     }).returning();
+
+    // Update response count
+    await db.update(forms)
+      .set({
+        responseCount: sql`${forms.responseCount} + 1`,
+        updatedAt: new Date()
+      })
+      .where(sql`${forms.id} = ${id}`);
 
     res.status(201).json({
       message: 'Form submitted successfully',

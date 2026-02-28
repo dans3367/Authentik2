@@ -130,7 +130,6 @@ rm -f /tmp/authentik_pids.txt
 # Define services and their ports
 declare -A SERVICES=(
     ["Main Server"]="5002"
-    ["Form Server"]="3004"
     ["Server Node"]="3502"
     ["Temporal Server"]="50051"
     ["Webhook Server"]="3505"
@@ -155,7 +154,6 @@ echo ""
 # Set environment variables
 export NODE_ENV=${NODE_ENV:-development}
 export PORT=${PORT:-5002}
-export FSERVER_PORT=${FSERVER_PORT:-3004}
 export TEMPORAL_SERVER_PORT=${TEMPORAL_SERVER_PORT:-50051}
 export WEBHOOK_PORT=${WEBHOOK_PORT:-3505}
 export CARDPROCESSOR_PORT=${CARDPROCESSOR_PORT:-5004}
@@ -173,13 +171,7 @@ if [ $? -eq 0 ]; then
     print_port "Main Server: http://localhost:5002"
 fi
 
-# 2. Start Form Server
-start_service "Form Server" "3004" "NODE_ENV=development npx tsx index.ts" "$PROJECT_ROOT/fserver"
-if [ $? -eq 0 ]; then
-    print_port "Form Server: http://localhost:3004"
-fi
-
-# 3. Start Server Node (if it exists)
+# 2. Start Server Node (if it exists)
 if [ -d "$PROJECT_ROOT/server-node" ]; then
     start_service "Server Node" "3502" "NODE_ENV=development npx tsx src/index.ts" "$PROJECT_ROOT/server-node"
     if [ $? -eq 0 ]; then
@@ -231,7 +223,6 @@ cleanup() {
     
     # Also kill any remaining processes by name
     pkill -f "npx tsx server/index.ts" 2>/dev/null
-    pkill -f "npx tsx fserver/index.ts" 2>/dev/null
     pkill -f "npx tsx server-node" 2>/dev/null
     pkill -f "npx tsx temporal-server" 2>/dev/null
     pkill -f "npx tsx server-hook" 2>/dev/null
