@@ -141,6 +141,7 @@ router.get('/', async (req: Request, res: Response) => {
         reminderSentAt: appointments.reminderSentAt,
         confirmationReceived: appointments.confirmationReceived,
         confirmationReceivedAt: appointments.confirmationReceivedAt,
+        statusChangedBy: appointments.statusChangedBy,
         declineReason: appointments.declineReason,
         reminderSettings: appointments.reminderSettings,
         createdAt: appointments.createdAt,
@@ -164,9 +165,10 @@ router.get('/', async (req: Request, res: Response) => {
       .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id));
 
     // Apply search filter across multiple fields (case-insensitive)
+    let finalQuery;
     if (search) {
       const searchPattern = `%${search}%`;
-      query = query.where(
+      finalQuery = query.where(
         and(
           ...conditions,
           or(
@@ -183,10 +185,10 @@ router.get('/', async (req: Request, res: Response) => {
         )
       );
     } else {
-      query = query.where(and(...conditions));
+      finalQuery = query.where(and(...conditions));
     }
 
-    const appointmentsList = await query.orderBy(desc(appointments.appointmentDate));
+    const appointmentsList = await finalQuery.orderBy(desc(appointments.appointmentDate));
 
     res.json({
       appointments: appointmentsList,
@@ -231,6 +233,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         reminderSentAt: appointments.reminderSentAt,
         confirmationReceived: appointments.confirmationReceived,
         confirmationReceivedAt: appointments.confirmationReceivedAt,
+        statusChangedBy: appointments.statusChangedBy,
         confirmationToken: appointments.confirmationToken,
         declineReason: appointments.declineReason,
         reminderSettings: appointments.reminderSettings,
@@ -332,10 +335,10 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Log activity for appointment creation
-    const customerName = appointmentCustomer 
+    const customerName = appointmentCustomer
       ? `${appointmentCustomer.firstName || ''} ${appointmentCustomer.lastName || ''}`.trim() || appointmentCustomer.email
       : 'Unknown Customer';
-    
+
     try {
       await logActivity({
         tenantId,
@@ -499,6 +502,22 @@ router.patch('/:id', async (req: Request, res: Response) => {
       if (!validStatuses.includes(updateData.status)) {
         return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
       }
+
+      // Check if status is being changed to confirmed or cancelled by an employee
+      if (updateData.status === 'confirmed' || updateData.status === 'cancelled') {
+        const userName = user.firstName
+          ? `${user.firstName} ${user.lastName || ''}`.trim()
+          : user.name || 'Employee';
+
+        // Only set statusChangedBy if we have a name (avoid setting to default 'Employee' if possible)
+        updateData.statusChangedBy = userName;
+
+        // Also update the confirmationReceived flag if it's confirmed
+        if (updateData.status === 'confirmed') {
+          updateData.confirmationReceived = true;
+          updateData.confirmationReceivedAt = new Date();
+        }
+      }
     }
 
     // Convert date strings to Date objects if present
@@ -650,7 +669,7 @@ router.delete('/:id', requireRole(['Owner', 'Administrator', 'Manager']), async 
       console.error('[Activity Log] Failed to log appointment deletion:', error);
     }
 
-    res.json({ 
+    res.json({
       message: 'Appointment deleted successfully',
       remindersCancelled: cancelResult.cancelled
     });
@@ -693,6 +712,7 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
         status: 'confirmed',
         confirmationReceived: true,
         confirmationReceivedAt: new Date(),
+        statusChangedBy: 'Customer',
         updatedAt: new Date(),
       })
       .where(eq(appointments.id, id))

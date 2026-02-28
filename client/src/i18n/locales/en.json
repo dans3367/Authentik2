@@ -535,6 +535,8 @@
       "confirmationStatus": "Confirmation Status",
       "confirmed": "Confirmed",
       "confirmedAt": "Confirmed At",
+      "confirmedBy": "Confirmed By",
+      "confirmedByCustomer": "Customer",
       "metadata": "Metadata",
       "created": "Created",
       "lastUpdated": "Last Updated",

@@ -2353,6 +2353,7 @@ export const appointments = pgTable("appointments", {
   reminderSentAt: timestamp("reminder_sent_at"),
   confirmationReceived: boolean("confirmation_received").default(false),
   confirmationReceivedAt: timestamp("confirmation_received_at"),
+  statusChangedBy: text("status_changed_by"), // "Customer" or employee name who confirmed/declined
   confirmationToken: text("confirmation_token"), // Unique token for confirmation links
   declineReason: text("decline_reason"), // Reason provided by customer when declining
   reminderSettings: text("reminder_settings"), // JSON: when to send reminders

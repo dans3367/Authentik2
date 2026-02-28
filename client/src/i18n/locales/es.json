@@ -337,6 +337,8 @@
       "confirmationStatus": "Estado de Confirmación",
       "confirmed": "Confirmado",
       "confirmedAt": "Confirmado El",
+      "confirmedBy": "Confirmado Por",
+      "confirmedByCustomer": "Cliente",
       "metadata": "Metadatos",
       "created": "Creado",
       "lastUpdated": "Última Actualización",

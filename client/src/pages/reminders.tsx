@@ -1116,10 +1116,14 @@ export default function RemindersPage() {
     updateAppointmentMutation.mutate(
       { id: appointmentId, data: { status } },
       {
-        onSuccess: () => {
+        onSuccess: (data: any) => {
           // Update local state if needed (for the viewing panel)
           if (updateLocal) {
-            setViewingAppointment(prev => prev ? { ...prev, status } : null);
+            if (data?.appointment) {
+              setViewingAppointment(prev => prev ? { ...prev, ...data.appointment } : null);
+            } else {
+              setViewingAppointment(prev => prev ? { ...prev, status } : null);
+            }
           }
 
           // Send reschedule email if requested
@@ -1144,9 +1148,13 @@ export default function RemindersPage() {
     updateAppointmentMutation.mutate(
       { id: appointmentId, data: { status: 'completed' } },
       {
-        onSuccess: () => {
+        onSuccess: (data: any) => {
           if (updateLocal) {
-            setViewingAppointment(prev => prev ? { ...prev, status: 'completed' } : null);
+            if (data?.appointment) {
+              setViewingAppointment(prev => prev ? { ...prev, ...data.appointment } : null);
+            } else {
+              setViewingAppointment(prev => prev ? { ...prev, status: 'completed' } : null);
+            }
           }
 
           // Send thank-you email if requested
@@ -3867,8 +3875,13 @@ export default function RemindersPage() {
                                     updateAppointmentMutation.mutate(
                                       { id: viewingAppointment.id, data: { status: value } },
                                       {
-                                        onSuccess: () => {
-                                          setViewingAppointment(prev => prev ? { ...prev, status: value } : null);
+                                        onSuccess: (data: any) => {
+                                          // Merge full server response to get statusChangedBy and other fields
+                                          if (data?.appointment) {
+                                            setViewingAppointment(prev => prev ? { ...prev, ...data.appointment } : null);
+                                          } else {
+                                            setViewingAppointment(prev => prev ? { ...prev, status: value } : null);
+                                          }
                                         }
                                       }
                                     );
@@ -3950,6 +3963,19 @@ export default function RemindersPage() {
                                 </span>
                               )}
                             </div>
+                            {(viewingAppointment).statusChangedBy && (
+                              <div className="flex items-center justify-between py-1">
+                                <p className="text-xs text-muted-foreground">{t('reminders.details.confirmedBy', 'Confirmed By')}</p>
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${(viewingAppointment).statusChangedBy === 'Customer'
+                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                                  : 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
+                                  }`}>
+                                  {(viewingAppointment).statusChangedBy === 'Customer'
+                                    ? t('reminders.details.confirmedByCustomer', 'Customer')
+                                    : (viewingAppointment).statusChangedBy}
+                                </span>
+                              </div>
+                            )}
                             {viewingAppointment.confirmationReceivedAt && (
                               <div className="flex items-center justify-between py-1">
                                 <p className="text-xs text-muted-foreground">{t('reminders.details.confirmedAt')}</p>

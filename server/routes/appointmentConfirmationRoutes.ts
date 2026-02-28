@@ -1,9 +1,84 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { appointments, emailContacts } from '@shared/schema';
+import { appointments, emailContacts, masterEmailDesign } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 const router = Router();
+
+const LOCKOUT_MINUTES = 5;
+
+/**
+ * Generates a "locked" HTML page explaining why the action cannot be performed.
+ */
+function renderLockedPage(title: string, message: string, logoUrl?: string | null): string {
+  const logoHtml = logoUrl 
+    ? `<img src="${escapeHtml(logoUrl)}" alt="Company Logo" class="logo" />`
+    : `<div class="icon">&#x1F512;</div>`;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${title}</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 50px auto; background: white; padding: 50px 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+        .icon { font-size: 64px; margin-bottom: 24px; color: #f59e0b; }
+        .logo { max-width: 150px; max-height: 80px; margin-bottom: 30px; object-fit: contain; }
+        h1 { color: #1f2937; margin: 0 0 16px 0; font-size: 24px; }
+        p { color: #4b5563; line-height: 1.6; font-size: 16px; margin: 0; }
+        .message-box { background: #fffbeb; border: 1px solid #fde68a; padding: 20px; border-radius: 8px; margin-top: 24px; }
+        .message-box p { color: #92400e; font-size: 15px; }
+        .contact-btn { display: inline-block; margin-top: 30px; padding: 12px 24px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: background-color 0.2s; }
+        .contact-btn:hover { background-color: #4338ca; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        ${logoHtml}
+        <h1>${title}</h1>
+        <p>${message}</p>
+        <div class="message-box">
+          <p>Please contact us directly if you need to make changes to your appointment.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * Checks if an appointment status change is allowed.
+ * Returns null if allowed, or an error object { title, message } if blocked.
+ */
+function checkStatusChangeLock(appointment: { appointmentDate: Date; confirmationReceivedAt: Date | null; confirmationReceived: boolean | null }): { title: string; message: string } | null {
+  const now = new Date();
+
+  // Block if appointment time has already passed
+  const appointmentTime = new Date(appointment.appointmentDate);
+  if (appointmentTime <= now) {
+    return {
+      title: 'Appointment Has Passed',
+      message: 'This appointment has already occurred. Status changes are no longer allowed.'
+    };
+  }
+
+  // Block if status was already changed within the lockout window
+  if (appointment.confirmationReceived && appointment.confirmationReceivedAt) {
+    const confirmedAt = new Date(appointment.confirmationReceivedAt);
+    const lockoutExpiry = new Date(confirmedAt.getTime() + LOCKOUT_MINUTES * 60 * 1000);
+    if (now >= lockoutExpiry) {
+      return {
+        title: 'Change Window Expired',
+        message: `Your response was already recorded more than ${LOCKOUT_MINUTES} minutes ago. Status changes are no longer allowed.`
+      };
+    }
+  }
+
+  return null;
+}
 
 /**
  * HTML escape helper to prevent XSS attacks.
@@ -52,7 +127,7 @@ router.get('/:id/confirm', async (req: Request, res: Response) => {
       `);
     }
 
-    // Fetch appointment with customer details, validating the token
+    // Fetch appointment with customer details and tenant logo, validating the token
     const appointmentData = await db
       .select({
         appointment: appointments,
@@ -60,10 +135,14 @@ router.get('/:id/confirm', async (req: Request, res: Response) => {
           firstName: emailContacts.firstName,
           lastName: emailContacts.lastName,
           email: emailContacts.email,
+        },
+        design: {
+          logoUrl: masterEmailDesign.logoUrl
         }
       })
       .from(appointments)
       .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
+      .leftJoin(masterEmailDesign, eq(appointments.tenantId, masterEmailDesign.tenantId))
       .where(and(
         eq(appointments.id, appointmentId),
         eq(appointments.confirmationToken, token)
@@ -95,7 +174,14 @@ router.get('/:id/confirm', async (req: Request, res: Response) => {
       `);
     }
 
-    const { appointment, customer } = appointmentData[0];
+    const { appointment, customer, design } = appointmentData[0];
+    const logoUrl = design?.logoUrl || null;
+
+    // Block if appointment time has passed or lockout window expired
+    const confirmLock = checkStatusChangeLock(appointment);
+    if (confirmLock) {
+      return res.status(403).send(renderLockedPage(confirmLock.title, confirmLock.message, logoUrl));
+    }
 
     // Idempotency check: if already confirmed, show success without re-updating
     if (appointment.status === 'confirmed' && appointment.confirmationReceived) {
@@ -161,6 +247,7 @@ router.get('/:id/confirm', async (req: Request, res: Response) => {
         status: 'confirmed',
         confirmationReceived: true,
         confirmationReceivedAt: new Date(),
+        statusChangedBy: 'Customer',
         updatedAt: new Date(),
       })
       .where(and(
@@ -289,7 +376,7 @@ router.get('/:id/decline', async (req: Request, res: Response) => {
       `);
     }
 
-    // Fetch appointment with customer details, validating the token
+    // Fetch appointment with customer details and tenant logo, validating the token
     const appointmentData = await db
       .select({
         appointment: appointments,
@@ -297,10 +384,14 @@ router.get('/:id/decline', async (req: Request, res: Response) => {
           firstName: emailContacts.firstName,
           lastName: emailContacts.lastName,
           email: emailContacts.email,
+        },
+        design: {
+          logoUrl: masterEmailDesign.logoUrl
         }
       })
       .from(appointments)
       .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
+      .leftJoin(masterEmailDesign, eq(appointments.tenantId, masterEmailDesign.tenantId))
       .where(and(
         eq(appointments.id, appointmentId),
         eq(appointments.confirmationToken, token)
@@ -332,7 +423,14 @@ router.get('/:id/decline', async (req: Request, res: Response) => {
       `);
     }
 
-    const { appointment, customer } = appointmentData[0];
+    const { appointment, customer, design } = appointmentData[0];
+    const logoUrl = design?.logoUrl || null;
+
+    // Block if appointment time has passed or lockout window expired
+    const declineLock = checkStatusChangeLock(appointment);
+    if (declineLock) {
+      return res.status(403).send(renderLockedPage(declineLock.title, declineLock.message, logoUrl));
+    }
 
     // Idempotency check: if already cancelled, show already-cancelled page
     if (appointment.status === 'cancelled' && appointment.confirmationReceived) {
@@ -610,6 +708,12 @@ router.post('/:id/decline', async (req: Request, res: Response) => {
 
     const { appointment } = appointmentData[0];
 
+    // Block if appointment time has passed or lockout window expired
+    const postDeclineLock = checkStatusChangeLock(appointment);
+    if (postDeclineLock) {
+      return res.status(403).json({ success: false, error: postDeclineLock.message });
+    }
+
     // Idempotency: if already cancelled, still return success
     if (appointment.status === 'cancelled' && appointment.confirmationReceived) {
       return res.json({ success: true, alreadyCancelled: true });
@@ -622,6 +726,7 @@ router.post('/:id/decline', async (req: Request, res: Response) => {
         status: 'cancelled',
         confirmationReceived: true,
         confirmationReceivedAt: new Date(),
+        statusChangedBy: 'Customer',
         declineReason: sanitizedReason || null,
         updatedAt: new Date(),
       })

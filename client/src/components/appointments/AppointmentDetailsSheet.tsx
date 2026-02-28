@@ -281,10 +281,25 @@ export function AppointmentDetailsSheet({
                         </span>
                       )}
                     </div>
+                    {appointment.statusChangedBy && (
+                      <div className="flex items-center justify-between py-1">
+                        <p className="text-xs text-muted-foreground">{t('reminders.details.confirmedBy', 'Confirmed By')}</p>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${appointment.statusChangedBy === 'Customer'
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                            : 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
+                          }`}>
+                          {appointment.statusChangedBy === 'Customer'
+                            ? t('reminders.details.confirmedByCustomer', 'Customer')
+                            : appointment.statusChangedBy}
+                        </span>
+                      </div>
+                    )}
                     {appointment.confirmationReceivedAt && (
                       <div className="flex items-center justify-between py-1">
                         <p className="text-xs text-muted-foreground">{t('reminders.details.confirmedAt')}</p>
-                        <p className="text-xs text-foreground">{formatDateTime(appointment.confirmationReceivedAt)}</p>
+                        <p className="text-xs text-foreground">
+                          {formatDateTime(appointment.confirmationReceivedAt)}
+                        </p>
                       </div>
                     )}
                     {appointment.declineReason && (

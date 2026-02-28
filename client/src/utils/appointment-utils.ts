@@ -31,6 +31,7 @@ export interface Appointment {
   reminderSentAt?: Date | null;
   confirmationReceived?: boolean | null;
   confirmationReceivedAt?: Date | null;
+  statusChangedBy?: string | null;
   confirmationToken?: string | null;
   declineReason?: string | null;
   reminderSettings?: string | null;
