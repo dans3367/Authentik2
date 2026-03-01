@@ -339,17 +339,41 @@ export const sendBulkRemindersTask = task({
  * Generate HTML for reminder email wrapped in the master email design
  */
 async function generateReminderEmailHtml(data: ReminderPayload): Promise<string> {
-  const locationSection = data.location
-    ? `<p style="margin: 0 0 10px 0;"><strong>Location:</strong> ${data.location}</p>`
+  const locationRow = data.location
+    ? `<tr>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+            <td width="36" valign="top" style="padding-right: 12px;">
+              <div style="width: 36px; height: 36px; background-color: #fef3c7; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#128205;</div>
+            </td>
+            <td>
+              <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Location</p>
+              <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${data.location}</p>
+            </td>
+          </tr></table>
+        </td>
+      </tr>`
     : "";
 
-  const durationSection = data.duration
-    ? `<p style="margin: 0 0 10px 0;"><strong>Duration:</strong> ${data.duration} minutes</p>`
+  const durationRow = data.duration
+    ? `<tr>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+            <td width="36" valign="top" style="padding-right: 12px;">
+              <div style="width: 36px; height: 36px; background-color: #fce7f3; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#9202;</div>
+            </td>
+            <td>
+              <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Duration</p>
+              <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${data.duration} minutes</p>
+            </td>
+          </tr></table>
+        </td>
+      </tr>`
     : "";
 
   const customMessageSection = data.content
-    ? `<div style="margin-top: 20px; padding: 15px; background-color: #f0f9ff; border-radius: 8px;">
-        <p style="margin: 0; color: #1e40af;">${data.content.replace(/\n/g, '<br/>')}</p>
+    ? `<div style="margin: 24px 0 0 0; padding: 16px 20px; background: linear-gradient(135deg, #eff6ff, #f0f9ff); border-radius: 10px; border-left: 4px solid #3b82f6;">
+        <p style="margin: 0; color: #1e40af; font-size: 14px; line-height: 1.6;">${data.content.replace(/\n/g, '<br/>')}</p>
       </div>`
     : "";
 
@@ -359,39 +383,75 @@ async function generateReminderEmailHtml(data: ReminderPayload): Promise<string>
   const declineUrl = `${baseUrl}/api/appointments/${data.appointmentId}/decline${tokenParam}`;
 
   const bodyContent = `
-    <h2 style="margin: 0 0 10px 0; color: #1f2937; font-size: 20px;">Reminder: ${data.appointmentTitle}</h2>
-    
-    <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px;">This is a friendly reminder about your upcoming appointment.</p>
-    
-    <div style="background-color: #f9fafb; padding: 24px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #f3f4f6;">
-      <h3 style="margin: 0 0 20px 0; color: #1f2937; font-size: 18px; font-weight: 700;">${data.appointmentTitle}</h3>
-      <p style="margin: 0 0 12px 0; font-size: 16px;"><strong style="color: #374151;">Date:</strong> <span style="color: #4b5563; border-bottom: 1px dashed #9ca3af; padding-bottom: 2px;">${data.appointmentDate}</span></p>
-      <p style="margin: 0 0 12px 0; font-size: 16px;"><strong style="color: #374151;">Time:</strong> <span style="color: #4b5563;">${data.appointmentTime}</span></p>
-      ${durationSection}
-      ${locationSection}
+    <div style="padding: 32px 32px 0 32px;">
+      <p style="margin: 0 0 6px 0; color: #6366f1; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">Appointment Reminder</p>
+      <h2 style="margin: 0 0 8px 0; color: #0f172a; font-size: 24px; font-weight: 700; line-height: 1.3;">${data.appointmentTitle}</h2>
+      <p style="margin: 0 0 28px 0; color: #64748b; font-size: 15px; line-height: 1.5;">Hi ${data.customerName}, this is a friendly reminder about your upcoming appointment.</p>
     </div>
-    
-    <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.5;">
-      Hi ${data.customerName},<br/><br/>
-      This is a reminder about your upcoming appointment.<br/><br/>
-      If you need to reschedule or have any questions, please contact us.<br/><br/>
-      Best regards,<br/>
-      Your Team
-    </p>
 
-    ${customMessageSection}
-    
-    <div style="margin: 30px 0;">
-      <table cellpadding="0" cellspacing="0" border="0">
+    <div style="padding: 0 32px;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
         <tr>
-          <td style="padding-right: 12px;">
-            <a href="${confirmUrl}" style="display: inline-block; padding: 10px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Confirm</a>
+          <td style="padding: 16px 16px 8px 16px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 12px 12px 0 0;">
+            <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.85); font-weight: 600; letter-spacing: 0.02em;">&#128197; Appointment Details</p>
           </td>
-          <td>
-            <a href="${declineUrl}" style="display: inline-block; padding: 10px 24px; background-color: white; color: #ef4444; border: 1px solid #ef4444; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Not attending</a>
+        </tr>
+        <tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              <td width="36" valign="top" style="padding-right: 12px;">
+                <div style="width: 36px; height: 36px; background-color: #ede9fe; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#128197;</div>
+              </td>
+              <td>
+                <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Date</p>
+                <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${data.appointmentDate}</p>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              <td width="36" valign="top" style="padding-right: 12px;">
+                <div style="width: 36px; height: 36px; background-color: #dbeafe; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#128336;</div>
+              </td>
+              <td>
+                <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Time</p>
+                <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${data.appointmentTime}</p>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        ${durationRow}
+        ${locationRow}
+      </table>
+    </div>
+
+    <div style="padding: 28px 32px 0 32px;">
+      <p style="margin: 0 0 16px 0; color: #475569; font-size: 15px; line-height: 1.7;">
+        If you need to reschedule or have any questions, please don't hesitate to contact us. We're happy to help!
+      </p>
+      ${customMessageSection}
+    </div>
+
+    <div style="padding: 28px 32px 8px 32px;">
+      <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748b; font-weight: 500;">Please confirm your attendance:</p>
+      <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="padding-right: 10px;" width="50%">
+            <a href="${confirmUrl}" style="display: block; padding: 14px 20px; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px; text-align: center; letter-spacing: 0.02em;">&#10003; Confirm</a>
+          </td>
+          <td width="50%">
+            <a href="${declineUrl}" style="display: block; padding: 14px 20px; background-color: #ffffff; color: #ef4444; border: 2px solid #fecaca; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px; text-align: center; letter-spacing: 0.02em;">&#10005; Not attending</a>
           </td>
         </tr>
       </table>
+    </div>
+
+    <div style="padding: 24px 32px 32px 32px;">
+      <p style="margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.5;">
+        Best regards,<br/><span style="font-weight: 600; color: #64748b;">Your Team</span>
+      </p>
     </div>
   `;
 

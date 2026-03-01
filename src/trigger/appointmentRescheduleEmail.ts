@@ -224,52 +224,120 @@ export const sendRescheduleEmailTask = task({
  * Generate HTML for reschedule invitation email wrapped in the master email design
  */
 async function generateRescheduleEmailHtml(data: RescheduleEmailPayload, statusText: string): Promise<string> {
-    const locationSection = data.location
-        ? `<p style="margin: 0 0 10px 0;"><strong>Location:</strong> ${data.location}</p>`
-        : "";
-
     // Validate URL is HTTP/HTTPS only to prevent XSS via javascript: protocol
     const safeBookingUrl = data.bookingUrl && /^https?:\/\//i.test(data.bookingUrl)
         ? data.bookingUrl
         : null;
 
-    const bookingSection = safeBookingUrl
-        ? `<div style="margin: 30px 0; text-align: center;">
-        <a href="${safeBookingUrl}" style="display: inline-block; padding: 14px 36px; background-color: #10b981; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Book a New Appointment</a>
-      </div>`
-        : `<p style="margin: 20px 0; text-align: center; color: #6b7280;">
-        Please contact us to schedule a new appointment at your convenience.
-      </p>`;
-
     const statusMessage = data.status === "cancelled"
         ? "We noticed that your appointment was cancelled."
         : "We're sorry we missed you at your recent appointment.";
 
+    const locationRow = data.location
+        ? `<tr>
+            <td style="padding: 12px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+                <td width="36" valign="top" style="padding-right: 12px;">
+                  <div style="width: 36px; height: 36px; background-color: #fef3c7; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#128205;</div>
+                </td>
+                <td>
+                  <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Location</p>
+                  <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${data.location}</p>
+                </td>
+              </tr></table>
+            </td>
+          </tr>`
+        : "";
+
+    const updatedBookingSection = safeBookingUrl
+        ? `<div style="padding: 0 32px 8px 32px;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+              <tr>
+                <td style="text-align: center;">
+                  <a href="${safeBookingUrl}" style="display: block; padding: 16px 24px; background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; text-align: center; letter-spacing: 0.02em;">&#128197; Book a New Appointment</a>
+                </td>
+              </tr>
+            </table>
+          </div>`
+        : `<div style="padding: 0 32px 8px 32px;">
+            <p style="margin: 0; text-align: center; color: #64748b; font-size: 14px; padding: 16px 20px; background-color: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
+              Please contact us to schedule a new appointment at your convenience.
+            </p>
+          </div>`;
+
     const bodyContent = `
-    <h2 style="margin: 0 0 20px 0; color: #92400e; font-size: 22px; text-align: center;">We'd Love to Reschedule</h2>
-    
-    <p style="margin: 0 0 20px 0;">Hi ${data.customerName},</p>
-    
-    <p style="margin: 0 0 20px 0;">${statusMessage}</p>
-    
-    <p style="margin: 0 0 20px 0;">We understand that life gets busy, and we'd love the opportunity to see you again. Here are the details of your ${statusText} appointment:</p>
-    
-    <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
-      <h3 style="margin: 0 0 15px 0; color: #92400e; font-size: 18px;">${data.appointmentTitle}</h3>
-      <p style="margin: 0 0 10px 0;"><strong>Date:</strong> ${data.appointmentDate}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Time:</strong> ${data.appointmentTime}</p>
-      ${locationSection}
+    <div style="padding: 32px 32px 0 32px; text-align: center;">
+      <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 50%; margin: 0 auto 20px auto; text-align: center; line-height: 64px; font-size: 28px;">&#128197;</div>
+      <p style="margin: 0 0 6px 0; color: #f59e0b; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">Reschedule Invitation</p>
+      <h2 style="margin: 0 0 8px 0; color: #0f172a; font-size: 24px; font-weight: 700; line-height: 1.3;">We'd Love to See You Again</h2>
+      <p style="margin: 0 0 28px 0; color: #64748b; font-size: 15px; line-height: 1.5;">Hi ${data.customerName}, ${statusMessage.toLowerCase()}</p>
     </div>
-    
-    <p style="margin: 0 0 20px 0; font-size: 16px; font-weight: 500; color: #1f2937;">
-      Would you like to reschedule?
-    </p>
-    
-    ${bookingSection}
-    
-    <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px;">
-      We value your time and look forward to serving you. If you have any questions or need assistance, please don't hesitate to reach out.
-    </p>
+
+    <div style="padding: 0 32px 24px 32px;">
+      <p style="margin: 0 0 16px 0; color: #475569; font-size: 15px; line-height: 1.7;">We understand that life gets busy, and we'd love the opportunity to see you again. Here are the details of your ${statusText} appointment:</p>
+    </div>
+
+    <div style="padding: 0 32px;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+        <tr>
+          <td style="padding: 16px 16px 8px 16px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 12px 12px 0 0;">
+            <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.85); font-weight: 600; letter-spacing: 0.02em;">&#128203; Previous Appointment</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              <td width="36" valign="top" style="padding-right: 12px;">
+                <div style="width: 36px; height: 36px; background-color: #fef3c7; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#128188;</div>
+              </td>
+              <td>
+                <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Service</p>
+                <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${data.appointmentTitle}</p>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              <td width="36" valign="top" style="padding-right: 12px;">
+                <div style="width: 36px; height: 36px; background-color: #ede9fe; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#128197;</div>
+              </td>
+              <td>
+                <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Date</p>
+                <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${data.appointmentDate}</p>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              <td width="36" valign="top" style="padding-right: 12px;">
+                <div style="width: 36px; height: 36px; background-color: #dbeafe; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#128336;</div>
+              </td>
+              <td>
+                <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Time</p>
+                <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${data.appointmentTime}</p>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        ${locationRow}
+      </table>
+    </div>
+
+    <div style="padding: 28px 32px 0 32px;">
+      <p style="margin: 0 0 20px 0; font-size: 16px; font-weight: 600; color: #0f172a; text-align: center;">Would you like to reschedule?</p>
+    </div>
+
+    ${updatedBookingSection}
+
+    <div style="padding: 24px 32px 32px 32px;">
+      <p style="margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.5; text-align: center;">
+        We value your time and look forward to serving you.<br/>If you have any questions, please don't hesitate to reach out.
+      </p>
+    </div>
   `;
 
     return wrapInEmailDesign(data.tenantId, bodyContent);

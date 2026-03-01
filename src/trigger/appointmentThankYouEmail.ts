@@ -229,9 +229,6 @@ function escapeHtml(unsafe: string): string {
  */
 async function generateThankYouEmailHtml(data: ThankYouEmailPayload): Promise<string> {
     const safeLocation = data.location ? escapeHtml(data.location) : "";
-    const locationSection = safeLocation
-        ? `<p style="margin: 0 0 10px 0;"><strong>Location:</strong> ${safeLocation}</p>`
-        : "";
 
     const safeCompanyName = escapeHtml(data.companyName || "Our Team");
     const safeCustomerName = escapeHtml(data.customerName);
@@ -239,31 +236,90 @@ async function generateThankYouEmailHtml(data: ThankYouEmailPayload): Promise<st
     const safeAppointmentDate = escapeHtml(data.appointmentDate);
     const safeAppointmentTime = escapeHtml(data.appointmentTime);
 
+    const locationRow = safeLocation
+        ? `<tr>
+            <td style="padding: 12px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+                <td width="36" valign="top" style="padding-right: 12px;">
+                  <div style="width: 36px; height: 36px; background-color: #fef3c7; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#128205;</div>
+                </td>
+                <td>
+                  <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Location</p>
+                  <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${safeLocation}</p>
+                </td>
+              </tr></table>
+            </td>
+          </tr>`
+        : "";
+
     const bodyContent = `
-    <h2 style="margin: 0 0 20px 0; color: #065f46; font-size: 22px; text-align: center;">Thank You for Your Visit!</h2>
-    
-    <p style="margin: 0 0 20px 0;">Hi ${safeCustomerName},</p>
-    
-    <p style="margin: 0 0 20px 0;">Thank you for visiting us! We truly appreciate your time and hope everything went well during your appointment.</p>
-    
-    <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #10b981;">
-      <h3 style="margin: 0 0 15px 0; color: #065f46; font-size: 18px;">Appointment Summary</h3>
-      <p style="margin: 0 0 10px 0;"><strong>Service:</strong> ${safeAppointmentTitle}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Date:</strong> ${safeAppointmentDate}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Time:</strong> ${safeAppointmentTime}</p>
-      ${locationSection}
+    <div style="padding: 32px 32px 0 32px; text-align: center;">
+      <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 50%; margin: 0 auto 20px auto; text-align: center; line-height: 64px; font-size: 28px;">&#10003;</div>
+      <p style="margin: 0 0 6px 0; color: #10b981; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">Visit Complete</p>
+      <h2 style="margin: 0 0 8px 0; color: #0f172a; font-size: 24px; font-weight: 700; line-height: 1.3;">Thank You for Your Visit!</h2>
+      <p style="margin: 0 0 28px 0; color: #64748b; font-size: 15px; line-height: 1.5;">Hi ${safeCustomerName}, we truly appreciate your time and hope everything went well.</p>
     </div>
-    
-    <p style="margin: 0 0 20px 0;">Your satisfaction is our top priority. If you have any feedback or questions about your visit, we'd love to hear from you.</p>
-    
-    <p style="margin: 0 0 20px 0; color: #6b7280; font-size: 14px;">
-      We look forward to seeing you again soon!
-    </p>
-    
-    <p style="margin: 20px 0 0 0; color: #374151;">
-      Warm regards,<br>
-      <strong>${safeCompanyName}</strong>
-    </p>
+
+    <div style="padding: 0 32px;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+        <tr>
+          <td style="padding: 16px 16px 8px 16px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 12px 12px 0 0;">
+            <p style="margin: 0; font-size: 14px; color: rgba(255,255,255,0.85); font-weight: 600; letter-spacing: 0.02em;">&#128203; Appointment Summary</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              <td width="36" valign="top" style="padding-right: 12px;">
+                <div style="width: 36px; height: 36px; background-color: #ecfdf5; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#128188;</div>
+              </td>
+              <td>
+                <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Service</p>
+                <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${safeAppointmentTitle}</p>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              <td width="36" valign="top" style="padding-right: 12px;">
+                <div style="width: 36px; height: 36px; background-color: #ede9fe; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#128197;</div>
+              </td>
+              <td>
+                <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Date</p>
+                <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${safeAppointmentDate}</p>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              <td width="36" valign="top" style="padding-right: 12px;">
+                <div style="width: 36px; height: 36px; background-color: #dbeafe; border-radius: 8px; text-align: center; line-height: 36px; font-size: 16px;">&#128336;</div>
+              </td>
+              <td>
+                <p style="margin: 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Time</p>
+                <p style="margin: 4px 0 0 0; font-size: 15px; color: #1e293b; font-weight: 500;">${safeAppointmentTime}</p>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        ${locationRow}
+      </table>
+    </div>
+
+    <div style="padding: 28px 32px 0 32px;">
+      <p style="margin: 0 0 16px 0; color: #475569; font-size: 15px; line-height: 1.7;">Your satisfaction is our top priority. If you have any feedback or questions about your visit, we'd love to hear from you.</p>
+      <p style="margin: 0 0 16px 0; color: #64748b; font-size: 14px; line-height: 1.5;">We look forward to seeing you again soon!</p>
+    </div>
+
+    <div style="padding: 24px 32px 32px 32px;">
+      <p style="margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.5;">
+        Warm regards,<br/><span style="font-weight: 600; color: #64748b;">${safeCompanyName}</span>
+      </p>
+    </div>
   `;
 
     return wrapInEmailDesign(data.tenantId, bodyContent);
