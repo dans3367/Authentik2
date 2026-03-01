@@ -444,6 +444,8 @@ const PublicFormPage: React.FC = () => {
   const [theme, setTheme] = useState<ThemeStyles | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState<string | null>(null);
+  const [formLoadTime] = useState<number>(Date.now());
+  const [honeypot, setHoneypot] = useState('');
 
   useEffect(() => {
     if (!formId) {
@@ -514,7 +516,7 @@ const PublicFormPage: React.FC = () => {
       const response = await fetch(`/api/forms/public/${formId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: formValues })
+        body: JSON.stringify({ data: formValues, _hp_email: honeypot, _ft: formLoadTime })
       });
 
       if (!response.ok) {
@@ -757,6 +759,20 @@ const PublicFormPage: React.FC = () => {
           </div>
           <div className="p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Honeypot field - hidden from real users, bots will fill it */}
+              <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }}>
+                <label htmlFor="_hp_email">Email</label>
+                <input
+                  type="email"
+                  id="_hp_email"
+                  name="_hp_email"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={honeypot}
+                  onChange={(e) => setHoneypot(e.target.value)}
+                />
+              </div>
+
               {form.formData.elements?.map(renderFormElement)}
 
               {form.category === 'email-signup' && (

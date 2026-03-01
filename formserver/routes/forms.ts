@@ -3,12 +3,23 @@ import { db } from '../database.js';
 import { forms, formResponses } from '../schema.js';
 import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_RESPONSE_DATA_BYTES = 512 * 1024; // 512 KB
+const MIN_SUBMIT_TIME_MS = 2000; // Minimum 2 seconds between form load and submit
+
+// ─── Rate limiter for form submissions ───────────────────────────────────────
+const submitLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 60 minutes
+  max: 3, // limit each IP to 3 submissions per window
+  message: { error: 'Too many form submissions from this IP, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ─── Middleware: validate :id is a UUID ───────────────────────────────────────
 function validateUuidParam(req: Request, res: Response, next: NextFunction) {
@@ -19,12 +30,14 @@ function validateUuidParam(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-// Schema for form response submission
+// Schema for form response submission (includes bot protection fields)
 const formResponseSchema = z.object({
   responseData: z.record(z.unknown()).refine(
     (val) => JSON.stringify(val).length <= MAX_RESPONSE_DATA_BYTES,
     { message: `Response data must not exceed ${MAX_RESPONSE_DATA_BYTES / 1024} KB` }
-  )
+  ),
+  _hp_email: z.string().optional(), // Honeypot field — must be empty
+  _ft: z.number().optional(), // Form load timestamp for timing check
 });
 
 // GET /api/forms/:id - Get a specific form by UUID
@@ -75,7 +88,7 @@ router.get('/:id', validateUuidParam, async (req, res) => {
 });
 
 // POST /api/forms/:id/submit - Submit a form response
-router.post('/:id/submit', validateUuidParam, async (req, res) => {
+router.post('/:id/submit', submitLimiter, validateUuidParam, async (req, res) => {
   try {
     const formId = req.params.id;
 
@@ -88,7 +101,32 @@ router.post('/:id/submit', validateUuidParam, async (req, res) => {
       });
     }
 
-    const { responseData } = validation.data;
+    const { responseData, _hp_email, _ft } = validation.data;
+
+    // ─── Bot Protection ────────────────────────────────────────────────
+    // 1. Honeypot check: if the hidden field has a value, it's a bot
+    if (_hp_email && _hp_email.length > 0) {
+      // Silently accept to not reveal detection to bots
+      console.warn(`[Bot Protection] Honeypot triggered for form ${formId} from IP ${req.ip}`);
+      return res.status(201).json({
+        success: true,
+        responseId: 'blocked',
+        message: 'Form response submitted successfully'
+      });
+    }
+
+    // 2. Timing check: reject submissions that happen too fast
+    if (_ft) {
+      const elapsed = Date.now() - _ft;
+      if (elapsed < MIN_SUBMIT_TIME_MS) {
+        console.warn(`[Bot Protection] Timing check failed for form ${formId} from IP ${req.ip} (${elapsed}ms)`);
+        return res.status(201).json({
+          success: true,
+          responseId: 'blocked',
+          message: 'Form response submitted successfully'
+        });
+      }
+    }
 
     // Verify the form exists and is active
     const form = await db.select({

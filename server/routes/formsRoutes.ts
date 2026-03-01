@@ -14,22 +14,25 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 const ALLOWED_CATEGORIES = ['intake', 'survey', 'email-signup'] as const;
 const MAX_PAGE_LIMIT = 100;
 const MAX_RESPONSE_DATA_BYTES = 512 * 1024; // 512 KB per submission
+const MIN_SUBMIT_TIME_MS = 2000; // Minimum 2 seconds between form load and submit
 
 // ─── Rate limiter for public submission endpoint ──────────────────────────────
 const publicSubmitLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
+  windowMs: 60 * 60 * 1000, // 60 minutes
+  max: 3,
   message: { message: 'Too many form submissions from this IP, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// ─── Zod schema for public form submission ────────────────────────────────────
+// ─── Zod schema for public form submission (includes bot protection fields) ──
 const publicSubmitSchema = z.object({
   data: z.record(z.unknown()).refine(
     (val) => JSON.stringify(val).length <= MAX_RESPONSE_DATA_BYTES,
     { message: `Response data must not exceed ${MAX_RESPONSE_DATA_BYTES / 1024} KB` }
   ),
+  _hp_email: z.string().optional(), // Honeypot field — must be empty
+  _ft: z.number().optional(), // Form load timestamp for timing check
 });
 
 // ─── Middleware: validate :id is a UUID ───────────────────────────────────────
@@ -421,7 +424,29 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
       return res.status(400).json({ message: 'Invalid submission data', details: parsed.error.errors });
     }
 
-    const { data } = parsed.data;
+    const { data, _hp_email, _ft } = parsed.data;
+
+    // ─── Bot Protection ────────────────────────────────────────────────
+    // 1. Honeypot check: if the hidden field has a value, it's a bot
+    if (_hp_email && _hp_email.length > 0) {
+      console.warn(`[Bot Protection] Honeypot triggered for form ${id} from IP ${req.ip}`);
+      return res.status(201).json({
+        message: 'Form submitted successfully',
+        responseId: 'blocked',
+      });
+    }
+
+    // 2. Timing check: reject submissions that happen too fast
+    if (_ft) {
+      const elapsed = Date.now() - _ft;
+      if (elapsed < MIN_SUBMIT_TIME_MS) {
+        console.warn(`[Bot Protection] Timing check failed for form ${id} from IP ${req.ip} (${elapsed}ms)`);
+        return res.status(201).json({
+          message: 'Form submitted successfully',
+          responseId: 'blocked',
+        });
+      }
+    }
 
     // Check if form exists and is active
     const form = await db.query.forms.findFirst({
