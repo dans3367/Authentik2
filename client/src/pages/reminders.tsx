@@ -423,6 +423,8 @@ export default function RemindersPage() {
   }, []);
   const [reminderValidationError, setReminderValidationError] = useState<string | null>(null);
   const reminderValidationSeq = useRef(0);
+  const newReminderSaveRef = useRef(false);
+  const editReminderSaveRef = useRef(false);
   // Fetch appointments - no date filtering on server
   // All date filtering is done client-side to ensure both upcoming and past tabs
   // have access to all appointment data
@@ -1779,12 +1781,12 @@ export default function RemindersPage() {
                       <Dialog open={newAppointmentReminderModalOpen} onOpenChange={(open) => {
                         setNewAppointmentReminderModalOpen(open);
                         if (!open) {
-                          // Keep enabled state true so we don't lose context, unless user explicitly cancels
-                          // But here we are just closing the modal.
-                          // If they closed via 'x' or outside click, maybe we should keep it enabled? 
-                          // Or assume they are done configuring? 
-                          // The previous logic disabled it on close, which implies "Cancel".
-                          // Let's stick to previous behavior but ensure we clear error state
+                          // If closed via X or outside click (not Save), disable the reminder toggle
+                          // to prevent accidental reminder creation with default settings.
+                          if (!newReminderSaveRef.current) {
+                            setNewAppointmentReminderEnabled(false);
+                          }
+                          newReminderSaveRef.current = false;
                           setReminderValidationError(null);
                         } else {
                           // Force validation check when opening - always check for email type
@@ -2021,7 +2023,10 @@ export default function RemindersPage() {
                                   }}>
                                     {t('reminders.appointments.cancel')}
                                   </Button>
-                                  <Button onClick={() => setNewAppointmentReminderModalOpen(false)} disabled={!!reminderValidationError && newAppointmentReminderData.reminderType === 'email'}>
+                                  <Button onClick={() => {
+                                    newReminderSaveRef.current = true;
+                                    setNewAppointmentReminderModalOpen(false);
+                                  }} disabled={!!reminderValidationError && newAppointmentReminderData.reminderType === 'email'}>
                                     {t('common.save')}
                                   </Button>
                                 </div>
@@ -3537,7 +3542,10 @@ export default function RemindersPage() {
                 <Dialog open={editAppointmentReminderModalOpen} onOpenChange={(open) => {
                   setEditAppointmentReminderModalOpen(open);
                   if (!open) {
-                    setEditAppointmentReminderEnabled(false);
+                    if (!editReminderSaveRef.current) {
+                      setEditAppointmentReminderEnabled(false);
+                    }
+                    editReminderSaveRef.current = false;
                     setReminderValidationError(null);
                   } else {
                     if (editAppointmentReminderData.reminderType === 'email') {
@@ -3689,7 +3697,10 @@ export default function RemindersPage() {
                       }}>
                         {t('reminders.appointments.cancel')}
                       </Button>
-                      <Button onClick={() => setEditAppointmentReminderModalOpen(false)} disabled={!!reminderValidationError && editAppointmentReminderData.reminderType === 'email'}>
+                      <Button onClick={() => {
+                        editReminderSaveRef.current = true;
+                        setEditAppointmentReminderModalOpen(false);
+                      }} disabled={!!reminderValidationError && editAppointmentReminderData.reminderType === 'email'}>
                         {t('common.save')}
                       </Button>
                     </div>
