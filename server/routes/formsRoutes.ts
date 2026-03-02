@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { sql, eq } from 'drizzle-orm';
-import { forms, formResponses, masterEmailDesign, companies } from '@shared/schema';
+import { forms, formResponses, masterEmailDesign, companies, emailContacts } from '@shared/schema';
 import { authenticateToken, requireRole, requireTenant } from '../middleware/auth-middleware';
 import { sanitizeString } from '../utils/sanitization';
 import { z } from 'zod';
@@ -352,6 +352,164 @@ formsRoutes.get("/:id/stats", authenticateToken, requireTenant, validateUuidPara
   } catch (error) {
     console.error('Get form stats error:', error);
     res.status(500).json({ message: 'Failed to get form statistics' });
+  }
+});
+
+// ─── Google Sign-In: Serve client ID to frontend ─────────────────────────────
+// NOTE: These must be defined BEFORE /public/:id to avoid matching as a UUID param
+formsRoutes.get("/public/google-client-id", (req: any, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    return res.json({ clientId: null });
+  }
+  res.json({ clientId });
+});
+
+// ─── Rate limiter for Google Sign-In submissions ─────────────────────────────
+const googleSignInLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { message: 'Too many sign-in attempts from this IP, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Schema for Google Sign-In request
+const googleSignInSchema = z.object({
+  credential: z.string().min(1, 'Google credential is required'),
+  formId: z.string().regex(UUID_REGEX, 'Invalid form ID format'),
+});
+
+// ─── Google Sign-In: Verify token and add email to newsletter ────────────────
+formsRoutes.post("/public/google-signin", googleSignInLimiter, async (req: any, res) => {
+  try {
+    const validation = googleSignInSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        message: 'Invalid request',
+        details: validation.error.errors,
+      });
+    }
+
+    const { credential, formId } = validation.data;
+
+    // Verify the Google ID token via Google's tokeninfo endpoint
+    const tokenInfoRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+    );
+
+    if (!tokenInfoRes.ok) {
+      return res.status(401).json({ message: 'Invalid Google credential' });
+    }
+
+    const tokenInfo = await tokenInfoRes.json() as {
+      email?: string;
+      email_verified?: string;
+      given_name?: string;
+      family_name?: string;
+      name?: string;
+      aud?: string;
+    };
+
+    // Verify audience matches our client ID
+    const expectedClientId = process.env.GOOGLE_CLIENT_ID;
+    if (expectedClientId && tokenInfo.aud !== expectedClientId) {
+      return res.status(401).json({ message: 'Token audience mismatch' });
+    }
+
+    if (!tokenInfo.email) {
+      return res.status(400).json({ message: 'No email found in Google account' });
+    }
+
+    if (tokenInfo.email_verified !== 'true') {
+      return res.status(400).json({ message: 'Google email is not verified' });
+    }
+
+    // Look up the form to get the tenantId
+    const form = await db.query.forms.findFirst({
+      where: sql`${forms.id} = ${formId} AND ${forms.isActive} = true`,
+    });
+
+    if (!form) {
+      return res.status(404).json({ message: 'Form not found or inactive' });
+    }
+
+    // Check if contact already exists for this tenant
+    const existingContact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.tenantId} = ${form.tenantId} AND ${emailContacts.email} = ${tokenInfo.email}`,
+    });
+
+    const clientIp = req.ip || 'unknown';
+    const userAgent = req.get('User-Agent') || 'unknown';
+
+    if (existingContact) {
+      // Contact already exists — update last activity
+      await db.update(emailContacts)
+        .set({ lastActivity: new Date(), updatedAt: new Date() })
+        .where(sql`${emailContacts.id} = ${existingContact.id}`);
+
+      return res.status(200).json({
+        success: true,
+        email: tokenInfo.email,
+        firstName: tokenInfo.given_name || null,
+        lastName: tokenInfo.family_name || null,
+        message: 'Email already subscribed',
+        alreadySubscribed: true,
+      });
+    }
+
+    // Create new email contact for the newsletter
+    const [newContact] = await db.insert(emailContacts).values({
+      tenantId: form.tenantId,
+      email: tokenInfo.email,
+      firstName: tokenInfo.given_name || null,
+      lastName: tokenInfo.family_name || null,
+      status: 'active',
+      consentGiven: true,
+      consentDate: new Date(),
+      consentMethod: 'google_signin',
+      consentIpAddress: clientIp,
+      consentUserAgent: userAgent,
+      prefNewsletters: true,
+      prefMarketing: true,
+    }).returning();
+
+    // Also record as a form response for tracking
+    await db.insert(formResponses).values({
+      tenantId: form.tenantId,
+      formId,
+      responseData: JSON.stringify({
+        email: tokenInfo.email,
+        firstName: tokenInfo.given_name || '',
+        lastName: tokenInfo.family_name || '',
+        source: 'google_signin',
+      }),
+      submittedAt: new Date(),
+      ipAddress: clientIp,
+      userAgent,
+    }).returning();
+
+    // Update form response count
+    await db.update(forms)
+      .set({
+        responseCount: sql`${forms.responseCount} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(sql`${forms.id} = ${formId}`);
+
+    res.status(201).json({
+      success: true,
+      email: tokenInfo.email,
+      firstName: tokenInfo.given_name || null,
+      lastName: tokenInfo.family_name || null,
+      contactId: newContact.id,
+      message: 'Successfully subscribed via Google Sign-In',
+      alreadySubscribed: false,
+    });
+
+  } catch (error) {
+    console.error('Google Sign-In error:', error);
+    res.status(500).json({ message: 'Failed to process Google sign-in' });
   }
 });
 

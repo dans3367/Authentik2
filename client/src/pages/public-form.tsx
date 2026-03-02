@@ -1,6 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useRoute } from 'wouter';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
+
+// Google Identity Services types
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: any) => void;
+          renderButton: (element: HTMLElement, config: any) => void;
+          prompt: () => void;
+        };
+      };
+    };
+  }
+}
 
 // ─── Theme System ────────────────────────────────────────────────────────────
 
@@ -446,6 +461,74 @@ const PublicFormPage: React.FC = () => {
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [formLoadTime] = useState<number>(Date.now());
   const [honeypot, setHoneypot] = useState('');
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
+  const [googleSignInLoading, setGoogleSignInLoading] = useState(false);
+  const [googleSignInSuccess, setGoogleSignInSuccess] = useState<{ email: string } | null>(null);
+  const [googleSignInError, setGoogleSignInError] = useState<string | null>(null);
+  const [googleInitialized, setGoogleInitialized] = useState(false);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+
+  // Fetch Google Client ID
+  useEffect(() => {
+    fetch('/api/forms/public/google-client-id')
+      .then(r => r.json())
+      .then(data => { if (data.clientId) setGoogleClientId(data.clientId); })
+      .catch(() => {});
+  }, []);
+
+  const handleGoogleCredential = useCallback(async (response: { credential: string }) => {
+    if (!formId) return;
+    setGoogleSignInLoading(true);
+    setGoogleSignInError(null);
+    try {
+      const res = await fetch('/api/forms/public/google-signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential, formId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to verify Google sign-in');
+      }
+      const data = await res.json();
+      setGoogleSignInSuccess({ email: data.email });
+      setSubmitted(true);
+    } catch (err: any) {
+      setGoogleSignInError(err.message || 'Google sign-in failed');
+    } finally {
+      setGoogleSignInLoading(false);
+    }
+  }, [formId]);
+
+  // Initialize Google Sign-In button
+  useEffect(() => {
+    if (!googleClientId || !googleButtonRef.current || googleInitialized || !form || form.category !== 'email-signup') return;
+
+    const initGoogle = () => {
+      if (!window.google?.accounts?.id) {
+        setTimeout(initGoogle, 300);
+        return;
+      }
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: handleGoogleCredential,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      if (googleButtonRef.current) {
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          text: 'signup_with',
+          shape: 'rectangular',
+          width: 320,
+        });
+      }
+      setGoogleInitialized(true);
+    };
+    initGoogle();
+  }, [googleClientId, googleInitialized, form, handleGoogleCredential]);
 
   useEffect(() => {
     if (!formId) {
@@ -799,6 +882,57 @@ const PublicFormPage: React.FC = () => {
                 })()}
               </button>
             </form>
+
+            {form.category === 'email-signup' && googleClientId && (
+              <div className="mt-4">
+                {googleSignInSuccess ? (
+                  <div className="flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                    <p className="text-sm text-green-700">
+                      Successfully signed up with {googleSignInSuccess.email}!
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Divider */}
+                    <div className="relative my-4">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300"></div>
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                        <span className="px-3 bg-white text-gray-500">
+                          {((form?.formData?.settings?.language || 'en') === 'es')
+                            ? 'o regístrate con Google'
+                            : 'or sign up with Google'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Google Sign-In Button */}
+                    <div className="flex flex-col items-center">
+                      {googleSignInLoading ? (
+                        <div className="flex items-center space-x-2 py-3 px-6 border border-gray-300 rounded-md bg-gray-50">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                          <span className="text-sm text-gray-600">Processing...</span>
+                        </div>
+                      ) : (
+                        <div
+                          ref={googleButtonRef}
+                          className={submitting ? 'opacity-50 pointer-events-none' : ''}
+                        />
+                      )}
+                    </div>
+
+                    {googleSignInError && (
+                      <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                        <p className="text-sm text-red-600">{googleSignInError}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

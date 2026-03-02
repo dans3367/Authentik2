@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { parseTheme, ThemeStyles } from '../themes';
 import { FullName } from './ui/FullName';
 import PrivacyStatement from './PrivacyStatement';
+import GoogleSignInButton from './GoogleSignInButton';
 
 interface FormElement {
   id: string;
@@ -57,6 +58,8 @@ const FormView: React.FC<FormViewProps> = ({ formId }) => {
   const [theme, setTheme] = useState<ThemeStyles | null>(null);
   const [formLoadTime] = useState<number>(Date.now());
   const [honeypot, setHoneypot] = useState('');
+  const [googleSignInSuccess, setGoogleSignInSuccess] = useState<{ email: string; firstName?: string; lastName?: string } | null>(null);
+  const [googleSignInError, setGoogleSignInError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchForm = async () => {
@@ -392,6 +395,47 @@ const FormView: React.FC<FormViewProps> = ({ formId }) => {
                 })()}
               </button>
             </form>
+
+            {form.category === 'email-signup' && (
+              <div className="mt-2">
+                {googleSignInSuccess ? (
+                  <div className="flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                    <p className="text-sm text-green-700">
+                      {(() => {
+                        const lang = (form?.formData?.settings?.language || 'en') as FormLanguage;
+                        return lang === 'es'
+                          ? `¡Registrado con éxito con ${googleSignInSuccess.email}!`
+                          : `Successfully signed up with ${googleSignInSuccess.email}!`;
+                      })()}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <GoogleSignInButton
+                      formId={form.id}
+                      disabled={submitting}
+                      language={form?.formData?.settings?.language || 'en'}
+                      onEmailReceived={(email, firstName, lastName) => {
+                        setGoogleSignInSuccess({ email, firstName, lastName });
+                        setGoogleSignInError(null);
+                        // Auto-submit success after Google sign-in
+                        setSubmitted(true);
+                      }}
+                      onError={(errorMsg) => {
+                        setGoogleSignInError(errorMsg);
+                      }}
+                    />
+                    {googleSignInError && (
+                      <div className="mt-2 flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                        <p className="text-sm text-red-600">{googleSignInError}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

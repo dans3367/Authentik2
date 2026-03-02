@@ -31,6 +31,32 @@ export const formResponses = pgTable("form_responses", {
   userAgent: text("user_agent"),
 });
 
+// Email contacts table (subset for newsletter signup via Google Sign-In)
+export const emailContacts = pgTable("email_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  email: text("email").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  status: text("status").notNull().default('active'),
+  addedDate: timestamp("added_date").defaultNow(),
+  lastActivity: timestamp("last_activity"),
+  emailsSent: integer("emails_sent").default(0),
+  emailsOpened: integer("emails_opened").default(0),
+  consentGiven: boolean("consent_given").notNull().default(false),
+  consentDate: timestamp("consent_date"),
+  consentMethod: text("consent_method"),
+  consentIpAddress: text("consent_ip_address"),
+  consentUserAgent: text("consent_user_agent"),
+  prefTransactional: boolean("pref_transactional").notNull().default(true),
+  prefMarketing: boolean("pref_marketing").notNull().default(true),
+  prefCustomerEngagement: boolean("pref_customer_engagement").notNull().default(true),
+  prefNewsletters: boolean("pref_newsletters").notNull().default(true),
+  prefSurveysForms: boolean("pref_surveys_forms").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Email events table for tracking email lifecycle events from Resend webhooks
 export const emailEvents = pgTable("email_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

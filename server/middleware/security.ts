@@ -12,12 +12,14 @@ export const helmetMiddleware = helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://rsms.me"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com", "https://accounts.google.com", "https://apis.google.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://rsms.me"],
       imgSrc: ["'self'", "data:", "https:", "http:"],
       connectSrc: [
         "'self'",
         "https://api.stripe.com",
+        "https://accounts.google.com",
+        "https://oauth2.googleapis.com",
         "https://tenginex.zendwise.work",
         "https://tenginex.zendwise.work/*",
         "https://*.zendwise.work",
@@ -35,7 +37,7 @@ export const helmetMiddleware = helmet({
         "https://*.replit.dev",
         "https://*.repl.co"
       ],
-      frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"],
+      frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com", "https://accounts.google.com"],
       // Explicitly disable upgrade-insecure-requests in development
       upgradeInsecureRequests: null,
     },
@@ -44,12 +46,14 @@ export const helmetMiddleware = helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://rsms.me"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.stripe.com", "https://accounts.google.com", "https://apis.google.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://rsms.me"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: [
         "'self'",
         "https://api.stripe.com",
+        "https://accounts.google.com",
+        "https://oauth2.googleapis.com",
         "https://tenginex.zendwise.work",
         "https://tenginex.zendwise.work/*",
         "https://*.zendwise.work",
@@ -63,7 +67,7 @@ export const helmetMiddleware = helmet({
         "https://*.replit.dev",
         "https://*.repl.co"
       ],
-      frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"],
+      frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com", "https://accounts.google.com"],
       upgradeInsecureRequests: [],
     },
   },
