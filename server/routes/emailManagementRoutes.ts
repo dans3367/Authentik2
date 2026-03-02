@@ -15,7 +15,7 @@ import { logActivity, computeChanges, allowedActivityTypes } from '../utils/acti
 import xss from 'xss';
 import { emailAttachmentUpload, validateAttachmentSize, filesToBase64Attachments, handleEmailAttachmentError } from '../middleware/emailAttachmentUpload';
 import { fromZonedTime } from 'date-fns-tz';
-import { wrapNewsletterContent, fetchNewsletterDesign, buildNewsletterEmailHtml } from '../utils/newsletterEmailWrapper';
+import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 
 // Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers
 export function sanitizeEmailHtml(html: string): string {
@@ -3927,11 +3927,6 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
     // Import email service
     const { enhancedEmailService } = await import('../emailService');
 
-    const cachedDesign = await fetchNewsletterDesign(tenantId).catch((err) => {
-      console.error(`⚠️ [ManualBirthdayCard] Failed to fetch newsletter design for tenant ${tenantId}, emails will be sent unwrapped:`, err);
-      return null;
-    });
-
     const skippedOptOut: string[] = [];
     const skippedSuppressed: string[] = [];
     for (const contact of contacts) {
@@ -4010,8 +4005,6 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             unsubscribeToken,
           });
 
-          const wrappedBirthdayHtml = cachedDesign ? buildNewsletterEmailHtml(cachedDesign, htmlBirthday) : htmlBirthday;
-
           // Build unsubscribe URL for List-Unsubscribe header
           const bdayUnsubUrl = unsubscribeToken
             ? `${process.env.APP_URL || 'http://localhost:5002'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
@@ -4020,9 +4013,9 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           const birthdayResult = await enhancedEmailService.sendCustomEmail(
             contact.email,
             `🎉 Happy Birthday ${recipientName}!`,
-            wrappedBirthdayHtml,
+            htmlBirthday,
             {
-              text: wrappedBirthdayHtml.replace(/<[^>]*>/g, ''),
+              text: htmlBirthday.replace(/<[^>]*>/g, ''),
               from: 'admin@zendwise.com',
               headers: bdayUnsubUrl ? {
                 'List-Unsubscribe': `<${bdayUnsubUrl}>`,
@@ -4078,8 +4071,8 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             // Also store the content
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
-              htmlContent: wrappedBirthdayHtml,
-              textContent: wrappedBirthdayHtml.replace(/<[^>]*>/g, ''),
+              htmlContent: htmlBirthday,
+              textContent: htmlBirthday.replace(/<[^>]*>/g, ''),
               metadata: JSON.stringify({
                 split: true,
                 manual: true,
@@ -4174,8 +4167,6 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           unsubscribeToken,
         });
 
-        const wrappedHtmlContent = cachedDesign ? buildNewsletterEmailHtml(cachedDesign, htmlContent) : htmlContent;
-
         // Build unsubscribe URL for List-Unsubscribe header
         const combinedUnsubUrl = unsubscribeToken
           ? `${process.env.APP_URL || 'http://localhost:5002'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
@@ -4185,9 +4176,9 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
         const result = await enhancedEmailService.sendCustomEmail(
           contact.email,
           `🎉 Happy Birthday ${recipientName}!`,
-          wrappedHtmlContent,
+          htmlContent,
           {
-            text: wrappedHtmlContent.replace(/<[^>]*>/g, ''),
+            text: htmlContent.replace(/<[^>]*>/g, ''),
             from: 'admin@zendwise.com',
             headers: combinedUnsubUrl ? {
               'List-Unsubscribe': `<${combinedUnsubUrl}>`,
@@ -4244,8 +4235,8 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             // Also store the content
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
-              htmlContent: wrappedHtmlContent,
-              textContent: wrappedHtmlContent.replace(/<[^>]*>/g, ''),
+              htmlContent: htmlContent,
+              textContent: htmlContent.replace(/<[^>]*>/g, ''),
               metadata: JSON.stringify({
                 split: false,
                 manual: true,
@@ -4305,8 +4296,8 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             // Also store the content
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
-              htmlContent: wrappedHtmlContent,
-              textContent: wrappedHtmlContent.replace(/<[^>]*>/g, ''),
+              htmlContent: htmlContent,
+              textContent: htmlContent.replace(/<[^>]*>/g, ''),
               metadata: JSON.stringify({
                 split: false,
                 manual: true,

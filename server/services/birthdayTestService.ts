@@ -216,13 +216,11 @@ async function sendSplitBirthdayEmails(
         unsubscribeToken,
     });
 
-    const wrappedBirthdayHtml = await wrapNewsletterContent(tenantId, htmlBirthday);
-
     const birthdaySubject = `🎉 Happy Birthday ${recipientName}! (Test)`;
     const birthdayHandle = await tasks.trigger('send-email', {
         to: userEmail,
         subject: birthdaySubject,
-        html: wrappedBirthdayHtml,
+        html: htmlBirthday,
         from: process.env.EMAIL_FROM || 'admin@zendwise.com',
         headers: unsubscribeUrl ? {
             'List-Unsubscribe': `<${unsubscribeUrl}>`,
@@ -304,14 +302,12 @@ async function sendCombinedBirthdayEmail(
         unsubscribeToken,
     });
 
-    const wrappedHtmlContent = await wrapNewsletterContent(tenantId, htmlContent);
-
     const subject = `🎉 Happy Birthday ${recipientName}! (Test)`;
 
     const handle = await tasks.trigger('send-email', {
         to: userEmail,
         subject,
-        html: wrappedHtmlContent,
+        html: htmlContent,
         from: process.env.EMAIL_FROM || 'admin@zendwise.com',
         headers: unsubscribeUrl ? {
             'List-Unsubscribe': `<${unsubscribeUrl}>`,
