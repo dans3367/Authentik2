@@ -355,9 +355,17 @@ formsRoutes.get("/:id/stats", authenticateToken, requireTenant, validateUuidPara
   }
 });
 
+// ─── Rate limiter for Google Client ID endpoint ──────────────────────────────
+const googleClientIdLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ─── Google Sign-In: Serve client ID to frontend ─────────────────────────────
 // NOTE: These must be defined BEFORE /public/:id to avoid matching as a UUID param
-formsRoutes.get("/public/google-client-id", (req: any, res) => {
+formsRoutes.get("/public/google-client-id", googleClientIdLimiter, (req: any, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
     return res.json({ clientId: null });
@@ -413,7 +421,10 @@ formsRoutes.post("/public/google-signin", googleSignInLimiter, async (req: any, 
 
     // Verify audience matches our client ID
     const expectedClientId = process.env.GOOGLE_CLIENT_ID;
-    if (expectedClientId && tokenInfo.aud !== expectedClientId) {
+    if (!expectedClientId) {
+      return res.status(500).json({ message: 'Google Sign-In is not configured' });
+    }
+    if (tokenInfo.aud !== expectedClientId) {
       return res.status(401).json({ message: 'Token audience mismatch' });
     }
 
@@ -458,44 +469,46 @@ formsRoutes.post("/public/google-signin", googleSignInLimiter, async (req: any, 
       });
     }
 
-    // Create new email contact for the newsletter
-    const [newContact] = await db.insert(emailContacts).values({
-      tenantId: form.tenantId,
-      email: tokenInfo.email,
-      firstName: tokenInfo.given_name || null,
-      lastName: tokenInfo.family_name || null,
-      status: 'active',
-      consentGiven: true,
-      consentDate: new Date(),
-      consentMethod: 'google_signin',
-      consentIpAddress: clientIp,
-      consentUserAgent: userAgent,
-      prefNewsletters: true,
-      prefMarketing: true,
-    }).returning();
-
-    // Also record as a form response for tracking
-    await db.insert(formResponses).values({
-      tenantId: form.tenantId,
-      formId,
-      responseData: JSON.stringify({
+    // Create new email contact, form response, and update count in a transaction
+    const newContact = await db.transaction(async (tx: any) => {
+      const [contact] = await tx.insert(emailContacts).values({
+        tenantId: form.tenantId,
         email: tokenInfo.email,
-        firstName: tokenInfo.given_name || '',
-        lastName: tokenInfo.family_name || '',
-        source: 'google_signin',
-      }),
-      submittedAt: new Date(),
-      ipAddress: clientIp,
-      userAgent,
-    }).returning();
+        firstName: tokenInfo.given_name || null,
+        lastName: tokenInfo.family_name || null,
+        status: 'active',
+        consentGiven: true,
+        consentDate: new Date(),
+        consentMethod: 'google_signin',
+        consentIpAddress: clientIp,
+        consentUserAgent: userAgent,
+        prefNewsletters: true,
+        prefMarketing: false,
+      }).returning();
 
-    // Update form response count
-    await db.update(forms)
-      .set({
-        responseCount: sql`${forms.responseCount} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(sql`${forms.id} = ${formId}`);
+      await tx.insert(formResponses).values({
+        tenantId: form.tenantId,
+        formId,
+        responseData: JSON.stringify({
+          email: tokenInfo.email,
+          firstName: tokenInfo.given_name || '',
+          lastName: tokenInfo.family_name || '',
+          source: 'google_signin',
+        }),
+        submittedAt: new Date(),
+        ipAddress: clientIp,
+        userAgent,
+      });
+
+      await tx.update(forms)
+        .set({
+          responseCount: sql`${forms.responseCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(sql`${forms.id} = ${formId}`);
+
+      return contact;
+    });
 
     res.status(201).json({
       success: true,

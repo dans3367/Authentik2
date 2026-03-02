@@ -2,21 +2,6 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useRoute } from 'wouter';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
-// Google Identity Services types
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: any) => void;
-          renderButton: (element: HTMLElement, config: any) => void;
-          prompt: () => void;
-        };
-      };
-    };
-  }
-}
-
 // ─── Theme System ────────────────────────────────────────────────────────────
 
 interface ThemeStyles {
@@ -500,12 +485,27 @@ const PublicFormPage: React.FC = () => {
     }
   }, [formId]);
 
-  // Initialize Google Sign-In button
+  useEffect(() => {
+    if (!googleClientId || googleInitialized || !form || form.category !== 'email-signup') return;
+
+    if (!document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+  }, [googleClientId, googleInitialized, form]);
+
   useEffect(() => {
     if (!googleClientId || !googleButtonRef.current || googleInitialized || !form || form.category !== 'email-signup') return;
 
+    let retryCount = 0;
+    const maxRetries = 25;
     const initGoogle = () => {
       if (!window.google?.accounts?.id) {
+        retryCount++;
+        if (retryCount >= maxRetries) return;
         setTimeout(initGoogle, 300);
         return;
       }

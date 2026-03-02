@@ -8,48 +8,9 @@ interface GoogleSignInButtonProps {
   language?: string;
 }
 
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: any) => void;
-          renderButton: (element: HTMLElement, config: any) => void;
-          prompt: () => void;
-        };
-      };
-    };
-  }
-}
-
 interface GoogleCredentialResponse {
   credential: string;
   select_by: string;
-}
-
-interface GoogleJwtPayload {
-  email: string;
-  given_name?: string;
-  family_name?: string;
-  name?: string;
-  picture?: string;
-  email_verified?: boolean;
-}
-
-function decodeJwtPayload(token: string): GoogleJwtPayload | null {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
 }
 
 const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
@@ -64,7 +25,6 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
-  // Fetch the Google Client ID from the server config endpoint
   useEffect(() => {
     fetch('/api/forms/google-client-id')
       .then((res) => res.json())
@@ -73,17 +33,18 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
           setGoogleClientId(data.clientId);
         }
       })
-      .catch(() => {
-        // Google Sign-In not configured, button won't render
-      });
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!googleClientId || !buttonRef.current || initialized) return;
 
+    let retryCount = 0;
+    const maxRetries = 25;
     const initializeGoogle = () => {
       if (!window.google?.accounts?.id) {
-        // Retry after a short delay if the script hasn't loaded yet
+        retryCount++;
+        if (retryCount >= maxRetries) return;
         setTimeout(initializeGoogle, 200);
         return;
       }
@@ -116,7 +77,6 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   const handleCredentialResponse = async (response: GoogleCredentialResponse) => {
     setLoading(true);
     try {
-      // Verify the token server-side and submit to newsletter
       const verifyRes = await fetch('/api/forms/google-signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -133,14 +93,8 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
 
       const data = await verifyRes.json();
 
-      // Also decode client-side for immediate UI feedback
-      const payload = decodeJwtPayload(response.credential);
-      if (payload?.email) {
-        onEmailReceived(
-          data.email || payload.email,
-          data.firstName || payload.given_name,
-          data.lastName || payload.family_name
-        );
+      if (data.email) {
+        onEmailReceived(data.email, data.firstName, data.lastName);
       } else {
         throw new Error('Could not extract email from Google sign-in');
       }
@@ -151,14 +105,12 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     }
   };
 
-  // Don't render if Google Client ID is not configured
   if (!googleClientId) return null;
 
   const dividerText = language === 'es' ? 'o regístrate con Google' : 'or sign up with Google';
 
   return (
     <div className="space-y-4">
-      {/* Divider */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-gray-300"></div>
@@ -168,7 +120,6 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         </div>
       </div>
 
-      {/* Google Sign-In Button */}
       <div className="flex flex-col items-center">
         {loading ? (
           <div className="flex items-center space-x-2 py-3 px-6 border border-gray-300 rounded-md bg-gray-50">

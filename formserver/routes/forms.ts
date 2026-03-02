@@ -176,8 +176,16 @@ router.post('/:id/submit', submitLimiter, validateUuidParam, async (req, res) =>
   }
 });
 
+// ─── Rate limiter for Google Client ID endpoint ──────────────────────────────
+const googleClientIdLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ─── Google Sign-In: Serve client ID to frontend ─────────────────────────────
-router.get('/google-client-id', (req, res) => {
+router.get('/google-client-id', googleClientIdLimiter, (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
     return res.json({ clientId: null });
@@ -233,7 +241,10 @@ router.post('/google-signin', googleSignInLimiter, async (req, res) => {
 
     // Verify the audience matches our client ID
     const expectedClientId = process.env.GOOGLE_CLIENT_ID;
-    if (expectedClientId && tokenInfo.aud !== expectedClientId) {
+    if (!expectedClientId) {
+      return res.status(500).json({ error: 'Google Sign-In is not configured' });
+    }
+    if (tokenInfo.aud !== expectedClientId) {
       return res.status(401).json({ error: 'Token audience mismatch' });
     }
 
@@ -304,7 +315,7 @@ router.post('/google-signin', googleSignInLimiter, async (req, res) => {
       consentIpAddress: clientIp,
       consentUserAgent: userAgent,
       prefNewsletters: true,
-      prefMarketing: true,
+      prefMarketing: false,
     }).returning({ id: emailContacts.id });
 
     // Also record as a form response for tracking
