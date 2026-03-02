@@ -11,6 +11,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import { tasks } from '@trigger.dev/sdk/v3';
 import { renderBirthdayTemplate, sanitizeEmailHtml } from '../routes/emailManagementRoutes';
+import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 
 export interface BirthdayTestRequest {
     userEmail: string;
@@ -215,11 +216,13 @@ async function sendSplitBirthdayEmails(
         unsubscribeToken,
     });
 
+    const wrappedBirthdayHtml = await wrapNewsletterContent(tenantId, htmlBirthday);
+
     const birthdaySubject = `🎉 Happy Birthday ${recipientName}! (Test)`;
     const birthdayHandle = await tasks.trigger('send-email', {
         to: userEmail,
         subject: birthdaySubject,
-        html: htmlBirthday,
+        html: wrappedBirthdayHtml,
         from: process.env.EMAIL_FROM || 'admin@zendwise.com',
         headers: unsubscribeUrl ? {
             'List-Unsubscribe': `<${unsubscribeUrl}>`,
@@ -245,10 +248,12 @@ async function sendSplitBirthdayEmails(
     const promoSubject = sanitizeEmailHtml(promotion?.title || 'Special Birthday Offer! (Test)');
     const htmlPromo = buildPromotionalEmailHtml(safePromoTitle, safePromoDescription, safePromoContent, unsubscribeUrl);
 
+    const wrappedPromoHtml = await wrapNewsletterContent(tenantId, htmlPromo);
+
     const promoHandle = await tasks.trigger('send-email', {
         to: userEmail,
         subject: `${promoSubject}`,
-        html: htmlPromo,
+        html: wrappedPromoHtml,
         from: process.env.EMAIL_FROM || 'admin@zendwise.com',
         headers: unsubscribeUrl ? {
             'List-Unsubscribe': `<${unsubscribeUrl}>`,
@@ -299,12 +304,14 @@ async function sendCombinedBirthdayEmail(
         unsubscribeToken,
     });
 
+    const wrappedHtmlContent = await wrapNewsletterContent(tenantId, htmlContent);
+
     const subject = `🎉 Happy Birthday ${recipientName}! (Test)`;
 
     const handle = await tasks.trigger('send-email', {
         to: userEmail,
         subject,
-        html: htmlContent,
+        html: wrappedHtmlContent,
         from: process.env.EMAIL_FROM || 'admin@zendwise.com',
         headers: unsubscribeUrl ? {
             'List-Unsubscribe': `<${unsubscribeUrl}>`,

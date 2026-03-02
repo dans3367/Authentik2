@@ -4,6 +4,7 @@ import { emailActivity, emailSends, emailContent, emailContacts, masterEmailDesi
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
 import crypto from 'crypto';
 import { sql, eq, and, or, ne } from 'drizzle-orm';
+import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 
 const router = Router();
 
@@ -84,6 +85,9 @@ router.post(
         }
       }
 
+      // Wrap promotional HTML in master email design
+      const wrappedHtmlPromo = await wrapNewsletterContent(tenantId, htmlPromo);
+
       // Import email service
       const { enhancedEmailService } = await import('../emailService');
 
@@ -91,7 +95,7 @@ router.post(
       const promoResult = await enhancedEmailService.sendCustomEmail(
         recipientEmail,
         `🎁 ${promoSubject}`,
-        htmlPromo,
+        wrappedHtmlPromo,
         {
           text: htmlPromo.replace(/<[^>]*>/g, ''),
           from: 'admin@zendwise.com',
@@ -160,7 +164,7 @@ router.post(
           // Log email content
           await db.insert(emailContent).values({
             emailSendId,
-            htmlContent: htmlPromo,
+            htmlContent: wrappedHtmlPromo,
             textContent: htmlPromo.replace(/<[^>]*>/g, ''),
           });
         } catch (logError) {
@@ -224,7 +228,7 @@ router.post(
         // Log email content
         await db.insert(emailContent).values({
           emailSendId,
-          htmlContent: htmlPromo,
+          htmlContent: wrappedHtmlPromo,
           textContent: htmlPromo.replace(/<[^>]*>/g, ''),
         });
       } catch (logError) {

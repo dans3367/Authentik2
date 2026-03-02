@@ -4,6 +4,7 @@ import { emailContacts, birthdaySettings, promotions } from '@shared/schema';
 import { eq, and, sql, isNotNull } from 'drizzle-orm';
 import { enhancedEmailService } from '../emailService';
 import { sanitizeEmailHtml } from '../routes/emailManagementRoutes';
+import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 
 export interface BirthdayJob {
   id: string;
@@ -330,12 +331,15 @@ export class BirthdayWorker extends EventEmitter {
         unsubscribeToken,
       });
 
+      // Wrap in global email design
+      const wrappedHtmlContent = await wrapNewsletterContent(job.tenantId, htmlContent);
+
       // Send the birthday email
       const result = await enhancedEmailService.send({
         to: job.contactEmail,
         from: 'admin@zendwise.com', // You might want to make this configurable
         subject: `🎉 Happy Birthday ${recipientName}!`,
-        html: htmlContent,
+        html: wrappedHtmlContent,
         text: htmlContent.replace(/<[^>]*>/g, ''), // Strip HTML for text version
         tags: ['birthday', 'automated', `tenant-${job.tenantId}`],
         metadata: {
