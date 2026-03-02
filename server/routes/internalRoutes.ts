@@ -85,7 +85,6 @@ router.post(
         }
       }
 
-      // Wrap promotional HTML in master email design
       const wrappedHtmlPromo = await wrapNewsletterContent(tenantId, htmlPromo);
 
       // Import email service
@@ -97,7 +96,7 @@ router.post(
         `🎁 ${promoSubject}`,
         wrappedHtmlPromo,
         {
-          text: htmlPromo.replace(/<[^>]*>/g, ''),
+          text: wrappedHtmlPromo.replace(/<[^>]*>/g, ''),
           from: 'admin@zendwise.com',
           metadata: {
             type: 'birthday-promotion',
@@ -165,7 +164,7 @@ router.post(
           await db.insert(emailContent).values({
             emailSendId,
             htmlContent: wrappedHtmlPromo,
-            textContent: htmlPromo.replace(/<[^>]*>/g, ''),
+            textContent: wrappedHtmlPromo.replace(/<[^>]*>/g, ''),
           });
         } catch (logError) {
           console.error(`⚠️ [Internal API] Failed to log to email_sends table:`, logError);
@@ -229,7 +228,7 @@ router.post(
         await db.insert(emailContent).values({
           emailSendId,
           htmlContent: wrappedHtmlPromo,
-          textContent: htmlPromo.replace(/<[^>]*>/g, ''),
+          textContent: wrappedHtmlPromo.replace(/<[^>]*>/g, ''),
         });
       } catch (logError) {
         console.error(`⚠️ [Internal API] Failed to log to email_sends table:`, logError);

@@ -15,7 +15,7 @@ import { logActivity, computeChanges, allowedActivityTypes } from '../utils/acti
 import xss from 'xss';
 import { emailAttachmentUpload, validateAttachmentSize, filesToBase64Attachments, handleEmailAttachmentError } from '../middleware/emailAttachmentUpload';
 import { fromZonedTime } from 'date-fns-tz';
-import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
+import { wrapNewsletterContent, fetchNewsletterDesign, buildNewsletterEmailHtml } from '../utils/newsletterEmailWrapper';
 
 // Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers
 export function sanitizeEmailHtml(html: string): string {
@@ -266,7 +266,6 @@ async function enqueuePromotionalEmailJob(
 async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Promise<void> {
   const { enhancedEmailService } = await import('../emailService');
 
-  // Wrap promotional HTML in master email design
   const wrappedHtmlPromo = await wrapNewsletterContent(payload.tenantId, payload.htmlPromo);
 
   const promoResult = await enhancedEmailService.sendCustomEmail(
@@ -274,7 +273,7 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
     `🎁 ${payload.promoSubject}`,
     wrappedHtmlPromo,
     {
-      text: payload.htmlPromo.replace(/<[^>]*>/g, ''),
+      text: wrappedHtmlPromo.replace(/<[^>]*>/g, ''),
       from: 'admin@zendwise.com',
       metadata: {
         type: 'birthday-promotion',
@@ -400,7 +399,7 @@ async function sendPromotionalEmailJob(payload: PromotionalEmailJobPayload): Pro
     await db.insert(emailContent).values({
       emailSendId: emailSendId,
       htmlContent: wrappedHtmlPromo,
-      textContent: payload.htmlPromo.replace(/<[^>]*>/g, ''),
+      textContent: wrappedHtmlPromo.replace(/<[^>]*>/g, ''),
       metadata: JSON.stringify({
         split: true,
         manual: !!payload.manual,
@@ -3928,7 +3927,11 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
     // Import email service
     const { enhancedEmailService } = await import('../emailService');
 
-    // Send birthday cards to each contact
+    const cachedDesign = await fetchNewsletterDesign(tenantId).catch((err) => {
+      console.error(`⚠️ [ManualBirthdayCard] Failed to fetch newsletter design for tenant ${tenantId}, emails will be sent unwrapped:`, err);
+      return null;
+    });
+
     const skippedOptOut: string[] = [];
     const skippedSuppressed: string[] = [];
     for (const contact of contacts) {
@@ -4007,8 +4010,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             unsubscribeToken,
           });
 
-          // Wrap birthday HTML in master email design
-          const wrappedBirthdayHtml = await wrapNewsletterContent(tenantId, htmlBirthday);
+          const wrappedBirthdayHtml = cachedDesign ? buildNewsletterEmailHtml(cachedDesign, htmlBirthday) : htmlBirthday;
 
           // Build unsubscribe URL for List-Unsubscribe header
           const bdayUnsubUrl = unsubscribeToken
@@ -4020,7 +4022,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             `🎉 Happy Birthday ${recipientName}!`,
             wrappedBirthdayHtml,
             {
-              text: htmlBirthday.replace(/<[^>]*>/g, ''),
+              text: wrappedBirthdayHtml.replace(/<[^>]*>/g, ''),
               from: 'admin@zendwise.com',
               headers: bdayUnsubUrl ? {
                 'List-Unsubscribe': `<${bdayUnsubUrl}>`,
@@ -4077,7 +4079,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
               htmlContent: wrappedBirthdayHtml,
-              textContent: htmlBirthday.replace(/<[^>]*>/g, ''),
+              textContent: wrappedBirthdayHtml.replace(/<[^>]*>/g, ''),
               metadata: JSON.stringify({
                 split: true,
                 manual: true,
@@ -4172,8 +4174,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           unsubscribeToken,
         });
 
-        // Wrap birthday HTML in master email design
-        const wrappedHtmlContent = await wrapNewsletterContent(tenantId, htmlContent);
+        const wrappedHtmlContent = cachedDesign ? buildNewsletterEmailHtml(cachedDesign, htmlContent) : htmlContent;
 
         // Build unsubscribe URL for List-Unsubscribe header
         const combinedUnsubUrl = unsubscribeToken
@@ -4186,7 +4187,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
           `🎉 Happy Birthday ${recipientName}!`,
           wrappedHtmlContent,
           {
-            text: htmlContent.replace(/<[^>]*>/g, ''),
+            text: wrappedHtmlContent.replace(/<[^>]*>/g, ''),
             from: 'admin@zendwise.com',
             headers: combinedUnsubUrl ? {
               'List-Unsubscribe': `<${combinedUnsubUrl}>`,
@@ -4244,7 +4245,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
               htmlContent: wrappedHtmlContent,
-              textContent: htmlContent.replace(/<[^>]*>/g, ''),
+              textContent: wrappedHtmlContent.replace(/<[^>]*>/g, ''),
               metadata: JSON.stringify({
                 split: false,
                 manual: true,
@@ -4305,7 +4306,7 @@ emailManagementRoutes.post("/email-contacts/send-birthday-card", authenticateTok
             await db.insert(emailContent).values({
               emailSendId: emailSendId,
               htmlContent: wrappedHtmlContent,
-              textContent: htmlContent.replace(/<[^>]*>/g, ''),
+              textContent: wrappedHtmlContent.replace(/<[^>]*>/g, ''),
               metadata: JSON.stringify({
                 split: false,
                 manual: true,
@@ -4444,8 +4445,9 @@ export function renderBirthdayTemplate(
     const fromMessage = params.senderName || 'The Team';
 
     // Header image section
-    const headerImageSection = customData.imageUrl
-      ? `<div style="height: 200px; background-image: url('${customData.imageUrl}'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;"></div>`
+    const isValidImageUrl = customData.imageUrl && (() => { try { const u = new URL(customData.imageUrl); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; } })();
+    const headerImageSection = isValidImageUrl
+      ? `<div style="height: 200px; background-image: url('${sanitizeEmailHtml(customData.imageUrl)}'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;"></div>`
       : `<div style="background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%); height: 200px; border-radius: 12px 12px 0 0;"></div>`;
 
     // Build promotion section if promotion content exists

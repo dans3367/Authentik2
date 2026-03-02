@@ -129,7 +129,17 @@ export async function fetchNewsletterDesign(tenantId: string): Promise<Newslette
  *  - src/trigger/emailWrapper.ts                (Trigger.dev wrapper)
  *  - the inline template in emailManagementRoutes.ts
  */
+function stripOuterHtmlWrapper(html: string): string {
+  let content = html.trim();
+  content = content.replace(/^<!DOCTYPE\s+html[^>]*>/i, '').trim();
+  content = content.replace(/^<html[^>]*>/i, '').replace(/<\/html\s*>$/i, '').trim();
+  content = content.replace(/^<head[^>]*>[\s\S]*?<\/head\s*>/i, '').trim();
+  content = content.replace(/^<body[^>]*>/i, '').replace(/<\/body\s*>$/i, '').trim();
+  return content;
+}
+
 export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: string): string {
+  bodyContent = stripOuterHtmlWrapper(bodyContent);
   const fontFamily = design.fontFamily;
   const primaryColor = design.primaryColor;
   const safeCompanyName = escapeHtml(design.displayCompanyName || '');
@@ -225,6 +235,11 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
  * Convenience: fetch design + wrap content in one call.
  */
 export async function wrapNewsletterContent(tenantId: string, bodyContent: string): Promise<string> {
-  const design = await fetchNewsletterDesign(tenantId);
-  return buildNewsletterEmailHtml(design, bodyContent);
+  try {
+    const design = await fetchNewsletterDesign(tenantId);
+    return buildNewsletterEmailHtml(design, bodyContent);
+  } catch (err) {
+    console.error(`⚠️ [wrapNewsletterContent] Failed to wrap email in master design for tenant ${tenantId}, sending unwrapped:`, err);
+    return bodyContent;
+  }
 }

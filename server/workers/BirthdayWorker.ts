@@ -340,7 +340,7 @@ export class BirthdayWorker extends EventEmitter {
         from: 'admin@zendwise.com', // You might want to make this configurable
         subject: `🎉 Happy Birthday ${recipientName}!`,
         html: wrappedHtmlContent,
-        text: htmlContent.replace(/<[^>]*>/g, ''), // Strip HTML for text version
+        text: wrappedHtmlContent.replace(/<[^>]*>/g, ''),
         tags: ['birthday', 'automated', `tenant-${job.tenantId}`],
         metadata: {
           type: 'birthday-card',
