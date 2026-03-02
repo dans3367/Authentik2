@@ -99,6 +99,8 @@ export function AppointmentDetailsSheet({
   const pendingReminders = appointmentReminders.filter(r => r.status === 'pending');
   const hasSentReminder = sentReminders.length > 0 || appointment.reminderSent;
   const isPastAppointment = isPast(new Date(appointment.appointmentDate));
+  const getReminderTypeLabel = (reminderType: string) =>
+    reminderType === 'email' ? 'Reminder Sent (Email)' : reminderType;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -342,7 +344,7 @@ export function AppointmentDetailsSheet({
                           {sentReminders.length > 0 ? (
                             sentReminders.map((reminder) => (
                               <div key={reminder.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span className="capitalize">{reminder.reminderType} • {reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
+                                <span>{getReminderTypeLabel(reminder.reminderType)} • {reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
                                 {reminder.sentAt && (
                                   <span>{formatDateTime(new Date(reminder.sentAt))}</span>
                                 )}
@@ -365,7 +367,7 @@ export function AppointmentDetailsSheet({
                         {pendingReminders.map((reminder) => (
                           <div key={reminder.id} className="flex items-center justify-between py-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs capitalize text-foreground">{reminder.reminderType}</span>
+                              <span className="text-xs text-foreground">{getReminderTypeLabel(reminder.reminderType)}</span>
                               <span className="text-xs text-muted-foreground">• {reminder.reminderTiming === 'custom' ? `${reminder.customMinutesBefore}m before` : reminder.reminderTiming}</span>
                             </div>
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
