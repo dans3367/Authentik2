@@ -219,7 +219,7 @@ export function UpcomingAppointmentsCard() {
             </div>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
             {upcomingAppointments.map((appointment) => {
               const statusConfig = getStatusConfig(appointment.status);
               const dayLabel = getDayLabel(appointment.appointmentDate);
