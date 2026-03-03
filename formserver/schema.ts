@@ -78,6 +78,16 @@ export const promotions = pgTable("promotions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Unsubscribe tokens table (for generating unsubscribe links in promotion emails)
+export const unsubscribeTokens = pgTable("unsubscribe_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  contactId: varchar("contact_id").notNull(),
+  token: text("token").notNull().unique(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Master email design settings (read-only, for wrapping promotion emails)
 export const masterEmailDesign = pgTable("master_email_design", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

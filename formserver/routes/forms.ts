@@ -1,8 +1,9 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { db } from '../database.js';
-import { forms, formResponses, emailContacts, promotions, masterEmailDesign, companies } from '../schema.js';
-import { eq, and, sql } from 'drizzle-orm';
+import { forms, formResponses, emailContacts, promotions, masterEmailDesign, companies, unsubscribeTokens } from '../schema.js';
+import { eq, and, sql, isNull } from 'drizzle-orm';
 import { z } from 'zod';
+import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
@@ -162,9 +163,54 @@ async function sendPromotionEmailIfEnabled(formRecord: { id: string; tenantId: s
     }
 
     // Wrap promotion content in the tenant's branded email design
-    const wrappedContent = await wrapInEmailDesign(formRecord.tenantId, promotion.content);
+    let wrappedContent = await wrapInEmailDesign(formRecord.tenantId, promotion.content);
+
+    // Generate unsubscribe token for the contact
+    let unsubscribeUrl: string | undefined;
+    try {
+      const contactRows = await db.select({ id: emailContacts.id })
+        .from(emailContacts)
+        .where(and(eq(emailContacts.tenantId, formRecord.tenantId), eq(emailContacts.email, recipientEmail)))
+        .limit(1);
+      if (contactRows.length > 0) {
+        const contactId = contactRows[0].id;
+        let tokenRows = await db.select({ token: unsubscribeTokens.token })
+          .from(unsubscribeTokens)
+          .where(and(
+            eq(unsubscribeTokens.tenantId, formRecord.tenantId),
+            eq(unsubscribeTokens.contactId, contactId),
+            isNull(unsubscribeTokens.usedAt)
+          ))
+          .limit(1);
+        if (tokenRows.length === 0) {
+          const token = crypto.randomBytes(24).toString('base64url');
+          tokenRows = await db.insert(unsubscribeTokens).values({
+            tenantId: formRecord.tenantId,
+            contactId,
+            token,
+          }).returning({ token: unsubscribeTokens.token });
+        }
+        if (tokenRows[0]?.token) {
+          const baseUrl = process.env.APP_URL || 'http://localhost:5002';
+          unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(tokenRows[0].token)}&type=marketing`;
+          const unsubscribeBlock = `<div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+            <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+              Don't want to receive these emails? <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+            </p>
+          </div>`;
+          wrappedContent = wrappedContent.replace(/(<\/div>\s*<\/body>)/i, `${unsubscribeBlock}$1`);
+        }
+      }
+    } catch (tokenErr) {
+      console.warn('[Promotion] Failed to generate unsubscribe token:', tokenErr);
+    }
 
     // Send via Resend HTTP API
+    const emailHeaders: Record<string, string> = {};
+    if (unsubscribeUrl) {
+      emailHeaders['List-Unsubscribe'] = `<${unsubscribeUrl}>`;
+      emailHeaders['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+    }
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -176,6 +222,7 @@ async function sendPromotionEmailIfEnabled(formRecord: { id: string; tenantId: s
         to: [recipientEmail],
         subject: promotion.title,
         html: wrappedContent,
+        ...(Object.keys(emailHeaders).length > 0 && { headers: emailHeaders }),
       }),
     });
 
