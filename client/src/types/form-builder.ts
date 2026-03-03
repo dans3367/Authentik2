@@ -153,6 +153,8 @@ export interface WizardState {
       showFormTitle?: boolean;
       compactMode?: boolean;
       language?: string;
+      promotionEnabled?: boolean;
+      promotionId?: string;
     };
   };
   selectedTheme: FormTheme | null;

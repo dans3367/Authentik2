@@ -54,11 +54,15 @@ interface PreviewStepProps {
   selectedTheme: FormTheme | null;
   formSettings?: {
     description?: string;
+    submitButtonText?: string;
+    resetButtonText?: string;
     showProgressBar?: boolean;
     allowSaveProgress?: boolean;
     showFormTitle?: boolean;
     compactMode?: boolean;
-    language?: FormLanguage;
+    language?: string;
+    promotionEnabled?: boolean;
+    promotionId?: string;
   };
   formCategory?: FormCategory;
   onSave: () => void;

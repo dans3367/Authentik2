@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Trash2, X, Plus, ChevronDown, ClipboardList, FileQuestion, Mail } from 'lucide-react';
+import { Trash2, X, Plus, ChevronDown, ClipboardList, FileQuestion, Mail, Megaphone, Loader2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { FormCategory } from '@/types/form-builder';
 import { apiRequest } from '@/lib/queryClient';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -24,6 +25,8 @@ interface FormPropertiesProps {
     showFormTitle?: boolean;
     compactMode?: boolean;
     language?: FormLanguage;
+    promotionEnabled?: boolean;
+    promotionId?: string;
   };
   elements?: any[];
   tags?: string[];
@@ -53,6 +56,8 @@ export function FormProperties({
   const [isLoadingTags, setIsLoadingTags] = useState(false);
   const [isWarningOpen, setIsWarningOpen] = useState(false);
   const [pendingCategory, setPendingCategory] = useState<FormCategory | null>(null);
+  const [availablePromotions, setAvailablePromotions] = useState<Array<{id: string, title: string, type: string, isActive: boolean}>>([]);
+  const [isLoadingPromotions, setIsLoadingPromotions] = useState(false);
   
   const {
     description = '',
@@ -61,6 +66,8 @@ export function FormProperties({
     showFormTitle = true,
     compactMode = false,
     language = 'en' as FormLanguage,
+    promotionEnabled = false,
+    promotionId = '',
   } = settings;
 
   const handleSettingChange = (key: string, value: any) => {
@@ -72,9 +79,10 @@ export function FormProperties({
     }
   };
 
-  // Fetch available tags on component mount
+  // Fetch available tags and promotions on component mount
   useEffect(() => {
     fetchAvailableTags();
+    fetchAvailablePromotions();
   }, []);
 
   const fetchAvailableTags = async () => {
@@ -87,6 +95,24 @@ export function FormProperties({
       console.error('Failed to fetch tags:', error);
     } finally {
       setIsLoadingTags(false);
+    }
+  };
+
+  const fetchAvailablePromotions = async () => {
+    try {
+      setIsLoadingPromotions(true);
+      const response = await apiRequest('GET', '/api/promotions?isActive=true');
+      const data = await response.json();
+      setAvailablePromotions((data.promotions || []).map((p: any) => ({
+        id: p.id,
+        title: p.title,
+        type: p.type,
+        isActive: p.isActive,
+      })));
+    } catch (error) {
+      console.error('Failed to fetch promotions:', error);
+    } finally {
+      setIsLoadingPromotions(false);
     }
   };
 
@@ -340,6 +366,68 @@ placeholder={t('formBuilder.properties.formDescriptionPlaceholder','Add a descri
             </div>
 
 
+
+            {/* Promotion Section - Only for email-signup */}
+            {category === 'email-signup' && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-neutral-700">
+                  {t('formBuilder.properties.promotionSection', 'Promotion')}
+                </h4>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Megaphone className="w-4 h-4 text-emerald-600" />
+                    <Label htmlFor="enable-promotion" className="text-xs text-neutral-600">
+                      {t('formBuilder.properties.enablePromotion', 'Enable Promotion')}
+                    </Label>
+                  </div>
+                  <Switch
+                    id="enable-promotion"
+                    checked={promotionEnabled}
+                    onCheckedChange={(checked) => {
+                      handleSettingChange('promotionEnabled', checked);
+                      if (!checked) {
+                        handleSettingChange('promotionId', '');
+                      }
+                    }}
+                  />
+                </div>
+                {promotionEnabled && (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-neutral-600">
+                      {t('formBuilder.properties.selectPromotion', 'Select Promotion Template')}
+                    </Label>
+                    {isLoadingPromotions ? (
+                      <div className="flex items-center gap-2 text-xs text-neutral-400 py-2">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        {t('formBuilder.properties.loadingPromotions', 'Loading promotions...')}
+                      </div>
+                    ) : availablePromotions.length === 0 ? (
+                      <p className="text-xs text-neutral-400 py-1">
+                        {t('formBuilder.properties.noPromotions', 'No active promotions available. Create one in the Promotions page.')}
+                      </p>
+                    ) : (
+                      <select
+                        value={promotionId}
+                        onChange={(e) => handleSettingChange('promotionId', e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-md bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-colors"
+                      >
+                        <option value="">
+                          {t('formBuilder.properties.selectPromotionPlaceholder', '-- Select a promotion --')}
+                        </option>
+                        {availablePromotions.map((promo) => (
+                          <option key={promo.id} value={promo.id}>
+                            {promo.title} ({promo.type})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <p className="text-[10px] text-neutral-400">
+                      {t('formBuilder.properties.promotionHint', 'The selected promotion will be sent to the user\'s email upon successful signup.')}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Form Options */}
             <div className="space-y-3">

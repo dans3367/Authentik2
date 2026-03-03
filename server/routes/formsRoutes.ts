@@ -1,13 +1,69 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { sql, eq } from 'drizzle-orm';
-import { forms, formResponses, masterEmailDesign, companies, emailContacts } from '@shared/schema';
+import { forms, formResponses, masterEmailDesign, companies, emailContacts, promotions } from '@shared/schema';
+import { EmailService } from '../emailService';
 import { authenticateToken, requireRole, requireTenant } from '../middleware/auth-middleware';
 import { sanitizeString } from '../utils/sanitization';
+import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 
 export const formsRoutes = Router();
+
+const emailService = new EmailService();
+
+// ─── Helper: Send promotion email after successful email signup ──────────────
+async function sendPromotionEmailIfEnabled(form: any, recipientEmail: string, firstName?: string | null) {
+  try {
+    // Parse form data to check for promotion settings
+    let formData: any;
+    try {
+      formData = typeof form.formData === 'string' ? JSON.parse(form.formData) : form.formData;
+    } catch {
+      return; // Can't parse form data, skip
+    }
+
+    const settings = formData?.settings;
+    if (!settings?.promotionEnabled || !settings?.promotionId) {
+      return; // Promotion not enabled or no promotion selected
+    }
+
+    // Fetch the promotion
+    const promotion = await db.query.promotions.findFirst({
+      where: sql`${promotions.id} = ${settings.promotionId} AND ${promotions.tenantId} = ${form.tenantId} AND ${promotions.isActive} = true`,
+    });
+
+    if (!promotion) {
+      console.warn(`[Promotion] Promotion ${settings.promotionId} not found or inactive for form ${form.id}`);
+      return;
+    }
+
+    // Wrap promotion content in the tenant's branded email design
+    const wrappedContent = await wrapNewsletterContent(form.tenantId, promotion.content);
+
+    // Send the promotion email
+    await emailService.sendCustomEmail(
+      recipientEmail,
+      promotion.title,
+      wrappedContent,
+      { text: promotion.description || undefined }
+    );
+
+    // Increment promotion usage count
+    await db.update(promotions)
+      .set({
+        usageCount: sql`${promotions.usageCount} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(sql`${promotions.id} = ${promotion.id}`);
+
+    console.log(`[Promotion] Sent promotion "${promotion.title}" to ${recipientEmail} for form ${form.id}`);
+  } catch (error) {
+    // Non-critical: log but don't fail the signup
+    console.error('[Promotion] Failed to send promotion email:', error);
+  }
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -510,6 +566,9 @@ formsRoutes.post("/public/google-signin", googleSignInLimiter, async (req: any, 
       return contact;
     });
 
+    // Send promotion email if enabled for this form (non-blocking)
+    sendPromotionEmailIfEnabled(form, tokenInfo.email, tokenInfo.given_name);
+
     res.status(201).json({
       success: true,
       email: tokenInfo.email,
@@ -645,6 +704,24 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
         updatedAt: new Date()
       })
       .where(sql`${forms.id} = ${id}`);
+
+    // Send promotion email if enabled for this email-signup form (non-blocking, new emails only)
+    if (form.category === 'email-signup') {
+      // Extract email from submission data
+      const submittedData = typeof data === 'object' ? data : {};
+      const submittedEmail = Object.values(submittedData).find(
+        (val) => typeof val === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+      ) as string | undefined;
+      if (submittedEmail) {
+        // Only send promotion if this email doesn't already exist in contacts
+        const existingEmail = await db.query.emailContacts.findFirst({
+          where: sql`${emailContacts.tenantId} = ${form.tenantId} AND ${emailContacts.email} = ${submittedEmail}`,
+        });
+        if (!existingEmail) {
+          sendPromotionEmailIfEnabled(form, submittedEmail);
+        }
+      }
+    }
 
     res.status(201).json({
       message: 'Form submitted successfully',

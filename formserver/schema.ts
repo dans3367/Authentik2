@@ -57,6 +57,59 @@ export const emailContacts = pgTable("email_contacts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Promotions table for managing promotional content templates
+export const promotions = pgTable("promotions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  content: text("content").notNull(), // HTML content of the promotion
+  type: text("type").notNull().default('newsletter'),
+  targetAudience: text("target_audience").notNull().default('all'),
+  isActive: boolean("is_active").default(true),
+  usageCount: integer("usage_count").default(0),
+  maxUses: integer("max_uses"),
+  validFrom: timestamp("valid_from"),
+  validTo: timestamp("valid_to"),
+  promotionalCodes: text("promotional_codes"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Master email design settings (read-only, for wrapping promotion emails)
+export const masterEmailDesign = pgTable("master_email_design", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().unique(),
+  companyName: text("company_name").default(''),
+  headerMode: text("header_mode").default('logo'),
+  logoUrl: text("logo_url"),
+  logoSize: text("logo_size").default('medium'),
+  logoAlignment: text("logo_alignment").default('center'),
+  bannerUrl: text("banner_url"),
+  showCompanyName: text("show_company_name").default('true'),
+  primaryColor: text("primary_color").default('#3B82F6'),
+  secondaryColor: text("secondary_color").default('#1E40AF'),
+  accentColor: text("accent_color").default('#10B981'),
+  fontFamily: text("font_family").default('Arial, sans-serif'),
+  headerText: text("header_text"),
+  footerText: text("footer_text"),
+  socialLinks: text("social_links"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Companies table (read-only, for fallback company name in email wrapper)
+export const companies = pgTable("companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Email events table for tracking email lifecycle events from Resend webhooks
 export const emailEvents = pgTable("email_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

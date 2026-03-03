@@ -1,11 +1,203 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { db } from '../database.js';
-import { forms, formResponses, emailContacts } from '../schema.js';
+import { forms, formResponses, emailContacts, promotions, masterEmailDesign, companies } from '../schema.js';
 import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
+
+// ─── Email Design Wrapper ────────────────────────────────────────────────────
+
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return c;
+    }
+  });
+}
+
+function isValidHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch { return false; }
+}
+
+async function wrapInEmailDesign(tenantId: string, bodyContent: string): Promise<string> {
+  try {
+    // Fetch the tenant's email design
+    const design = await db.select()
+      .from(masterEmailDesign)
+      .where(eq(masterEmailDesign.tenantId, tenantId))
+      .limit(1);
+
+    // Fetch company name as fallback
+    const company = await db.select({ name: companies.name })
+      .from(companies)
+      .where(and(eq(companies.tenantId, tenantId), eq(companies.isActive, true)))
+      .limit(1);
+
+    const companyName = design[0]?.companyName || company[0]?.name || '';
+    const d = design[0];
+    const primaryColor = d?.primaryColor || '#3B82F6';
+    const fontFamily = d?.fontFamily || 'Arial, sans-serif';
+    const headerMode = d?.headerMode || 'logo';
+    const logoUrl = d?.logoUrl || null;
+    const logoSize = d?.logoSize || 'medium';
+    const logoAlignment = d?.logoAlignment || 'center';
+    const bannerUrl = d?.bannerUrl || null;
+    const showCompanyName = (d?.showCompanyName ?? 'true') === 'true';
+    const headerText = d?.headerText || null;
+    const footerText = d?.footerText || (companyName ? `&copy; ${new Date().getFullYear()} ${escapeHtml(companyName)}. All rights reserved.` : '');
+
+    // Social links
+    let socialLinksHtml = '';
+    if (d?.socialLinks) {
+      try {
+        const parsed = JSON.parse(d.socialLinks);
+        const linkStyle = "color: #64748b; text-decoration: none; margin: 0 10px; font-weight: 500;";
+        const links: string[] = [];
+        if (parsed.facebook && isValidHttpUrl(parsed.facebook)) links.push(`<a href="${escapeHtml(parsed.facebook)}" style="${linkStyle}">Facebook</a>`);
+        if (parsed.twitter && isValidHttpUrl(parsed.twitter)) links.push(`<a href="${escapeHtml(parsed.twitter)}" style="${linkStyle}">Twitter</a>`);
+        if (parsed.instagram && isValidHttpUrl(parsed.instagram)) links.push(`<a href="${escapeHtml(parsed.instagram)}" style="${linkStyle}">Instagram</a>`);
+        if (parsed.linkedin && isValidHttpUrl(parsed.linkedin)) links.push(`<a href="${escapeHtml(parsed.linkedin)}" style="${linkStyle}">LinkedIn</a>`);
+        if (links.length > 0) socialLinksHtml = `<div style="margin-bottom: 24px;">${links.join(' | ')}</div>`;
+      } catch { /* ignore */ }
+    }
+
+    const safeCompanyName = escapeHtml(companyName);
+    const safeHeaderText = headerText ? escapeHtml(headerText) : null;
+    const useBanner = headerMode === 'banner' && bannerUrl && isValidHttpUrl(bannerUrl);
+
+    // Logo
+    const logoSizeMap: Record<string, string> = { small: '64px', medium: '96px', large: '128px', xlarge: '160px' };
+    const logoHeight = logoSizeMap[logoSize] || '96px';
+    const logoML = logoAlignment === 'center' ? 'auto' : logoAlignment === 'right' ? 'auto' : '0';
+    const logoMR = logoAlignment === 'center' ? 'auto' : logoAlignment === 'right' ? '0' : 'auto';
+    const logoSection = logoUrl && isValidHttpUrl(logoUrl)
+      ? `<img src="${escapeHtml(logoUrl)}" alt="${safeCompanyName}" style="display: block; height: ${logoHeight}; width: auto; margin: 0 ${logoMR} 20px ${logoML}; object-fit: contain;" />`
+      : (safeCompanyName && showCompanyName)
+        ? `<div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 ${logoMR} 16px ${logoML}; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">${escapeHtml(companyName.charAt(0))}</div>`
+        : '';
+
+    return `<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+  <body style="font-family: ${fontFamily}; margin: 0; padding: 0; background-color: #f7fafc; -webkit-font-smoothing: antialiased;">
+    <div style="max-width: 600px; margin: 0 auto; background: white;">
+      ${useBanner ? `
+      <img src="${escapeHtml(bannerUrl!)}" alt="${safeCompanyName}" style="display: block; width: 100%; height: auto; border: 0;" />
+      ${(safeCompanyName && showCompanyName) || safeHeaderText ? `
+      <div style="padding: 16px 24px; text-align: center; background-color: ${primaryColor}; color: #ffffff;">
+        ${safeCompanyName && showCompanyName ? `<h1 style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; color: #ffffff;">${safeCompanyName}</h1>` : ''}
+        ${safeHeaderText ? `<p style="margin: 0 auto; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">${safeHeaderText}</p>` : ''}
+      </div>` : ''}
+      ` : `
+      <div style="padding: 40px 24px; text-align: ${logoAlignment}; background-color: ${primaryColor}; color: #ffffff;">
+        ${logoSection}
+        ${safeCompanyName && showCompanyName ? `<h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; color: #ffffff;">${safeCompanyName}</h1>` : ''}
+        ${safeHeaderText ? `<p style="margin: 0 ${logoMR} 0 ${logoML}; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">${safeHeaderText}</p>` : ''}
+      </div>
+      `}
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+        <tr><td style="padding: 0; font-size: 16px; line-height: 1.625; color: #334155;">${bodyContent}</td></tr>
+      </table>
+      <div style="background-color: #f8fafc; padding: 32px; text-align: center; border-top: 1px solid #e2e8f0; color: #64748b;">
+        ${socialLinksHtml}
+        ${footerText ? `<p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${footerText}</p>` : ''}
+        ${safeCompanyName && showCompanyName ? `<div style="font-size: 12px; color: #94a3b8;"><p style="margin: 0;">Sent via ${safeCompanyName}</p></div>` : ''}
+      </div>
+    </div>
+  </body>
+</html>`;
+  } catch (err) {
+    console.error('[Promotion] Failed to wrap email in design:', err);
+    return bodyContent; // Fallback: send unwrapped
+  }
+}
+
+// ─── Helper: Send promotion email after successful email signup ──────────────
+async function sendPromotionEmailIfEnabled(formRecord: { id: string; tenantId: string; formData: string }, recipientEmail: string, firstName?: string | null) {
+  try {
+    let formData: any;
+    try {
+      formData = typeof formRecord.formData === 'string' ? JSON.parse(formRecord.formData) : formRecord.formData;
+    } catch {
+      return;
+    }
+
+    const settings = formData?.settings;
+    if (!settings?.promotionEnabled || !settings?.promotionId) {
+      return;
+    }
+
+    // Fetch the promotion
+    const promo = await db.select()
+      .from(promotions)
+      .where(and(
+        eq(promotions.id, settings.promotionId),
+        eq(promotions.tenantId, formRecord.tenantId),
+        eq(promotions.isActive, true)
+      ))
+      .limit(1);
+
+    if (promo.length === 0) {
+      console.warn(`[Promotion] Promotion ${settings.promotionId} not found or inactive for form ${formRecord.id}`);
+      return;
+    }
+
+    const promotion = promo[0];
+    const resendApiKey = process.env.RESEND_API_KEY;
+    const fromEmail = process.env.FROM_EMAIL || 'admin@zendwise.com';
+
+    if (!resendApiKey) {
+      console.warn('[Promotion] RESEND_API_KEY not set, skipping promotion email');
+      return;
+    }
+
+    // Wrap promotion content in the tenant's branded email design
+    const wrappedContent = await wrapInEmailDesign(formRecord.tenantId, promotion.content);
+
+    // Send via Resend HTTP API
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: [recipientEmail],
+        subject: promotion.title,
+        html: wrappedContent,
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error(`[Promotion] Resend API error: ${res.status} ${errBody}`);
+      return;
+    }
+
+    // Increment promotion usage count
+    await db.update(promotions)
+      .set({
+        usageCount: sql`${promotions.usageCount} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(promotions.id, promotion.id));
+
+    console.log(`[Promotion] Sent promotion "${promotion.title}" to ${recipientEmail} for form ${formRecord.id}`);
+  } catch (error) {
+    console.error('[Promotion] Failed to send promotion email:', error);
+  }
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -131,7 +323,9 @@ router.post('/:id/submit', submitLimiter, validateUuidParam, async (req, res) =>
     // Verify the form exists and is active
     const form = await db.select({
       id: forms.id,
-      tenantId: forms.tenantId
+      tenantId: forms.tenantId,
+      category: forms.category,
+      formData: forms.formData,
     })
       .from(forms)
       .where(and(eq(forms.id, formId), eq(forms.isActive, true)))
@@ -163,6 +357,26 @@ router.post('/:id/submit', submitLimiter, validateUuidParam, async (req, res) =>
         updatedAt: new Date()
       })
       .where(eq(forms.id, formId));
+
+    // Send promotion email if enabled for this email-signup form (non-blocking, new emails only)
+    if (formRecord.category === 'email-signup') {
+      const submittedEmail = Object.values(responseData).find(
+        (val) => typeof val === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val as string)
+      ) as string | undefined;
+      if (submittedEmail) {
+        // Only send promotion if this email doesn't already exist in contacts
+        const existingEmail = await db.select({ id: emailContacts.id })
+          .from(emailContacts)
+          .where(and(
+            eq(emailContacts.tenantId, formRecord.tenantId),
+            eq(emailContacts.email, submittedEmail)
+          ))
+          .limit(1);
+        if (existingEmail.length === 0) {
+          sendPromotionEmailIfEnabled(formRecord, submittedEmail);
+        }
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -261,6 +475,7 @@ router.post('/google-signin', googleSignInLimiter, async (req, res) => {
       id: forms.id,
       tenantId: forms.tenantId,
       category: forms.category,
+      formData: forms.formData,
     })
       .from(forms)
       .where(and(eq(forms.id, formId), eq(forms.isActive, true)))
@@ -341,6 +556,9 @@ router.post('/google-signin', googleSignInLimiter, async (req, res) => {
         updatedAt: new Date(),
       })
       .where(eq(forms.id, formId));
+
+    // Send promotion email if enabled for this form (non-blocking)
+    sendPromotionEmailIfEnabled(formRecord, tokenInfo.email, tokenInfo.given_name);
 
     res.status(201).json({
       success: true,
