@@ -64,7 +64,7 @@ function sanitizeColor(color: string | undefined | null, fallback: string = '#3B
   if (/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/.test(normalized)) return normalized;
   const rgbMatch = normalized.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(,\s*(0|1|0?\.\d+)\s*)?\)$/);
   if (rgbMatch && parseInt(rgbMatch[1]) <= 255 && parseInt(rgbMatch[2]) <= 255 && parseInt(rgbMatch[3]) <= 255) return normalized;
-  const namedColors = ['black','white','red','green','blue','yellow','orange','purple','pink','brown','gray','grey','cyan','magenta','lime','navy','teal','aqua','maroon','olive','silver','fuchsia','transparent'];
+  const namedColors = ['black', 'white', 'red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'grey', 'cyan', 'magenta', 'lime', 'navy', 'teal', 'aqua', 'maroon', 'olive', 'silver', 'fuchsia', 'transparent'];
   if (namedColors.includes(normalized)) return normalized;
   return fallback;
 }
@@ -209,7 +209,7 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
       <!-- Body Content -->
       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
         <tr>
-          <td style="padding: 0; font-size: 16px; line-height: 1.625; color: #334155;">
+          <td style="padding: 32px 24px; font-size: 16px; line-height: 1.625; color: #334155;">
             ${bodyContent}
           </td>
         </tr>
