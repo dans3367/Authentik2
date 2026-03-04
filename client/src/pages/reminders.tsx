@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { isPast } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from 'react-i18next';
@@ -51,7 +51,9 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  BellOff
+  BellOff,
+  ChevronsUpDown,
+  Check
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -75,6 +77,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import ContactViewDrawer from "@/components/ContactViewDrawer";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NextUpAppointments } from "@/components/NextUpAppointments";
 
@@ -209,6 +213,8 @@ export default function RemindersPage() {
     status: 'scheduled' as const,
     notes: "",
   });
+  const [newCustomerSearchOpen, setNewCustomerSearchOpen] = useState(false);
+  const [newCustomerSearchQuery, setNewCustomerSearchQuery] = useState("");
   const [newAppointmentErrors, setNewAppointmentErrors] = useState<{
     customerId?: boolean;
     title?: boolean;
@@ -593,6 +599,15 @@ export default function RemindersPage() {
   const pastEndIndex = pastStartIndex + pastPageSize;
   const pastAppointments = sortedPastAppointments.slice(pastStartIndex, pastEndIndex);
   const customers: Customer[] = customersData?.contacts || [];
+  const filteredNewCustomers = useMemo(() => {
+    if (!newCustomerSearchQuery.trim()) return customers;
+    const q = newCustomerSearchQuery.toLowerCase();
+    return customers.filter((c) => {
+      const name = getCustomerName(c).toLowerCase();
+      const email = (c.email || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [customers, newCustomerSearchQuery]);
   const reminders: AppointmentReminder[] = remindersData?.reminders || [];
 
   // Pagination calculations for reminders
@@ -1056,6 +1071,8 @@ export default function RemindersPage() {
       notes: "",
     });
     setNewAppointmentErrors({});
+    setNewCustomerSearchOpen(false);
+    setNewCustomerSearchQuery("");
     setNewAppointmentReminderEnabled(false);
     setNewAppointmentReminderData({
       reminderType: 'email',
@@ -1647,27 +1664,71 @@ export default function RemindersPage() {
                           <Label className={newAppointmentErrors.customerId ? "text-red-500" : ""}>
                             {t('reminders.appointments.customer')} <span className="text-red-500">*</span>
                           </Label>
-                          <Select value={newAppointmentData.customerId} onValueChange={async (value) => {
-                            setNewAppointmentData(prev => ({ ...prev, customerId: value }));
-                            setNewAppointmentErrors(prev => ({ ...prev, customerId: false }));
+                          <Popover open={newCustomerSearchOpen} onOpenChange={setNewCustomerSearchOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={newCustomerSearchOpen}
+                                className={cn(
+                                  "w-full justify-between font-normal",
+                                  !newAppointmentData.customerId && "text-muted-foreground",
+                                  newAppointmentErrors.customerId && "border-red-500"
+                                )}
+                              >
+                                {newAppointmentData.customerId
+                                  ? (() => {
+                                      const sc = customers.find(c => c.id === newAppointmentData.customerId);
+                                      return sc ? `${getCustomerName(sc)} (${sc.email})` : t('reminders.appointments.selectCustomer');
+                                    })()
+                                  : t('reminders.appointments.selectCustomer')}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                              <Command shouldFilter={false}>
+                                <CommandInput
+                                  placeholder="Search by name or email..."
+                                  value={newCustomerSearchQuery}
+                                  onValueChange={setNewCustomerSearchQuery}
+                                />
+                                <CommandList className="max-h-[300px] overflow-y-auto">
+                                  <CommandEmpty>No customers found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {filteredNewCustomers.map((customer) => (
+                                      <CommandItem
+                                        key={customer.id}
+                                        value={customer.id}
+                                        onSelect={(value) => {
+                                          setNewAppointmentData(prev => ({ ...prev, customerId: value }));
+                                          setNewAppointmentErrors(prev => ({ ...prev, customerId: false }));
+                                          setNewCustomerSearchOpen(false);
+                                          setNewCustomerSearchQuery("");
 
-                            // Force validation check when customer is selected and reminder is enabled with email type
-                            if (newAppointmentReminderEnabled && newAppointmentReminderData.reminderType === 'email') {
-                              const customer = customers.find(c => c.id === value);
-                              runEmailValidation(customer?.email);
-                            }
-                          }}>
-                            <SelectTrigger className={`focus-visible:ring-0 focus:ring-0 ${newAppointmentErrors.customerId ? 'border-red-500' : ''}`}>
-                              <SelectValue placeholder={t('reminders.appointments.selectCustomer')} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {customers.map((customer) => (
-                                <SelectItem key={customer.id} value={customer.id}>
-                                  {getCustomerName(customer)} ({customer.email})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                                          // Force validation check when customer is selected and reminder is enabled with email type
+                                          if (newAppointmentReminderEnabled && newAppointmentReminderData.reminderType === 'email') {
+                                            const c = customers.find(c => c.id === value);
+                                            runEmailValidation(c?.email);
+                                          }
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            newAppointmentData.customerId === customer.id ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <div className="flex flex-col">
+                                          <span className="text-sm font-medium">{getCustomerName(customer)}</span>
+                                          <span className="text-xs text-muted-foreground">{customer.email}</span>
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </div>
 
                         <div>
@@ -4301,16 +4362,36 @@ export default function RemindersPage() {
                         {t('reminders.details.createNewAppointment')}
                       </Button>
                     ) : (
-                      <Button
-                        className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
-                        onClick={() => {
-                          setViewAppointmentPanelOpen(false);
-                          handleEditAppointment(viewingAppointment);
-                        }}
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        {t('reminders.details.editAppointment')}
-                      </Button>
+                      <>
+                        <Button
+                          className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
+                          onClick={() => {
+                            setViewAppointmentPanelOpen(false);
+                            handleEditAppointment(viewingAppointment);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          {t('reminders.details.editAppointment')}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
+                          onClick={() => {
+                            sendReminderMutation.mutate({
+                              appointmentIds: [viewingAppointment.id],
+                              reminderType: 'email',
+                            });
+                          }}
+                          disabled={sendReminderMutation.isPending || !viewingAppointment.customer?.email}
+                        >
+                          {sendReminderMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4 mr-2" />
+                          )}
+                          {t('reminders.details.sendReminder')}
+                        </Button>
+                      </>
                     )}
                     <Button
                       variant="outline"

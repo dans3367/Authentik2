@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarPlus, AlertTriangle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { CalendarPlus, AlertTriangle, ChevronsUpDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   getCustomerName,
   toLocalDateString,
@@ -88,6 +91,8 @@ export function AppointmentFormDialog({
   });
 
   const [reminderValidationError, setReminderValidationError] = useState<string | null>(null);
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
 
   // Update timezone when userTimezone changes
   useEffect(() => {
@@ -163,6 +168,16 @@ export function AppointmentFormDialog({
     onSubmit(appointmentData, reminderEnabled, reminderData);
     };
 
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearchQuery.trim()) return customers;
+    const q = customerSearchQuery.toLowerCase();
+    return customers.filter((c) => {
+      const name = getCustomerName(c).toLowerCase();
+      const email = (c.email || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [customers, customerSearchQuery]);
+
   const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
   const isCustomerBlocked = selectedCustomer &&
     reminderData.reminderType === 'email' &&
@@ -188,30 +203,71 @@ export function AppointmentFormDialog({
           <Label className={errors.customerId ? "text-red-500" : ""}>
             {t('reminders.appointments.customer')} <span className="text-red-500">*</span>
           </Label>
-          <Select
-            value={appointmentData.customerId}
-            onValueChange={async (value) => {
-              setAppointmentData(prev => ({ ...prev, customerId: value }));
-              setErrors(prev => ({ ...prev, customerId: false }));
+          <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={customerSearchOpen}
+                className={cn(
+                  "w-full justify-between font-normal",
+                  !appointmentData.customerId && "text-muted-foreground",
+                  errors.customerId && "border-red-500"
+                )}
+              >
+                {selectedCustomer
+                  ? `${getCustomerName(selectedCustomer)} (${selectedCustomer.email})`
+                  : t('reminders.appointments.selectCustomer')}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-[--radix-popover-trigger-width] p-0"
+              align="start"
+              usePortal={false}
+            >
+              <Command shouldFilter={false}>
+                <CommandInput
+                  placeholder="Search by name or email..."
+                  value={customerSearchQuery}
+                  onValueChange={setCustomerSearchQuery}
+                />
+                <CommandList className="max-h-[300px] overflow-y-auto">
+                  <CommandEmpty>No customers found.</CommandEmpty>
+                  <CommandGroup>
+                    {filteredCustomers.map((customer) => (
+                      <CommandItem
+                        key={customer.id}
+                        value={customer.id}
+                        onSelect={(value) => {
+                          setAppointmentData(prev => ({ ...prev, customerId: value }));
+                          setErrors(prev => ({ ...prev, customerId: false }));
+                          setCustomerSearchOpen(false);
+                          setCustomerSearchQuery("");
 
-              // Force validation check when customer is selected and reminder is enabled with email type
-              if (reminderEnabled && reminderData.reminderType === 'email') {
-                const customer = customers.find(c => c.id === value);
-                runEmailValidation(customer?.email);
-              }
-            }}
-          >
-            <SelectTrigger className={`focus-visible:ring-0 focus:ring-0 ${errors.customerId ? 'border-red-500' : ''}`}>
-              <SelectValue placeholder={t('reminders.appointments.selectCustomer')} />
-            </SelectTrigger>
-            <SelectContent>
-              {customers.map((customer) => (
-                <SelectItem key={customer.id} value={customer.id}>
-                  {getCustomerName(customer)} ({customer.email})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                          if (reminderEnabled && reminderData.reminderType === 'email') {
+                            const c = customers.find(c => c.id === value);
+                            runEmailValidation(c?.email);
+                          }
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            appointmentData.customerId === customer.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{getCustomerName(customer)}</span>
+                          <span className="text-xs text-muted-foreground">{customer.email}</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div>

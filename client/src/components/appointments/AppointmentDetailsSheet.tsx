@@ -42,6 +42,8 @@ interface AppointmentDetailsSheetProps {
   onStatusChange: (appointmentId: string, status: AppointmentWithCustomer['status']) => void;
   onViewCustomerProfile: () => void;
   onCreateNewAppointment: (appointment: AppointmentWithCustomer) => void;
+  onSendReminder?: (appointmentId: string) => void;
+  isSendingReminder?: boolean;
   // Note mutations
   newNoteContent: string;
   onNewNoteContentChange: (content: string) => void;
@@ -68,6 +70,8 @@ export function AppointmentDetailsSheet({
   onStatusChange,
   onViewCustomerProfile,
   onCreateNewAppointment,
+  onSendReminder,
+  isSendingReminder,
   newNoteContent,
   onNewNoteContentChange,
   onCreateNote,
@@ -587,13 +591,30 @@ export function AppointmentDetailsSheet({
                 {t('reminders.details.createNewAppointment')}
               </Button>
             ) : (
-              <Button
-                className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
-                onClick={() => onEdit(appointment)}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                {t('reminders.details.editAppointment')}
-              </Button>
+              <>
+                <Button
+                  className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
+                  onClick={() => onEdit(appointment)}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  {t('reminders.details.editAppointment')}
+                </Button>
+                {onSendReminder && (
+                  <Button
+                    variant="secondary"
+                    className="flex-1 shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
+                    onClick={() => onSendReminder(appointment.id)}
+                    disabled={isSendingReminder || !appointment.customer?.email}
+                  >
+                    {isSendingReminder ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Bell className="h-4 w-4 mr-2" />
+                    )}
+                    {t('reminders.details.sendReminder')}
+                  </Button>
+                )}
+              </>
             )}
             <Button
               variant="outline"
