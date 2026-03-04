@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type ReactNode } from "react";
+import { useState, useRef, useCallback, useMemo, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ import RichTextEditor from "@/components/LazyRichTextEditor";
 import { Label } from "@/components/ui/label";
 import { Loader2, Mail, Paperclip, X, FileText, Image, FileSpreadsheet, File } from "lucide-react";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
+import { sanitizeHtmlForPreview } from "@/utils/sanitize-html";
 
 // 40MB total limit (including base64 overhead ~33%)
 const MAX_TOTAL_RAW_SIZE = 30 * 1024 * 1024; // 30MB raw = ~40MB after base64
@@ -95,29 +96,32 @@ export default function SendEmailModal({
     return raw;
   })();
 
-  const previewHtml = wrapInEmailPreview(
-    `
-      <div style="padding:64px 48px;min-height:200px;">
-        <div style="font-size:16px;line-height:1.625;color:#334155;">
-          ${content || "<p style='color:#94a3b8;'>No content yet...</p>"}
+  const previewHtml = useMemo(() => {
+    const sanitizedContent = content ? sanitizeHtmlForPreview(content) : "<p style='color:#94a3b8;'>No content yet...</p>";
+    return wrapInEmailPreview(
+      `
+        <div style="padding:64px 48px;min-height:200px;">
+          <div style="font-size:16px;line-height:1.625;color:#334155;">
+            ${sanitizedContent}
+          </div>
         </div>
-      </div>
-    `,
-    {
-      companyName: (masterDesign as any)?.companyName || "",
-      headerMode: (masterDesign as any)?.headerMode,
-      primaryColor: (masterDesign as any)?.primaryColor,
-      logoUrl: (masterDesign as any)?.logoUrl,
-      logoSize: (masterDesign as any)?.logoSize,
-      logoAlignment: (masterDesign as any)?.logoAlignment,
-      bannerUrl: (masterDesign as any)?.bannerUrl,
-      showCompanyName: (masterDesign as any)?.showCompanyName,
-      headerText: (masterDesign as any)?.headerText,
-      footerText: (masterDesign as any)?.footerText,
-      fontFamily: (masterDesign as any)?.fontFamily,
-      socialLinks: parsedSocialLinks,
-    }
-  );
+      `,
+      {
+        companyName: (masterDesign as any)?.companyName || "",
+        headerMode: (masterDesign as any)?.headerMode,
+        primaryColor: (masterDesign as any)?.primaryColor,
+        logoUrl: (masterDesign as any)?.logoUrl,
+        logoSize: (masterDesign as any)?.logoSize,
+        logoAlignment: (masterDesign as any)?.logoAlignment,
+        bannerUrl: (masterDesign as any)?.bannerUrl,
+        showCompanyName: (masterDesign as any)?.showCompanyName,
+        headerText: (masterDesign as any)?.headerText,
+        footerText: (masterDesign as any)?.footerText,
+        fontFamily: (masterDesign as any)?.fontFamily,
+        socialLinks: parsedSocialLinks,
+      }
+    );
+  }, [content, masterDesign, parsedSocialLinks]);
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const newFiles = Array.from(files);
@@ -437,7 +441,7 @@ export default function SendEmailModal({
                 <iframe
                   srcDoc={previewHtml}
                   title="Email body preview"
-                  sandbox="allow-same-origin"
+                  sandbox=""
                   className="w-full border-0"
                   style={{ minHeight: "640px", background: "#fff" }}
                 />

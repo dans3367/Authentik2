@@ -686,6 +686,10 @@ emailManagementRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticate
       return res.status(404).json({ message: 'Scheduled email not found for this contact' });
     }
 
+    if (existingTask.status === 'running' || existingTask.status === 'triggered') {
+      return res.status(409).json({ message: 'Cannot reschedule an email that is already being sent' });
+    }
+
     // 2. Verify contact exists and belongs to tenant
     const contact = await db.query.emailContacts.findFirst({
       where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${tenantId}`,
@@ -724,7 +728,7 @@ emailManagementRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticate
     }
 
     const newSubject = subject || existingPayload.subject || 'No Subject';
-    const newHtml = html || existingPayload.html || '';
+    const newHtml = sanitizeEmailHtml(html || existingPayload.html || '');
     const timezone = existingPayload.timezone;
 
     // 4. Cancel the old Trigger.dev run
@@ -732,7 +736,8 @@ emailManagementRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticate
       const runIdToCancel = existingTask.runId || queueId;
       const cancelResult = await cancelReminderRun(runIdToCancel);
       if (!cancelResult.success) {
-        console.warn(`⚠️ [ScheduledEmails] Could not cancel old run ${runIdToCancel}: ${cancelResult.error}`);
+        console.error(`❌ [ScheduledEmails] Failed to cancel old run ${runIdToCancel}: ${cancelResult.error}`);
+        return res.status(409).json({ message: 'Failed to cancel the existing scheduled email. Please try again.' });
       }
     }
 
