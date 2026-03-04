@@ -62,14 +62,113 @@ print_port() {
     echo -e "${CYAN}[PORT]${NC} $1"
 }
 
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to list listening PIDs for a port, with tool fallbacks
+get_listening_pids() {
+    local port=$1
+    local pids=""
+
+    if command_exists lsof; then
+        pids=$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | sort -u)
+    elif command_exists fuser; then
+        pids=$(fuser -n tcp "$port" 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+$' | sort -u)
+    elif command_exists python3; then
+        pids=$(python3 - "$port" <<'PY'
+import os
+import sys
+
+port = int(sys.argv[1])
+hex_port = format(port, '04X')
+inodes = set()
+
+for path in ('/proc/net/tcp', '/proc/net/tcp6'):
+    try:
+        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+            next(f, None)
+            for line in f:
+                parts = line.split()
+                if len(parts) < 10:
+                    continue
+                local_addr = parts[1]
+                state = parts[3]
+                inode = parts[9]
+                try:
+                    _, local_port = local_addr.split(':')
+                except ValueError:
+                    continue
+                if state == '0A' and local_port.upper() == hex_port:
+                    inodes.add(inode)
+    except FileNotFoundError:
+        continue
+
+if not inodes:
+    sys.exit(0)
+
+pids = set()
+for entry in os.listdir('/proc'):
+    if not entry.isdigit():
+        continue
+    fd_dir = f'/proc/{entry}/fd'
+    try:
+        for fd in os.listdir(fd_dir):
+            fd_path = os.path.join(fd_dir, fd)
+            try:
+                target = os.readlink(fd_path)
+            except OSError:
+                continue
+            if target.startswith('socket:[') and target.endswith(']'):
+                inode = target[8:-1]
+                if inode in inodes:
+                    pids.add(entry)
+                    break
+    except OSError:
+        continue
+
+for pid in sorted(pids, key=int):
+    print(pid)
+PY
+)
+    fi
+
+    if [ -n "$pids" ]; then
+        echo "$pids" | tr ' ' '\n' | grep -E '^[0-9]+$' | sort -u
+    fi
+}
+
 # Function to check if a port is in use
 check_port() {
     local port=$1
-    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+    if [ -n "$(get_listening_pids "$port")" ]; then
         return 0  # Port is in use
     else
         return 1  # Port is free
     fi
+}
+
+# Function to check if child_pid is the same as or descended from parent_pid
+pid_descends_from() {
+    local child_pid=$1
+    local parent_pid=$2
+
+    if [ "$child_pid" = "$parent_pid" ]; then
+        return 0
+    fi
+
+    while [ -n "$child_pid" ] && [ "$child_pid" != "1" ]; do
+        child_pid=$(ps -o ppid= -p "$child_pid" 2>/dev/null | tr -d ' ')
+        if [ -z "$child_pid" ]; then
+            break
+        fi
+        if [ "$child_pid" = "$parent_pid" ]; then
+            return 0
+        fi
+    done
+
+    return 1
 }
 
 # Function to kill process using a specific port
@@ -79,27 +178,42 @@ kill_port_process() {
     
     print_warning "Port $port ($service_name) is in use, searching for process..."
 
-    # Find the PID of the process using the port
-    local pid=$(lsof -ti:$port 2>/dev/null)
+    # Find all listening PIDs using the port
+    local pids=$(get_listening_pids "$port")
 
-    if [ ! -z "$pid" ]; then
-        print_warning "Found process $pid using port $port"
-        
-        # Get process information for logging
-        local process_info=$(ps -p $pid -o pid,ppid,cmd --no-headers 2>/dev/null)
-        if [ ! -z "$process_info" ]; then
-            print_warning "Process details: $process_info"
-        fi
+    if [ -n "$pids" ]; then
+        print_warning "Found process(es) using port $port: $(echo "$pids" | tr '\n' ' ')"
 
-        # Kill the process
-        print_warning "Terminating process $pid..."
-        kill -9 $pid 2>/dev/null
+        while read -r pid; do
+            [ -z "$pid" ] && continue
+            # Get process information for logging
+            local process_info
+            process_info=$(ps -p "$pid" -o pid,ppid,cmd --no-headers 2>/dev/null)
+            if [ -n "$process_info" ]; then
+                print_warning "Process details: $process_info"
+            fi
 
-        # Wait a moment for the process to die
+            # Try graceful termination first
+            print_warning "Terminating process $pid..."
+            kill "$pid" 2>/dev/null
+        done <<< "$pids"
+
+        # Wait briefly, then force kill any stragglers
         sleep 2
 
+        local remaining_pids
+        remaining_pids=$(get_listening_pids "$port")
+        if [ -n "$remaining_pids" ]; then
+            while read -r pid; do
+                [ -z "$pid" ] && continue
+                print_warning "Force-killing process $pid..."
+                kill -9 "$pid" 2>/dev/null
+            done <<< "$remaining_pids"
+            sleep 1
+        fi
+
         # Check if the port is now free
-        if check_port $port; then
+        if check_port "$port"; then
             print_error "Failed to kill process on port $port"
             return 1
         else
@@ -131,9 +245,33 @@ start_service() {
     
     # Wait a moment for the service to start
     sleep 3
+
+    # Ensure the launched process itself is still alive
+    if ! kill -0 "$service_pid" 2>/dev/null; then
+        print_error "$service_name process exited early (PID: $service_pid)"
+        return 1
+    fi
+
+    local port_pids
+    port_pids=$(get_listening_pids "$port")
     
-    # Check if the service is actually running on the expected port
-    if check_port $port; then
+    # Check if the service (or one of its children) is running on the expected port
+    if [ -n "$port_pids" ]; then
+        local matched=0
+        while read -r port_pid; do
+            [ -z "$port_pid" ] && continue
+            if pid_descends_from "$port_pid" "$service_pid"; then
+                matched=1
+                break
+            fi
+        done <<< "$port_pids"
+
+        if [ "$matched" -eq 0 ]; then
+            print_error "$service_name did not bind port $port (port is used by unrelated PID(s): $(echo "$port_pids" | tr '\n' ' '))"
+            kill "$service_pid" 2>/dev/null
+            return 1
+        fi
+
         print_success "$service_name is running on port $port (PID: $service_pid)"
         echo "$service_pid" >> /tmp/authentik_web_pids.txt
         return 0
@@ -227,6 +365,9 @@ start_services() {
     start_service "Main Server" "$PORT" "NODE_ENV=$NODE_ENV PORT=$PORT npx tsx server/index.ts" "$PROJECT_ROOT"
     if [ $? -eq 0 ]; then
         print_port "Main Server: http://localhost:5002"
+    else
+        print_error "Main Server failed to start cleanly. Try './startweb.sh stop' then './startweb.sh start'."
+        return 1
     fi
 
     echo ""
@@ -248,7 +389,7 @@ start_services() {
 # Main command handling
 case "$COMMAND" in
     "start")
-        start_services
+        start_services || exit 1
         ;;
     "stop")
         stop_services
@@ -257,7 +398,7 @@ case "$COMMAND" in
         print_status "Restarting Main Server..."
         stop_services
         sleep 2
-        start_services
+        start_services || exit 1
         ;;
     *)
         echo "Usage: $0 [start|stop|restart]"
