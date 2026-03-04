@@ -342,3 +342,7 @@
 .ProseMirror *[style] {
   /* Inline styles should take precedence */
 }
+
+[cmdk-list] {
+  overflow-y: auto !important;
+}
