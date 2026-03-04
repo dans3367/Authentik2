@@ -293,11 +293,12 @@ router.post(
         });
       }
 
-      // Only require providerMessageId for non-failed statuses
-      if (validatedStatus !== 'failed' && !providerMessageId) {
+      // Only require providerMessageId for terminal success statuses (sent, delivered)
+      // 'pending' is a pre-send status update where providerMessageId doesn't exist yet
+      if (validatedStatus !== 'failed' && validatedStatus !== 'pending' && !providerMessageId) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required field: providerMessageId is required for non-failed statuses',
+          error: 'Missing required field: providerMessageId is required for sent/delivered statuses',
         });
       }
 

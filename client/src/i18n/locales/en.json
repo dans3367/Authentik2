@@ -127,6 +127,21 @@
       "status_cancelled": "Cancelled",
       "status_completed": "Completed",
       "status_no_show": "No Show"
+    },
+    "scheduledEmails": {
+      "title": "Upcoming Scheduled Emails",
+      "viewAll": "View All",
+      "noEmailsTitle": "No scheduled emails",
+      "noEmailsDesc": "Schedule an email to a contact and it will appear here",
+      "scheduleNew": "Schedule an Email",
+      "upcoming": "{{count}} upcoming",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "inDays": "in {{count}} days",
+      "to": "To",
+      "pending": "Pending",
+      "triggered": "Queued",
+      "running": "Sending"
     }
   },
   "cards": {
@@ -2847,7 +2862,7 @@
       "back": "Back",
       "scheduling": "Scheduling...",
       "confirmSchedule": "Confirm Schedule",
-      "sendLater": "Send Later",
+      "sendLater": "Schedule Send",
       "saving": "Saving...",
       "sendNow": "Send Now",
       "submitting": "Submitting...",

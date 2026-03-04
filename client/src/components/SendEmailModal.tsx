@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, type ReactNode } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -13,9 +13,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import RichTextEditor from "@/components/LazyRichTextEditor";
 import { Label } from "@/components/ui/label";
 import { Loader2, Mail, Paperclip, X, FileText, Image, FileSpreadsheet, File } from "lucide-react";
+import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 
 // 40MB total limit (including base64 overhead ~33%)
 const MAX_TOTAL_RAW_SIZE = 30 * 1024 * 1024; // 30MB raw = ~40MB after base64
@@ -32,6 +33,10 @@ function getFileIcon(type: string) {
   if (type.includes("spreadsheet") || type.includes("excel") || type === "text/csv") return FileSpreadsheet;
   if (type.includes("pdf") || type.includes("word") || type.includes("document") || type === "text/plain") return FileText;
   return File;
+}
+
+function hasEditorContent(html: string): boolean {
+  return html.replace(/<[^>]*>/g, "").trim().length > 0;
 }
 
 interface SendEmailModalProps {
@@ -54,6 +59,7 @@ export default function SendEmailModal({
   onEmailSent,
 }: SendEmailModalProps) {
   const [open, setOpen] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -63,6 +69,55 @@ export default function SendEmailModal({
 
   const totalSize = attachments.reduce((sum, f) => sum + f.size, 0);
   const estimatedBase64Size = Math.ceil(totalSize / 3) * 4;
+
+  const { data: masterDesign } = useQuery({
+    queryKey: ["/api/master-email-design"],
+    enabled: open,
+    queryFn: async () => {
+      const response = await fetch('/api/master-email-design', {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch email design');
+      return response.json();
+    },
+  });
+
+  const parsedSocialLinks = (() => {
+    const raw = (masterDesign as any)?.socialLinks;
+    if (!raw) return undefined;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return undefined;
+      }
+    }
+    return raw;
+  })();
+
+  const previewHtml = wrapInEmailPreview(
+    `
+      <div style="padding:64px 48px;min-height:200px;">
+        <div style="font-size:16px;line-height:1.625;color:#334155;">
+          ${content || "<p style='color:#94a3b8;'>No content yet...</p>"}
+        </div>
+      </div>
+    `,
+    {
+      companyName: (masterDesign as any)?.companyName || "",
+      headerMode: (masterDesign as any)?.headerMode,
+      primaryColor: (masterDesign as any)?.primaryColor,
+      logoUrl: (masterDesign as any)?.logoUrl,
+      logoSize: (masterDesign as any)?.logoSize,
+      logoAlignment: (masterDesign as any)?.logoAlignment,
+      bannerUrl: (masterDesign as any)?.bannerUrl,
+      showCompanyName: (masterDesign as any)?.showCompanyName,
+      headerText: (masterDesign as any)?.headerText,
+      footerText: (masterDesign as any)?.footerText,
+      fontFamily: (masterDesign as any)?.fontFamily,
+      socialLinks: parsedSocialLinks,
+    }
+  );
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const newFiles = Array.from(files);
@@ -176,7 +231,7 @@ export default function SendEmailModal({
       return;
     }
 
-    if (!content.trim()) {
+    if (!hasEditorContent(content)) {
       toast({
         title: "Validation Error",
         description: "Please enter email content",
@@ -192,6 +247,7 @@ export default function SendEmailModal({
     setOpen(nextOpen);
     if (!nextOpen) {
       setAttachments([]);
+      setShowPreview(false);
     }
   };
 
@@ -236,18 +292,20 @@ export default function SendEmailModal({
 
             <div className="grid gap-2">
               <Label htmlFor="content">Content</Label>
-              <Textarea
-                id="content"
-                placeholder="Enter email content"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                disabled={sendEmailMutation.isPending}
-                rows={8}
-                className="resize-none"
-                required
-              />
+              <div id="content" aria-disabled={sendEmailMutation.isPending}>
+                <RichTextEditor
+                  value={content}
+                  onChange={setContent}
+                  placeholder="Write your email..."
+                  className="min-h-[220px]"
+                  customerInfo={{
+                    firstName: contactName?.split(" ")[0] || undefined,
+                    lastName: contactName?.split(" ").slice(1).join(" ") || undefined,
+                  }}
+                />
+              </div>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Plain text content will be automatically formatted for email delivery.
+                Rich text content will be sent as HTML in the email.
               </p>
             </div>
 
@@ -320,6 +378,14 @@ export default function SendEmailModal({
             <Button
               type="button"
               variant="outline"
+              onClick={() => setShowPreview(true)}
+              disabled={sendEmailMutation.isPending || !hasEditorContent(content)}
+            >
+              Preview Email
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => setOpen(false)}
               disabled={sendEmailMutation.isPending}
             >
@@ -344,6 +410,42 @@ export default function SendEmailModal({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Email Preview</DialogTitle>
+            <DialogDescription>
+              Preview of how this message will look in an email client for {contactEmail}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl">
+              <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full">
+                <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
+                  <div className="flex gap-2 mb-1">
+                    <span className="font-semibold text-right w-14">To:</span>
+                    <span className="text-gray-900">{contactEmail}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-right w-14">Subject:</span>
+                    <span className="text-gray-900 font-bold">{subject || "(no subject)"}</span>
+                  </div>
+                </div>
+
+                <iframe
+                  srcDoc={previewHtml}
+                  title="Email body preview"
+                  sandbox="allow-same-origin"
+                  className="w-full border-0"
+                  style={{ minHeight: "640px", background: "#fff" }}
+                />
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

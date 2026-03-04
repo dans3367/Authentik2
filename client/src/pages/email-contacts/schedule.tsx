@@ -5,8 +5,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import RichTextEditor from "@/components/RichTextEditor";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ArrowLeft, Calendar, Clock, Mail, AlertTriangle, Eye, Paperclip, X, FileText, Image, FileSpreadsheet, File } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -307,7 +307,7 @@ export default function ScheduleContactEmailPage() {
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Contact
             </Button>
             <h1 className="text-2xl font-bold">Schedule Email</h1>
-            <p className="text-gray-600 dark:text-gray-400">Send a B2C email to {contact.email} at a later time.</p>
+            <p className="text-gray-600 dark:text-gray-400">Schedule a personalized email to {contact.email} for the exact date and time you choose.</p>
           </div>
         </div>
 
@@ -360,12 +360,17 @@ export default function ScheduleContactEmailPage() {
                   dangerouslySetInnerHTML={{ __html: content }}
                 />
               ) : (
-                <Textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Write your email..."
-                  className="mt-2 min-h-[220px]"
-                />
+                <div className="mt-2">
+                  <RichTextEditor
+                    value={content}
+                    onChange={setContent}
+                    placeholder="Write your email..."
+                    customerInfo={{
+                      firstName: contact.firstName || undefined,
+                      lastName: contact.lastName || undefined,
+                    }}
+                  />
+                </div>
               )}
             </div>
 

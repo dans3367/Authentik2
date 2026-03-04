@@ -4,6 +4,7 @@ import { NewsletterCard } from "@/components/ui/newsletter-card";
 import { HighlightsCard } from "@/components/ui/highlights-card";
 import { UpcomingBirthdaysCard } from "@/components/ui/upcoming-birthdays-card";
 import { UpcomingAppointmentsCard } from "@/components/ui/upcoming-appointments-card";
+import { UpcomingScheduledEmailsCard } from "@/components/ui/upcoming-scheduled-emails-card";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import {
   LayoutDashboard,
@@ -241,6 +242,12 @@ export default function Dashboard() {
         </div>
         <div className="lg:col-span-4">
           <HighlightsCard />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+        <div className="lg:col-span-8">
+          <UpcomingScheduledEmailsCard />
         </div>
       </div>
     </div>

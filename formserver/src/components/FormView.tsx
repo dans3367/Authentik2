@@ -20,12 +20,12 @@ const formButtonTranslations: Record<FormLanguage, { submit: string; submitting:
   en: { 
     submit: 'Submit Form', 
     submitting: 'Submitting...',
-    disclaimer: 'By submitting this form, you agree to receive email and phone communications from us, including marketing messages, updates, and promotional offers. Standard message and data rates may apply to phone communications. You can opt out at any time by following the unsubscribe instructions in our emails or by contacting us directly.'
+    disclaimer: 'By submitting this form or signing in with Google, you expressly consent to receive email and phone communications from us, including marketing materials, newsletters, promotional offers, customer engagement messages, surveys, product updates, event invitations, and transactional notifications. Standard message and data rates may apply to phone and SMS communications. Your consent covers all communication categories. You can opt out of marketing communications at any time by following the unsubscribe instructions in our emails, replying STOP to any SMS, or by contacting us directly. Opting out does not affect transactional or service-related messages.'
   },
   es: { 
     submit: 'Enviar Formulario', 
     submitting: 'Enviando...',
-    disclaimer: 'Al enviar este formulario, aceptas recibir comunicaciones por correo electrónico y teléfono de nuestra parte, incluidos mensajes de marketing, actualizaciones y ofertas promocionales. Se pueden aplicar tarifas estándar de mensajes y datos a las comunicaciones telefónicas. Puedes darte de baja en cualquier momento siguiendo las instrucciones de cancelación de suscripción en nuestros correos electrónicos o contactándonos directamente.'
+    disclaimer: 'Al enviar este formulario o iniciar sesión con Google, aceptas expresamente recibir comunicaciones por correo electrónico y teléfono de nuestra parte, incluidos materiales de marketing, boletines informativos, ofertas promocionales, mensajes de interacción con clientes, encuestas, actualizaciones de productos, invitaciones a eventos y notificaciones transaccionales. Se pueden aplicar tarifas estándar de mensajes y datos a las comunicaciones telefónicas y SMS. Tu consentimiento cubre todas las categorías de comunicación. Puedes darte de baja de las comunicaciones de marketing en cualquier momento siguiendo las instrucciones de cancelación en nuestros correos electrónicos, respondiendo STOP a cualquier SMS o contactándonos directamente. La cancelación no afecta los mensajes transaccionales o relacionados con el servicio.'
   },
 };
 

@@ -585,8 +585,11 @@ formsRoutes.post("/public/google-signin", googleSignInLimiter, async (req: any, 
         consentMethod: 'google_signin',
         consentIpAddress: clientIp,
         consentUserAgent: userAgent,
+        prefTransactional: true,
+        prefMarketing: true,
+        prefCustomerEngagement: true,
         prefNewsletters: true,
-        prefMarketing: false,
+        prefSurveysForms: true,
       }).returning();
 
       await tx.insert(formResponses).values({

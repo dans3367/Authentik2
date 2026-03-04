@@ -321,7 +321,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                   }}
                 >
                   <Clock className="w-4 h-4 mr-2" />
-                  Send Later
+                  Schedule Send
                 </Button>
                 <Button
                   variant="outline"

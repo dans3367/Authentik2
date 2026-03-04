@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { TemplateSelector } from "@/components/TemplateSelector";
+import { useToast } from "@/hooks/use-toast";
 
 interface ScheduledEmail {
   id: string;
@@ -32,6 +33,7 @@ export default function ScheduledEmailsTimelinePage() {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState<string | null>(null);
   const [form, setForm] = useState<{ queueId?: string; subject: string; content: string; date: string; time: string }>({ subject: "", content: "", date: "", time: "" });
+  const { toast } = useToast();
 
   const { data, isLoading, error, refetch, isFetching } = useQuery<{ scheduled: ScheduledEmail[]}>({
     queryKey: ["/api/email-contacts", id, "scheduled"],
@@ -75,7 +77,18 @@ export default function ScheduledEmailsTimelinePage() {
     },
     onSuccess: () => {
       setEditOpen(false);
+      toast({
+        title: "Email Updated",
+        description: "Scheduled email has been updated successfully.",
+      });
       refetch();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error?.message || "Failed to update scheduled email. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
