@@ -142,7 +142,12 @@ export default function ScheduleContactEmailPage() {
     },
   });
 
-  const isUnsubscribed = contact?.status === "unsubscribed" || contact?.status === "bounced" || !!bouncedCheck?.isBounced;
+  const isEmailSuppressed = contact?.status === 'suppressed' || !!bouncedCheck?.isSuppressed || (!!bouncedCheck?.isBounced && bouncedCheck?.bounceType === 'suppressed');
+  const isUnsubscribed = contact?.status === "unsubscribed" || contact?.status === "bounced" || !!bouncedCheck?.isBounced || isEmailSuppressed;
+
+  const suppressedSinceFormatted = bouncedCheck?.suppressedSince
+    ? new Date(bouncedCheck.suppressedSince).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    : null;
 
   const parsedSocialLinks = useMemo(() => {
     const raw = (masterDesign as any)?.socialLinks;
@@ -191,12 +196,12 @@ export default function ScheduleContactEmailPage() {
   const isBounced = contact?.status === "bounced" || !!bouncedCheck?.isBounced;
   let suppressedTitle = "Suppressed Contact";
 
-  if (isBounced) {
-    suppressedTitle = "Suppressed Contact (bounced)";
+  if (isEmailSuppressed) {
+    suppressedTitle = "Suppressed Email Address";
+  } else if (isBounced) {
+    suppressedTitle = "Bounced Contact";
   } else if (contact?.status === "unsubscribed") {
-    suppressedTitle = "Suppressed Contact (unsubscribed)";
-  } else if (contact?.suppressionReason) {
-    suppressedTitle = `Suppressed Contact (${contact.suppressionReason})`;
+    suppressedTitle = "Unsubscribed Contact";
   }
 
   const scheduleMutation = useMutation({
@@ -252,9 +257,11 @@ export default function ScheduleContactEmailPage() {
     },
   });
 
-  const scheduleWarningMessage = "This customer has unsubscribed from the mailing list. Please do not send marketing or promotional emails to this contact. You may still send direct or scheduled messages if needed.";
+  const scheduleWarningMessage = isEmailSuppressed
+    ? `This email address has been suppressed${suppressedSinceFormatted ? ` since ${suppressedSinceFormatted}` : ''}${bouncedCheck?.suppressionReason ? ` due to: ${bouncedCheck.suppressionReason}` : ''}. No outgoing communication of any kind (individual emails, scheduled emails, birthday letters, or newsletters) can be sent to this address. The email provider has flagged this address and further sending attempts may harm your sender reputation.`
+    : "This customer has unsubscribed from the mailing list. Please do not send marketing or promotional emails to this contact. You may still send direct or scheduled messages if needed.";
 
-  const canSubmit = !!subject && !!content && !!date && !!id;
+  const canSubmit = !!subject && !!content && !!date && !!id && !isEmailSuppressed;
 
   const handleTemplateSelect = (template: { subject: string; content: string }) => {
     setSubject(template.subject);
@@ -311,7 +318,15 @@ export default function ScheduleContactEmailPage() {
           </div>
         </div>
 
-        {isUnsubscribed && (
+        {isEmailSuppressed && (
+          <Alert className="border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle className="text-sm font-semibold">{suppressedTitle}</AlertTitle>
+            <AlertDescription className="text-sm">{scheduleWarningMessage}</AlertDescription>
+          </Alert>
+        )}
+
+        {!isEmailSuppressed && isUnsubscribed && (
           <Alert className="border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle className="text-sm font-medium">{suppressedTitle}</AlertTitle>

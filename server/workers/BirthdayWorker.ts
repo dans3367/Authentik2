@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { db } from '../db';
-import { emailContacts, birthdaySettings, promotions } from '@shared/schema';
+import { emailContacts, birthdaySettings, promotions, bouncedEmails } from '@shared/schema';
 import { eq, and, sql, isNotNull } from 'drizzle-orm';
 import { enhancedEmailService } from '../emailService';
 import { sanitizeEmailHtml } from '../routes/emailManagementRoutes';
@@ -288,6 +288,23 @@ export class BirthdayWorker extends EventEmitter {
       progress.status = 'processing';
       this.emit('jobStarted', { jobId, job });
 
+      // Suppression check: verify email is not on the global suppression list before sending
+      const suppressionRecord = await db.query.bouncedEmails.findFirst({
+        where: and(
+          sql`LOWER(${bouncedEmails.email}) = ${job.contactEmail.toLowerCase().trim()}`,
+          eq(bouncedEmails.isActive, true),
+        ),
+      });
+
+      if (suppressionRecord) {
+        const reason = suppressionRecord.suppressionReason || suppressionRecord.bounceReason || suppressionRecord.bounceType || 'provider suppression';
+        console.log(`🚫 [BirthdayWorker] Skipping suppressed email ${job.contactEmail} (type=${suppressionRecord.bounceType}, reason=${reason})`);
+        progress.status = 'failed';
+        progress.error = `Email suppressed: ${reason}`;
+        this.emit('jobFailed', { jobId, job, error: progress.error });
+        return;
+      }
+
       console.log(`🎂 [BirthdayWorker] Sending birthday card to ${job.contactEmail}`);
 
       // Prepare recipient name
@@ -332,28 +349,33 @@ export class BirthdayWorker extends EventEmitter {
       });
 
       // Send the birthday email
-      const result = await enhancedEmailService.send({
-        to: job.contactEmail,
-        from: 'admin@zendwise.com',
-        subject: `🎉 Happy Birthday ${recipientName}!`,
-        html: htmlContent,
-        text: htmlContent.replace(/<[^>]*>/g, ''),
-        tags: ['birthday', 'automated', `tenant-${job.tenantId}`],
-        metadata: {
-          type: 'birthday-card',
-          contactId: job.contactId,
-          tenantId: job.tenantId,
-          birthdayDate: job.birthdayDate,
-          automated: true,
-          unsubscribeToken: unsubscribeToken || 'none',
-        },
-      });
+      const result = await enhancedEmailService.sendCustomEmail(
+        job.contactEmail,
+        `🎉 Happy Birthday ${recipientName}!`,
+        htmlContent,
+        {
+          text: htmlContent.replace(/<[^>]*>/g, ''),
+          from: 'admin@zendwise.com',
+          tags: [
+            { name: 'birthday', value: 'automated' },
+            { name: 'tenant', value: job.tenantId },
+          ],
+          metadata: {
+            type: 'birthday-card',
+            contactId: job.contactId,
+            tenantId: job.tenantId,
+            birthdayDate: job.birthdayDate,
+            automated: true,
+            unsubscribeToken: unsubscribeToken || 'none',
+          },
+        }
+      );
 
       if (result.success) {
         progress.status = 'completed';
         progress.sentAt = new Date();
         progress.messageId = result.messageId;
-        progress.provider = result.provider;
+        progress.provider = result.providerId;
 
         console.log(`✅ [BirthdayWorker] Birthday card sent successfully to ${job.contactEmail}: ${result.messageId}`);
         this.emit('jobCompleted', { jobId, job, result });

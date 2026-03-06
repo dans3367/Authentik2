@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Mail, Paperclip, X, FileText, Image, FileSpreadsheet, File } from "lucide-react";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { sanitizeHtmlForPreview } from "@/utils/sanitize-html";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // 40MB total limit (including base64 overhead ~33%)
 const MAX_TOTAL_RAW_SIZE = 30 * 1024 * 1024; // 30MB raw = ~40MB after base64
@@ -257,14 +258,36 @@ export default function SendEmailModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="outline" disabled={disabled}>
-            <Mail className="w-4 h-4 mr-2" />
-            Send Email
-          </Button>
-        )}
-      </DialogTrigger>
+      {disabled && disabledReason ? (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-block" tabIndex={0}>
+                <DialogTrigger asChild>
+                  {trigger || (
+                    <Button variant="outline" disabled={disabled}>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Send Email
+                    </Button>
+                  )}
+                </DialogTrigger>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs text-sm">
+              <p>{disabledReason}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : (
+        <DialogTrigger asChild>
+          {trigger || (
+            <Button variant="outline" disabled={disabled}>
+              <Mail className="w-4 h-4 mr-2" />
+              Send Email
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[600px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>

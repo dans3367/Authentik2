@@ -1620,18 +1620,27 @@ emailManagementRoutes.get("/bounced-emails", authenticateToken, requireTenant, a
   }
 });
 
-// Check if email is bounced
+// Check if email is bounced/suppressed
 emailManagementRoutes.get("/bounced-emails/check/:email", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { email } = req.params;
     const sanitizedEmail = sanitizeEmail(email);
 
     const bouncedEmail = await db.query.bouncedEmails.findFirst({
-      where: sql`${bouncedEmails.email} = ${sanitizedEmail}`,
+      where: and(
+        sql`${bouncedEmails.email} = ${sanitizedEmail}`,
+        eq(bouncedEmails.isActive, true),
+      ),
     });
+
+    const isSuppressed = !!bouncedEmail && bouncedEmail.bounceType === 'suppressed';
 
     res.json({
       isBounced: !!bouncedEmail,
+      isSuppressed,
+      bounceType: bouncedEmail?.bounceType || null,
+      suppressedSince: bouncedEmail?.firstBouncedAt || null,
+      suppressionReason: bouncedEmail?.suppressionReason || bouncedEmail?.bounceReason || null,
       bouncedEmail: bouncedEmail || null,
     });
   } catch (error) {
@@ -1993,9 +2002,36 @@ emailManagementRoutes.post("/email-contacts/:id/schedule", authenticateToken, re
       return res.status(400).json({ message: 'Contact email is missing' });
     }
 
-    // Block scheduling for unsubscribed/bounced/suppressed contacts unless override flags are provided
+    // Hard block: check global suppression list (bounced_emails table) — cannot be overridden
+    const suppressionRecord = await db.query.bouncedEmails.findFirst({
+      where: and(
+        sql`LOWER(${bouncedEmails.email}) = ${String(contact.email).toLowerCase().trim()}`,
+        eq(bouncedEmails.isActive, true),
+      ),
+    });
+
+    if (suppressionRecord) {
+      const suppressedSince = suppressionRecord.firstBouncedAt
+        ? new Date(suppressionRecord.firstBouncedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+        : 'an unknown date';
+      const reason = suppressionRecord.suppressionReason || suppressionRecord.bounceReason || suppressionRecord.bounceType || 'provider suppression';
+
+      console.log(`🚫 [ScheduleEmail] Hard-blocked: email ${maskEmail(String(contact.email))} is on suppression list (type=${suppressionRecord.bounceType}, since=${suppressedSince})`);
+
+      return res.status(403).json({
+        success: false,
+        message: `This email address has been suppressed since ${suppressedSince} due to: ${reason}. No outgoing communication can be scheduled for this address. The email provider has flagged this address and further sending attempts may harm your sender reputation.`,
+        contactStatus: 'suppressed',
+        suppressionType: suppressionRecord.bounceType,
+        suppressedSince: suppressionRecord.firstBouncedAt,
+        suppressionReason: reason,
+        email: maskEmail(String(contact.email)),
+      });
+    }
+
+    // Block scheduling for unsubscribed/bounced contacts unless override flags are provided
     const { allowUnsubscribed, isTransactional } = req.body || {};
-    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced' || contact.status === 'suppressed';
+    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced';
 
     if (isUnsubscribedOrBounced) {
       // SECURITY: Only allow Administrators and Owners to override unsubscribe protection
@@ -4913,9 +4949,36 @@ emailManagementRoutes.post("/email-contacts/:id/send-email", authenticateToken, 
 
     console.log(`📧 [SendEmail] Found contact: ${maskEmail(String(contact.email))}, status: ${contact.status}`);
 
-    // Block sending for unsubscribed/bounced/suppressed contacts unless override flags are provided
+    // Hard block: check global suppression list (bounced_emails table) — cannot be overridden
+    const suppressionRecord = await db.query.bouncedEmails.findFirst({
+      where: and(
+        sql`LOWER(${bouncedEmails.email}) = ${String(contact.email).toLowerCase().trim()}`,
+        eq(bouncedEmails.isActive, true),
+      ),
+    });
+
+    if (suppressionRecord) {
+      const suppressedSince = suppressionRecord.firstBouncedAt
+        ? new Date(suppressionRecord.firstBouncedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+        : 'an unknown date';
+      const reason = suppressionRecord.suppressionReason || suppressionRecord.bounceReason || suppressionRecord.bounceType || 'provider suppression';
+
+      console.log(`🚫 [SendEmail] Hard-blocked: email ${maskEmail(String(contact.email))} is on suppression list (type=${suppressionRecord.bounceType}, since=${suppressedSince})`);
+
+      return res.status(403).json({
+        success: false,
+        message: `This email address has been suppressed since ${suppressedSince} due to: ${reason}. No outgoing communication can be sent to this address. The email provider has flagged this address and further sending attempts may harm your sender reputation.`,
+        contactStatus: 'suppressed',
+        suppressionType: suppressionRecord.bounceType,
+        suppressedSince: suppressionRecord.firstBouncedAt,
+        suppressionReason: reason,
+        email: maskEmail(String(contact.email)),
+      });
+    }
+
+    // Block sending for unsubscribed/bounced contacts unless override flags are provided
     const { allowUnsubscribed, isTransactional } = req.body || {};
-    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced' || contact.status === 'suppressed';
+    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced';
 
     if (isUnsubscribedOrBounced) {
       // SECURITY: Only allow Administrators and Owners to override unsubscribe protection

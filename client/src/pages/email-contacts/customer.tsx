@@ -38,7 +38,7 @@ interface Contact {
   email: string;
   firstName: string | null;
   lastName: string | null;
-  status: "active" | "unsubscribed" | "bounced" | "pending";
+  status: "active" | "unsubscribed" | "bounced" | "pending" | "suppressed";
   tags: ContactTag[];
   lists: EmailList[];
   addedDate: Date;
@@ -160,10 +160,11 @@ export default function CustomerViewPage() {
   };
 
   const getStatusBadge = (status: Contact["status"]) => {
-    const statusConfig = {
+    const statusConfig: Record<string, { color: string; icon: any; label: string }> = {
       active: { color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400", icon: CheckCircle2, label: "Active" },
       unsubscribed: { color: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400", icon: XCircle, label: "Unsubscribed" },
       bounced: { color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", icon: AlertCircle, label: "Bounced" },
+      suppressed: { color: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300", icon: AlertCircle, label: "Suppressed" },
       pending: { color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", icon: AlertCircle, label: "Pending" },
     };
 
@@ -212,12 +213,20 @@ export default function CustomerViewPage() {
     queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', id, 'stats'] });
   };
 
-  // Guard against unsubscribed/bounced contacts to prevent server 403s
-  const isSendEmailDisabled = contact ? (contact.status === 'unsubscribed' || contact.status === 'bounced' || !!bouncedCheck?.isBounced) : false;
+  // Guard against unsubscribed/bounced/suppressed contacts to prevent server 403s
+  const isEmailSuppressed = contact ? (contact.status === 'suppressed' || !!bouncedCheck?.isSuppressed || (!!bouncedCheck?.isBounced && bouncedCheck?.bounceType === 'suppressed')) : false;
+  const isSendEmailDisabled = contact ? (contact.status === 'unsubscribed' || contact.status === 'bounced' || !!bouncedCheck?.isBounced || isEmailSuppressed) : false;
+
+  const suppressedSinceFormatted = bouncedCheck?.suppressedSince
+    ? new Date(bouncedCheck.suppressedSince).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    : null;
+
   const sendEmailDisabledReason = isSendEmailDisabled
-    ? (contact?.status === 'bounced' || !!bouncedCheck?.isBounced
-      ? "Cannot send email to a bounced contact."
-      : "Cannot send email to an unsubscribed contact.")
+    ? (isEmailSuppressed
+      ? `This email has been suppressed${suppressedSinceFormatted ? ` since ${suppressedSinceFormatted}` : ''}${bouncedCheck?.suppressionReason ? ` due to: ${bouncedCheck.suppressionReason}` : ''}. No outgoing communication can be sent to this address.`
+      : contact?.status === 'bounced' || !!bouncedCheck?.isBounced
+        ? "Cannot send email to a bounced contact."
+        : "Cannot send email to an unsubscribed contact.")
     : undefined;
 
   if (isLoading) {
@@ -340,23 +349,35 @@ export default function CustomerViewPage() {
         </Button>
       </div>
 
-      {/* Unsubscribed/Bounced Contact Warning */}
-      {(() => {
+      {/* Suppressed Email Warning */}
+      {isEmailSuppressed && (
+        <Alert className="border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200 [&>svg]:text-red-600 dark:[&>svg]:text-red-400">
+          <AlertTriangleIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <AlertTitle className="text-sm font-semibold">Suppressed Email Address</AlertTitle>
+          <AlertDescription className="text-red-700 dark:text-red-300 text-sm leading-relaxed">
+            This email address has been marked as <strong>suppressed{suppressedSinceFormatted ? ` since ${suppressedSinceFormatted}` : ''}</strong>
+            {bouncedCheck?.suppressionReason ? <> due to: <em>{bouncedCheck.suppressionReason}</em></> : null}.
+            <br className="my-1" />
+            No outgoing communication of any kind (individual emails, scheduled emails, birthday letters, or newsletters) can be sent to this address. The email provider has flagged this address and further sending attempts may harm your sender reputation.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Unsubscribed/Bounced Contact Warning (only show if NOT suppressed) */}
+      {!isEmailSuppressed && (() => {
         const isBounced = contact.status === 'bounced' || !!bouncedCheck?.isBounced;
         const isUnsubscribed = contact.status === 'unsubscribed';
 
         if (!isBounced && !isUnsubscribed) return null;
 
-        const suppressionReason = isBounced ? 'bounced' : 'unsubscribed';
-
         return (
           <Alert className="border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200 [&>svg]:text-yellow-600 dark:[&>svg]:text-yellow-400">
             <AlertTriangleIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <AlertTitle className="text-sm font-medium">
-              {suppressionReason === 'bounced' ? "Bounced Contact" : "Unsubscribed Contact"}
+              {isBounced ? "Bounced Contact" : "Unsubscribed Contact"}
             </AlertTitle>
             <AlertDescription className="text-yellow-700 dark:text-yellow-300 text-sm leading-relaxed">
-              {suppressionReason === 'bounced'
+              {isBounced
                 ? "This contact's email address has bounced. Future emails may not be delivered."
                 : "This customer has unsubscribed from the mailing list. Please do not send marketing or promotional emails to this contact. You may still send direct or scheduled messages if needed."}
             </AlertDescription>
