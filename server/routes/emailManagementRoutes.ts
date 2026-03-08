@@ -1628,7 +1628,7 @@ emailManagementRoutes.get("/bounced-emails/check/:email", authenticateToken, req
 
     const bouncedEmail = await db.query.bouncedEmails.findFirst({
       where: and(
-        sql`${bouncedEmails.email} = ${sanitizedEmail}`,
+        sql`LOWER(${bouncedEmails.email}) = ${sanitizedEmail.toLowerCase().trim()}`,
         eq(bouncedEmails.isActive, true),
       ),
     });
@@ -1641,7 +1641,6 @@ emailManagementRoutes.get("/bounced-emails/check/:email", authenticateToken, req
       bounceType: bouncedEmail?.bounceType || null,
       suppressedSince: bouncedEmail?.firstBouncedAt || null,
       suppressionReason: bouncedEmail?.suppressionReason || bouncedEmail?.bounceReason || null,
-      bouncedEmail: bouncedEmail || null,
     });
   } catch (error) {
     console.error('Check bounced email error:', error);

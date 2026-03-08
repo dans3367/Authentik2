@@ -2,8 +2,21 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and, desc, isNotNull } from 'drizzle-orm';
 import { newsletters, tenants, companies, masterEmailDesign, blogDesign } from '@shared/schema';
+import rateLimit from 'express-rate-limit';
+import { sanitizeEmailHtml } from './emailManagementRoutes';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 
 export const publicNewsletterRoutes = Router();
+
+const publicNewsletterRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many requests, please try again later.' },
+});
+
+publicNewsletterRoutes.use(publicNewsletterRateLimiter);
 
 async function getBrandingForTenant(tenantId: string, tenantName: string) {
   const company = await db.query.companies.findFirst({
@@ -48,10 +61,10 @@ async function getBrandingForTenant(tenantId: string, tenantName: string) {
 
 /**
  * GET /api/public/newsletters/preview/:tenantSlug/:newsletterId
- * Preview route used by the authenticated app UI so drafts and unsent newsletters
- * can be viewed in article/blog format before publication.
+ * Preview route — requires authentication and tenant membership to prevent
+ * unauthorized access to draft/unpublished newsletters.
  */
-publicNewsletterRoutes.get('/preview/:tenantSlug/:newsletterId', async (req, res) => {
+publicNewsletterRoutes.get('/preview/:tenantSlug/:newsletterId', authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { tenantSlug, newsletterId } = req.params;
 
@@ -61,6 +74,10 @@ publicNewsletterRoutes.get('/preview/:tenantSlug/:newsletterId', async (req, res
 
     if (!tenant) {
       return res.status(404).json({ message: 'Publication not found' });
+    }
+
+    if (tenant.id !== req.user.tenantId) {
+      return res.status(403).json({ message: 'Access denied' });
     }
 
     const newsletter = await db.query.newsletters.findFirst({
@@ -77,6 +94,8 @@ publicNewsletterRoutes.get('/preview/:tenantSlug/:newsletterId', async (req, res
 
     const branding = await getBrandingForTenant(tenant.id, tenant.name);
 
+    const sanitizedContent = newsletter.content ? sanitizeEmailHtml(newsletter.content) : '';
+
     res.json({
       tenant: {
         name: tenant.name,
@@ -87,7 +106,7 @@ publicNewsletterRoutes.get('/preview/:tenantSlug/:newsletterId', async (req, res
         id: newsletter.id,
         title: newsletter.title,
         subject: newsletter.subject,
-        content: newsletter.content,
+        content: sanitizedContent,
         webSlug: newsletter.webSlug,
         publishedAt: newsletter.publishedAt,
         createdAt: newsletter.createdAt,
@@ -211,6 +230,8 @@ publicNewsletterRoutes.get("/:tenantSlug/:webSlug", async (req, res) => {
 
     const branding = await getBrandingForTenant(tenant.id, tenant.name);
 
+    const sanitizedContent = newsletter.content ? sanitizeEmailHtml(newsletter.content) : '';
+
     res.json({
       tenant: {
         name: tenant.name,
@@ -221,7 +242,7 @@ publicNewsletterRoutes.get("/:tenantSlug/:webSlug", async (req, res) => {
         id: newsletter.id,
         title: newsletter.title,
         subject: newsletter.subject,
-        content: newsletter.content,
+        content: sanitizedContent,
         webSlug: newsletter.webSlug,
         publishedAt: newsletter.publishedAt,
         createdAt: newsletter.createdAt,

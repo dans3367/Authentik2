@@ -830,7 +830,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
   try {
     const { id } = req.params;
     const validatedData = updateNewsletterSchema.parse(req.body);
-    const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds, reactionsEnabled } = validatedData;
+    const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds, reactionsEnabled, publishedAt: _ignoredPublishedAt, webSlug: _ignoredWebSlug, ...rest } = validatedData;
 
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,

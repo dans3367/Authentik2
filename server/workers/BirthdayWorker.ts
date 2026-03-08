@@ -5,6 +5,15 @@ import { eq, and, sql, isNotNull } from 'drizzle-orm';
 import { enhancedEmailService } from '../emailService';
 import { sanitizeEmailHtml } from '../routes/emailManagementRoutes';
 
+function maskEmail(email: string): string {
+  const parts = email.split('@');
+  if (parts.length !== 2) return '***';
+  const local = parts[0];
+  const domain = parts[1];
+  const maskedLocal = local.length <= 2 ? '*'.repeat(local.length) : local[0] + '*'.repeat(local.length - 2) + local[local.length - 1];
+  return `${maskedLocal}@${domain}`;
+}
+
 
 export interface BirthdayJob {
   id: string;
@@ -208,7 +217,7 @@ export class BirthdayWorker extends EventEmitter {
       // Create birthday jobs for each contact
       for (const contact of contacts) {
         const jobId = this.createBirthdayJob(contact, settings);
-        console.log(`🎂 [BirthdayWorker] Created birthday job ${jobId} for ${contact.email}${settings.promotion ? ' with promotion' : ''}`);
+        console.log(`🎂 [BirthdayWorker] Created birthday job ${jobId} for ${maskEmail(contact.email)}${settings.promotion ? ' with promotion' : ''}`);
       }
 
       // Process jobs in batches
@@ -298,14 +307,14 @@ export class BirthdayWorker extends EventEmitter {
 
       if (suppressionRecord) {
         const reason = suppressionRecord.suppressionReason || suppressionRecord.bounceReason || suppressionRecord.bounceType || 'provider suppression';
-        console.log(`🚫 [BirthdayWorker] Skipping suppressed email ${job.contactEmail} (type=${suppressionRecord.bounceType}, reason=${reason})`);
+        console.log(`🚫 [BirthdayWorker] Skipping suppressed email ${maskEmail(job.contactEmail)} (type=${suppressionRecord.bounceType}, reason=${reason})`);
         progress.status = 'failed';
         progress.error = `Email suppressed: ${reason}`;
         this.emit('jobFailed', { jobId, job, error: progress.error });
         return;
       }
 
-      console.log(`🎂 [BirthdayWorker] Sending birthday card to ${job.contactEmail}`);
+      console.log(`🎂 [BirthdayWorker] Sending birthday card to ${maskEmail(job.contactEmail)}`);
 
       // Prepare recipient name
       const recipientName = job.contactFirstName
@@ -327,12 +336,12 @@ export class BirthdayWorker extends EventEmitter {
         if (tokenResponse.ok) {
           const tokenData = await tokenResponse.json();
           unsubscribeToken = tokenData.token;
-          console.log(`🔗 [BirthdayWorker] Generated unsubscribe token for ${job.contactEmail}`);
+          console.log(`🔗 [BirthdayWorker] Generated unsubscribe token for ${maskEmail(job.contactEmail)}`);
         } else {
-          console.warn(`⚠️ [BirthdayWorker] Failed to generate unsubscribe token for ${job.contactEmail}: ${tokenResponse.status}`);
+          console.warn(`⚠️ [BirthdayWorker] Failed to generate unsubscribe token for ${maskEmail(job.contactEmail)}: ${tokenResponse.status}`);
         }
       } catch (error) {
-        console.warn(`⚠️ [BirthdayWorker] Error generating unsubscribe token for ${job.contactEmail}:`, error);
+        console.warn(`⚠️ [BirthdayWorker] Error generating unsubscribe token for ${maskEmail(job.contactEmail)}:`, error);
       }
 
       // Render birthday template with promotion content and unsubscribe link
@@ -377,7 +386,7 @@ export class BirthdayWorker extends EventEmitter {
         progress.messageId = result.messageId;
         progress.provider = result.providerId;
 
-        console.log(`✅ [BirthdayWorker] Birthday card sent successfully to ${job.contactEmail}: ${result.messageId}`);
+        console.log(`✅ [BirthdayWorker] Birthday card sent successfully to ${maskEmail(job.contactEmail)}: ${result.messageId}`);
         this.emit('jobCompleted', { jobId, job, result });
 
       } else {
@@ -388,7 +397,7 @@ export class BirthdayWorker extends EventEmitter {
       progress.status = 'failed';
       progress.error = error instanceof Error ? error.message : String(error);
 
-      console.error(`❌ [BirthdayWorker] Failed to send birthday card to ${job.contactEmail}:`, error);
+      console.error(`❌ [BirthdayWorker] Failed to send birthday card to ${maskEmail(job.contactEmail)}:`, error);
       this.emit('jobFailed', { jobId, job, error });
     }
   }

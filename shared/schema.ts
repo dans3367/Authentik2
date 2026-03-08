@@ -522,7 +522,9 @@ export const newsletters = pgTable("newsletters", {
   webSlug: text("web_slug"), // URL-friendly slug for the newsletter (auto-generated from title)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  uniqueTenantWebSlug: uniqueIndex("newsletters_tenant_web_slug_idx").on(table.tenantId, table.webSlug).where(sql`web_slug IS NOT NULL`),
+}));
 
 // Newsletter task status for tracking processing stages
 export const newsletterTaskStatus = pgTable("newsletter_task_status", {
@@ -1766,8 +1768,6 @@ export const updateNewsletterSchema = z.object({
   reviewStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
   reviewNotes: z.string().optional(),
   reactionsEnabled: z.boolean().optional(),
-  publishedAt: z.union([z.string(), z.date()]).optional().nullable(),
-  webSlug: z.string().optional().nullable(),
 });
 
 export const insertNewsletterSchema = createInsertSchema(newsletters).omit({
