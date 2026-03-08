@@ -243,42 +243,51 @@ start_service() {
     eval "$command" &
     local service_pid=$!
     
-    # Wait a moment for the service to start
-    sleep 3
+    # Poll up to 30 seconds for the service to bind the port
+    local max_wait=30
+    local elapsed=0
+    print_status "Waiting up to ${max_wait}s for $service_name to bind port $port..."
 
-    # Ensure the launched process itself is still alive
-    if ! kill -0 "$service_pid" 2>/dev/null; then
-        print_error "$service_name process exited early (PID: $service_pid)"
-        return 1
-    fi
+    while [ $elapsed -lt $max_wait ]; do
+        sleep 1
+        elapsed=$((elapsed + 1))
 
-    local port_pids
-    port_pids=$(get_listening_pids "$port")
-    
-    # Check if the service (or one of its children) is running on the expected port
-    if [ -n "$port_pids" ]; then
-        local matched=0
-        while read -r port_pid; do
-            [ -z "$port_pid" ] && continue
-            if pid_descends_from "$port_pid" "$service_pid"; then
-                matched=1
-                break
-            fi
-        done <<< "$port_pids"
-
-        if [ "$matched" -eq 0 ]; then
-            print_error "$service_name did not bind port $port (port is used by unrelated PID(s): $(echo "$port_pids" | tr '\n' ' '))"
-            kill "$service_pid" 2>/dev/null
+        # If the process died, fail immediately
+        if ! kill -0 "$service_pid" 2>/dev/null; then
+            print_error "$service_name process exited early (PID: $service_pid)"
             return 1
         fi
 
-        print_success "$service_name is running on port $port (PID: $service_pid)"
-        echo "$service_pid" >> /tmp/authentik_web_pids.txt
-        return 0
+        local port_pids
+        port_pids=$(get_listening_pids "$port")
+
+        if [ -n "$port_pids" ]; then
+            # Verify the listener is our process (or a child of it)
+            local matched=0
+            while read -r port_pid; do
+                [ -z "$port_pid" ] && continue
+                if pid_descends_from "$port_pid" "$service_pid"; then
+                    matched=1
+                    break
+                fi
+            done <<< "$port_pids"
+
+            if [ "$matched" -eq 1 ]; then
+                print_success "$service_name is running on port $port (PID: $service_pid) — ready in ${elapsed}s"
+                echo "$service_pid" >> /tmp/authentik_web_pids.txt
+                return 0
+            fi
+        fi
+    done
+
+    # Timed out — check one last time why
+    if ! kill -0 "$service_pid" 2>/dev/null; then
+        print_error "$service_name process exited before binding port $port"
     else
-        print_error "$service_name failed to start on port $port"
-        return 1
+        print_error "$service_name is still running (PID: $service_pid) but did not bind port $port within ${max_wait}s"
+        print_error "The server may need more time — check logs above for errors"
     fi
+    return 1
 }
 
 # Function to cleanup background processes on exit
