@@ -407,6 +407,13 @@
       "when": 1772932747035,
       "tag": "0057_ancient_hitman",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1772946674753,
+      "tag": "0058_medical_thena",
+      "breakpoints": true
     }
   ]
 }

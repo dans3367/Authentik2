@@ -589,7 +589,7 @@ export const campaigns = pgTable("campaigns", {
   userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
   description: text("description"),
-  type: text("type").notNull().default('email'), // email, sms, push, social
+  type: text("type").notNull().default('email'), // email, sms, push, social, intake_form
   status: text("status").notNull().default('draft'), // draft, active, paused, completed, cancelled
   budget: decimal("budget", { precision: 10, scale: 2 }),
   currency: text("currency").default('USD'),
@@ -626,6 +626,19 @@ export const campaignNewsletters = pgTable("campaign_newsletters", {
   campaignNewsletterUnique: uniqueIndex("campaign_newsletter_unique").on(table.campaignId, table.newsletterId),
   campaignIdx: index("idx_campaign_newsletters_campaign").on(table.campaignId),
   newsletterIdx: index("idx_campaign_newsletters_newsletter").on(table.newsletterId),
+}));
+
+// Campaign-Form junction table for aggregating intake form signups across campaigns
+export const campaignForms = pgTable("campaign_forms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => campaigns.id, { onDelete: 'cascade' }),
+  formId: varchar("form_id").notNull().references(() => forms.id, { onDelete: 'cascade' }),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  addedAt: timestamp("added_at").defaultNow(),
+}, (table) => ({
+  campaignFormUnique: uniqueIndex("campaign_form_unique").on(table.campaignId, table.formId),
+  campaignIdx: index("idx_campaign_forms_campaign").on(table.campaignId),
+  formIdx: index("idx_campaign_forms_form").on(table.formId),
 }));
 
 // Email activity tracking for webhook events
@@ -1848,6 +1861,7 @@ export const campaignRelations = relations(campaigns, ({ one, many }) => ({
     references: [betterAuthUser.id],
   }),
   campaignNewsletters: many(campaignNewsletters),
+  campaignForms: many(campaignForms),
 }));
 
 // Campaign-Newsletter junction relations
@@ -1862,11 +1876,23 @@ export const campaignNewsletterRelations = relations(campaignNewsletters, ({ one
   }),
 }));
 
+// Campaign-Form junction relations
+export const campaignFormRelations = relations(campaignForms, ({ one }) => ({
+  campaign: one(campaigns, {
+    fields: [campaignForms.campaignId],
+    references: [campaigns.id],
+  }),
+  form: one(forms, {
+    fields: [campaignForms.formId],
+    references: [forms.id],
+  }),
+}));
+
 // Campaign schemas
 export const createCampaignSchema = z.object({
   name: z.string().min(1, "Campaign name is required"),
   description: z.string().optional(),
-  type: z.enum(['email', 'sms', 'push', 'social']).default('email'),
+  type: z.enum(['email', 'sms', 'push', 'social', 'intake_form']).default('email'),
   status: z.enum(['draft', 'active', 'paused', 'completed', 'cancelled']).default('draft'),
   budget: z.number().positive("Budget must be positive").optional(),
   currency: z.string().default('USD'),
@@ -1879,12 +1905,13 @@ export const createCampaignSchema = z.object({
   requiresReviewerApproval: z.boolean().default(false),
   reviewerId: z.string().optional(),
   newsletterIds: z.array(z.string()).optional(),
+  formIds: z.array(z.string()).optional(),
 });
 
 export const updateCampaignSchema = z.object({
   name: z.string().min(1, "Campaign name is required").optional(),
   description: z.string().optional(),
-  type: z.enum(['email', 'sms', 'push', 'social']).optional(),
+  type: z.enum(['email', 'sms', 'push', 'social', 'intake_form']).optional(),
   status: z.enum(['draft', 'active', 'paused', 'completed', 'cancelled']).optional(),
   budget: z.number().positive("Budget must be positive").optional(),
   currency: z.string().optional(),
@@ -1900,6 +1927,7 @@ export const updateCampaignSchema = z.object({
   reviewNotes: z.string().optional(),
   isActive: z.boolean().optional(),
   newsletterIds: z.array(z.string()).optional(),
+  formIds: z.array(z.string()).optional(),
 });
 
 export const insertCampaignSchema = createInsertSchema(campaigns).omit({
@@ -1916,6 +1944,7 @@ export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
 export type CreateCampaignData = z.infer<typeof createCampaignSchema>;
 export type UpdateCampaignData = z.infer<typeof updateCampaignSchema>;
 export type CampaignNewsletter = typeof campaignNewsletters.$inferSelect;
+export type CampaignForm = typeof campaignForms.$inferSelect;
 
 export interface NewsletterWithUser extends Newsletter {
   user: User;

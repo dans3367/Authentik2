@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import {
   CalendarIcon, DollarSign, Target, TrendingUp, Newspaper, Search,
-  Plus, X, ArrowLeft, Save, Loader2, Mail, Zap, Check,
+  Plus, X, ArrowLeft, Save, Loader2, Mail, Zap, Check, ClipboardList,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -18,12 +18,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import { createCampaignSchema, type CreateCampaignData, type User } from '@shared/schema';
+import { createCampaignSchema, type CreateCampaignData } from '@shared/schema';
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -43,6 +42,8 @@ export default function CreateCampaignPage() {
   const [currentGoal, setCurrentGoal] = useState('');
   const [selectedNewsletterIds, setSelectedNewsletterIds] = useState<string[]>([]);
   const [newsletterSearch, setNewsletterSearch] = useState('');
+  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
+  const [formSearch, setFormSearch] = useState('');
 
   const form = useForm<CreateCampaignData>({
     resolver: zodResolver(createCampaignSchema),
@@ -53,20 +54,9 @@ export default function CreateCampaignPage() {
       status: 'draft',
       currency: 'USD',
       goals: [],
-      requiresReviewerApproval: false,
-      reviewerId: '',
       newsletterIds: [],
+      formIds: [],
     },
-  });
-
-  // Fetch eligible reviewers
-  const { data: reviewersData, isLoading: reviewersLoading } = useQuery<{ managers: User[] }>({
-    queryKey: ['/api/campaigns/managers'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/campaigns/managers');
-      return await response.json();
-    },
-    staleTime: 60_000,
   });
 
   // Fetch available newsletters
@@ -79,8 +69,19 @@ export default function CreateCampaignPage() {
     staleTime: 30_000,
   });
 
-  const reviewers = reviewersData?.managers || [];
   const allNewsletters = newslettersData?.newsletters || [];
+
+  // Fetch available forms
+  const { data: formsData, isLoading: formsLoading } = useQuery<{ forms: any[] }>({
+    queryKey: ['/api/campaigns/forms/available'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/campaigns/forms/available');
+      return await response.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const allForms = formsData?.forms || [];
 
   // Filter newsletters by search
   const filteredNewsletters = useMemo(() => {
@@ -90,6 +91,25 @@ export default function CreateCampaignPage() {
       nl.title?.toLowerCase().includes(q) || nl.subject?.toLowerCase().includes(q)
     );
   }, [allNewsletters, newsletterSearch]);
+
+  // Filter forms by search
+  const filteredForms = useMemo(() => {
+    if (!formSearch.trim()) return allForms;
+    const q = formSearch.toLowerCase();
+    return allForms.filter((f: any) =>
+      f.title?.toLowerCase().includes(q) || f.description?.toLowerCase().includes(q)
+    );
+  }, [allForms, formSearch]);
+
+  const toggleForm = (formId: string) => {
+    setSelectedFormIds(prev => {
+      const next = prev.includes(formId) ? prev.filter(id => id !== formId) : [...prev, formId];
+      form.setValue('formIds', next);
+      return next;
+    });
+  };
+
+  const watchedType = form.watch('type');
 
   const toggleNewsletter = (nlId: string) => {
     setSelectedNewsletterIds(prev => {
@@ -119,6 +139,7 @@ export default function CreateCampaignPage() {
       ...data,
       goals,
       newsletterIds: selectedNewsletterIds,
+      formIds: selectedFormIds,
     });
   };
 
@@ -210,6 +231,7 @@ export default function CreateCampaignPage() {
                         <SelectItem value="sms"><span className="flex items-center gap-2"><Zap className="h-3.5 w-3.5 text-orange-500" /> SMS</span></SelectItem>
                         <SelectItem value="push"><span className="flex items-center gap-2"><Target className="h-3.5 w-3.5 text-indigo-500" /> Push</span></SelectItem>
                         <SelectItem value="social"><span className="flex items-center gap-2"><TrendingUp className="h-3.5 w-3.5 text-pink-500" /> Social</span></SelectItem>
+                        <SelectItem value="intake_form"><span className="flex items-center gap-2"><ClipboardList className="h-3.5 w-3.5 text-teal-500" /> Intake Form Signups</span></SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -328,6 +350,98 @@ export default function CreateCampaignPage() {
               </div>
               <p className="text-xs text-muted-foreground">
                 {selectedNewsletterIds.length} newsletter{selectedNewsletterIds.length !== 1 ? 's' : ''} selected
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* ── Intake Form Selection ── */}
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                  <ClipboardList className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Intake Forms</CardTitle>
+                  <CardDescription className="mt-0.5">
+                    Select intake forms to track signups as part of this campaign
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <Separator />
+            <CardContent className="pt-6 space-y-4">
+              {/* Selected forms summary */}
+              {selectedFormIds.length > 0 && (
+                <div className="flex flex-wrap gap-2 pb-2">
+                  {selectedFormIds.map(fId => {
+                    const f = allForms.find((fm: any) => fm.id === fId);
+                    return f ? (
+                      <Badge key={fId} variant="secondary" className="py-1 pl-2.5 pr-1.5 gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors" onClick={() => toggleForm(fId)}>
+                        {f.title}
+                        <X className="h-3 w-3" />
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search forms by title..."
+                  value={formSearch}
+                  onChange={(e) => setFormSearch(e.target.value)}
+                  className="pl-9 h-9 text-sm"
+                />
+              </div>
+
+              {/* Form list */}
+              <div className="max-h-[300px] overflow-y-auto border rounded-lg divide-y">
+                {formsLoading ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">Loading forms...</div>
+                ) : filteredForms.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    {allForms.length === 0 ? 'No forms available yet' : 'No forms match your search'}
+                  </div>
+                ) : (
+                  filteredForms.map((f: any) => {
+                    const isSelected = selectedFormIds.includes(f.id);
+                    return (
+                      <div
+                        key={f.id}
+                        className={cn(
+                          "flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-muted/50",
+                          isSelected && "bg-teal-50/50 dark:bg-teal-900/10"
+                        )}
+                        onClick={() => toggleForm(f.id)}
+                      >
+                        <div className={cn(
+                          "flex items-center justify-center h-5 w-5 rounded border-2 shrink-0 transition-colors",
+                          isSelected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300 dark:border-gray-600"
+                        )}>
+                          {isSelected && <Check className="h-3 w-3" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{f.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{f.description || 'No description'}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge variant="secondary" className={`text-[10px] ${f.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                            {f.isActive ? 'Active' : 'Inactive'}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">
+                            {f.responseCount || 0} signups
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {selectedFormIds.length} form{selectedFormIds.length !== 1 ? 's' : ''} selected
               </p>
             </CardContent>
           </Card>
@@ -471,64 +585,6 @@ export default function CreateCampaignPage() {
                   <FormMessage />
                 </FormItem>
               )} />
-            </CardContent>
-          </Card>
-
-          {/* ── Review & Approval ── */}
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
-                  <Target className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                </div>
-                <div>
-                  <CardTitle className="text-base">Review & Approval</CardTitle>
-                  <CardDescription className="mt-0.5">Configure approval workflow for this campaign</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <Separator />
-            <CardContent className="pt-6 space-y-5">
-              <FormField control={form.control} name="requiresReviewerApproval" render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-muted/30">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-sm font-medium">Requires Reviewer Approval</FormLabel>
-                    <FormDescription className="text-xs">Campaign will need manager approval before activation</FormDescription>
-                  </div>
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                </FormItem>
-              )} />
-
-              {form.watch('requiresReviewerApproval') && (
-                <FormField control={form.control} name="reviewerId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Select Reviewer</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={reviewersLoading ? "Loading reviewers..." : "Select a reviewer"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {reviewersLoading ? (
-                          <SelectItem value="loading" disabled>Loading reviewers...</SelectItem>
-                        ) : reviewers.length === 0 ? (
-                          <SelectItem value="no-reviewers" disabled>No reviewers available</SelectItem>
-                        ) : (
-                          reviewers.map((reviewer: User) => (
-                            <SelectItem key={reviewer.id} value={reviewer.id}>
-                              {reviewer.firstName} {reviewer.lastName} - {reviewer.email} ({reviewer.role})
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              )}
             </CardContent>
           </Card>
 

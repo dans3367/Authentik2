@@ -90,7 +90,7 @@ const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, max
       { name: t?.('navigation.surveyForms') || "Survey Forms", href: "/forms", icon: FileQuestion },
     ] },
     { name: t?.('navigation.templates') || "Templates", href: "/templates", icon: FileText },
-    { name: t?.('navigation.emailCampaigns') || "Email Campaigns", href: "/email-campaigns", icon: Mail },
+    { name: t?.('navigation.campaigns') || "Campaigns", href: "/email-campaigns", icon: Target },
     { name: t?.('navigation.cards') || "e-Cards", href: "/cards", icon: Gift },
     { name: t?.('navigation.reminders') || "Appointments", href: "/reminders", icon: Bell },
     { name: t?.('navigation.contacts') || "Contacts", href: "/email-contacts", icon: UserCheck },

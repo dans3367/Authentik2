@@ -23,6 +23,7 @@ import {
   Newspaper,
   Users,
   ArrowUpRight,
+  ClipboardList,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,8 @@ function getTypeBorderAccent(type: string) {
       return "border-l-indigo-500";
     case "social":
       return "border-l-pink-500";
+    case "intake_form":
+      return "border-l-teal-500";
     default:
       return "border-l-gray-400";
   }
@@ -94,8 +97,21 @@ function getTypeIcon(type: string) {
       return <Target className="h-4 w-4" />;
     case "social":
       return <TrendingUp className="h-4 w-4" />;
+    case "intake_form":
+      return <ClipboardList className="h-4 w-4" />;
     default:
       return <Mail className="h-4 w-4" />;
+  }
+}
+
+function getTypeLabel(type: string) {
+  switch (type) {
+    case "email": return "Email";
+    case "sms": return "SMS";
+    case "push": return "Push";
+    case "social": return "Social";
+    case "intake_form": return "Intake Form";
+    default: return type;
   }
 }
 
@@ -111,7 +127,7 @@ export default function EmailCampaignsPage() {
 
   useSetBreadcrumbs([
     { label: t("navigation.dashboard"), href: "/", icon: LayoutDashboard },
-    { label: t("emailCampaigns.title"), icon: Target },
+    { label: "Campaigns", icon: Target },
   ]);
 
   // Fetch campaigns (enriched with newsletter count + aggregated stats)
@@ -227,10 +243,10 @@ export default function EmailCampaignsPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-foreground">
-              {t("emailCampaigns.title")}
+              Campaigns
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Group newsletters into campaigns and track aggregated performance across stores
+              Group newsletters and intake forms into campaigns to track aggregated performance
             </p>
           </div>
         </div>
@@ -241,7 +257,7 @@ export default function EmailCampaignsPage() {
           data-testid="button-create-campaign"
         >
           <Plus className="h-4 w-4 mr-1.5" />
-          {t("emailCampaigns.createCampaign")}
+          Create Campaign
         </Button>
       </div>
 
@@ -315,7 +331,7 @@ export default function EmailCampaignsPage() {
             <div>
               <CardTitle className="text-base">All Campaigns</CardTitle>
               <CardDescription className="mt-0.5">
-                View and manage campaigns with aggregated newsletter analytics
+                View and manage campaigns with aggregated analytics
               </CardDescription>
             </div>
           </div>
@@ -358,7 +374,7 @@ export default function EmailCampaignsPage() {
               </p>
               <Button onClick={() => setLocation("/campaigns/create")}>
                 <Plus className="h-4 w-4 mr-1.5" />
-                {t("emailCampaigns.createCampaign")}
+                Create Campaign
               </Button>
             </div>
           ) : filteredCampaigns.length === 0 ? (
@@ -372,6 +388,8 @@ export default function EmailCampaignsPage() {
               {filteredCampaigns.map((campaign: any) => {
                 const agg = campaign.aggregatedStats || {};
                 const nlCount = campaign.newsletterCount || 0;
+                const fmCount = campaign.formCount || 0;
+                const fmStats = campaign.formStats || {};
 
                 return (
                   <div
@@ -389,6 +407,10 @@ export default function EmailCampaignsPage() {
                             <h3 className="font-semibold text-base text-foreground truncate">
                               {campaign.name}
                             </h3>
+                            <Badge variant="outline" className="text-[10px] font-medium shrink-0 gap-1">
+                              {getTypeIcon(campaign.type)}
+                              {getTypeLabel(campaign.type)}
+                            </Badge>
                             <Badge variant="secondary" className={`text-[11px] font-medium shrink-0 ${getStatusBadgeClasses(campaign.status)}`}>
                               {campaign.status}
                             </Badge>
@@ -423,12 +445,20 @@ export default function EmailCampaignsPage() {
                         </div>
                       </div>
 
-                      {/* Row 2: Newsletter count + timeline */}
+                      {/* Row 2: Type counts + timeline */}
                       <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-                        <div className="flex items-center gap-1.5">
-                          <Newspaper className="h-3.5 w-3.5" />
-                          <span className="font-medium">{nlCount} newsletter{nlCount !== 1 ? 's' : ''}</span>
-                        </div>
+                        {nlCount > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <Newspaper className="h-3.5 w-3.5" />
+                            <span className="font-medium">{nlCount} newsletter{nlCount !== 1 ? 's' : ''}</span>
+                          </div>
+                        )}
+                        {fmCount > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <ClipboardList className="h-3.5 w-3.5" />
+                            <span className="font-medium">{fmCount} form{fmCount !== 1 ? 's' : ''}</span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5">
                           <Calendar className="h-3.5 w-3.5" />
                           {campaign.startDate ? (
@@ -443,8 +473,8 @@ export default function EmailCampaignsPage() {
                       </div>
 
                       {/* Row 3: Aggregated Stats */}
-                      {nlCount > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                      {nlCount > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-3">
                           <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/40">
                             <Send className="h-3.5 w-3.5 text-blue-500" />
                             <div>
@@ -488,10 +518,32 @@ export default function EmailCampaignsPage() {
                             </div>
                           </div>
                         </div>
-                      ) : (
+                      )}
+
+                      {/* Row 4: Form Signup Stats */}
+                      {fmCount > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-teal-50/50 dark:bg-teal-900/10">
+                            <ClipboardList className="h-3.5 w-3.5 text-teal-500" />
+                            <div>
+                              <p className="text-xs text-muted-foreground">Forms</p>
+                              <p className="text-sm font-semibold">{fmStats.totalForms || 0}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-teal-50/50 dark:bg-teal-900/10">
+                            <Users className="h-3.5 w-3.5 text-teal-600" />
+                            <div>
+                              <p className="text-xs text-muted-foreground">Total Signups</p>
+                              <p className="text-sm font-semibold">{(fmStats.totalSignups || 0).toLocaleString()}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {nlCount === 0 && fmCount === 0 && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground italic px-3 py-2 rounded-md bg-muted/30">
-                          <Newspaper className="h-3.5 w-3.5" />
-                          No newsletters attached — add newsletters to see aggregated analytics
+                          <Target className="h-3.5 w-3.5" />
+                          No newsletters or forms attached — add items to see aggregated analytics
                         </div>
                       )}
                     </div>

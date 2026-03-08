@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and, inArray } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
-import { betterAuthUser, campaigns, campaignNewsletters, newsletters, convexNewsletterStats, createCampaignSchema, updateCampaignSchema } from '@shared/schema';
+import { betterAuthUser, campaigns, campaignNewsletters, campaignForms, newsletters, forms, formResponses, convexNewsletterStats, createCampaignSchema, updateCampaignSchema } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { getNewsletterStats } from '../utils/convexNewsletterTracker';
 
@@ -32,6 +32,61 @@ async function getCampaignNewsletterIds(campaignId: string): Promise<string[]> {
     .from(campaignNewsletters)
     .where(eq(campaignNewsletters.campaignId, campaignId));
   return rows.map(r => r.newsletterId);
+}
+
+// Helper: sync form associations for a campaign
+async function syncCampaignForms(campaignId: string, formIds: string[], tenantId: string) {
+  await db.delete(campaignForms)
+    .where(eq(campaignForms.campaignId, campaignId));
+
+  if (formIds.length > 0) {
+    await db.insert(campaignForms).values(
+      formIds.map(fId => ({
+        campaignId,
+        formId: fId,
+        tenantId,
+      }))
+    );
+  }
+}
+
+// Helper: get form IDs for a campaign
+async function getCampaignFormIds(campaignId: string): Promise<string[]> {
+  const rows = await db.select({ formId: campaignForms.formId })
+    .from(campaignForms)
+    .where(eq(campaignForms.campaignId, campaignId));
+  return rows.map(r => r.formId);
+}
+
+// Helper: get aggregated form signup stats for a list of form IDs
+async function getAggregatedFormStats(formIds: string[]) {
+  if (formIds.length === 0) {
+    return { totalForms: 0, totalSignups: 0, formBreakdown: [] };
+  }
+
+  const formsList = await db.query.forms.findMany({
+    where: inArray(forms.id, formIds),
+  });
+
+  let totalSignups = 0;
+  const formBreakdown = await Promise.all(
+    formsList.map(async (f: any) => {
+      const responseCount = await db.select({
+        count: sql<number>`count(*)`,
+      }).from(formResponses).where(eq(formResponses.formId, f.id));
+      const signups = Number(responseCount[0]?.count || 0);
+      totalSignups += signups;
+      return {
+        formId: f.id,
+        title: f.title,
+        category: f.category,
+        signups,
+        isActive: f.isActive,
+      };
+    })
+  );
+
+  return { totalForms: formIds.length, totalSignups, formBreakdown };
 }
 
 // Helper: get aggregated stats for a list of newsletter IDs
@@ -138,6 +193,30 @@ campaignRoutes.get("/newsletters/available", authenticateToken, requireTenant, a
   }
 });
 
+// Get intake forms for campaign picker
+campaignRoutes.get("/forms/available", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const tenantForms = await db.query.forms.findMany({
+      where: sql`${forms.tenantId} = ${req.user.tenantId}`,
+      orderBy: sql`${forms.createdAt} DESC`,
+      columns: {
+        id: true,
+        title: true,
+        description: true,
+        category: true,
+        isActive: true,
+        responseCount: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({ forms: tenantForms });
+  } catch (error) {
+    console.error('Get available forms error:', error);
+    res.status(500).json({ message: 'Failed to get forms' });
+  }
+});
+
 // Get eligible reviewers (all users except Employee role)
 campaignRoutes.get("/managers", authenticateToken, requireTenant, async (req: any, res) => {
   try {
@@ -187,19 +266,25 @@ campaignRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) 
       offset,
       with: {
         campaignNewsletters: true,
+        campaignForms: true,
       },
     });
 
-    // Enrich each campaign with newsletter count and aggregated stats
+    // Enrich each campaign with newsletter count, form count, and aggregated stats
     const enrichedCampaigns = await Promise.all(
       tenantCampaigns.map(async (c: any) => {
         const nlIds = (c.campaignNewsletters || []).map((cn: any) => cn.newsletterId);
+        const fIds = (c.campaignForms || []).map((cf: any) => cf.formId);
         const aggregatedStats = await getAggregatedNewsletterStats(nlIds);
+        const formStats = await getAggregatedFormStats(fIds);
         return {
           ...c,
           newsletterCount: nlIds.length,
           newsletterIds: nlIds,
+          formCount: fIds.length,
+          formIds: fIds,
           aggregatedStats,
+          formStats,
         };
       })
     );
@@ -232,6 +317,7 @@ campaignRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, re
       where: sql`${campaigns.id} = ${id} AND ${campaigns.tenantId} = ${req.user.tenantId}`,
       with: {
         campaignNewsletters: true,
+        campaignForms: true,
       },
     });
 
@@ -240,6 +326,7 @@ campaignRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, re
     }
 
     const nlIds = ((campaign as any).campaignNewsletters || []).map((cn: any) => cn.newsletterId);
+    const fIds = ((campaign as any).campaignForms || []).map((cf: any) => cf.formId);
 
     // Fetch full newsletter objects for the associated newsletters
     let campaignNewslettersList: any[] = [];
@@ -283,15 +370,19 @@ campaignRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, re
     );
 
     const aggregatedStats = await getAggregatedNewsletterStats(nlIds);
+    const formStats = await getAggregatedFormStats(fIds);
 
     res.json({
       campaign: {
         ...campaign,
         newsletterIds: nlIds,
         newsletterCount: nlIds.length,
+        formIds: fIds,
+        formCount: fIds.length,
       },
       newsletters: newslettersWithStats,
       aggregatedStats,
+      formStats,
     });
   } catch (error) {
     console.error('Get campaign error:', error);
@@ -303,7 +394,7 @@ campaignRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, re
 campaignRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const validatedData = createCampaignSchema.parse(req.body);
-    const { name, description, type, targetAudience, budget, startDate, endDate, status, newsletterIds } = validatedData;
+    const { name, description, type, targetAudience, budget, startDate, endDate, status, newsletterIds, formIds } = validatedData;
 
     const sanitizedName = sanitizeString(name);
     const sanitizedDescription = description ? sanitizeString(description) : null;
@@ -331,7 +422,12 @@ campaignRoutes.post("/", authenticateToken, requireTenant, async (req: any, res)
       await syncCampaignNewsletters(created.id, newsletterIds, req.user.tenantId);
     }
 
-    res.status(201).json({ ...created, newsletterIds: newsletterIds || [] });
+    // Sync form associations
+    if (formIds && formIds.length > 0) {
+      await syncCampaignForms(created.id, formIds, req.user.tenantId);
+    }
+
+    res.status(201).json({ ...created, newsletterIds: newsletterIds || [], formIds: formIds || [] });
   } catch (error) {
     console.error('Create campaign error:', error);
     res.status(500).json({ message: 'Failed to create campaign' });
@@ -343,7 +439,7 @@ campaignRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, re
   try {
     const { id } = req.params;
     const validatedData = updateCampaignSchema.parse(req.body);
-    const { name, description, type, targetAudience, budget, startDate, endDate, status, newsletterIds } = validatedData;
+    const { name, description, type, targetAudience, budget, startDate, endDate, status, newsletterIds, formIds } = validatedData;
 
     const campaign = await db.query.campaigns.findFirst({
       where: sql`${campaigns.id} = ${id} AND ${campaigns.tenantId} = ${req.user.tenantId}`,
@@ -399,9 +495,15 @@ campaignRoutes.put("/:id", authenticateToken, requireTenant, async (req: any, re
       await syncCampaignNewsletters(id, newsletterIds, req.user.tenantId);
     }
 
-    const nlIds = newsletterIds ?? await getCampaignNewsletterIds(id);
+    // Sync form associations if provided
+    if (formIds !== undefined) {
+      await syncCampaignForms(id, formIds, req.user.tenantId);
+    }
 
-    res.json({ ...updatedCampaign[0], newsletterIds: nlIds });
+    const nlIds = newsletterIds ?? await getCampaignNewsletterIds(id);
+    const fIds = formIds ?? await getCampaignFormIds(id);
+
+    res.json({ ...updatedCampaign[0], newsletterIds: nlIds, formIds: fIds });
   } catch (error) {
     console.error('Update campaign error:', error);
     res.status(500).json({ message: 'Failed to update campaign' });

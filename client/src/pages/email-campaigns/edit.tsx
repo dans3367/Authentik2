@@ -17,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import {
   Form,
   FormControl,
@@ -25,7 +24,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import {
   Select,
@@ -51,7 +49,6 @@ import {
   Zap,
   AlertTriangle,
   Plus,
-  ClipboardCheck,
   Newspaper,
   Search,
   Check,
@@ -61,13 +58,13 @@ import {
   Users,
   ArrowUpRight,
   BarChart3,
+  ClipboardList,
 } from "lucide-react";
 
 import {
   createCampaignSchema,
   type CreateCampaignData,
   type Campaign,
-  type User,
 } from "@shared/schema";
 
 function getStatusColor(status: string) {
@@ -91,6 +88,8 @@ export default function EditCampaignPage() {
   const [currentGoal, setCurrentGoal] = useState("");
   const [selectedNewsletterIds, setSelectedNewsletterIds] = useState<string[]>([]);
   const [newsletterSearch, setNewsletterSearch] = useState("");
+  const [selectedFormIds, setSelectedFormIds] = useState<string[]>([]);
+  const [formSearch, setFormSearch] = useState("");
 
   useSetBreadcrumbs([
     { label: t("navigation.dashboard"), href: "/", icon: LayoutDashboard },
@@ -114,16 +113,6 @@ export default function EditCampaignPage() {
     },
   });
 
-  // Fetch eligible reviewers
-  const { data: reviewersData, isLoading: reviewersLoading } = useQuery<{ managers: User[] }>({
-    queryKey: ["/api/campaigns/managers"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/campaigns/managers");
-      return res.json();
-    },
-    staleTime: 60_000,
-  });
-
   // Fetch available newsletters for the picker
   const { data: newslettersData, isLoading: newslettersLoading } = useQuery<{ newsletters: any[] }>({
     queryKey: ["/api/campaigns/newsletters/available"],
@@ -134,8 +123,19 @@ export default function EditCampaignPage() {
     staleTime: 30_000,
   });
 
-  const reviewers = reviewersData?.managers || [];
   const allNewsletters = newslettersData?.newsletters || [];
+
+  // Fetch available forms for the picker
+  const { data: formsData, isLoading: formsLoading } = useQuery<{ forms: any[] }>({
+    queryKey: ["/api/campaigns/forms/available"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/campaigns/forms/available");
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const allForms = formsData?.forms || [];
 
   // Filter newsletters by search
   const filteredNewsletters = useMemo(() => {
@@ -150,6 +150,23 @@ export default function EditCampaignPage() {
     setSelectedNewsletterIds(prev => {
       const next = prev.includes(nlId) ? prev.filter(id => id !== nlId) : [...prev, nlId];
       form.setValue("newsletterIds", next);
+      return next;
+    });
+  };
+
+  // Filter forms by search
+  const filteredForms = useMemo(() => {
+    if (!formSearch.trim()) return allForms;
+    const q = formSearch.toLowerCase();
+    return allForms.filter((f: any) =>
+      f.title?.toLowerCase().includes(q) || f.description?.toLowerCase().includes(q)
+    );
+  }, [allForms, formSearch]);
+
+  const toggleForm = (fId: string) => {
+    setSelectedFormIds(prev => {
+      const next = prev.includes(fId) ? prev.filter(id => id !== fId) : [...prev, fId];
+      form.setValue("formIds", next);
       return next;
     });
   };
@@ -169,9 +186,8 @@ export default function EditCampaignPage() {
       goals: [],
       kpis: "",
       settings: "",
-      requiresReviewerApproval: false,
-      reviewerId: "",
       newsletterIds: [],
+      formIds: [],
     },
   });
 
@@ -180,6 +196,7 @@ export default function EditCampaignPage() {
     const loaded: Campaign | undefined = (campaignData as any)?.campaign;
     if (loaded) {
       const nlIds = (loaded as any).newsletterIds || [];
+      const fmIds = (loaded as any).formIds || [];
       form.reset({
         name: loaded.name || "",
         description: (loaded as any).description || "",
@@ -193,12 +210,12 @@ export default function EditCampaignPage() {
         goals: (loaded as any).goals || [],
         kpis: (loaded as any).kpis || "",
         settings: (loaded as any).settings || "",
-        requiresReviewerApproval: (loaded as any).requiresReviewerApproval || false,
-        reviewerId: (loaded as any).reviewerId || "",
         newsletterIds: nlIds,
+        formIds: fmIds,
       });
       setGoals(((loaded as any).goals as string[]) || []);
       setSelectedNewsletterIds(nlIds);
+      setSelectedFormIds(fmIds);
     }
   }, [campaignData, form]);
 
@@ -223,6 +240,7 @@ export default function EditCampaignPage() {
       ...data,
       goals,
       newsletterIds: selectedNewsletterIds,
+      formIds: selectedFormIds,
       budget: typeof data.budget === "number" ? data.budget : undefined,
     });
   };
@@ -466,6 +484,7 @@ export default function EditCampaignPage() {
                         <SelectItem value="sms"><span className="flex items-center gap-2"><Zap className="h-3.5 w-3.5 text-orange-500" /> {t("emailCampaigns.edit.basicInfo.typeSms")}</span></SelectItem>
                         <SelectItem value="push"><span className="flex items-center gap-2"><Target className="h-3.5 w-3.5 text-indigo-500" /> {t("emailCampaigns.edit.basicInfo.typePush")}</span></SelectItem>
                         <SelectItem value="social"><span className="flex items-center gap-2"><TrendingUp className="h-3.5 w-3.5 text-pink-500" /> {t("emailCampaigns.edit.basicInfo.typeSocial")}</span></SelectItem>
+                        <SelectItem value="intake_form"><span className="flex items-center gap-2"><ClipboardList className="h-3.5 w-3.5 text-teal-500" /> Intake Form Signups</span></SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -586,6 +605,98 @@ export default function EditCampaignPage() {
               </div>
               <p className="text-xs text-muted-foreground">
                 {selectedNewsletterIds.length} newsletter{selectedNewsletterIds.length !== 1 ? 's' : ''} selected
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* ── Intake Form Selection ── */}
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                  <ClipboardList className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Intake Forms</CardTitle>
+                  <CardDescription className="mt-0.5">
+                    Select intake forms to track signups as part of this campaign
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <Separator />
+            <CardContent className="pt-6 space-y-4">
+              {/* Selected forms summary */}
+              {selectedFormIds.length > 0 && (
+                <div className="flex flex-wrap gap-2 pb-2">
+                  {selectedFormIds.map(fId => {
+                    const f = allForms.find((fm: any) => fm.id === fId);
+                    return f ? (
+                      <Badge key={fId} variant="secondary" className="py-1 pl-2.5 pr-1.5 gap-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors" onClick={() => toggleForm(fId)}>
+                        {f.title}
+                        <X className="h-3 w-3" />
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search forms by title..."
+                  value={formSearch}
+                  onChange={(e) => setFormSearch(e.target.value)}
+                  className="pl-9 h-9 text-sm"
+                />
+              </div>
+
+              {/* Form list */}
+              <div className="max-h-[300px] overflow-y-auto border rounded-lg divide-y">
+                {formsLoading ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">Loading forms...</div>
+                ) : filteredForms.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    {allForms.length === 0 ? 'No forms available yet' : 'No forms match your search'}
+                  </div>
+                ) : (
+                  filteredForms.map((f: any) => {
+                    const isSelected = selectedFormIds.includes(f.id);
+                    return (
+                      <div
+                        key={f.id}
+                        className={cn(
+                          "flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-muted/50",
+                          isSelected && "bg-teal-50/50 dark:bg-teal-900/10"
+                        )}
+                        onClick={() => toggleForm(f.id)}
+                      >
+                        <div className={cn(
+                          "flex items-center justify-center h-5 w-5 rounded border-2 shrink-0 transition-colors",
+                          isSelected ? "bg-teal-600 border-teal-600 text-white" : "border-gray-300 dark:border-gray-600"
+                        )}>
+                          {isSelected && <Check className="h-3 w-3" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{f.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{f.description || 'No description'}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge variant="secondary" className={`text-[10px] ${f.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                            {f.isActive ? 'Active' : 'Inactive'}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">
+                            {f.responseCount || 0} signups
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {selectedFormIds.length} form{selectedFormIds.length !== 1 ? 's' : ''} selected
               </p>
             </CardContent>
           </Card>
@@ -729,62 +840,6 @@ export default function EditCampaignPage() {
                   <FormMessage />
                 </FormItem>
               )} />
-            </CardContent>
-          </Card>
-
-          {/* ── Review & Approval ── */}
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
-                  <ClipboardCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                </div>
-                <div>
-                  <CardTitle className="text-base">{t("emailCampaigns.edit.review.title")}</CardTitle>
-                  <CardDescription className="mt-0.5">{t("emailCampaigns.edit.review.description")}</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <Separator />
-            <CardContent className="pt-6 space-y-5">
-              <FormField control={form.control} name="requiresReviewerApproval" render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-muted/30">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-sm font-medium">{t("emailCampaigns.edit.review.requiresApproval")}</FormLabel>
-                    <FormDescription className="text-xs">{t("emailCampaigns.edit.review.requiresApprovalDescription")}</FormDescription>
-                  </div>
-                  <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                </FormItem>
-              )} />
-
-              {form.watch("requiresReviewerApproval") && (
-                <FormField control={form.control} name="reviewerId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("emailCampaigns.edit.review.selectReviewer")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={reviewersLoading ? t("emailCampaigns.edit.review.loadingReviewers") : t("emailCampaigns.edit.review.selectReviewerPlaceholder")} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {reviewersLoading ? (
-                          <SelectItem value="loading" disabled>{t("emailCampaigns.edit.review.loadingReviewers")}</SelectItem>
-                        ) : reviewers.length === 0 ? (
-                          <SelectItem value="no-reviewers" disabled>{t("emailCampaigns.edit.review.noReviewers")}</SelectItem>
-                        ) : (
-                          reviewers.map((reviewer: User) => (
-                            <SelectItem key={reviewer.id} value={reviewer.id}>
-                              {reviewer.firstName} {reviewer.lastName} - {reviewer.email} ({reviewer.role})
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              )}
             </CardContent>
           </Card>
 
