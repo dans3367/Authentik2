@@ -27,21 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 
-const channelOptions = [
-  { value: "individual", label: "Individual Email", description: "Send one-to-one emails quickly" },
-  { value: "promotional", label: "Promotional", description: "Campaign blasts and seasonal offers" },
-  { value: "newsletter", label: "Newsletter", description: "Recurring newsletter layouts" },
-  { value: "transactional", label: "Transactional", description: "Receipts, confirmations, and notifications" },
-  { value: "single-purpose", label: "Single Purpose", description: "One-off templates for specific occasions" },
-];
 
-const getChannelOptions = (t: any) => [
-  { value: "individual", label: t('templatesPage.channels.individual'), description: t('templatesPage.channels.individualDesc') },
-  { value: "promotional", label: t('templatesPage.channels.promotional'), description: t('templatesPage.channels.promotionalDesc') },
-  { value: "newsletter", label: t('templatesPage.channels.newsletter'), description: t('templatesPage.channels.newsletterDesc') },
-  { value: "transactional", label: t('templatesPage.channels.transactional'), description: t('templatesPage.channels.transactionalDesc') },
-  { value: "single-purpose", label: t('templatesPage.channels.singlePurpose', 'Single Purpose'), description: t('templatesPage.channels.singlePurposeDesc', 'One-off templates for specific occasions') },
-];
 
 const categoryOptions = [
   { value: "welcome", label: "Welcome & Onboarding" },
@@ -72,12 +58,12 @@ const PRESET_LABEL_KEYS: Record<string, { label: string; description: string }> 
 };
 
 
-type TemplateChannel = (typeof channelOptions)[number]["value"];
+
 type TemplateCategory = (typeof categoryOptions)[number]["value"];
 
 interface CreateTemplatePayload {
   name: string;
-  channel: TemplateChannel;
+  channel: string;
   category: TemplateCategory;
   subjectLine: string;
   body: string;
@@ -190,11 +176,9 @@ export default function CreateTemplatePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get localized options
-  const localizedChannelOptions = getChannelOptions(t);
   const localizedCategoryOptions = getCategoryOptions(t);
 
   const [name, setName] = useState("");
-  const [channel, setChannel] = useState<TemplateChannel>("individual");
   const [category, setCategory] = useState<TemplateCategory>("welcome");
   const [subjectLine, setSubjectLine] = useState("");
   const [content, setContent] = useState("");
@@ -216,12 +200,7 @@ export default function CreateTemplatePage() {
     setTagInput("");
   };
 
-  const handleChannelChange = (value: TemplateChannel) => {
-    setChannel(value);
-    if (value !== "single-purpose") {
-      setSelectedPreset(null);
-    }
-  };
+
 
   const { data: masterDesign } = useQuery({
     queryKey: ["/api/master-email-design"],
@@ -292,7 +271,7 @@ export default function CreateTemplatePage() {
     try {
       await createTemplate({
         name: name.trim(),
-        channel,
+        channel: "single-purpose",
         category,
         subjectLine: subjectLine.trim(),
         body: content.trim(),
@@ -344,66 +323,45 @@ export default function CreateTemplatePage() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="template-channel">{t('templatesPage.createTemplatePage.channel')}</Label>
-                <Select value={channel} onValueChange={(value: TemplateChannel) => handleChannelChange(value)}>
-                  <SelectTrigger id="template-channel">
-                    <SelectValue placeholder={t('templatesPage.createTemplatePage.selectChannel')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {localizedChannelOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{option.label}</span>
-                          <span className="text-xs text-muted-foreground">{option.description}</span>
+                <Label>{t('templatesPage.createTemplatePage.selectPurpose')}</Label>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {t('templatesPage.createTemplatePage.selectPurposeHelp')}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {SINGLE_PURPOSE_PRESETS.map((preset) => {
+                    const keys = PRESET_LABEL_KEYS[preset.id];
+                    const label = keys ? t(keys.label) : preset.label;
+                    const description = keys ? t(keys.description) : preset.description;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handleSelectPreset(preset)}
+                        className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${selectedPreset === preset.id
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
+                          : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                          }`}
+                      >
+                        {selectedPreset === preset.id && (
+                          <CheckCircle className="absolute top-2 right-2 h-4 w-4 text-blue-500 dark:text-blue-400" />
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Sparkles className={`h-4 w-4 ${selectedPreset === preset.id ? "text-blue-500 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`} />
+                          <span className="font-medium text-sm text-gray-900 dark:text-gray-100">{label}</span>
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {channel === "single-purpose" && (
-                <div className="grid gap-2">
-                  <Label>{t('templatesPage.createTemplatePage.selectPurpose')}</Label>
-                  <p className="text-xs text-muted-foreground mb-1">
-                    {t('templatesPage.createTemplatePage.selectPurposeHelp')}
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {SINGLE_PURPOSE_PRESETS.map((preset) => {
-                      const keys = PRESET_LABEL_KEYS[preset.id];
-                      const label = keys ? t(keys.label) : preset.label;
-                      const description = keys ? t(keys.description) : preset.description;
-                      return (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          onClick={() => handleSelectPreset(preset)}
-                          className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${selectedPreset === preset.id
-                              ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
-                              : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                            }`}
-                        >
-                          {selectedPreset === preset.id && (
-                            <CheckCircle className="absolute top-2 right-2 h-4 w-4 text-blue-500 dark:text-blue-400" />
-                          )}
-                          <div className="flex items-center gap-2">
-                            <Sparkles className={`h-4 w-4 ${selectedPreset === preset.id ? "text-blue-500 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`} />
-                            <span className="font-medium text-sm text-gray-900 dark:text-gray-100">{label}</span>
-                          </div>
-                          <span className="text-xs text-muted-foreground leading-snug">{description}</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {preset.tags.map((tag) => (
-                              <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                        <span className="text-xs text-muted-foreground leading-snug">{description}</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {preset.tags.map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="template-category">{t('templatesPage.createTemplatePage.category')}</Label>

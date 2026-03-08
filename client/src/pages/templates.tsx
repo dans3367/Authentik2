@@ -38,7 +38,7 @@ import {
   Copy,
   CreditCard,
   Eye,
-  Filter,
+
   Loader2,
   Mail,
   MapPin,
@@ -59,13 +59,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import RichTextEditor from "@/components/LazyRichTextEditor";
 
-const channelOptions = [
-  { value: "individual", label: "Individual Email", description: "Send one-to-one emails quickly" },
-  { value: "promotional", label: "Promotional", description: "Campaign blasts and seasonal offers" },
-  { value: "newsletter", label: "Newsletter", description: "Recurring newsletter layouts" },
-  { value: "transactional", label: "Transactional", description: "Receipts, confirmations, and notifications" },
-  { value: "single-purpose", label: "Single Purpose", description: "One-off templates for specific occasions" },
-];
+
 
 const categoryOptions = [
   { value: "welcome", label: "Welcome & Onboarding" },
@@ -75,13 +69,7 @@ const categoryOptions = [
   { value: "custom", label: "Custom" },
 ];
 
-const getChannelOptions = (t: (key: string) => string) => [
-  { value: "individual", label: t('templatesPage.channels.individual'), description: t('templatesPage.channels.individualDesc') },
-  { value: "promotional", label: t('templatesPage.channels.promotional'), description: t('templatesPage.channels.promotionalDesc') },
-  { value: "newsletter", label: t('templatesPage.channels.newsletter'), description: t('templatesPage.channels.newsletterDesc') },
-  { value: "transactional", label: t('templatesPage.channels.transactional'), description: t('templatesPage.channels.transactionalDesc') },
-  { value: "single-purpose", label: t('templatesPage.channels.singlePurpose'), description: t('templatesPage.channels.singlePurposeDesc') },
-];
+
 
 const getCategoryOptions = (t: (key: string) => string) => [
   { value: "welcome", label: t('templatesPage.categories.welcome') },
@@ -104,7 +92,7 @@ const PRESET_LABEL_KEYS: Record<string, { label: string; description: string }> 
 };
 
 type TemplateCategory = (typeof categoryOptions)[number]["value"];
-type TemplateChannel = (typeof channelOptions)[number]["value"];
+
 
 // Template types from API
 interface Template {
@@ -112,7 +100,7 @@ interface Template {
   tenantId: string;
   userId: string;
   name: string;
-  channel: TemplateChannel;
+  channel: string;
   category: TemplateCategory;
   subjectLine: string;
   preview?: string | null;
@@ -380,7 +368,7 @@ function formatOperatingHours(raw: string | undefined | null): string {
 
 interface CreateTemplatePayload {
   name: string;
-  channel: TemplateChannel;
+  channel: string;
   category: TemplateCategory;
   subjectLine: string;
   body: string;
@@ -398,7 +386,7 @@ interface TemplateCardProps {
   isTogglingFavorite?: boolean;
 }
 
-function getChannelBadgeClasses(channel: TemplateChannel) {
+function getChannelBadgeClasses(channel: string) {
   switch (channel) {
     case "individual":
       return "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300";
@@ -711,7 +699,7 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [channel, setChannel] = useState<TemplateChannel>("individual");
+
   const [category, setCategory] = useState<TemplateCategory>("welcome");
   const [subjectLine, setSubjectLine] = useState("");
   const [content, setContent] = useState("");
@@ -721,7 +709,6 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
   const [showPreview, setShowPreview] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
 
-  const localizedChannelOptions = getChannelOptions(t);
   const localizedCategoryOptions = getCategoryOptions(t);
 
   const { data: masterDesign } = useQuery({
@@ -780,21 +767,16 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
   useEffect(() => {
     if (template) {
       setName(template.name);
-      setChannel(template.channel);
       setCategory(template.category);
       setSubjectLine(template.subjectLine);
       setContent(template.body);
       setTagInput(template.tags.join(", "));
       setOpen(true);
-      // If editing a single-purpose template, try to match it to a preset
-      if (template.channel === "single-purpose") {
-        const matchedPreset = SINGLE_PURPOSE_PRESETS.find(p =>
-          t(PRESET_LABEL_KEYS[p.id]?.label ?? p.label) === template.name
-        );
-        setSelectedPreset(matchedPreset?.id || null);
-      } else {
-        setSelectedPreset(null);
-      }
+      // Try to match it to a preset
+      const matchedPreset = SINGLE_PURPOSE_PRESETS.find(p =>
+        t(PRESET_LABEL_KEYS[p.id]?.label ?? p.label) === template.name
+      );
+      setSelectedPreset(matchedPreset?.id || null);
     }
   }, [template]);
 
@@ -808,16 +790,10 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
     setTagInput(preset.tags.join(", "));
   };
 
-  const handleChannelChange = (value: TemplateChannel) => {
-    setChannel(value);
-    if (value !== "single-purpose") {
-      setSelectedPreset(null);
-    }
-  };
+
 
   const resetForm = () => {
     setName("");
-    setChannel("individual");
     setCategory("welcome");
     setSubjectLine("");
     setContent("");
@@ -839,7 +815,7 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
 
     onSave(template.id, {
       name: name.trim(),
-      channel,
+      channel: "single-purpose",
       category,
       subjectLine: subjectLine.trim(),
       body: content.trim(),
@@ -881,66 +857,45 @@ function EditTemplateDialog({ template, onSave, onCancel }: EditTemplateDialogPr
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="edit-template-channel">{t('templatesPage.editDialog.channel')}</Label>
-              <Select value={channel} onValueChange={(value: TemplateChannel) => handleChannelChange(value)}>
-                <SelectTrigger id="edit-template-channel">
-                  <SelectValue placeholder={t('templatesPage.editDialog.selectChannel')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {localizedChannelOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{option.label}</span>
-                        <span className="text-xs text-muted-foreground">{option.description}</span>
+              <Label>{t('templatesPage.createTemplatePage.selectPurpose')}</Label>
+              <p className="text-xs text-muted-foreground mb-1">
+                {t('templatesPage.createTemplatePage.selectPurposeHelp')}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {SINGLE_PURPOSE_PRESETS.map((preset) => {
+                  const keys = PRESET_LABEL_KEYS[preset.id];
+                  const label = keys ? t(keys.label) : preset.label;
+                  const description = keys ? t(keys.description) : preset.description;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleSelectPreset(preset)}
+                      className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${selectedPreset === preset.id
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
+                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                        }`}
+                    >
+                      {selectedPreset === preset.id && (
+                        <CheckCircle className="absolute top-2 right-2 h-4 w-4 text-blue-500 dark:text-blue-400" />
+                      )}
+                      <div className="flex items-center gap-2">
+                        <Sparkles className={`h-4 w-4 ${selectedPreset === preset.id ? "text-blue-500 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`} />
+                        <span className="font-medium text-sm text-gray-900 dark:text-gray-100">{label}</span>
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {channel === "single-purpose" && (
-              <div className="grid gap-2">
-                <Label>{t('templatesPage.createTemplatePage.selectPurpose')}</Label>
-                <p className="text-xs text-muted-foreground mb-1">
-                  {t('templatesPage.createTemplatePage.selectPurposeHelp')}
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {SINGLE_PURPOSE_PRESETS.map((preset) => {
-                    const keys = PRESET_LABEL_KEYS[preset.id];
-                    const label = keys ? t(keys.label) : preset.label;
-                    const description = keys ? t(keys.description) : preset.description;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => handleSelectPreset(preset)}
-                        className={`relative flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${selectedPreset === preset.id
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-400 ring-1 ring-blue-500 dark:ring-blue-400"
-                          : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                          }`}
-                      >
-                        {selectedPreset === preset.id && (
-                          <CheckCircle className="absolute top-2 right-2 h-4 w-4 text-blue-500 dark:text-blue-400" />
-                        )}
-                        <div className="flex items-center gap-2">
-                          <Sparkles className={`h-4 w-4 ${selectedPreset === preset.id ? "text-blue-500 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`} />
-                          <span className="font-medium text-sm text-gray-900 dark:text-gray-100">{label}</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground leading-snug">{description}</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {preset.tags.map((tag) => (
-                            <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                      <span className="text-xs text-muted-foreground leading-snug">{description}</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {preset.tags.map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-            )}
+            </div>
 
             <div className="grid gap-2">
               <Label htmlFor="edit-template-category">{t('templatesPage.editDialog.category')}</Label>
@@ -1250,7 +1205,6 @@ export default function TemplatesPage() {
   const [pagination, setPagination] = useState<TemplatePagination>({ page: 1, limit: 50, total: 0, pages: 0 });
   const [stats, setStats] = useState<TemplateStats | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [channelFilter, setChannelFilter] = useState<"all" | TemplateChannel>("all");
   const [categoryFilter, setCategoryFilter] = useState<"all" | TemplateCategory>("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
@@ -1286,7 +1240,6 @@ export default function TemplatesPage() {
         page: pagination.page,
         limit: pagination.limit,
         search: searchTerm || undefined,
-        channel: channelFilter !== 'all' ? channelFilter : undefined,
         category: categoryFilter !== 'all' ? categoryFilter : undefined,
         favoritesOnly: favoritesOnly || undefined,
       });
@@ -1330,7 +1283,7 @@ export default function TemplatesPage() {
     }, 300); // Debounce search
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, channelFilter, categoryFilter, favoritesOnly, pagination.page]);
+  }, [searchTerm, categoryFilter, favoritesOnly, pagination.page]);
 
   // Filtered templates for display (now handled server-side)
   const filteredTemplates = templates;
@@ -1534,20 +1487,6 @@ export default function TemplatesPage() {
                 />
               </div>
               <div className="flex flex-wrap gap-3">
-                <Select value={channelFilter} onValueChange={(value: TemplateChannel | "all") => setChannelFilter(value)}>
-                  <SelectTrigger className="w-[180px]">
-                    <Filter className="mr-2 h-4 w-4" />
-                    <SelectValue placeholder="Channel" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('templatesPage.filters.allChannels')}</SelectItem>
-                    {channelOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <Select value={categoryFilter} onValueChange={(value: TemplateCategory | "all") => setCategoryFilter(value)}>
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="Category" />
@@ -1603,15 +1542,14 @@ export default function TemplatesPage() {
                 <CardContent className="py-12 text-center space-y-3">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('templatesPage.empty.noTemplates')}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {searchTerm || channelFilter !== 'all' || categoryFilter !== 'all' || favoritesOnly
+                    {searchTerm || categoryFilter !== 'all' || favoritesOnly
                       ? t('templatesPage.empty.adjustFilters')
                       : t('templatesPage.empty.getStarted')}
                   </p>
                   <div className="space-x-2">
-                    {(searchTerm || channelFilter !== 'all' || categoryFilter !== 'all' || favoritesOnly) && (
+                    {(searchTerm || categoryFilter !== 'all' || favoritesOnly) && (
                       <Button variant="outline" onClick={() => {
                         setSearchTerm("");
-                        setChannelFilter("all");
                         setCategoryFilter("all");
                         setFavoritesOnly(false);
                       }}>

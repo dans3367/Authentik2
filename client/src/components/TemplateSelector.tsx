@@ -7,14 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Search, Star, Filter } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FileText, Search, Star } from "lucide-react";
+
 
 interface Template {
   id: string;
@@ -35,20 +29,13 @@ interface TemplateSelectorProps {
   channel?: string; // Filter by channel (e.g., 'individual')
 }
 
-const channelFilterOptions = [
-  { value: "all", label: "All Channels" },
-  { value: "individual", label: "Individual Email" },
-  { value: "promotional", label: "Promotional" },
-  { value: "newsletter", label: "Newsletter" },
-  { value: "transactional", label: "Transactional" },
-  { value: "single-purpose", label: "Single Purpose" },
-];
+
 
 export function TemplateSelector({ onSelect, trigger, channel }: TemplateSelectorProps) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [channelFilter, setChannelFilter] = useState<string>(channel || "all");
+  const [channelFilter] = useState<string>(channel || "all");
 
   // Fetch templates (all channels, filter client-side or via API)
   const activeChannel = channelFilter === "all" ? undefined : channelFilter;
@@ -59,7 +46,7 @@ export function TemplateSelector({ onSelect, trigger, channel }: TemplateSelecto
       if (searchTerm) params.append("search", searchTerm);
       if (activeChannel) params.append("channel", activeChannel);
       params.append("limit", "100");
-      
+
       const res = await apiRequest("GET", `/api/templates?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to load templates");
       return res.json();
@@ -120,7 +107,7 @@ export function TemplateSelector({ onSelect, trigger, channel }: TemplateSelecto
         </div>
 
         <div className="px-6 flex-1 overflow-hidden flex flex-col gap-4">
-          {/* Search & Channel Filter */}
+          {/* Search */}
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -131,19 +118,6 @@ export function TemplateSelector({ onSelect, trigger, channel }: TemplateSelecto
                 className="pl-10"
               />
             </div>
-            <Select value={channelFilter} onValueChange={setChannelFilter}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
-                <SelectValue placeholder="Channel" />
-              </SelectTrigger>
-              <SelectContent>
-                {channelFilterOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Templates List */}
@@ -170,11 +144,10 @@ export function TemplateSelector({ onSelect, trigger, channel }: TemplateSelecto
                         key={template.id}
                         type="button"
                         onClick={() => handleSelectTemplate(template)}
-                        className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                          selectedTemplate?.id === template.id
+                        className={`w-full text-left p-3 rounded-lg border transition-colors ${selectedTemplate?.id === template.id
                             ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                             : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">

@@ -45,14 +45,14 @@ export interface FormSettings {
   compactMode?: boolean;
 }
 
-export type FormElementType = 
-  | 'text-input' 
-  | 'email-input' 
-  | 'number-input' 
-  | 'textarea' 
-  | 'select' 
-  | 'checkbox' 
-  | 'radio' 
+export type FormElementType =
+  | 'text-input'
+  | 'email-input'
+  | 'number-input'
+  | 'textarea'
+  | 'select'
+  | 'checkbox'
+  | 'radio'
   | 'image'
   | 'rate-scale'
   | 'boolean-switch'
@@ -155,6 +155,8 @@ export interface WizardState {
       language?: string;
       promotionEnabled?: boolean;
       promotionId?: string;
+      templateEmailEnabled?: boolean;
+      templateId?: string;
     };
   };
   selectedTheme: FormTheme | null;

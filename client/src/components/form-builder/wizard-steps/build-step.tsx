@@ -63,81 +63,81 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
   // Custom collision detection: prioritize insertion points near pointer, then canvas
   const customCollisionDetection: CollisionDetection = (args) => {
     const { droppableContainers, pointerCoordinates, active } = args;
-    
+
     if (!pointerCoordinates) {
       return closestCenter(args);
     }
-    
+
     const isDraggingExistingElement = !active.data.current?.isNew;
-    
+
     // Filter to only insertion points
     const insertionPoints = droppableContainers.filter(
       (container) => container.data.current?.isInsertionPoint
     );
-    
+
     // Get the form canvas bounds
     const formCanvas = droppableContainers.find(c => c.id === 'form-canvas');
     const canvasRect = formCanvas?.rect.current;
-    
+
     if (insertionPoints.length > 0 && canvasRect) {
       // Only activate insertion points when pointer is reasonably near the canvas
-      const isNearCanvas = 
-        pointerCoordinates.x >= canvasRect.left - 150 && 
+      const isNearCanvas =
+        pointerCoordinates.x >= canvasRect.left - 150 &&
         pointerCoordinates.x <= canvasRect.right + 150 &&
         pointerCoordinates.y >= canvasRect.top - 50 &&
         pointerCoordinates.y <= canvasRect.bottom + 50;
-      
+
       if (isNearCanvas) {
         let closestInsertionPoint: typeof insertionPoints[0] | null = null;
         let closestDistance = Infinity;
-        
+
         for (const container of insertionPoints) {
           if (!container.rect.current) continue;
-          
+
           // Skip insertion points adjacent to the dragged element
           if (isDraggingExistingElement) {
             const insertionElementId = container.data.current?.elementId;
             if (insertionElementId === active.id) continue;
           }
-          
+
           const rect = container.rect.current;
           const centerY = rect.top + rect.height / 2;
           const distanceY = Math.abs(pointerCoordinates.y - centerY);
-          
+
           if (distanceY < closestDistance) {
             closestDistance = distanceY;
             closestInsertionPoint = container;
           }
         }
-        
+
         // Tighter threshold - 120px is enough for comfortable targeting
         if (closestInsertionPoint && closestDistance < 120) {
           return [{ id: closestInsertionPoint.id, data: { droppableContainer: closestInsertionPoint } }];
         }
       }
     }
-    
+
     // Fall back to pointer-within for the canvas itself
     const pointerCollisions = pointerWithin(args);
     if (pointerCollisions.length > 0) {
       return pointerCollisions;
     }
-    
+
     // Fall back to rect intersection
     const rectCollisions = rectIntersection(args);
     if (rectCollisions.length > 0) {
       return rectCollisions;
     }
-    
+
     return closestCenter(args);
   };
 
   const selectedElement = elements.find(el => el.id === selectedElementId) || null;
-  
+
   // Use refs to track data and initialization
-  const lastSentData = useRef<{title: string, elements: any[], settings: any, tags: string[], category: FormCategory}>({ title: '', elements: [], settings: {}, tags: [], category: initialCategory });
+  const lastSentData = useRef<{ title: string, elements: any[], settings: any, tags: string[], category: FormCategory }>({ title: '', elements: [], settings: {}, tags: [], category: initialCategory });
   const hasInitialized = useRef(false);
-  
+
   // Initialize form data from props on first mount only
   useEffect(() => {
     if (!hasInitialized.current && initialTitle && initialElements) {
@@ -165,25 +165,25 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       hasInitialized.current = true;
     }
   }, []);
-  
+
   // Update parent component when data changes (only when user makes actual changes)
   useEffect(() => {
     if (hasInitialized.current) {
       const timeoutId = setTimeout(() => {
         // Simple comparison to detect changes
-        const dataChanged = formTitle !== lastSentData.current.title || 
-                           elements.length !== lastSentData.current.elements.length ||
-                           JSON.stringify(elements) !== JSON.stringify(lastSentData.current.elements) ||
-                           JSON.stringify(formSettings) !== JSON.stringify(lastSentData.current.settings) ||
-                           JSON.stringify(formTags) !== JSON.stringify(lastSentData.current.tags) ||
-                           formCategory !== lastSentData.current.category;
-        
+        const dataChanged = formTitle !== lastSentData.current.title ||
+          elements.length !== lastSentData.current.elements.length ||
+          JSON.stringify(elements) !== JSON.stringify(lastSentData.current.elements) ||
+          JSON.stringify(formSettings) !== JSON.stringify(lastSentData.current.settings) ||
+          JSON.stringify(formTags) !== JSON.stringify(lastSentData.current.tags) ||
+          formCategory !== lastSentData.current.category;
+
         if (dataChanged) {
           onDataChange(formTitle, elements, formSettings, formTags, formCategory);
           lastSentData.current = { title: formTitle, elements: [...elements], settings: { ...formSettings }, tags: [...formTags], category: formCategory };
         }
       }, 100); // 100ms debounce
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [formTitle, elements, formSettings, formTags, formCategory, onDataChange]);
@@ -217,22 +217,22 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
     // Handle dropping new component from palette
     if (active.data.current?.isNew) {
       const type = active.id.toString().replace('palette-', '') as FormElementType;
-      
+
       // Check if dropping on an insertion point
       if (over.data.current?.isInsertionPoint) {
         const { elementId, position, insertIndex } = over.data.current;
-        
+
         // Handle special drop zones (insert-first and insert-end)
         if (over.id === 'insert-first') {
           addElementAtIndex(type, 0);
           return;
         }
-        
+
         if (over.id === 'insert-end') {
           addElement(type);
           return;
         }
-        
+
         // Handle insertion between elements
         const targetIndex = elements.findIndex(el => el.id === elementId);
         if (targetIndex !== -1) {
@@ -241,7 +241,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
           return;
         }
       }
-      
+
       // Default: add to end of form
       if (over.id === 'form-canvas') {
         addElement(type);
@@ -250,11 +250,11 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       // Handle reordering existing elements
       const oldIndex = elements.findIndex(el => el.id === active.id);
       if (oldIndex === -1) return;
-      
+
       // Check if dropping on an insertion point
       if (over.data.current?.isInsertionPoint) {
         const { elementId, position } = over.data.current;
-        
+
         // Handle special drop zones
         if (over.id === 'insert-first') {
           if (oldIndex !== 0) {
@@ -262,7 +262,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
           }
           return;
         }
-        
+
         if (over.id === 'insert-end') {
           const lastIndex = elements.length - 1;
           if (oldIndex !== lastIndex) {
@@ -270,7 +270,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
           }
           return;
         }
-        
+
         // Handle insertion between elements
         const targetIndex = elements.findIndex(el => el.id === elementId);
         if (targetIndex !== -1) {
@@ -285,7 +285,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
         }
         return;
       }
-      
+
       // Direct drop on another element (fallback)
       if (active.id !== over.id) {
         const newIndex = elements.findIndex(el => el.id === over.id);
@@ -344,11 +344,11 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
       <div className="flex relative">
         {/* Left Sidebar - Component Palette (hidden for email-signup) */}
         {!isEmailSignup && (
-        <div className="hidden lg:block flex-none relative z-20 sticky top-0 self-start max-h-screen overflow-y-auto">
-          <ComponentPalette onAddElement={handleAddElement} />
-        </div>
+          <div className="hidden lg:block flex-none relative z-20 sticky top-0 self-start max-h-screen overflow-y-auto">
+            <ComponentPalette onAddElement={handleAddElement} />
+          </div>
         )}
-        
+
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 relative z-10">
           <FormCanvas
@@ -358,7 +358,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
             previewMode={previewMode}
             draggedType={draggedType}
             onSelectElement={selectElement}
-            onRemoveElement={isEmailSignup ? () => {} : removeElement}
+            onRemoveElement={isEmailSignup ? () => { } : removeElement}
             onUpdateElement={updateElement}
             onUpdateFormTitle={updateFormTitle}
             onTogglePreview={togglePreview}
@@ -367,7 +367,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
             onMoveElement={moveElement}
           />
         </div>
-        
+
         {/* Right Sidebar - Form Properties & Element Properties */}
         <div className="hidden lg:block flex-none relative z-20 flex flex-col sticky top-0 self-start max-h-screen overflow-y-auto">
           {/* Form Properties - Always visible */}
@@ -380,8 +380,11 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
             onUpdateTags={updateFormTags}
             category={formCategory}
             onUpdateCategory={handleCategoryChange}
-            onUpdateSettings={(newSettings) => {
-              // Update the entire settings object
+            onUpdateSettings={(newSettingsOrFn) => {
+              // Support both object and function-style updates
+              const newSettings = typeof newSettingsOrFn === 'function'
+                ? newSettingsOrFn(formSettings)
+                : newSettingsOrFn;
               Object.keys(newSettings).forEach(key => {
                 updateFormSettings(key, newSettings[key]);
               });
@@ -389,7 +392,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
             onClearForm={isEditMode ? undefined : () => resetFormData('', [])}
             hideClearButton={isEditMode}
           />
-          
+
           {/* Element Properties - Only when element is selected */}
           {selectedElement && (
             <PropertiesPanel
@@ -398,7 +401,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
               onDeselectElement={handleDeselectElement}
             />
           )}
-          
+
           {/* Helper text when no element is selected */}
           {!selectedElement && (
             <div className="w-80 p-6 border-l border-neutral-200 bg-neutral-50 flex-1 flex items-center justify-center">
@@ -415,17 +418,17 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
 
         {/* Mobile Floating Add Button (hidden for email-signup) */}
         {!previewMode && !isEmailSignup && (
-        <div className="lg:hidden fixed bottom-6 left-6 z-50">
-          <Button
-            size="lg"
-            className="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
-            onClick={() => setShowMobileAdd(true)}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </Button>
-        </div>
+          <div className="lg:hidden fixed bottom-6 left-6 z-50">
+            <Button
+              size="lg"
+              className="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
+              onClick={() => setShowMobileAdd(true)}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </Button>
+          </div>
         )}
 
 
@@ -449,11 +452,11 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
                 </div>
               </div>
               <div className="flex-1 p-4 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
-                <ComponentPalette 
+                <ComponentPalette
                   onAddElement={(type) => {
                     handleAddElement(type);
                     setShowMobileAdd(false);
-                  }} 
+                  }}
                 />
               </div>
             </div>
@@ -488,7 +491,7 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
             </div>
           </div>
         )}
-        
+
         {/* Drag Overlay - shows ghost for both new palette items and reordering */}
         <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
           {draggedType && (

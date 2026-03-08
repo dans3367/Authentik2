@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { forms, formResponses, masterEmailDesign, companies, emailContacts, promotions, unsubscribeTokens } from '@shared/schema';
+import { forms, formResponses, masterEmailDesign, companies, emailContacts, promotions, unsubscribeTokens, templates } from '@shared/schema';
 import crypto from 'crypto';
 import { EmailService } from '../emailService';
 import { authenticateToken, requireRole, requireTenant } from '../middleware/auth-middleware';
@@ -109,6 +109,109 @@ async function sendPromotionEmailIfEnabled(form: any, recipientEmail: string, fi
   } catch (error) {
     // Non-critical: log but don't fail the signup
     console.error('[Promotion] Failed to send promotion email:', error);
+  }
+}
+
+// ─── Helper: Send template-based email on any form submission ────────────────
+async function sendTemplateEmailIfEnabled(
+  form: any,
+  recipientEmail: string,
+  firstName?: string | null,
+) {
+  try {
+    let formData: any;
+    try {
+      formData = typeof form.formData === 'string' ? JSON.parse(form.formData) : form.formData;
+    } catch {
+      return;
+    }
+
+    const settings = formData?.settings;
+    if (!settings?.templateEmailEnabled || !settings?.templateId) return;
+
+    // Fetch the template
+    const template = await db.query.templates.findFirst({
+      where: sql`${templates.id} = ${settings.templateId} AND ${templates.tenantId} = ${form.tenantId} AND ${templates.isActive} = true`,
+    });
+
+    if (!template) {
+      console.warn(`[TemplateEmail] Template ${settings.templateId} not found or inactive for form ${form.id}`);
+      return;
+    }
+
+    // Personalize body: replace common placeholders
+    let body = template.body || '';
+    if (firstName) {
+      body = body.replace(/\{\{\s*first_name\s*\}\}/gi, firstName)
+        .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
+        .replace(/\{customer_name\}/gi, firstName);
+    }
+
+    // Wrap in the tenant's branded email design
+    const wrappedBody = await wrapNewsletterContent(form.tenantId, body);
+
+    // Build unsubscribe link if the contact exists
+    let unsubscribeUrl: string | undefined;
+    try {
+      const contact = await db.query.emailContacts.findFirst({
+        where: and(eq(emailContacts.tenantId, form.tenantId), eq(emailContacts.email, recipientEmail)),
+        columns: { id: true },
+      });
+      if (contact) {
+        let tokenRow = await db.query.unsubscribeTokens.findFirst({
+          where: and(
+            eq(unsubscribeTokens.tenantId, form.tenantId),
+            eq(unsubscribeTokens.contactId, contact.id),
+            sql`${unsubscribeTokens.usedAt} IS NULL`,
+          ),
+        });
+        if (!tokenRow) {
+          const token = crypto.randomBytes(24).toString('base64url');
+          const created = await db.insert(unsubscribeTokens).values({
+            tenantId: form.tenantId,
+            contactId: contact.id,
+            token,
+          }).returning();
+          tokenRow = created[0];
+        }
+        if (tokenRow?.token) {
+          const baseUrl = process.env.APP_URL || 'http://localhost:5002';
+          unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(tokenRow.token)}&type=marketing`;
+        }
+      }
+    } catch (tokenErr) {
+      console.warn('[TemplateEmail] Failed to generate unsubscribe token:', tokenErr);
+    }
+
+    let finalBody = wrappedBody;
+    if (unsubscribeUrl) {
+      const footer = `<div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;">
+        <p style="margin:0;font-size:12px;color:#94a3b8;">Don't want to receive these emails? <a href="${unsubscribeUrl}" style="color:#64748b;text-decoration:underline;">Unsubscribe</a></p>
+      </div>`;
+      finalBody = finalBody.replace(/(<\/div>\s*<\/body>)/i, `${footer}$1`);
+    }
+
+    await emailService.sendCustomEmail(
+      recipientEmail,
+      template.subjectLine,
+      finalBody,
+      {
+        text: template.preview || undefined,
+        headers: unsubscribeUrl ? {
+          'List-Unsubscribe': `<${unsubscribeUrl}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        } : undefined,
+      },
+    );
+
+    // Increment template usage count
+    await db.update(templates)
+      .set({ usageCount: sql`${templates.usageCount} + 1`, lastUsed: new Date(), updatedAt: new Date() })
+      .where(sql`${templates.id} = ${template.id}`);
+
+    console.log(`[TemplateEmail] Sent template "${template.name}" to ${recipientEmail} for form ${form.id}`);
+  } catch (error) {
+    console.error('[TemplateEmail] Failed to send template email:', error);
   }
 }
 
@@ -755,15 +858,25 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
       })
       .where(sql`${forms.id} = ${id}`);
 
-    // Send promotion email if enabled for this email-signup form (non-blocking, new emails only)
-    if (form.category === 'email-signup') {
-      // Extract email from submission data
-      const submittedData = typeof data === 'object' ? data : {};
-      const submittedEmail = Object.values(submittedData).find(
-        (val) => typeof val === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
-      ) as string | undefined;
-      if (submittedEmail) {
-        // Only send promotion if this email doesn't already exist in contacts
+    // Extract email from submission data for template/promotion emails
+    const submittedData = typeof data === 'object' ? data : {};
+    const submittedEmail = Object.values(submittedData).find(
+      (val) => typeof val === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+    ) as string | undefined;
+
+    // Derive first name from submission data if available
+    const submittedFirstName = (() => {
+      const entries = Object.entries(submittedData);
+      const firstNameEntry = entries.find(([k]) => /first.?name/i.test(k));
+      return typeof firstNameEntry?.[1] === 'string' ? firstNameEntry[1] : null;
+    })();
+
+    if (submittedEmail) {
+      // Send template-based confirmation email (all form categories)
+      sendTemplateEmailIfEnabled(form, submittedEmail, submittedFirstName);
+
+      // Send promotion email if this is an email-signup form (new emails only)
+      if (form.category === 'email-signup') {
         const existingEmail = await db.query.emailContacts.findFirst({
           where: sql`${emailContacts.tenantId} = ${form.tenantId} AND ${emailContacts.email} = ${submittedEmail}`,
         });
@@ -791,7 +904,7 @@ formsRoutes.get("/js/authentik-forms.js", (req: any, res) => {
       console.log('Authentik Forms script loaded');
     })();
   `;
-  
+
   res.setHeader('Content-Type', 'application/javascript');
   res.send(script);
 });
@@ -810,7 +923,7 @@ formsRoutes.get("/embed-example", (req: any, res) => {
     </body>
     </html>
   `;
-  
+
   res.setHeader('Content-Type', 'text/html');
   res.send(html);
 });
@@ -829,7 +942,7 @@ formsRoutes.get("/simple-example", (req: any, res) => {
     </body>
     </html>
   `;
-  
+
   res.setHeader('Content-Type', 'text/html');
   res.send(html);
 });
