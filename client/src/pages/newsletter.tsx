@@ -21,7 +21,8 @@ import {
   UserCog,
   ShieldCheck,
   ClipboardCheck,
-  CalendarClock
+  CalendarClock,
+  ExternalLink
 } from "lucide-react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
@@ -61,6 +62,13 @@ import { format, formatDistanceToNow } from "date-fns";
 import { es as esLocale } from "date-fns/locale/es";
 import type { NewsletterWithUser } from "@shared/schema";
 
+type NewsletterListItem = NewsletterWithUser & {
+  opens?: number;
+  totalOpens?: number;
+  publishedAt?: string | null;
+  webSlug?: string | null;
+};
+
 const getStatusBadge = (status: string, t: (key: string, fallback?: string) => string) => {
   switch (status) {
     case 'draft':
@@ -84,8 +92,8 @@ export default function NewsletterPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [previewNewsletter, setPreviewNewsletter] = useState<(NewsletterWithUser & { opens?: number; totalOpens?: number }) | null>(null);
-  const [editRecipientsNewsletter, setEditRecipientsNewsletter] = useState<(NewsletterWithUser & { opens?: number; totalOpens?: number }) | null>(null);
+  const [previewNewsletter, setPreviewNewsletter] = useState<NewsletterListItem | null>(null);
+  const [editRecipientsNewsletter, setEditRecipientsNewsletter] = useState<NewsletterListItem | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
@@ -252,7 +260,7 @@ export default function NewsletterPage() {
     }
   };
 
-  const newsletters: (NewsletterWithUser & { opens?: number; totalOpens?: number })[] = newslettersData || [];
+  const newsletters: NewsletterListItem[] = newslettersData || [];
 
   const filteredNewsletters = useMemo(() => {
     return newsletters.filter((newsletter) => {
@@ -477,6 +485,8 @@ export default function NewsletterPage() {
               const isPendingReview = newsletter.status === 'pending_review';
               const isScheduled = newsletter.status === 'scheduled';
               const isCurrentUserReviewer = newsletter.reviewerId === currentUserId;
+              const tenantSlug = (newsletter as any)?.tenant?.slug;
+              const articlePreviewUrl = tenantSlug ? `/n/preview/${tenantSlug}/${newsletter.id}` : null;
 
               const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
               const isDeploying = deployMutation.isPending && deployMutation.variables === newsletter.id;
@@ -540,6 +550,17 @@ export default function NewsletterPage() {
                                 <Eye className="h-4 w-4 mr-2" />
                                 {t("newsletter.actions.preview")}
                               </DropdownMenuItem>
+                              {articlePreviewUrl && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(articlePreviewUrl, '_blank', 'noopener,noreferrer');
+                                  }}
+                                >
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  Preview article on blog
+                                </DropdownMenuItem>
+                              )}
                               {(isDraft || isReadyToSend) && (
                                 <DropdownMenuItem
                                   onClick={(e) => {

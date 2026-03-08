@@ -16,6 +16,39 @@ import crypto from 'crypto';
 
 export const newsletterRoutes = Router();
 
+/**
+ * Generate a URL-friendly slug from a newsletter title.
+ * Ensures uniqueness within a tenant by appending a numeric suffix if needed.
+ */
+async function generateWebSlug(title: string, tenantId: string, excludeId?: string): Promise<string> {
+  let base = title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80);
+  if (!base) base = 'newsletter';
+
+  let slug = base;
+  let attempt = 0;
+  while (attempt < 20) {
+    const existing = await db.query.newsletters.findFirst({
+      where: and(
+        eq(newsletters.tenantId, tenantId),
+        eq(newsletters.webSlug, slug),
+        excludeId ? sql`${newsletters.id} != ${excludeId}` : undefined,
+      ),
+      columns: { id: true },
+    });
+    if (!existing) return slug;
+    attempt++;
+    slug = `${base}-${attempt}`;
+  }
+  // Fallback: append random suffix
+  return `${base}-${Date.now().toString(36)}`;
+}
+
 // Rate limiting for approval code attempts
 const MAX_APPROVAL_CODE_ATTEMPTS = 5;
 const approvalCodeRateLimit = new Map<string, { count: number; resetAt: number; nextAllowedAt: number }>();
@@ -427,7 +460,8 @@ newsletterRoutes.get("/", authenticateToken, requireTenant, requirePermission('n
       limit: Number(limit),
       offset,
       with: {
-        user: true
+        user: true,
+        tenant: true,
       }
     });
 
@@ -1762,11 +1796,16 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
           failed
         });
 
+        // Generate web slug and publish for browser viewing
+        const webSlug = await generateWebSlug(newsletter.title, req.user.tenantId, id);
+
         await db.update(newsletters)
           .set({
             status: 'sent',
             recipientCount: successful,
             sentAt: new Date(),
+            publishedAt: new Date(),
+            webSlug,
             updatedAt: new Date(),
           })
           .where(eq(newsletters.id, id));
@@ -2159,6 +2198,22 @@ newsletterRoutes.put('/internal/:id/status', authenticateInternalService, async 
 
     if (sentCount !== undefined) {
       updateData.recipientCount = sentCount;
+    }
+
+    // When marking as 'sent', also publish for web viewing
+    if (status === 'sent') {
+      const newsletter = await db.query.newsletters.findFirst({
+        where: eq(newsletters.id, id),
+        columns: { id: true, title: true, tenantId: true, webSlug: true },
+      });
+      if (newsletter && !newsletter.webSlug) {
+        updateData.publishedAt = new Date();
+        updateData.webSlug = await generateWebSlug(newsletter.title, newsletter.tenantId, id);
+        console.log(`[Newsletter Internal] Auto-publishing newsletter ${id} with webSlug: ${updateData.webSlug}`);
+      }
+      if (!updateData.sentAt) {
+        updateData.sentAt = new Date();
+      }
     }
 
     await db.update(newsletters)

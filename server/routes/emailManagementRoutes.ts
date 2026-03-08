@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens, masterEmailDesign, triggerTasks } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens, masterEmailDesign, blogDesign, triggerTasks } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
@@ -3475,6 +3475,203 @@ emailManagementRoutes.put("/master-email-design", authenticateToken, requireTena
   } catch (error) {
     console.error('Update master email design error:', error);
     res.status(500).json({ message: 'Failed to update master email design' });
+  }
+});
+
+// Get blog design settings
+emailManagementRoutes.get("/blog-design", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const design = await db.query.blogDesign.findFirst({
+      where: sql`${blogDesign.tenantId} = ${req.user.tenantId}`,
+    });
+
+    // Get company info for defaults
+    const company = await db.query.companies.findFirst({
+      where: sql`${companies.tenantId} = ${req.user.tenantId} AND ${companies.isActive} = true`,
+    });
+
+    // If no blog design exists, return default settings
+    if (!design) {
+      console.log('🎨 [Blog Design GET] No design found, returning defaults');
+      const defaultDesign = {
+        id: '',
+        tenantId: req.user.tenantId,
+        companyName: company?.name || '',
+        headerMode: 'logo',
+        logoUrl: null,
+        logoSize: 'medium',
+        logoAlignment: 'center',
+        bannerUrl: null,
+        showCompanyName: 'true',
+        primaryColor: '#3B82F6',
+        secondaryColor: '#1E40AF',
+        accentColor: '#10B981',
+        fontFamily: 'Arial, sans-serif',
+        headerText: null,
+        footerText: company?.name ? `© ${new Date().getFullYear()} ${company.name}. All rights reserved.` : null,
+        socialLinks: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      return res.json(defaultDesign);
+    }
+
+    console.log('🎨 [Blog Design GET] Returning design:', { id: design.id });
+    res.json(design);
+  } catch (error) {
+    console.error('Get blog design error:', error);
+    res.status(500).json({ message: 'Failed to get blog design' });
+  }
+});
+
+// Update blog design settings
+emailManagementRoutes.put("/blog-design", authenticateToken, requireTenant, requirePermission('emails.manage_design'), async (req: any, res) => {
+  try {
+    const {
+      companyName,
+      headerMode,
+      logoUrl,
+      logoSize,
+      logoAlignment,
+      bannerUrl,
+      showCompanyName,
+      primaryColor,
+      secondaryColor,
+      accentColor,
+      fontFamily,
+      headerText,
+      footerText,
+      socialLinks,
+    } = req.body;
+
+    console.log('🎨 [Blog Design PUT] Received:', { companyName, headerMode, logoUrl, logoSize, logoAlignment, bannerUrl, headerText, primaryColor, tenantId: req.user.tenantId });
+
+    // ── Validate all inputs (reuse same validation helpers as email design) ──
+
+    // Enum fields
+    if (headerMode !== undefined && !ALLOWED_HEADER_MODES.includes(headerMode)) {
+      return res.status(400).json({ message: `Invalid headerMode. Must be one of: ${ALLOWED_HEADER_MODES.join(', ')}` });
+    }
+    if (logoSize !== undefined && !ALLOWED_LOGO_SIZES.includes(logoSize)) {
+      return res.status(400).json({ message: `Invalid logoSize. Must be one of: ${ALLOWED_LOGO_SIZES.join(', ')}` });
+    }
+    if (logoAlignment !== undefined && !ALLOWED_LOGO_ALIGNMENTS.includes(logoAlignment)) {
+      return res.status(400).json({ message: `Invalid logoAlignment. Must be one of: ${ALLOWED_LOGO_ALIGNMENTS.join(', ')}` });
+    }
+    if (showCompanyName !== undefined && showCompanyName !== 'true' && showCompanyName !== 'false') {
+      return res.status(400).json({ message: 'showCompanyName must be "true" or "false"' });
+    }
+
+    // Font family
+    let safeFontFamily: string | undefined;
+    if (fontFamily !== undefined && fontFamily !== null) {
+      const normalized = String(fontFamily).trim();
+      const match = ALLOWED_FONT_FAMILIES.find(f => f.toLowerCase() === normalized.toLowerCase());
+      safeFontFamily = match || 'Arial, sans-serif';
+    }
+
+    // Colors
+    const safeColors: Record<string, string | undefined> = {};
+    if (primaryColor !== undefined) {
+      const validated = validateDesignColor(primaryColor);
+      if (!validated) return res.status(400).json({ message: 'Invalid primaryColor. Must be a hex color (e.g. #3B82F6)' });
+      safeColors.primaryColor = validated;
+    }
+    if (secondaryColor !== undefined) {
+      const validated = validateDesignColor(secondaryColor);
+      if (!validated) return res.status(400).json({ message: 'Invalid secondaryColor. Must be a hex color (e.g. #1E40AF)' });
+      safeColors.secondaryColor = validated;
+    }
+    if (accentColor !== undefined) {
+      const validated = validateDesignColor(accentColor);
+      if (!validated) return res.status(400).json({ message: 'Invalid accentColor. Must be a hex color (e.g. #10B981)' });
+      safeColors.accentColor = validated;
+    }
+
+    // URLs
+    const safeLogoUrl = logoUrl !== undefined ? validateDesignUrl(logoUrl) : undefined;
+    const safeBannerUrl = bannerUrl !== undefined ? validateDesignUrl(bannerUrl) : undefined;
+    if (logoUrl !== undefined && logoUrl !== null && logoUrl !== '' && safeLogoUrl === null) {
+      return res.status(400).json({ message: 'Invalid logoUrl. Must be a valid http(s) URL.' });
+    }
+    if (bannerUrl !== undefined && bannerUrl !== null && bannerUrl !== '' && safeBannerUrl === null) {
+      return res.status(400).json({ message: 'Invalid bannerUrl. Must be a valid http(s) URL.' });
+    }
+
+    // Text fields
+    const safeCompanyName = companyName !== undefined ? sanitizeDesignText(companyName, 200) : undefined;
+    const safeHeaderText = headerText !== undefined ? sanitizeDesignText(headerText, 500) : undefined;
+    const safeFooterText = footerText !== undefined ? sanitizeDesignText(footerText, 1000) : undefined;
+
+    // Social links
+    const hasSocialLinks = Object.prototype.hasOwnProperty.call(req.body, 'socialLinks');
+    let safeSocialLinksStr: string | null | undefined;
+    if (hasSocialLinks) {
+      const validated = validateSocialLinks(socialLinks);
+      safeSocialLinksStr = validated ? JSON.stringify(validated) : null;
+    }
+
+    // ── Persist ──
+
+    const existingDesign = await db.query.blogDesign.findFirst({
+      where: sql`${blogDesign.tenantId} = ${req.user.tenantId}`,
+    });
+
+    let updatedDesign;
+
+    if (existingDesign) {
+      const updateSet: Record<string, unknown> = {
+        companyName: safeCompanyName !== undefined ? (safeCompanyName ?? '') : existingDesign.companyName,
+        headerMode: headerMode !== undefined ? headerMode : existingDesign.headerMode,
+        logoUrl: logoUrl !== undefined ? (safeLogoUrl ?? null) : existingDesign.logoUrl,
+        logoSize: logoSize !== undefined ? logoSize : existingDesign.logoSize,
+        logoAlignment: logoAlignment !== undefined ? logoAlignment : existingDesign.logoAlignment,
+        bannerUrl: bannerUrl !== undefined ? (safeBannerUrl ?? null) : existingDesign.bannerUrl,
+        showCompanyName: showCompanyName !== undefined ? showCompanyName : existingDesign.showCompanyName,
+        primaryColor: safeColors.primaryColor ?? existingDesign.primaryColor,
+        secondaryColor: safeColors.secondaryColor ?? existingDesign.secondaryColor,
+        accentColor: safeColors.accentColor ?? existingDesign.accentColor,
+        fontFamily: safeFontFamily ?? existingDesign.fontFamily,
+        headerText: headerText !== undefined ? safeHeaderText : existingDesign.headerText,
+        footerText: footerText !== undefined ? safeFooterText : existingDesign.footerText,
+        updatedAt: new Date(),
+      };
+
+      if (hasSocialLinks) {
+        updateSet.socialLinks = safeSocialLinksStr;
+      }
+
+      updatedDesign = await db.update(blogDesign)
+        .set(updateSet)
+        .where(sql`${blogDesign.tenantId} = ${req.user.tenantId}`)
+        .returning();
+    } else {
+      updatedDesign = await db.insert(blogDesign)
+        .values({
+          tenantId: req.user.tenantId,
+          companyName: safeCompanyName || '',
+          headerMode: headerMode || 'logo',
+          logoUrl: safeLogoUrl || null,
+          logoSize: logoSize || 'medium',
+          logoAlignment: logoAlignment || 'center',
+          bannerUrl: safeBannerUrl || null,
+          showCompanyName: showCompanyName || 'true',
+          primaryColor: safeColors.primaryColor || '#3B82F6',
+          secondaryColor: safeColors.secondaryColor || '#1E40AF',
+          accentColor: safeColors.accentColor || '#10B981',
+          fontFamily: safeFontFamily || 'Arial, sans-serif',
+          headerText: safeHeaderText || null,
+          footerText: safeFooterText || null,
+          socialLinks: hasSocialLinks ? safeSocialLinksStr : null,
+        })
+        .returning();
+    }
+
+    console.log('🎨 [Blog Design PUT] Updated design:', { id: updatedDesign[0]?.id });
+    res.json(updatedDesign[0]);
+  } catch (error) {
+    console.error('Update blog design error:', error);
+    res.status(500).json({ message: 'Failed to update blog design' });
   }
 });
 

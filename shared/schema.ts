@@ -517,6 +517,9 @@ export const newsletters = pgTable("newsletters", {
   triggerRunId: text("trigger_run_id"), // Trigger.dev run ID for scheduled sends (used for cancellation)
   deletedAt: timestamp("deleted_at"), // Soft delete: when set, newsletter is hidden from UI but preserved for analytics
   reactionsEnabled: boolean("reactions_enabled").notNull().default(true), // Enable/disable emoji reactions for this newsletter
+  // Web publication fields — allows newsletters to be viewed in a browser via /n/:tenantSlug/:webSlug
+  publishedAt: timestamp("published_at"), // When set, newsletter is publicly viewable on the web
+  webSlug: text("web_slug"), // URL-friendly slug for the newsletter (auto-generated from title)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1763,6 +1766,8 @@ export const updateNewsletterSchema = z.object({
   reviewStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
   reviewNotes: z.string().optional(),
   reactionsEnabled: z.boolean().optional(),
+  publishedAt: z.union([z.string(), z.date()]).optional().nullable(),
+  webSlug: z.string().optional().nullable(),
 });
 
 export const insertNewsletterSchema = createInsertSchema(newsletters).omit({
@@ -2837,3 +2842,37 @@ export const rolePermissionRelations = relations(rolePermissions, ({ one }) => (
 
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type InsertRolePermission = typeof rolePermissions.$inferInsert;
+
+// Blog design settings for tenant-wide public newsletter/blog page branding
+export const blogDesign = pgTable("blog_design", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().unique().references(() => tenants.id, { onDelete: 'cascade' }),
+  companyName: text("company_name").default(''),
+  headerMode: text("header_mode").default('logo'), // 'logo' | 'banner'
+  logoUrl: text("logo_url"),
+  logoSize: text("logo_size").default('medium'), // small | medium | large | xlarge
+  logoAlignment: text("logo_alignment").default('center'), // left | center | right
+  bannerUrl: text("banner_url"),
+  showCompanyName: text("show_company_name").default('true'), // 'true' | 'false'
+  primaryColor: text("primary_color").default('#3B82F6'),
+  secondaryColor: text("secondary_color").default('#1E40AF'),
+  accentColor: text("accent_color").default('#10B981'),
+  fontFamily: text("font_family").default('Arial, sans-serif'),
+  headerText: text("header_text"),
+  footerText: text("footer_text"),
+  socialLinks: text("social_links"), // JSON: { facebook, twitter, instagram, linkedin }
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Blog design relations
+export const blogDesignRelations = relations(blogDesign, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [blogDesign.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+// Blog design types
+export type BlogDesign = typeof blogDesign.$inferSelect;
+export type InsertBlogDesign = typeof blogDesign.$inferInsert;

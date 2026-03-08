@@ -7,6 +7,7 @@ import UsersPage from "@/pages/users";
 import ShopsPage from "@/pages/shops";
 import ManagementTags from "@/pages/management-tags";
 import ManagementEmailDesign from "@/pages/management-email-design";
+import ManagementBlogDesign from "@/pages/management-blog-design";
 import ManagementRolesPermissions from "@/pages/management-roles-permissions";
 import ManagementNewsletterReviewer from "@/pages/management-newsletter-reviewer";
 import { AccountUsageCard, ResourceUsageCard } from "@/components/ui/account-usage-card";
@@ -40,6 +41,7 @@ export default function ManagementPage() {
             <TabsTrigger value="tags">{t('management.tabs.tags')}</TabsTrigger>
             <TabsTrigger value="roles-permissions">{t('management.tabs.rolesPermissions', 'Roles & Permissions')}</TabsTrigger>
             <TabsTrigger value="email-design">{t('management.tabs.emailDesign')}</TabsTrigger>
+            <TabsTrigger value="blog-design">{t('management.tabs.blogDesign', 'Blog Design')}</TabsTrigger>
             <TabsTrigger value="newsletter-reviewer">{t('management.tabs.newsletterReviewer', 'Reviewer')}</TabsTrigger>
           </TabsList>
           <div className="mt-6">
@@ -63,6 +65,9 @@ export default function ManagementPage() {
             </TabsContent>
             <TabsContent value="email-design">
               <ManagementEmailDesign />
+            </TabsContent>
+            <TabsContent value="blog-design">
+              <ManagementBlogDesign />
             </TabsContent>
             <TabsContent value="newsletter-reviewer">
               <ManagementNewsletterReviewer />

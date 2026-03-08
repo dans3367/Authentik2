@@ -74,6 +74,8 @@ const DataProcessingPage = lazy(() => import("@/pages/data-processing"));
 const CookiePolicyPage = lazy(() => import("@/pages/cookie-policy"));
 const LegalAgreementsPage = lazy(() => import("@/pages/legal-agreements"));
 const PublicFormPage = lazy(() => import("@/pages/public-form"));
+const PublicNewsletterHub = lazy(() => import("@/pages/public-newsletter"));
+const PublicNewsletterView = lazy(() => import("@/pages/public-newsletter-view"));
 
 // Redirect components for legacy routes
 function BirthdaysRedirect() {
@@ -343,12 +345,24 @@ function Router() {
     setGlobalAuthErrorHandler(handleAuthError);
   }, [handleAuthError]);
 
-  // Render public form page outside of ProtectedRoute — no auth required
+  // Render public pages outside of ProtectedRoute — no auth required
   if (currentLocation.startsWith('/form/')) {
     return (
       <Suspense fallback={<PageLoader />}>
         <Switch>
           <Route path="/form/:id" component={PublicFormPage} />
+        </Switch>
+      </Suspense>
+    );
+  }
+
+  if (currentLocation.startsWith('/n/')) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Switch>
+          <Route path="/n/preview/:tenantSlug/:newsletterId" component={PublicNewsletterView} />
+          <Route path="/n/:tenantSlug/:newsletterSlug" component={PublicNewsletterView} />
+          <Route path="/n/:tenantSlug" component={PublicNewsletterHub} />
         </Switch>
       </Suspense>
     );
