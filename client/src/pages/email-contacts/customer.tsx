@@ -122,6 +122,18 @@ export default function CustomerViewPage() {
     },
   });
 
+  // Fetch custom field values for this contact
+  const { data: customFieldsData } = useQuery({
+    queryKey: ['/api/email-contacts', id, 'custom-fields'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/email-contacts/${id}/custom-fields`);
+      return res.json();
+    },
+    enabled: !!id && !!response?.contact,
+  });
+
+  const customFields = customFieldsData?.customFields || [];
+
   // Extract contact from response
   const contact: Contact | undefined = response?.contact;
   const engagementStats = statsResponse?.stats;
@@ -486,6 +498,42 @@ export default function CustomerViewPage() {
                           </p>
                         </div>
                       )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Custom Fields */}
+              {customFields.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Custom Fields</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      {customFields.map((field: any) => {
+                        let displayValue: React.ReactNode = field.value || 'Not set';
+                        if (field.value) {
+                          if (field.type === 'boolean') {
+                            displayValue = field.value === 'true' ? 'Yes' : 'No';
+                          } else if (field.type === 'date') {
+                            displayValue = new Date(field.value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                          } else if (field.type === 'url') {
+                            displayValue = (
+                              <a href={field.value} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline break-all">
+                                {field.value}
+                              </a>
+                            );
+                          } else if (field.type === 'number') {
+                            displayValue = Number(field.value).toLocaleString();
+                          }
+                        }
+                        return (
+                          <div key={field.fieldId}>
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{field.label}</label>
+                            <p className="text-gray-900 dark:text-white text-sm">{displayValue}</p>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </>
