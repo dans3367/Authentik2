@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens, masterEmailDesign, blogDesign, triggerTasks } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactTags, contactListMemberships, contactTagAssignments, betterAuthUser, birthdaySettings, eCardSettings, emailActivity, tenants, emailSends, emailContent, companies, unsubscribeTokens, masterEmailDesign, blogDesign, triggerTasks, contactCustomFields, contactCustomFieldValues } from '@shared/schema';
 import { deleteImageFromR2 } from '../config/r2';
 import { authenticateToken, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { authenticateInternalService, InternalServiceRequest } from '../middleware/internal-service-auth';
@@ -1625,6 +1625,10 @@ emailManagementRoutes.get("/bounced-emails/check/:email", authenticateToken, req
   try {
     const { email } = req.params;
     const sanitizedEmail = sanitizeEmail(email);
+    
+    if (!sanitizedEmail) {
+      return res.status(400).json({ message: 'Invalid email address' });
+    }
 
     const bouncedEmail = await db.query.bouncedEmails.findFirst({
       where: and(
@@ -5535,5 +5539,235 @@ emailManagementRoutes.patch("/email-templates/:id/favorite", authenticateToken, 
       success: false,
       message: error.message || "Failed to toggle favorite status"
     });
+  }
+});
+
+// ============================================================
+// Custom Fields for Email Contacts
+// ============================================================
+
+// List all custom field definitions for the tenant
+emailManagementRoutes.get("/contact-custom-fields", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const fields = await db.select()
+      .from(contactCustomFields)
+      .where(eq(contactCustomFields.tenantId, req.user.tenantId))
+      .orderBy(contactCustomFields.sortOrder, contactCustomFields.createdAt);
+
+    // Parse options JSON for select fields
+    const parsed = fields.map(f => ({
+      ...f,
+      options: f.options ? JSON.parse(f.options) : [],
+    }));
+
+    res.json({ fields: parsed });
+  } catch (error) {
+    console.error('List custom fields error:', error);
+    res.status(500).json({ message: 'Failed to list custom fields' });
+  }
+});
+
+// Create a custom field definition
+emailManagementRoutes.post("/contact-custom-fields", authenticateToken, requireTenant, requirePermission('contacts.create'), async (req: any, res) => {
+  try {
+    const { name, label, fieldType, options, placeholder, isRequired, sortOrder } = req.body;
+
+    if (!name || !label) {
+      return res.status(400).json({ message: 'Name and label are required' });
+    }
+
+    const allowedTypes = ['text', 'number', 'date', 'select', 'url', 'boolean'];
+    if (fieldType && !allowedTypes.includes(fieldType)) {
+      return res.status(400).json({ message: `Invalid field type. Must be one of: ${allowedTypes.join(', ')}` });
+    }
+
+    // Check for duplicate name within tenant
+    const existing = await db.select().from(contactCustomFields)
+      .where(sql`${contactCustomFields.tenantId} = ${req.user.tenantId} AND LOWER(${contactCustomFields.name}) = LOWER(${sanitizeString(name)})`);
+
+    if (existing.length > 0) {
+      return res.status(400).json({ message: 'A custom field with this name already exists' });
+    }
+
+    const [field] = await db.insert(contactCustomFields).values({
+      tenantId: req.user.tenantId,
+      name: sanitizeString(name),
+      label: sanitizeString(label),
+      fieldType: fieldType || 'text',
+      options: options && Array.isArray(options) ? JSON.stringify(options) : null,
+      placeholder: placeholder ? sanitizeString(placeholder) : null,
+      isRequired: isRequired || false,
+      sortOrder: sortOrder ?? 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+
+    res.status(201).json({
+      ...field,
+      options: field.options ? JSON.parse(field.options) : [],
+    });
+  } catch (error) {
+    console.error('Create custom field error:', error);
+    res.status(500).json({ message: 'Failed to create custom field' });
+  }
+});
+
+// Update a custom field definition
+emailManagementRoutes.put("/contact-custom-fields/:id", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const { name, label, fieldType, options, placeholder, isRequired, sortOrder } = req.body;
+
+    const existing = await db.select().from(contactCustomFields)
+      .where(sql`${contactCustomFields.id} = ${id} AND ${contactCustomFields.tenantId} = ${req.user.tenantId}`);
+
+    if (existing.length === 0) {
+      return res.status(404).json({ message: 'Custom field not found' });
+    }
+
+    const updateData: any = { updatedAt: new Date() };
+    if (name !== undefined) updateData.name = sanitizeString(name);
+    if (label !== undefined) updateData.label = sanitizeString(label);
+    if (fieldType !== undefined) {
+      const allowedTypes = ['text', 'number', 'date', 'select', 'url', 'boolean'];
+      if (!allowedTypes.includes(fieldType)) {
+        return res.status(400).json({ message: `Invalid field type` });
+      }
+      updateData.fieldType = fieldType;
+    }
+    if (options !== undefined) updateData.options = Array.isArray(options) ? JSON.stringify(options) : null;
+    if (placeholder !== undefined) updateData.placeholder = placeholder ? sanitizeString(placeholder) : null;
+    if (isRequired !== undefined) updateData.isRequired = isRequired;
+    if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+
+    const [updated] = await db.update(contactCustomFields)
+      .set(updateData)
+      .where(sql`${contactCustomFields.id} = ${id} AND ${contactCustomFields.tenantId} = ${req.user.tenantId}`)
+      .returning();
+
+    res.json({
+      ...updated,
+      options: updated.options ? JSON.parse(updated.options) : [],
+    });
+  } catch (error) {
+    console.error('Update custom field error:', error);
+    res.status(500).json({ message: 'Failed to update custom field' });
+  }
+});
+
+// Delete a custom field definition (cascades to values)
+emailManagementRoutes.delete("/contact-custom-fields/:id", authenticateToken, requireTenant, requirePermission('contacts.delete'), async (req: any, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await db.select().from(contactCustomFields)
+      .where(sql`${contactCustomFields.id} = ${id} AND ${contactCustomFields.tenantId} = ${req.user.tenantId}`);
+
+    if (existing.length === 0) {
+      return res.status(404).json({ message: 'Custom field not found' });
+    }
+
+    await db.delete(contactCustomFields)
+      .where(sql`${contactCustomFields.id} = ${id} AND ${contactCustomFields.tenantId} = ${req.user.tenantId}`);
+
+    res.json({ message: 'Custom field deleted successfully' });
+  } catch (error) {
+    console.error('Delete custom field error:', error);
+    res.status(500).json({ message: 'Failed to delete custom field' });
+  }
+});
+
+// Get custom field values for a specific contact
+emailManagementRoutes.get("/email-contacts/:contactId/custom-fields", authenticateToken, requireTenant, requirePermission('contacts.view'), async (req: any, res) => {
+  try {
+    const { contactId } = req.params;
+
+    // Verify contact belongs to tenant
+    const contact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+    });
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    // Get all field definitions for the tenant
+    const fields = await db.select()
+      .from(contactCustomFields)
+      .where(eq(contactCustomFields.tenantId, req.user.tenantId))
+      .orderBy(contactCustomFields.sortOrder, contactCustomFields.createdAt);
+
+    // Get all values for this contact
+    const values = await db.select()
+      .from(contactCustomFieldValues)
+      .where(sql`${contactCustomFieldValues.contactId} = ${contactId} AND ${contactCustomFieldValues.tenantId} = ${req.user.tenantId}`);
+
+    // Build a map of fieldId -> value
+    const valueMap: Record<string, string | null> = {};
+    values.forEach(v => { valueMap[v.fieldId] = v.value; });
+
+    // Merge fields with their values
+    const result = fields.map(f => ({
+      ...f,
+      options: f.options ? JSON.parse(f.options) : [],
+      value: valueMap[f.id] ?? null,
+    }));
+
+    res.json({ customFields: result });
+  } catch (error) {
+    console.error('Get contact custom fields error:', error);
+    res.status(500).json({ message: 'Failed to get custom field values' });
+  }
+});
+
+// Save/update custom field values for a contact (batch upsert)
+emailManagementRoutes.put("/email-contacts/:contactId/custom-fields", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
+  try {
+    const { contactId } = req.params;
+    const { values } = req.body; // Array of { fieldId, value }
+
+    if (!Array.isArray(values)) {
+      return res.status(400).json({ message: 'values must be an array of { fieldId, value }' });
+    }
+
+    // Verify contact belongs to tenant
+    const contact = await db.query.emailContacts.findFirst({
+      where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
+    });
+
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    // Batch upsert within transaction
+    await db.transaction(async (tx: any) => {
+      for (const { fieldId, value } of values) {
+        if (!fieldId) continue;
+
+        // Check if value already exists
+        const existing = await tx.select().from(contactCustomFieldValues)
+          .where(sql`${contactCustomFieldValues.contactId} = ${contactId} AND ${contactCustomFieldValues.fieldId} = ${fieldId} AND ${contactCustomFieldValues.tenantId} = ${req.user.tenantId}`);
+
+        if (existing.length > 0) {
+          await tx.update(contactCustomFieldValues)
+            .set({ value: value ?? null, updatedAt: new Date() })
+            .where(sql`${contactCustomFieldValues.contactId} = ${contactId} AND ${contactCustomFieldValues.fieldId} = ${fieldId} AND ${contactCustomFieldValues.tenantId} = ${req.user.tenantId}`);
+        } else {
+          await tx.insert(contactCustomFieldValues).values({
+            tenantId: req.user.tenantId,
+            contactId,
+            fieldId,
+            value: value ?? null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }
+      }
+    });
+
+    res.json({ message: 'Custom field values saved successfully' });
+  } catch (error) {
+    console.error('Save contact custom fields error:', error);
+    res.status(500).json({ message: 'Failed to save custom field values' });
   }
 });

@@ -1369,6 +1369,7 @@ export const emailContactRelations = relations(emailContacts, ({ one, many }) =>
   listMemberships: many(contactListMemberships),
   tagAssignments: many(contactTagAssignments),
   activities: many(emailActivity),
+  customFieldValues: many(contactCustomFieldValues),
 }));
 
 export const emailListRelations = relations(emailLists, ({ one, many }) => ({
@@ -2900,6 +2901,75 @@ export const rolePermissionRelations = relations(rolePermissions, ({ one }) => (
 
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type InsertRolePermission = typeof rolePermissions.$inferInsert;
+
+// Custom field definitions for email contacts (tenant-level)
+export const contactCustomFields = pgTable("contact_custom_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  label: text("label").notNull(), // Display label
+  fieldType: text("field_type").notNull().default('text'), // text, number, date, select, url, boolean
+  options: text("options"), // JSON array of options for 'select' type, e.g. '["Option A","Option B"]'
+  placeholder: text("placeholder"),
+  isRequired: boolean("is_required").default(false),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Custom field values per contact
+export const contactCustomFieldValues = pgTable("contact_custom_field_values", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  contactId: varchar("contact_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
+  fieldId: varchar("field_id").notNull().references(() => contactCustomFields.id, { onDelete: 'cascade' }),
+  value: text("value"), // All values stored as text, parsed by fieldType on read
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Custom field relations
+export const contactCustomFieldRelations = relations(contactCustomFields, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [contactCustomFields.tenantId],
+    references: [tenants.id],
+  }),
+  values: many(contactCustomFieldValues),
+}));
+
+export const contactCustomFieldValueRelations = relations(contactCustomFieldValues, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [contactCustomFieldValues.tenantId],
+    references: [tenants.id],
+  }),
+  contact: one(emailContacts, {
+    fields: [contactCustomFieldValues.contactId],
+    references: [emailContacts.id],
+  }),
+  field: one(contactCustomFields, {
+    fields: [contactCustomFieldValues.fieldId],
+    references: [contactCustomFields.id],
+  }),
+}));
+
+// Custom field schemas
+export const createContactCustomFieldSchema = z.object({
+  name: z.string().min(1, "Field name is required").max(100),
+  label: z.string().min(1, "Display label is required").max(100),
+  fieldType: z.enum(['text', 'number', 'date', 'select', 'url', 'boolean']).default('text'),
+  options: z.array(z.string()).optional(), // For select type
+  placeholder: z.string().max(200).optional(),
+  isRequired: z.boolean().default(false),
+  sortOrder: z.number().int().default(0),
+});
+
+export const updateContactCustomFieldSchema = createContactCustomFieldSchema.partial();
+
+// Custom field types
+export type ContactCustomField = typeof contactCustomFields.$inferSelect;
+export type InsertContactCustomField = typeof contactCustomFields.$inferInsert;
+export type ContactCustomFieldValue = typeof contactCustomFieldValues.$inferSelect;
+export type InsertContactCustomFieldValue = typeof contactCustomFieldValues.$inferInsert;
 
 // Blog design settings for tenant-wide public newsletter/blog page branding
 export const blogDesign = pgTable("blog_design", {

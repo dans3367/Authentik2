@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, X, Mail, CheckCircle2, UserCheck, Tag, Calendar, Shield, AlertTriangle, CalendarIcon, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Save, Loader2, X, Mail, CheckCircle2, UserCheck, Tag, Calendar, Shield, AlertTriangle, CalendarIcon, ShieldAlert, Settings2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -85,6 +85,7 @@ export default function EditEmailContact() {
 
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedLists, setSelectedLists] = useState<string[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
 
   if (!match || !params?.id) {
     setLocation("/email-contacts");
@@ -120,6 +121,18 @@ export default function EditEmailContact() {
       return res.json();
     },
   });
+
+  // Fetch custom field definitions + values for this contact
+  const { data: customFieldsData } = useQuery({
+    queryKey: ["/api/email-contacts", contactId, "custom-fields"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/email-contacts/${contactId}/custom-fields`);
+      return res.json();
+    },
+    enabled: !!contactId,
+  });
+
+  const customFieldDefs: any[] = customFieldsData?.customFields || [];
 
   const form = useForm<EditContactForm>({
     resolver: zodResolver(editContactSchema),
@@ -172,6 +185,19 @@ export default function EditEmailContact() {
     }
   }, [contactData, form]);
 
+  // Load custom field values when data is ready
+  useEffect(() => {
+    if (customFieldDefs.length > 0) {
+      const vals: Record<string, string> = {};
+      customFieldDefs.forEach((cf: any) => {
+        if (cf.value !== null && cf.value !== undefined) {
+          vals[cf.id] = cf.value;
+        }
+      });
+      setCustomFieldValues(vals);
+    }
+  }, [customFieldsData]);
+
   const updateContactMutation = useMutation({
     mutationFn: async (data: UpdateContactRequest) => {
       const response = await apiRequest("PUT", `/api/email-contacts/${contactId}`, data);
@@ -198,7 +224,7 @@ export default function EditEmailContact() {
     },
   });
 
-  const onSubmit = (data: EditContactForm) => {
+  const onSubmit = async (data: EditContactForm) => {
     const formData: UpdateContactRequest = {
       email: data.email,
       firstName: data.firstName || null,
@@ -219,6 +245,20 @@ export default function EditEmailContact() {
       phoneNumber: data.phoneNumber || null,
       dateOfBirth: data.dateOfBirth ? format(data.dateOfBirth, 'yyyy-MM-dd') : null,
     };
+
+    // Save custom field values in parallel with contact update
+    if (customFieldDefs.length > 0) {
+      const cfValues = Object.entries(customFieldValues).map(([fieldId, value]) => ({
+        fieldId,
+        value: value || null,
+      }));
+      try {
+        await apiRequest("PUT", `/api/email-contacts/${contactId}/custom-fields`, { values: cfValues });
+      } catch (err) {
+        console.error('Failed to save custom field values:', err);
+      }
+    }
+
     updateContactMutation.mutate(formData);
   };
 
@@ -511,6 +551,84 @@ export default function EditEmailContact() {
                       />
                     </div>
                   </div>
+
+                  {/* Custom Fields */}
+                  {customFieldDefs.length > 0 && (
+                    <div className="space-y-4 border-t pt-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Settings2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                        <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">Custom Fields</h3>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {customFieldDefs.map((cf: any) => (
+                          <div key={cf.id} className="space-y-1.5">
+                            <FormLabel>
+                              {cf.label}
+                              {cf.isRequired && <span className="text-red-500 ml-1">*</span>}
+                            </FormLabel>
+                            {cf.fieldType === 'text' && (
+                              <Input
+                                placeholder={cf.placeholder || `Enter ${cf.label.toLowerCase()}...`}
+                                value={customFieldValues[cf.id] || ''}
+                                onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                              />
+                            )}
+                            {cf.fieldType === 'number' && (
+                              <Input
+                                type="number"
+                                placeholder={cf.placeholder || '0'}
+                                value={customFieldValues[cf.id] || ''}
+                                onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                              />
+                            )}
+                            {cf.fieldType === 'url' && (
+                              <Input
+                                type="url"
+                                placeholder={cf.placeholder || 'https://...'}
+                                value={customFieldValues[cf.id] || ''}
+                                onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                              />
+                            )}
+                            {cf.fieldType === 'date' && (
+                              <Input
+                                type="date"
+                                value={customFieldValues[cf.id] || ''}
+                                onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                              />
+                            )}
+                            {cf.fieldType === 'select' && (
+                              <Select
+                                value={customFieldValues[cf.id] || ''}
+                                onValueChange={(val) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: val }))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={cf.placeholder || `Select ${cf.label.toLowerCase()}...`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {(cf.options || []).map((opt: string) => (
+                                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                            {cf.fieldType === 'boolean' && (
+                              <div className="flex items-center space-x-2 pt-1">
+                                <Checkbox
+                                  id={`cf-${cf.id}`}
+                                  checked={customFieldValues[cf.id] === 'true'}
+                                  onCheckedChange={(checked) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: checked ? 'true' : 'false' }))}
+                                />
+                                <label htmlFor={`cf-${cf.id}`} className="text-sm text-muted-foreground cursor-pointer">
+                                  {cf.placeholder || 'Yes'}
+                                </label>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Status */}
                   <FormField

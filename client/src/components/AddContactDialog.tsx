@@ -24,7 +24,8 @@ import {
   User,
   Tag,
   List,
-  Loader2
+  Loader2,
+  Settings2,
 } from "lucide-react";
 import {
   Form,
@@ -85,6 +86,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
   const queryClient = useQueryClient();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedLists, setSelectedLists] = useState<string[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
 
   const form = useForm<AddContactForm>({
     resolver: zodResolver(addContactSchema),
@@ -127,6 +129,17 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
   const lists: EmailList[] = listsData?.lists || [];
   const tags: ContactTag[] = tagsData?.tags || [];
 
+  // Fetch custom field definitions
+  const { data: customFieldsData } = useQuery({
+    queryKey: ['/api/contact-custom-fields'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/contact-custom-fields');
+      return response.json();
+    },
+  });
+
+  const customFieldDefs: any[] = customFieldsData?.fields || [];
+
   // Create contact mutation
   const createContactMutation = useMutation({
     mutationFn: async (data: AddContactForm) => {
@@ -140,7 +153,21 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
       const response = await apiRequest('POST', '/api/email-contacts', payload);
       return response.json();
     },
-    onSuccess: (data, variables) => {
+    onSuccess: async (data, variables) => {
+      // Save custom field values for the newly created contact
+      if (data?.id && customFieldDefs.length > 0) {
+        const cfValues = Object.entries(customFieldValues)
+          .filter(([_, value]) => value)
+          .map(([fieldId, value]) => ({ fieldId, value }));
+        if (cfValues.length > 0) {
+          try {
+            await apiRequest('PUT', `/api/email-contacts/${data.id}/custom-fields`, { values: cfValues });
+          } catch (err) {
+            console.error('Failed to save custom field values:', err);
+          }
+        }
+      }
+
       toast({
         title: t('emailContacts.toasts.success'),
         description: t('emailContacts.newContact.toasts.createSuccess', { 
@@ -157,6 +184,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
       form.reset();
       setSelectedTags([]);
       setSelectedLists([]);
+      setCustomFieldValues({});
       onOpenChange(false);
     },
     onError: (err: any) => {
@@ -358,6 +386,83 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
                 )}
               />
             </div>
+
+            {/* Custom Fields */}
+            {customFieldDefs.length > 0 && (
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Settings2 className="w-4 h-4" />
+                  Custom Fields
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {customFieldDefs.map((cf: any) => (
+                    <div key={cf.id} className="space-y-1.5">
+                      <Label>
+                        {cf.label}
+                        {cf.isRequired && <span className="text-red-500 ml-1">*</span>}
+                      </Label>
+                      {cf.fieldType === 'text' && (
+                        <Input
+                          placeholder={cf.placeholder || `Enter ${cf.label.toLowerCase()}...`}
+                          value={customFieldValues[cf.id] || ''}
+                          onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                        />
+                      )}
+                      {cf.fieldType === 'number' && (
+                        <Input
+                          type="number"
+                          placeholder={cf.placeholder || '0'}
+                          value={customFieldValues[cf.id] || ''}
+                          onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                        />
+                      )}
+                      {cf.fieldType === 'url' && (
+                        <Input
+                          type="url"
+                          placeholder={cf.placeholder || 'https://...'}
+                          value={customFieldValues[cf.id] || ''}
+                          onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                        />
+                      )}
+                      {cf.fieldType === 'date' && (
+                        <Input
+                          type="date"
+                          value={customFieldValues[cf.id] || ''}
+                          onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                        />
+                      )}
+                      {cf.fieldType === 'select' && (
+                        <Select
+                          value={customFieldValues[cf.id] || ''}
+                          onValueChange={(val) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: val }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={cf.placeholder || `Select ${cf.label.toLowerCase()}...`} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(cf.options || []).map((opt: string) => (
+                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {cf.fieldType === 'boolean' && (
+                        <div className="flex items-center space-x-2 pt-1">
+                          <Checkbox
+                            id={`add-cf-${cf.id}`}
+                            checked={customFieldValues[cf.id] === 'true'}
+                            onCheckedChange={(checked) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: checked ? 'true' : 'false' }))}
+                          />
+                          <Label htmlFor={`add-cf-${cf.id}`} className="text-sm text-muted-foreground cursor-pointer">
+                            {cf.placeholder || 'Yes'}
+                          </Label>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Status Field */}
             <FormField

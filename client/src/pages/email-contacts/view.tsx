@@ -29,7 +29,9 @@ import {
   Send,
   TrendingUp,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  Settings2,
+  ExternalLink,
 } from "lucide-react";
 
 interface Contact {
@@ -125,6 +127,18 @@ export default function ViewContact() {
       return res.json();
     },
   });
+
+  // Fetch custom field values for this contact
+  const { data: customFieldsData } = useQuery({
+    queryKey: ['/api/email-contacts', id, 'custom-fields'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/email-contacts/${id}/custom-fields`);
+      return res.json();
+    },
+    enabled: !!id && !!response?.contact,
+  });
+
+  const customFields = customFieldsData?.customFields || [];
 
   // Extract contact from response - the API returns { contact: ... }
   const contact: Contact | undefined = response?.contact;
@@ -740,6 +754,58 @@ export default function ViewContact() {
               ))}
             </CardContent>
           </Card>
+
+          {/* Custom Fields */}
+          {customFields.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings2 className="w-5 h-5" />
+                  Custom Fields
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {customFields.filter((cf: any) => cf.value !== null && cf.value !== '').length > 0 ? (
+                  customFields
+                    .filter((cf: any) => cf.value !== null && cf.value !== '')
+                    .map((cf: any) => (
+                      <div key={cf.id} className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{cf.label}</p>
+                          {cf.fieldType === 'url' && cf.value ? (
+                            <a
+                              href={cf.value.startsWith('http') ? cf.value : `https://${cf.value}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:underline flex items-center gap-1 break-all"
+                            >
+                              {cf.value}
+                              <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                            </a>
+                          ) : cf.fieldType === 'boolean' ? (
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {cf.value === 'true' ? 'Yes' : 'No'}
+                            </p>
+                          ) : cf.fieldType === 'date' ? (
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {new Date(cf.value).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                            </p>
+                          ) : cf.fieldType === 'number' ? (
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {Number(cf.value).toLocaleString()}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 break-words">{cf.value}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No custom field values set</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Consent Information */}
           <Card>
