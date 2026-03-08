@@ -615,6 +615,19 @@ export const campaigns = pgTable("campaigns", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Campaign-Newsletter junction table for aggregating newsletter analytics across campaigns
+export const campaignNewsletters = pgTable("campaign_newsletters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => campaigns.id, { onDelete: 'cascade' }),
+  newsletterId: varchar("newsletter_id").notNull().references(() => newsletters.id, { onDelete: 'cascade' }),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  addedAt: timestamp("added_at").defaultNow(),
+}, (table) => ({
+  campaignNewsletterUnique: uniqueIndex("campaign_newsletter_unique").on(table.campaignId, table.newsletterId),
+  campaignIdx: index("idx_campaign_newsletters_campaign").on(table.campaignId),
+  newsletterIdx: index("idx_campaign_newsletters_newsletter").on(table.newsletterId),
+}));
+
 // Email activity tracking for webhook events
 export const emailActivity = pgTable("email_activity", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1821,7 +1834,7 @@ export type CreateNewsletterTaskStatusData = z.infer<typeof createNewsletterTask
 export type UpdateNewsletterTaskStatusData = z.infer<typeof updateNewsletterTaskStatusSchema>;
 
 // Campaign relations
-export const campaignRelations = relations(campaigns, ({ one }) => ({
+export const campaignRelations = relations(campaigns, ({ one, many }) => ({
   tenant: one(tenants, {
     fields: [campaigns.tenantId],
     references: [tenants.id],
@@ -1833,6 +1846,19 @@ export const campaignRelations = relations(campaigns, ({ one }) => ({
   reviewer: one(betterAuthUser, {
     fields: [campaigns.reviewerId],
     references: [betterAuthUser.id],
+  }),
+  campaignNewsletters: many(campaignNewsletters),
+}));
+
+// Campaign-Newsletter junction relations
+export const campaignNewsletterRelations = relations(campaignNewsletters, ({ one }) => ({
+  campaign: one(campaigns, {
+    fields: [campaignNewsletters.campaignId],
+    references: [campaigns.id],
+  }),
+  newsletter: one(newsletters, {
+    fields: [campaignNewsletters.newsletterId],
+    references: [newsletters.id],
   }),
 }));
 
@@ -1852,6 +1878,7 @@ export const createCampaignSchema = z.object({
   settings: z.string().optional(),
   requiresReviewerApproval: z.boolean().default(false),
   reviewerId: z.string().optional(),
+  newsletterIds: z.array(z.string()).optional(),
 });
 
 export const updateCampaignSchema = z.object({
@@ -1872,6 +1899,7 @@ export const updateCampaignSchema = z.object({
   reviewStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
   reviewNotes: z.string().optional(),
   isActive: z.boolean().optional(),
+  newsletterIds: z.array(z.string()).optional(),
 });
 
 export const insertCampaignSchema = createInsertSchema(campaigns).omit({
@@ -1887,6 +1915,7 @@ export type Campaign = typeof campaigns.$inferSelect;
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
 export type CreateCampaignData = z.infer<typeof createCampaignSchema>;
 export type UpdateCampaignData = z.infer<typeof updateCampaignSchema>;
+export type CampaignNewsletter = typeof campaignNewsletters.$inferSelect;
 
 export interface NewsletterWithUser extends Newsletter {
   user: User;
