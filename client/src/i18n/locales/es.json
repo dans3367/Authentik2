@@ -1809,6 +1809,13 @@
       "deactivate": "Desactivar",
       "delete": "Eliminar"
     },
+    "preview": {
+      "title": "Vista Previa de Correo",
+      "description": "Así se verá la promoción en un cliente de correo electrónico.",
+      "promotion": "Promoción",
+      "type": "Tipo",
+      "descriptionLabel": "Descripción"
+    },
     "confirmDelete": {
       "title": "¿Estás seguro?",
       "description": "Esta acción no se puede deshacer. Esto eliminará permanentemente la promoción \"{{title}}\" y la removerá de todas las campañas.",

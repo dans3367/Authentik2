@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Megaphone, Plus, Eye, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { apiRequest } from '@/lib/queryClient';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
+import { wrapInEmailPreview } from '@/utils/email-preview-wrapper';
 
 interface Promotion {
   id: string;
@@ -52,10 +53,59 @@ function PromotionPreviewModal({ promotion, isOpen, onClose }: {
   onClose: () => void;
 }) {
   const { t } = useLanguage();
-  
+
+  // Fetch global email design for wrapping
+  const { data: emailDesign } = useQuery<{
+    companyName?: string;
+    headerMode?: string;
+    logoUrl?: string;
+    logoSize?: string;
+    logoAlignment?: string;
+    bannerUrl?: string;
+    showCompanyName?: string;
+    primaryColor?: string;
+    fontFamily?: string;
+    headerText?: string;
+    footerText?: string;
+    socialLinks?: { facebook?: string; twitter?: string; instagram?: string; linkedin?: string } | string;
+  }>({
+    queryKey: ["/api/master-email-design"],
+    queryFn: async () => {
+      const response = await fetch('/api/master-email-design', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch email design');
+      return response.json();
+    },
+  });
+
+  const parsedSocialLinks = useMemo(() => {
+    const raw = emailDesign?.socialLinks;
+    if (!raw) return undefined;
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw); } catch { return undefined; }
+    }
+    return raw;
+  }, [emailDesign]);
+
+  const wrappedPreviewHtml = useMemo(() => {
+    return wrapInEmailPreview(promotion.content || '', {
+      companyName: emailDesign?.companyName || '',
+      headerMode: emailDesign?.headerMode,
+      primaryColor: emailDesign?.primaryColor,
+      logoUrl: emailDesign?.logoUrl,
+      logoSize: emailDesign?.logoSize,
+      logoAlignment: emailDesign?.logoAlignment,
+      bannerUrl: emailDesign?.bannerUrl,
+      showCompanyName: emailDesign?.showCompanyName,
+      headerText: emailDesign?.headerText,
+      footerText: emailDesign?.footerText,
+      fontFamily: emailDesign?.fontFamily,
+      socialLinks: parsedSocialLinks,
+    });
+  }, [promotion, emailDesign, parsedSocialLinks]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Megaphone className="h-5 w-5" />
@@ -64,22 +114,45 @@ function PromotionPreviewModal({ promotion, isOpen, onClose }: {
               {promotion.type}
             </Badge>
           </DialogTitle>
+          <DialogDescription>
+            {t('birthdays.promotions.selector.previewDescription', 'This is how the promotion will appear in an email client.')}
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          {promotion.description && (
-            <p className="text-gray-600 dark:text-gray-400">
-              {promotion.description}
-            </p>
-          )}
-          <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-900">
-            <h4 className="font-medium mb-2">{t('birthdays.promotions.selector.contentPreview')}</h4>
-            <div
-              className="prose prose-sm max-w-none dark:prose-invert"
-              dangerouslySetInnerHTML={{ __html: promotion.content }}
-            />
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {t('birthdays.promotions.selector.targetAudience')}: {promotion.targetAudience} • {t('birthdays.promotions.selector.used')} {promotion.usageCount} {t('birthdays.promotions.selector.times')}
+
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl">
+            <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full">
+              <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
+                <div className="flex gap-2 mb-1">
+                  <span className="font-semibold text-right w-20">{t('birthdays.promotions.selector.promotionLabel', 'Promotion')}</span>
+                  <span className="text-gray-900 font-semibold truncate">
+                    {promotion.title}
+                  </span>
+                </div>
+                {promotion.description && (
+                  <div className="flex gap-2 mb-1">
+                    <span className="font-semibold text-right w-20">{t('birthdays.promotions.selector.descriptionLabel', 'Description')}</span>
+                    <span className="text-gray-700 line-clamp-2">
+                      {promotion.description}
+                    </span>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <span className="font-semibold text-right w-20">{t('birthdays.promotions.selector.targetAudience')}</span>
+                  <span className="text-gray-900">
+                    {promotion.targetAudience} • {t('birthdays.promotions.selector.used')} {promotion.usageCount} {t('birthdays.promotions.selector.times')}
+                  </span>
+                </div>
+              </div>
+
+              <iframe
+                srcDoc={wrappedPreviewHtml}
+                title="Promotion email preview"
+                sandbox="allow-same-origin"
+                className="w-full border-0"
+                style={{ minHeight: '640px', background: '#fff' }}
+              />
+            </div>
           </div>
         </div>
       </DialogContent>

@@ -1879,6 +1879,13 @@
       "deactivate": "Deactivate",
       "delete": "Delete"
     },
+    "preview": {
+      "title": "Email Preview",
+      "description": "This is how the promotion will appear in an email client.",
+      "promotion": "Promotion",
+      "type": "Type",
+      "descriptionLabel": "Description"
+    },
     "confirmDelete": {
       "title": "Are you sure?",
       "description": "This action cannot be undone. This will permanently delete the promotion \"{{title}}\" and remove it from all campaigns.",

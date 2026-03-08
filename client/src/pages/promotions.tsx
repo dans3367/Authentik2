@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,10 +9,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { wrapInEmailPreview } from '@/utils/email-preview-wrapper';
 
 interface Promotion {
   id: string;
@@ -155,6 +157,7 @@ export default function PromotionsPage() {
   const { toast } = useToast();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const [previewPromotion, setPreviewPromotion] = useState<Promotion | null>(null);
 
   // Set breadcrumbs in header
   useSetBreadcrumbs([
@@ -165,6 +168,56 @@ export default function PromotionsPage() {
   const { data: promotionsData, isLoading, error } = useQuery({
     queryKey: ['/api/promotions'],
   });
+
+  // Fetch global email design for preview
+  const { data: emailDesign } = useQuery<{
+    companyName?: string;
+    headerMode?: string;
+    logoUrl?: string;
+    logoSize?: string;
+    logoAlignment?: string;
+    bannerUrl?: string;
+    showCompanyName?: string;
+    primaryColor?: string;
+    fontFamily?: string;
+    headerText?: string;
+    footerText?: string;
+    socialLinks?: { facebook?: string; twitter?: string; instagram?: string; linkedin?: string } | string;
+  }>({
+    queryKey: ["/api/master-email-design"],
+    queryFn: async () => {
+      const response = await fetch('/api/master-email-design', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch email design');
+      return response.json();
+    },
+  });
+
+  const parsedSocialLinks = useMemo(() => {
+    const raw = emailDesign?.socialLinks;
+    if (!raw) return undefined;
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw); } catch { return undefined; }
+    }
+    return raw;
+  }, [emailDesign]);
+
+  const wrappedPreviewHtml = useMemo(() => {
+    if (!previewPromotion) return '';
+    return wrapInEmailPreview(previewPromotion.content || '', {
+      companyName: emailDesign?.companyName || '',
+      headerMode: emailDesign?.headerMode,
+      primaryColor: emailDesign?.primaryColor,
+      logoUrl: emailDesign?.logoUrl,
+      logoSize: emailDesign?.logoSize,
+      logoAlignment: emailDesign?.logoAlignment,
+      bannerUrl: emailDesign?.bannerUrl,
+      showCompanyName: emailDesign?.showCompanyName,
+      headerText: emailDesign?.headerText,
+      footerText: emailDesign?.footerText,
+      fontFamily: emailDesign?.fontFamily,
+      socialLinks: parsedSocialLinks,
+    });
+  }, [previewPromotion, emailDesign, parsedSocialLinks]);
 
   const promotions = (promotionsData as any)?.promotions || [];
   const promotionTypeOptions = getPromotionTypeOptions(t);
@@ -307,7 +360,9 @@ export default function PromotionsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setPreviewPromotion(promotion)}
+                            >
                               <Eye className="h-4 w-4 mr-2" />
                               {t('promotionsPage.actions.preview')}
                             </DropdownMenuItem>
@@ -406,6 +461,58 @@ export default function PromotionsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Promotion Email Preview Dialog */}
+      <Dialog open={!!previewPromotion} onOpenChange={(open) => !open && setPreviewPromotion(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              {t('promotionsPage.preview.title', 'Email Preview')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('promotionsPage.preview.description', 'This is how the promotion will appear in an email client.')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl">
+              <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full">
+                <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
+                  <div className="flex gap-2 mb-1">
+                    <span className="font-semibold text-right w-20">{t('promotionsPage.preview.promotion', 'Promotion')}</span>
+                    <span className="text-gray-900 font-semibold truncate">
+                      {previewPromotion?.title}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 mb-1">
+                    <span className="font-semibold text-right w-20">{t('promotionsPage.preview.type', 'Type')}</span>
+                    <span className="text-gray-900 capitalize">
+                      {previewPromotion?.type ? promotionTypeOptions[previewPromotion.type] : ''}
+                    </span>
+                  </div>
+                  {previewPromotion?.description && (
+                    <div className="flex gap-2">
+                      <span className="font-semibold text-right w-20">{t('promotionsPage.preview.descriptionLabel', 'Description')}</span>
+                      <span className="text-gray-700 line-clamp-2">
+                        {previewPromotion.description}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <iframe
+                  srcDoc={wrappedPreviewHtml}
+                  title="Promotion email preview"
+                  sandbox="allow-same-origin"
+                  className="w-full border-0"
+                  style={{ minHeight: '640px', background: '#fff' }}
+                />
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
