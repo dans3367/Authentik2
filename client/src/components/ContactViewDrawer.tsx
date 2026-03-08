@@ -122,6 +122,20 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
     enabled: !!contactId && open,
   });
 
+  // Fetch custom fields for this contact
+  const { data: customFieldsResponse } = useQuery({
+    queryKey: ['/api/email-contacts', contactId, 'custom-fields'],
+    queryFn: async () => {
+      if (!contactId) return null;
+      const apiResponse = await apiRequest('GET', `/api/email-contacts/${contactId}/custom-fields`);
+      const data = await apiResponse.json();
+      return data;
+    },
+    enabled: !!contactId && open,
+  });
+
+  const customFields = customFieldsResponse?.customFields;
+
   // Global suppression check (bounced/spam complaints) for this email
   const emailForCheck = response?.contact?.email as string | undefined;
   const { data: bouncedCheck } = useQuery({
@@ -478,6 +492,48 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                                   </p>
                                 </div>
                               )}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Custom Fields */}
+                      {Array.isArray(customFields) && customFields.some((f: any) => f.value !== null && f.value !== undefined && f.value !== '') && (
+                        <>
+                          <Separator />
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Custom Fields</h4>
+                            <div className="grid grid-cols-2 gap-4">
+                              {customFields.filter((f: any) => f.value !== null && f.value !== undefined && f.value !== '').map((field: any) => {
+                                let displayValue = field.value;
+                                if (field.fieldType === 'boolean') {
+                                  displayValue = field.value === 'true' ? 'Yes' : 'No';
+                                } else if (field.fieldType === 'date') {
+                                  displayValue = new Date(field.value).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                  });
+                                } else if (field.fieldType === 'url') {
+                                  displayValue = (
+                                    <a
+                                      href={field.value}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+                                      data-testid={`link-custom-field-${field.id}`}
+                                    >
+                                      {field.value}
+                                    </a>
+                                  );
+                                }
+                                return (
+                                  <div key={field.id} data-testid={`custom-field-${field.id}`}>
+                                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{field.label}</label>
+                                    <p className="text-gray-900 dark:text-white">{displayValue}</p>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         </>
