@@ -23,6 +23,7 @@ import {
   AlignRight,
   Calendar,
   ArrowRight,
+  PenTool,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -58,6 +59,7 @@ interface BlogDesignData {
     instagram?: string;
     linkedin?: string;
   };
+  newsletterEditorType?: string;
   updatedAt: string;
 }
 
@@ -354,6 +356,87 @@ export default function ManagementBlogDesign() {
             <CardContent className="p-0">
               <Accordion type="single" collapsible defaultValue="brand" className="space-y-4">
 
+                {/* 0. Newsletter Editor */}
+                <AccordionItem value="editor" className="border rounded-lg bg-card px-4 shadow-sm">
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-md text-indigo-600 dark:text-indigo-400">
+                        <PenTool className="w-5 h-5" />
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold text-base">Newsletter Editor</h3>
+                        <p className="text-sm text-muted-foreground font-normal">Choose your editing experience</p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-2 pb-6 space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Select which editor to use when creating newsletters. This setting applies to all new newsletters.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Classic (Puck) */}
+                      <button
+                        type="button"
+                        onClick={() => updateField("newsletterEditorType", "classic")}
+                        className={`relative flex flex-col items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${(draft.newsletterEditorType || 'classic') === 'classic'
+                            ? 'border-primary bg-primary/5 shadow-md ring-1 ring-primary/20'
+                            : 'border-input bg-background hover:border-muted-foreground/30 hover:bg-muted/50'
+                          }`}
+                      >
+                        {(draft.newsletterEditorType || 'classic') === 'classic' && (
+                          <div className="absolute top-2.5 right-2.5">
+                            <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                              <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                        <div className="p-2.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                          <Layout className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm">Classic Editor</h4>
+                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                            Drag-and-drop block editor with visual components. Best for richly designed email newsletters with images, grids, and custom layouts.
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="text-[10px] px-2 py-0.5">Puck Editor</Badge>
+                      </button>
+
+                      {/* Notion-like (TipTap) */}
+                      <button
+                        type="button"
+                        onClick={() => updateField("newsletterEditorType", "notion")}
+                        className={`relative flex flex-col items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${draft.newsletterEditorType === 'notion'
+                            ? 'border-primary bg-primary/5 shadow-md ring-1 ring-primary/20'
+                            : 'border-input bg-background hover:border-muted-foreground/30 hover:bg-muted/50'
+                          }`}
+                      >
+                        {draft.newsletterEditorType === 'notion' && (
+                          <div className="absolute top-2.5 right-2.5">
+                            <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                              <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                        <div className="p-2.5 rounded-lg bg-violet-100 dark:bg-violet-900/30">
+                          <PenTool className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm">Notion-like Editor</h4>
+                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                            Clean writing experience with slash commands (<code className="text-[10px] bg-muted px-1 py-0.5 rounded font-mono">/</code>). Best for text-focused newsletters and blog-style content.
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="text-[10px] px-2 py-0.5">TipTap Editor</Badge>
+                      </button>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
                 {/* 1. Brand Identity */}
                 <AccordionItem value="brand" className="border rounded-lg bg-card px-4 shadow-sm">
                   <AccordionTrigger className="hover:no-underline py-4">
@@ -402,11 +485,10 @@ export default function ManagementBlogDesign() {
                             key={opt.value}
                             type="button"
                             onClick={() => updateField("headerMode", opt.value)}
-                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm rounded-md border transition-colors ${
-                              (draft.headerMode || 'logo') === opt.value
+                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm rounded-md border transition-colors ${(draft.headerMode || 'logo') === opt.value
                                 ? 'bg-primary text-primary-foreground border-primary'
                                 : 'bg-background hover:bg-muted border-input'
-                            }`}
+                              }`}
                           >
                             <opt.icon className="w-4 h-4" />
                             <span className="font-medium">{opt.label}</span>
@@ -451,11 +533,10 @@ export default function ManagementBlogDesign() {
                                 key={opt.value}
                                 type="button"
                                 onClick={() => updateField("logoSize", opt.value)}
-                                className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
-                                  (draft.logoSize || 'medium') === opt.value
+                                className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${(draft.logoSize || 'medium') === opt.value
                                     ? 'bg-primary text-primary-foreground border-primary'
                                     : 'bg-background hover:bg-muted border-input'
-                                }`}
+                                  }`}
                               >
                                 <div className="font-medium">{opt.label}</div>
                                 <div className="text-[10px] opacity-70">{opt.px}</div>
@@ -475,11 +556,10 @@ export default function ManagementBlogDesign() {
                                 key={opt.value}
                                 type="button"
                                 onClick={() => updateField("logoAlignment", opt.value)}
-                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-md border transition-colors ${
-                                  (draft.logoAlignment || 'center') === opt.value
+                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-md border transition-colors ${(draft.logoAlignment || 'center') === opt.value
                                     ? 'bg-primary text-primary-foreground border-primary'
                                     : 'bg-background hover:bg-muted border-input'
-                                }`}
+                                  }`}
                               >
                                 <opt.icon className="w-4 h-4" />
                                 <span className="font-medium">{opt.label}</span>

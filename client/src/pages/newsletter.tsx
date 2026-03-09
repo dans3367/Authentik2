@@ -58,6 +58,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
+import { EditorPickerModal } from "@/components/EditorPickerModal";
 import { format, formatDistanceToNow } from "date-fns";
 import { es as esLocale } from "date-fns/locale/es";
 import type { NewsletterWithUser } from "@shared/schema";
@@ -94,6 +95,7 @@ export default function NewsletterPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [previewNewsletter, setPreviewNewsletter] = useState<NewsletterListItem | null>(null);
   const [editRecipientsNewsletter, setEditRecipientsNewsletter] = useState<NewsletterListItem | null>(null);
+  const [showEditorPicker, setShowEditorPicker] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
@@ -369,7 +371,7 @@ export default function NewsletterPage() {
               {t("newsletter.subtitle")}
             </p>
           </div>
-          <Button onClick={() => setLocation('/newsletter/create')} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={() => setShowEditorPicker(true)} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="h-4 w-4 mr-2" />
             {t("newsletter.createNew", "Create Newsletter")}
           </Button>
@@ -455,7 +457,7 @@ export default function NewsletterPage() {
             <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-sm mx-auto">
               {t("newsletter.noNewslettersDesc")}
             </p>
-            <Button onClick={() => setLocation('/newsletter/create')} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={() => setShowEditorPicker(true)} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="h-4 w-4 mr-2" />
               {t("newsletter.createFirst")}
             </Button>
@@ -805,6 +807,8 @@ export default function NewsletterPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <EditorPickerModal open={showEditorPicker} onOpenChange={setShowEditorPicker} />
     </>
   );
 }

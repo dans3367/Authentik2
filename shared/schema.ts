@@ -2989,6 +2989,7 @@ export const blogDesign = pgTable("blog_design", {
   headerText: text("header_text"),
   footerText: text("footer_text"),
   socialLinks: text("social_links"), // JSON: { facebook, twitter, instagram, linkedin }
+  newsletterEditorType: text("newsletter_editor_type").default('classic'), // 'classic' (Puck) | 'notion' (TipTap)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

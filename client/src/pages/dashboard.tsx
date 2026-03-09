@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useLocation } from "wouter";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
@@ -21,6 +22,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useDashboardHighlights } from "@/hooks/useStats";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EditorPickerModal } from "@/components/EditorPickerModal";
 
 function getGreeting(t: (key: string) => string): { text: string; emoji: string } {
   const hour = new Date().getHours();
@@ -70,11 +72,14 @@ export default function Dashboard() {
 
   const firstName = user.name?.split(" ")[0] || user.email?.split("@")[0] || "there";
 
+  const [showEditorPicker, setShowEditorPicker] = useState(false);
+
   const quickActions = [
     {
       label: t("dashboard.quickActions.newNewsletter"),
       icon: Newspaper,
-      path: "/newsletter/create",
+      path: "",
+      onClick: () => setShowEditorPicker(true),
       gradient: "from-blue-500 to-indigo-600",
       lightBg: "bg-blue-50 dark:bg-blue-950/40",
     },
@@ -137,6 +142,7 @@ export default function Dashboard() {
   ];
 
   return (
+    <>
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 overflow-y-auto">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div className="space-y-1">
@@ -162,7 +168,7 @@ export default function Dashboard() {
           {quickActions.map((action) => (
             <button
               key={action.label}
-              onClick={() => setLocation(action.path)}
+              onClick={() => action.onClick ? action.onClick() : setLocation(action.path)}
               className={`group flex items-center gap-2 px-3 py-2 rounded-lg ${action.lightBg} border border-transparent hover:border-border/50 hover:shadow-sm active:scale-[0.97] transition-all duration-200 cursor-pointer`}
               data-testid={`button-quick-${action.path.replace(/\//g, '-').substring(1)}`}
             >
@@ -251,5 +257,7 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+    <EditorPickerModal open={showEditorPicker} onOpenChange={setShowEditorPicker} />
+    </>
   );
 }

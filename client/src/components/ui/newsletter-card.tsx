@@ -1,18 +1,22 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Newspaper, ArrowRight, Sparkles, Send } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { EditorPickerModal } from "@/components/EditorPickerModal";
 
 export function NewsletterCard() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
+  const [showEditorPicker, setShowEditorPicker] = useState(false);
 
   const handleCreateNewsletter = () => {
-    setLocation("/newsletter/create");
+    setShowEditorPicker(true);
   };
 
   return (
+    <>
     <Card className="h-full group relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow duration-300">
       <div className="absolute inset-0 bg-gradient-to-br from-primary via-blue-600 to-indigo-700 dark:from-primary/90 dark:via-blue-700 dark:to-indigo-800" />
 
@@ -84,5 +88,7 @@ export function NewsletterCard() {
         </div>
       </CardContent>
     </Card>
+    <EditorPickerModal open={showEditorPicker} onOpenChange={setShowEditorPicker} />
+    </>
   );
 }

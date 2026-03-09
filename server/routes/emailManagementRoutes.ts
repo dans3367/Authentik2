@@ -1066,7 +1066,7 @@ emailManagementRoutes.post("/email-contacts", authenticateToken, requireTenant, 
     const sanitizedZipCode = zipCode ? sanitizeString(zipCode) : null;
     const sanitizedCountry = country ? sanitizeString(country) : null;
     const sanitizedPhoneNumber = phoneNumber ? sanitizeString(phoneNumber) : null;
-    
+
     // Validate dateOfBirth format if provided
     let validatedDateOfBirth = null;
     if (dateOfBirth) {
@@ -1625,7 +1625,7 @@ emailManagementRoutes.get("/bounced-emails/check/:email", authenticateToken, req
   try {
     const { email } = req.params;
     const sanitizedEmail = sanitizeEmail(email);
-    
+
     if (!sanitizedEmail) {
       return res.status(400).json({ message: 'Invalid email address' });
     }
@@ -3513,6 +3513,7 @@ emailManagementRoutes.get("/blog-design", authenticateToken, requireTenant, asyn
         headerText: null,
         footerText: company?.name ? `© ${new Date().getFullYear()} ${company.name}. All rights reserved.` : null,
         socialLinks: null,
+        newsletterEditorType: 'classic',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -3545,6 +3546,7 @@ emailManagementRoutes.put("/blog-design", authenticateToken, requireTenant, requ
       headerText,
       footerText,
       socialLinks,
+      newsletterEditorType,
     } = req.body;
 
     console.log('🎨 [Blog Design PUT] Received:', { companyName, headerMode, logoUrl, logoSize, logoAlignment, bannerUrl, headerText, primaryColor, tenantId: req.user.tenantId });
@@ -3614,6 +3616,12 @@ emailManagementRoutes.put("/blog-design", authenticateToken, requireTenant, requ
       safeSocialLinksStr = validated ? JSON.stringify(validated) : null;
     }
 
+    // Newsletter editor type
+    const ALLOWED_EDITOR_TYPES = ['classic', 'notion'] as const;
+    if (newsletterEditorType !== undefined && !ALLOWED_EDITOR_TYPES.includes(newsletterEditorType)) {
+      return res.status(400).json({ message: `Invalid newsletterEditorType. Must be one of: ${ALLOWED_EDITOR_TYPES.join(', ')}` });
+    }
+
     // ── Persist ──
 
     const existingDesign = await db.query.blogDesign.findFirst({
@@ -3637,6 +3645,7 @@ emailManagementRoutes.put("/blog-design", authenticateToken, requireTenant, requ
         fontFamily: safeFontFamily ?? existingDesign.fontFamily,
         headerText: headerText !== undefined ? safeHeaderText : existingDesign.headerText,
         footerText: footerText !== undefined ? safeFooterText : existingDesign.footerText,
+        newsletterEditorType: newsletterEditorType !== undefined ? newsletterEditorType : existingDesign.newsletterEditorType,
         updatedAt: new Date(),
       };
 
@@ -3666,6 +3675,7 @@ emailManagementRoutes.put("/blog-design", authenticateToken, requireTenant, requ
           headerText: safeHeaderText || null,
           footerText: safeFooterText || null,
           socialLinks: hasSocialLinks ? safeSocialLinksStr : null,
+          newsletterEditorType: newsletterEditorType || 'classic',
         })
         .returning();
     }

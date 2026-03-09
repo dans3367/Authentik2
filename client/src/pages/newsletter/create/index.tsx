@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Puck } from "@puckeditor/core";
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
+// Lazy load editors to avoid loading both bundles
+const LazyPuck = lazy(() => import("@puckeditor/core").then(m => ({ default: m.Puck })));
+const LazyNotionEditor = lazy(() => import("@/components/NotionLikeEditor"));
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createConfig, initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
@@ -60,7 +62,37 @@ export default function NewsletterCreatePage() {
   const { t, currentLanguage } = useLanguage();
   const queryClient = useQueryClient();
 
-  // Build translated Puck config — rebuilds when language changes
+  // Fetch blog design to determine editor type
+  const { data: blogDesignData } = useQuery<{ newsletterEditorType?: string }>({
+    queryKey: ["/api/blog-design"],
+    queryFn: async () => {
+      const response = await fetch('/api/blog-design', { credentials: 'include' });
+      if (!response.ok) return { newsletterEditorType: 'classic' };
+      return response.json();
+    },
+  });
+
+  const managementEditorType = blogDesignData?.newsletterEditorType || 'classic';
+
+  // Read ?editor= query param (set by the editor picker modal when creating a new newsletter)
+  const queryEditorType = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    const val = params.get('editor');
+    return val === 'classic' || val === 'notion' ? val : null;
+  }, []);
+
+  // When editing an existing newsletter, detect which editor it was originally created with
+  // so we always reopen it in the correct editor regardless of the current management setting.
+  const [detectedEditorType, setDetectedEditorType] = useState<'classic' | 'notion' | null>(null);
+
+  // Priority: existing newsletter detected type > query param from picker modal > management setting
+  const editorType = isEditMode && detectedEditorType
+    ? detectedEditorType
+    : queryEditorType || managementEditorType;
+
+  // State for notion editor HTML content
+  const [notionHtmlContent, setNotionHtmlContent] = useState<string>("");
+  // Build translated Puck config — rebuilds when language changes (only needed for classic)
   const translatedConfig = useMemo(() => createConfig(t), [t, currentLanguage]);
 
   useEffect(() => { dataRef.current = data; }, [data]);
@@ -85,10 +117,21 @@ export default function NewsletterCreatePage() {
       if (nl.puckData) {
         try {
           const parsed = JSON.parse(nl.puckData);
-          setData(parsed);
+          // Detect which editor created this newsletter and always reopen with that editor
+          if (parsed.notionHtml) {
+            setDetectedEditorType('notion');
+            setNotionHtmlContent(parsed.notionHtml);
+          } else {
+            setDetectedEditorType('classic');
+            setData(parsed);
+          }
         } catch {
           // puckData was invalid JSON, start fresh
+          setDetectedEditorType('classic');
         }
+      } else {
+        // No puckData at all — use management default
+        setDetectedEditorType(null);
       }
       // Populate recipient data for the send wizard
       if (nl.recipientType) {
@@ -134,13 +177,16 @@ export default function NewsletterCreatePage() {
   });
 
   const getHtmlContent = useCallback(() => {
+    if (editorType === 'notion') {
+      return notionHtmlContent;
+    }
     return extractPuckEmailHtml();
-  }, []);
+  }, [editorType, notionHtmlContent]);
 
   // Save newsletter to database (create or update)
   const saveToDatabase = useCallback(async (status: 'draft' | 'ready_to_send' | 'scheduled' = 'draft') => {
-    const htmlContent = extractPuckEmailHtml();
-    const puckDataJson = JSON.stringify(dataRef.current);
+    const htmlContent = editorType === 'notion' ? notionHtmlContent : extractPuckEmailHtml();
+    const puckDataJson = editorType === 'notion' ? JSON.stringify({ notionHtml: notionHtmlContent }) : JSON.stringify(dataRef.current);
     const currentTitle = title.trim() || t("newsletter.create.untitled", "Untitled Newsletter");
     const currentSubject = subject.trim() || currentTitle;
 
@@ -191,7 +237,7 @@ export default function NewsletterCreatePage() {
     } finally {
       setIsSaving(false);
     }
-  }, [newsletterId, title, subject, reactionsEnabled, toast, queryClient]);
+  }, [newsletterId, title, subject, reactionsEnabled, toast, queryClient, editorType, notionHtmlContent]);
 
   const handleSaveDraft = useCallback(async () => {
     try {
@@ -879,21 +925,322 @@ export default function NewsletterCreatePage() {
             </button>
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
-            {dataReady ? (
-              <Puck
-                key={`${newsletterId || 'new'}-loaded`}
-                config={translatedConfig}
-                data={data}
-                onChange={handleDataChange}
-                onPublish={handlePublish}
-                iframe={iframeConfig}
-                overrides={puckOverrides}
-              />
-            ) : (
+            <Suspense fallback={
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                 <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#6b7280' }} />
               </div>
-            )}
+            }>
+              {editorType === 'notion' ? (
+                /* ─── Notion-like TipTap Editor ─── */
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  {/* Notion editor toolbar */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 16px',
+                    borderBottom: '1px solid #e5e7eb',
+                    background: '#fff',
+                    flexShrink: 0,
+                  }}>
+                    <input
+                      type="text"
+                      value={subject}
+                      onChange={(e) => { setSubject(e.target.value); setHasUnsavedChanges(true); }}
+                      placeholder="Email subject line..."
+                      style={{
+                        flex: 1,
+                        fontSize: '13px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        padding: '6px 12px',
+                        outline: 'none',
+                        background: '#f9fafb',
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: justSaved ? '#22c55e' : isSaving ? '#3b82f6' : '#9ca3af',
+                        whiteSpace: 'nowrap',
+                        transition: 'color 0.3s ease',
+                        minWidth: '80px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      {isSaving ? t("newsletter.create.saving", "Saving...") : justSaved ? t("newsletter.create.saved", "Saved") : hasUnsavedChanges ? t("newsletter.create.unsavedChanges", "Unsaved changes") : ""}
+                    </span>
+                    <button
+                      onClick={() => setPreviewOpen(true)}
+                      style={{
+                        padding: '6px 12px',
+                        background: '#7c3aed',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <Mail size={14} />
+                      {t("newsletter.create.sendPreview", "Send Preview")}
+                    </button>
+                    <button
+                      onClick={handleSaveDraft}
+                      disabled={isSaving}
+                      style={{
+                        padding: '6px 12px',
+                        background: '#059669',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: isSaving ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        opacity: isSaving ? 0.7 : 1,
+                      }}
+                    >
+                      {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                      {t("newsletter.create.saveDraft", "Save Draft")}
+                    </button>
+                    <button
+                      onClick={() => handlePublish(dataRef.current)}
+                      style={{
+                        padding: '6px 16px',
+                        background: '#2563eb',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <Rocket size={14} />
+                      {t("newsletter.create.ready", "Ready")}
+                    </button>
+                  </div>
+                  <div style={{ flex: 1, minHeight: 0, overflow: 'auto', background: '#f7fafc' }}>
+                    {/* Email design chrome wrapper — mirrors the Puck preview override */}
+                    {(() => {
+                      const primaryColor = emailDesign?.primaryColor || '#3B82F6';
+                      const companyName = emailDesign?.companyName || '';
+                      const logoUrl = emailDesign?.logoUrl;
+                      const headerText = emailDesign?.headerText;
+                      const footerText = emailDesign?.footerText || '';
+                      const socialLinks = emailDesign?.socialLinks;
+                      const fontFamily = emailDesign?.fontFamily || 'Arial, Helvetica, sans-serif';
+                      const logoSizeMap: Record<string, string> = { small: '64px', medium: '96px', large: '128px', xlarge: '160px' };
+                      const logoHeight = logoSizeMap[emailDesign?.logoSize || 'medium'] || '48px';
+                      const showName = (emailDesign?.showCompanyName ?? 'true') === 'true';
+                      const headerMode = emailDesign?.headerMode || 'logo';
+                      const bannerUrl = emailDesign?.bannerUrl;
+                      const useBanner = headerMode === 'banner' && !!bannerUrl;
+                      const logoAlign = (emailDesign?.logoAlignment || 'center') as 'left' | 'center' | 'right';
+                      const logoML = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? 'auto' : '0';
+                      const logoMR = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? '0' : 'auto';
+
+                      return (
+                        <div style={{
+                          width: '100%',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'flex-start',
+                          padding: '24px 20px',
+                          minHeight: '100%',
+                        }}>
+                          <div style={{
+                            width: '100%',
+                            maxWidth: '620px',
+                            boxShadow: '0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)',
+                            background: '#fff',
+                            margin: '0 auto',
+                            fontFamily,
+                            borderRadius: '2px',
+                          }}>
+                            {/* Branded email header */}
+                            {useBanner ? (
+                              <>
+                                <img
+                                  src={bannerUrl}
+                                  alt={companyName}
+                                  style={{ display: 'block', width: '100%', height: 'auto', border: 0 }}
+                                />
+                                {(showName && companyName || headerText) && (
+                                  <div style={{
+                                    padding: '16px 24px',
+                                    textAlign: 'center',
+                                    backgroundColor: primaryColor,
+                                    color: '#ffffff',
+                                  }}>
+                                    {companyName && showName && (
+                                      <h1 style={{
+                                        margin: '0 0 4px 0',
+                                        fontSize: '24px',
+                                        fontWeight: 'bold',
+                                        letterSpacing: '-0.025em',
+                                        color: '#ffffff',
+                                        fontFamily,
+                                      }}>
+                                        {companyName}
+                                      </h1>
+                                    )}
+                                    {headerText && (
+                                      <p style={{
+                                        margin: '0 auto',
+                                        fontSize: '16px',
+                                        opacity: 0.95,
+                                        maxWidth: '400px',
+                                        lineHeight: '1.5',
+                                        color: '#ffffff',
+                                      }}>
+                                        {headerText}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div style={{
+                                padding: '40px 24px',
+                                textAlign: logoAlign,
+                                backgroundColor: primaryColor,
+                                color: '#ffffff',
+                              }}>
+                                {logoUrl ? (
+                                  <img
+                                    src={logoUrl}
+                                    alt={companyName}
+                                    style={{ height: logoHeight, width: 'auto', objectFit: 'contain', display: 'block', margin: `0 ${logoMR} 20px ${logoML}` }}
+                                  />
+                                ) : (companyName && showName) ? (
+                                  <div style={{
+                                    height: '48px',
+                                    width: '48px',
+                                    backgroundColor: 'rgba(255,255,255,0.2)',
+                                    borderRadius: '50%',
+                                    margin: `0 ${logoMR} 16px ${logoML}`,
+                                    lineHeight: '48px',
+                                    fontSize: '20px',
+                                    fontWeight: 'bold',
+                                    color: '#ffffff',
+                                    textAlign: 'center',
+                                  }}>
+                                    {companyName.charAt(0)}
+                                  </div>
+                                ) : null}
+                                {companyName && showName && (
+                                  <h1 style={{
+                                    margin: '0 0 10px 0',
+                                    fontSize: '24px',
+                                    fontWeight: 'bold',
+                                    letterSpacing: '-0.025em',
+                                    color: '#ffffff',
+                                    fontFamily,
+                                  }}>
+                                    {companyName}
+                                  </h1>
+                                )}
+                                {headerText && (
+                                  <p style={{
+                                    margin: `0 ${logoMR} 0 ${logoML}`,
+                                    fontSize: '16px',
+                                    opacity: 0.95,
+                                    maxWidth: '400px',
+                                    lineHeight: '1.5',
+                                    color: '#ffffff',
+                                  }}>
+                                    {headerText}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Body content zone — editor lives here */}
+                            <div className="notion-editor-embedded" style={{ padding: '32px 24px', fontSize: '16px', lineHeight: '1.625', color: '#334155' }}>
+                              <LazyNotionEditor
+                                content={notionHtmlContent}
+                                onChange={(html) => {
+                                  setNotionHtmlContent(html);
+                                  setHasUnsavedChanges(true);
+                                }}
+                                placeholder="Type '/' for commands, or start writing your newsletter..."
+                                className="notion-editor-embedded"
+                              />
+                            </div>
+
+                            {/* Branded email footer */}
+                            <div style={{
+                              backgroundColor: '#f8fafc',
+                              padding: '32px',
+                              textAlign: 'center',
+                              borderTop: '1px solid #e2e8f0',
+                              color: '#64748b',
+                            }}>
+                              {socialLinks && (socialLinks.facebook || socialLinks.twitter || socialLinks.instagram || socialLinks.linkedin) && (
+                                <div style={{ marginBottom: '24px' }}>
+                                  {[
+                                    socialLinks.facebook && 'Facebook',
+                                    socialLinks.twitter && 'Twitter',
+                                    socialLinks.instagram && 'Instagram',
+                                    socialLinks.linkedin && 'LinkedIn',
+                                  ].filter(Boolean).map((name, i, arr) => (
+                                    <span key={name} style={{ color: '#64748b', fontSize: '13px', fontWeight: 500 }}>
+                                      {name}{i < arr.length - 1 ? ' | ' : ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {footerText && (
+                                <p style={{ margin: '0 0 16px 0', fontSize: '12px', lineHeight: '1.5', color: '#64748b' }}>
+                                  {footerText}
+                                </p>
+                              )}
+                              {companyName && showName && (
+                                <div style={{ fontSize: '12px', lineHeight: '1.5', color: '#94a3b8' }}>
+                                  <p style={{ margin: 0 }}>Sent via {companyName}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              ) : (
+                /* ─── Classic Puck Editor ─── */
+                dataReady ? (
+                  <LazyPuck
+                    key={`${newsletterId || 'new'}-loaded`}
+                    config={translatedConfig}
+                    data={data}
+                    onChange={handleDataChange}
+                    onPublish={handlePublish}
+                    iframe={iframeConfig}
+                    overrides={puckOverrides}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                    <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#6b7280' }} />
+                  </div>
+                )
+              )}
+            </Suspense>
           </div>
         </div>
         <SendPreviewDialog
