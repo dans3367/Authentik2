@@ -669,22 +669,24 @@ export default function NewsletterPage() {
                               </div>
 
                               {/* Row 4: Author + Date (with top divider) */}
-                              <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700/50">
+                              <div className="pt-3 border-t border-gray-100 dark:border-gray-700/50">
                                 <div className="flex items-center gap-2.5">
                                   <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-sm">
                                     {(newsletter.user?.firstName?.[0] || '')}{(newsletter.user?.lastName?.[0] || '')}
                                   </div>
-                                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-                                    {newsletter.user?.firstName || ''} {newsletter.user?.lastName || ''}
-                                  </span>
+                                  <div className="flex flex-col overflow-hidden">
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                                      {newsletter.user?.firstName || ''} {newsletter.user?.lastName || ''}
+                                    </span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">
+                                      {newsletter.sentAt
+                                        ? formatDistanceToNow(new Date(newsletter.sentAt), { addSuffix: true, ...dateFnsLocale })
+                                        : newsletter.createdAt
+                                          ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true, ...dateFnsLocale })
+                                          : ''}
+                                    </span>
+                                  </div>
                                 </div>
-                                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                                  {newsletter.sentAt
-                                    ? formatDistanceToNow(new Date(newsletter.sentAt), { addSuffix: true, ...dateFnsLocale })
-                                    : newsletter.createdAt
-                                      ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true, ...dateFnsLocale })
-                                      : ''}
-                                </span>
                               </div>
 
                               {/* Row 5: Bottom info (with top divider) */}
