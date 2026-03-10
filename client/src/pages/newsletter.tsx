@@ -91,7 +91,6 @@ const getStatusBadge = (status: string, t: (key: string, fallback?: string) => s
 
 export default function NewsletterPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [previewNewsletter, setPreviewNewsletter] = useState<NewsletterListItem | null>(null);
   const [editRecipientsNewsletter, setEditRecipientsNewsletter] = useState<NewsletterListItem | null>(null);
@@ -266,21 +265,69 @@ export default function NewsletterPage() {
 
   const filteredNewsletters = useMemo(() => {
     return newsletters.filter((newsletter) => {
-      const matchesSearch = searchQuery === "" ||
+      return searchQuery === "" ||
         newsletter.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         newsletter.subject.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === "all" || newsletter.status === statusFilter;
-      return matchesSearch && matchesStatus;
     });
-  }, [newsletters, searchQuery, statusFilter]);
+  }, [newsletters, searchQuery]);
 
-  const stats = useMemo(() => ({
-    total: newsletters.length,
-    drafts: newsletters.filter(n => n.status === 'draft').length,
-    pendingReview: newsletters.filter(n => n.status === 'pending_review').length,
-    scheduled: newsletters.filter(n => n.status === 'scheduled').length,
-    sent: newsletters.filter(n => n.status === 'sent').length,
-  }), [newsletters]);
+  const kanbanColumns = useMemo(() => {
+    const drafts = filteredNewsletters.filter(n => n.status === 'draft');
+    const readyToSend = filteredNewsletters.filter(n => ['ready_to_send', 'pending_review'].includes(n.status));
+    const scheduled = filteredNewsletters.filter(n => ['scheduled', 'sending'].includes(n.status));
+    const sent = filteredNewsletters.filter(n => n.status === 'sent');
+    return [
+      {
+        key: 'drafts',
+        title: t('newsletter.kanban.drafts', 'Drafts'),
+        icon: FileText,
+        color: 'amber',
+        borderColor: 'border-amber-300 dark:border-amber-700',
+        bgHeader: 'bg-amber-50 dark:bg-amber-950/40',
+        textColor: 'text-amber-700 dark:text-amber-300',
+        badgeBg: 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300',
+        accentBar: 'bg-amber-400',
+        items: drafts,
+      },
+      {
+        key: 'ready_to_send',
+        title: t('newsletter.kanban.readyToSend', 'Ready to Send'),
+        icon: Send,
+        color: 'blue',
+        borderColor: 'border-blue-300 dark:border-blue-700',
+        bgHeader: 'bg-blue-50 dark:bg-blue-950/40',
+        textColor: 'text-blue-700 dark:text-blue-300',
+        badgeBg: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
+        accentBar: 'bg-blue-400',
+        items: readyToSend,
+      },
+      {
+        key: 'scheduled',
+        title: t('newsletter.kanban.scheduled', 'Scheduled'),
+        icon: Clock,
+        color: 'purple',
+        borderColor: 'border-purple-300 dark:border-purple-700',
+        bgHeader: 'bg-purple-50 dark:bg-purple-950/40',
+        textColor: 'text-purple-700 dark:text-purple-300',
+        badgeBg: 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300',
+        accentBar: 'bg-purple-400',
+        items: scheduled,
+      },
+      {
+        key: 'sent',
+        title: t('newsletter.kanban.sent', 'Sent'),
+        icon: Mail,
+        color: 'green',
+        borderColor: 'border-green-300 dark:border-green-700',
+        bgHeader: 'bg-green-50 dark:bg-green-950/40',
+        textColor: 'text-green-700 dark:text-green-300',
+        badgeBg: 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300',
+        accentBar: 'bg-green-400',
+        items: sent,
+      },
+    ];
+  }, [filteredNewsletters, t]);
+
 
   const parsedSocialLinks = useMemo(() => {
     const raw = emailDesign?.socialLinks;
@@ -344,11 +391,7 @@ export default function NewsletterPage() {
           </div>
           <Skeleton className="h-10 w-40" />
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
-          ))}
-        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-64 rounded-xl" />
@@ -377,61 +420,6 @@ export default function NewsletterPage() {
           </Button>
         </div>
 
-        {/* Stats Row */}
-        <div className={`grid grid-cols-2 ${stats.pendingReview > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
-          <button
-            onClick={() => setStatusFilter("all")}
-            className={`rounded-xl border p-4 text-left transition-all hover:shadow-md ${statusFilter === 'all' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-500' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
-          >
-            <div className="flex items-center justify-between">
-              <Mail className="h-5 w-5 text-blue-500" />
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</span>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t("newsletter.stats.total")}</p>
-          </button>
-          <button
-            onClick={() => setStatusFilter(statusFilter === "draft" ? "all" : "draft")}
-            className={`rounded-xl border p-4 text-left transition-all hover:shadow-md ${statusFilter === 'draft' ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 ring-1 ring-amber-500' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
-          >
-            <div className="flex items-center justify-between">
-              <FileText className="h-5 w-5 text-amber-500" />
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.drafts}</span>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t("newsletter.stats.drafts")}</p>
-          </button>
-          {stats.pendingReview > 0 && (
-            <button
-              onClick={() => setStatusFilter(statusFilter === "pending_review" ? "all" : "pending_review")}
-              className={`rounded-xl border p-4 text-left transition-all hover:shadow-md ${statusFilter === 'pending_review' ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30 ring-1 ring-orange-500' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
-            >
-              <div className="flex items-center justify-between">
-                <ShieldCheck className="h-5 w-5 text-orange-500" />
-                <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.pendingReview}</span>
-              </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t("newsletter.stats.pendingReview")}</p>
-            </button>
-          )}
-          <button
-            onClick={() => setStatusFilter(statusFilter === "scheduled" ? "all" : "scheduled")}
-            className={`rounded-xl border p-4 text-left transition-all hover:shadow-md ${statusFilter === 'scheduled' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-500' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
-          >
-            <div className="flex items-center justify-between">
-              <Clock className="h-5 w-5 text-blue-500" />
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.scheduled}</span>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t("newsletter.stats.scheduled")}</p>
-          </button>
-          <button
-            onClick={() => setStatusFilter(statusFilter === "sent" ? "all" : "sent")}
-            className={`rounded-xl border p-4 text-left transition-all hover:shadow-md ${statusFilter === 'sent' ? 'border-green-500 bg-green-50 dark:bg-green-950/30 ring-1 ring-green-500' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'}`}
-          >
-            <div className="flex items-center justify-between">
-              <Send className="h-5 w-5 text-green-500" />
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.sent}</span>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t("newsletter.stats.sent")}</p>
-          </button>
-        </div>
 
         {/* Search */}
         <div className="relative max-w-md">
@@ -445,7 +433,7 @@ export default function NewsletterPage() {
           />
         </div>
 
-        {/* Newsletter Cards Grid */}
+        {/* Kanban Board */}
         {newsletters.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -476,247 +464,281 @@ export default function NewsletterPage() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
-            {filteredNewsletters.map((newsletter) => {
-              const openRate = (newsletter.recipientCount || 0) > 0
-                ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
-                : "0";
-              const isDraft = newsletter.status === 'draft';
-              const isSent = newsletter.status === 'sent';
-              const isReadyToSend = newsletter.status === 'ready_to_send';
-              const isPendingReview = newsletter.status === 'pending_review';
-              const isScheduled = newsletter.status === 'scheduled';
-              const isCurrentUserReviewer = newsletter.reviewerId === currentUserId;
-              const tenantSlug = (newsletter as any)?.tenant?.slug;
-              const articlePreviewUrl = tenantSlug ? `/n/preview/${tenantSlug}/${newsletter.id}` : null;
-
-              const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
-              const isDeploying = deployMutation.isPending && deployMutation.variables === newsletter.id;
-              const isSubmittingForReview = submitForReviewMutation.isPending && submitForReviewMutation.variables === newsletter.id;
-              const isCancellingSchedule = cancelScheduleMutation.isPending && cancelScheduleMutation.variables === newsletter.id;
-
-              if (isDeleting) {
-                return (
-                  <Card key={newsletter.id} className="h-64 flex flex-col items-center justify-center border-dashed border-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 animate-pulse">
-                    <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-4" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{t("newsletter.card.deleting")}</p>
-                  </Card>
-                );
-              }
-
-              return (
-                <Card
-                  key={newsletter.id}
-                  className="group relative border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 overflow-hidden cursor-pointer"
-                  onClick={() => (isDraft || isReadyToSend)
-                    ? setLocation(`/newsletter/create/${newsletter.id}`)
-                    : setLocation(`/newsletters/${newsletter.id}`)
-                  }
-                >
-                  {/* Status color bar at top */}
-                  <div className={`h-1 w-full ${newsletter.status === 'sent' ? 'bg-green-500' :
-                    newsletter.status === 'ready_to_send' ? 'bg-blue-500' :
-                      newsletter.status === 'pending_review' ? 'bg-orange-500' :
-                        newsletter.status === 'scheduled' ? 'bg-blue-500' :
-                          newsletter.status === 'sending' ? 'bg-purple-500' :
-                            'bg-amber-400'
-                    }`} />
-
-                  <CardContent className="p-5">
-                    <div className="space-y-4">
-                      {/* Header: Status badge + Actions */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-base group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                            {newsletter.title}
-                          </h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-                            {newsletter.subject}
-                          </p>
-                        </div>
-                        <div className="shrink-0 flex items-center gap-2">
-                          {getStatusBadge(newsletter.status, t)}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" aria-label="Newsletter actions" className="h-8 w-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPreviewNewsletter(newsletter);
-                                }}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                {t("newsletter.actions.preview")}
-                              </DropdownMenuItem>
-                              {articlePreviewUrl && (
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.open(articlePreviewUrl, '_blank', 'noopener,noreferrer');
-                                  }}
-                                >
-                                  <ExternalLink className="h-4 w-4 mr-2" />
-                                  Preview article on blog
-                                </DropdownMenuItem>
-                              )}
-                              {(isDraft || isReadyToSend) && (
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setLocation(`/newsletter/create/${newsletter.id}`);
-                                  }}
-                                >
-                                  <Pencil className="h-4 w-4 mr-2" />
-                                  {t("newsletter.actions.edit")}
-                                </DropdownMenuItem>
-                              )}
-                              {(isDraft || isReadyToSend) && (
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditRecipientsNewsletter(newsletter);
-                                  }}
-                                  data-testid={`button-edit-recipients-${newsletter.id}`}
-                                >
-                                  <UserCog className="h-4 w-4 mr-2" />
-                                  {t("newsletter.actions.editRecipients")}
-                                </DropdownMenuItem>
-                              )}
-                              {isReadyToSend && (
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deployMutation.mutate(newsletter.id);
-                                  }}
-                                  disabled={isDeploying}
-                                >
-                                  <Send className="h-4 w-4 mr-2" />
-                                  {isDeploying ? t("newsletter.actions.sending") : t("newsletter.actions.sendNow")}
-                                </DropdownMenuItem>
-                              )}
-                              {isScheduled && (
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    cancelScheduleMutation.mutate(newsletter.id);
-                                  }}
-                                  disabled={isCancellingSchedule}
-                                  className="text-orange-600 focus:text-orange-600 focus:bg-orange-50 dark:focus:bg-orange-950/50"
-                                >
-                                  <CalendarClock className="h-4 w-4 mr-2" />
-                                  {isCancellingSchedule ? t("newsletter.actions.cancelling") : t("newsletter.actions.cancelSchedule")}
-                                </DropdownMenuItem>
-                              )}
-                              {reviewerEnabled && (isDraft || isReadyToSend) && !isPendingReview && newsletter.reviewStatus !== 'approved' && (
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    submitForReviewMutation.mutate(newsletter.id);
-                                  }}
-                                  disabled={isSubmittingForReview}
-                                >
-                                  <ClipboardCheck className="h-4 w-4 mr-2" />
-                                  {isSubmittingForReview ? t("newsletter.actions.submitting") : t("newsletter.actions.submitForReview")}
-                                </DropdownMenuItem>
-                              )}
-                              {isPendingReview && isCurrentUserReviewer && (
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setLocation(`/newsletters/${newsletter.id}`);
-                                  }}
-                                >
-                                  <ShieldCheck className="h-4 w-4 mr-2" />
-                                  {t("newsletter.actions.reviewNewsletter")}
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteId(newsletter.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                {t("newsletter.actions.delete")}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-
-                      {/* Author + Date */}
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-semibold shrink-0">
-                            {(newsletter.user?.firstName?.[0] || '')}{(newsletter.user?.lastName?.[0] || '')}
-                          </div>
-                          <span className="text-gray-600 dark:text-gray-400 truncate text-xs">
-                            {newsletter.user?.firstName || ''} {newsletter.user?.lastName || ''}
-                          </span>
-                        </div>
-                        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                          {newsletter.sentAt
-                            ? formatDistanceToNow(new Date(newsletter.sentAt), { addSuffix: true, ...dateFnsLocale })
-                            : newsletter.createdAt
-                              ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true, ...dateFnsLocale })
-                              : ''}
-                        </span>
-                      </div>
-
-                      {/* Metrics row */}
-                      {isSent ? (
-                        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-100 dark:border-gray-700/50">
-                          <div className="text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <Users className="h-3.5 w-3.5 text-blue-500" />
-                              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                {(newsletter.recipientCount || 0).toLocaleString()}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.sent")}</p>
-                          </div>
-                          <div className="text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <Eye className="h-3.5 w-3.5 text-green-500" />
-                              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                {newsletter.opens || 0}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.opened", { rate: openRate })}</p>
-                          </div>
-                          <div className="text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <MousePointer className="h-3.5 w-3.5 text-purple-500" />
-                              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                {newsletter.clickCount || 0}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.clicks")}</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="pt-3 border-t border-gray-100 dark:border-gray-700/50">
-                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                            <Calendar className="h-3.5 w-3.5" />
-                            {newsletter.status === 'scheduled' && newsletter.scheduledAt ? (
-                              <span>{t("newsletter.card.scheduledFor", { date: t("newsletter.card.dateTimeAt", { date: format(new Date(newsletter.scheduledAt), 'MMM d, yyyy', { locale: currentLanguage === 'es' ? esLocale : undefined }), time: format(new Date(newsletter.scheduledAt), 'h:mm a', { locale: currentLanguage === 'es' ? esLocale : undefined }) }) })}</span>
-                            ) : (
-                              <span>{newsletter.updatedAt ? t("newsletter.card.lastEdited", { time: formatDistanceToNow(new Date(newsletter.updatedAt), { addSuffix: true, ...dateFnsLocale }) }) : t("newsletter.card.lastEditedRecently")}</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {kanbanColumns.map((column) => (
+              <div
+                key={column.key}
+                className={`flex flex-col rounded-xl border ${column.borderColor} bg-gray-50/60 dark:bg-gray-900/40 overflow-hidden`}
+              >
+                {/* Column Header */}
+                <div className={`${column.bgHeader} px-4 py-3 border-b ${column.borderColor}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${column.accentBar}`} />
+                      <column.icon className={`h-4 w-4 ${column.textColor}`} />
+                      <h3 className={`text-sm font-semibold ${column.textColor}`}>
+                        {column.title}
+                      </h3>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${column.badgeBg}`}>
+                      {column.items.length}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Column Body */}
+                <div className="flex-1 p-3 space-y-3 overflow-y-auto max-h-[calc(100vh-380px)] min-h-[200px]">
+                  {column.items.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center">
+                      <div className={`w-10 h-10 rounded-xl ${column.bgHeader} flex items-center justify-center mb-3`}>
+                        <column.icon className={`h-5 w-5 ${column.textColor} opacity-50`} />
+                      </div>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+                        {t('newsletter.kanban.empty', 'No newsletters here')}
+                      </p>
+                    </div>
+                  ) : (
+                    column.items.map((newsletter) => {
+                      const openRate = (newsletter.recipientCount || 0) > 0
+                        ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
+                        : "0";
+                      const isDraft = newsletter.status === 'draft';
+                      const isSent = newsletter.status === 'sent';
+                      const isReadyToSend = newsletter.status === 'ready_to_send';
+                      const isPendingReview = newsletter.status === 'pending_review';
+                      const isScheduled = newsletter.status === 'scheduled';
+                      const isCurrentUserReviewer = newsletter.reviewerId === currentUserId;
+                      const tenantSlug = (newsletter as any)?.tenant?.slug;
+                      const articlePreviewUrl = tenantSlug ? `/n/preview/${tenantSlug}/${newsletter.id}` : null;
+
+                      const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
+                      const isDeploying = deployMutation.isPending && deployMutation.variables === newsletter.id;
+                      const isSubmittingForReview = submitForReviewMutation.isPending && submitForReviewMutation.variables === newsletter.id;
+                      const isCancellingSchedule = cancelScheduleMutation.isPending && cancelScheduleMutation.variables === newsletter.id;
+
+                      if (isDeleting) {
+                        return (
+                          <Card key={newsletter.id} className="flex flex-col items-center justify-center border-dashed border-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 animate-pulse py-8">
+                            <Loader2 className="h-6 w-6 text-blue-500 animate-spin mb-3" />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("newsletter.card.deleting")}</p>
+                          </Card>
+                        );
+                      }
+
+                      return (
+                        <Card
+                          key={newsletter.id}
+                          className={`group relative rounded-xl hover:shadow-md transition-all duration-200 overflow-hidden cursor-pointer bg-white dark:bg-gray-800 border-t-[3px] ${newsletter.status === 'sent' ? 'border-t-green-500' :
+                            newsletter.status === 'ready_to_send' ? 'border-t-blue-500' :
+                              newsletter.status === 'pending_review' ? 'border-t-orange-500' :
+                                newsletter.status === 'scheduled' ? 'border-t-purple-500' :
+                                  newsletter.status === 'sending' ? 'border-t-purple-500' :
+                                    'border-t-amber-400'
+                            } border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600`}
+                          onClick={() => (isDraft || isReadyToSend)
+                            ? setLocation(`/newsletter/create/${newsletter.id}`)
+                            : setLocation(`/newsletters/${newsletter.id}`)
+                          }
+                        >
+                          <CardContent className="p-5">
+                            <div className="space-y-4">
+                              {/* Row 1: Status badge + kebab menu */}
+                              <div className="flex items-center justify-between">
+                                {getStatusBadge(newsletter.status, t)}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                    <Button variant="ghost" size="icon" aria-label="Newsletter actions" className="h-8 w-8 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPreviewNewsletter(newsletter);
+                                      }}
+                                    >
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      {t("newsletter.actions.preview")}
+                                    </DropdownMenuItem>
+                                    {articlePreviewUrl && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          window.open(articlePreviewUrl, '_blank', 'noopener,noreferrer');
+                                        }}
+                                      >
+                                        <ExternalLink className="h-4 w-4 mr-2" />
+                                        Preview article on blog
+                                      </DropdownMenuItem>
+                                    )}
+                                    {(isDraft || isReadyToSend) && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setLocation(`/newsletter/create/${newsletter.id}`);
+                                        }}
+                                      >
+                                        <Pencil className="h-4 w-4 mr-2" />
+                                        {t("newsletter.actions.edit")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {(isDraft || isReadyToSend) && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditRecipientsNewsletter(newsletter);
+                                        }}
+                                        data-testid={`button-edit-recipients-${newsletter.id}`}
+                                      >
+                                        <UserCog className="h-4 w-4 mr-2" />
+                                        {t("newsletter.actions.editRecipients")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {isReadyToSend && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deployMutation.mutate(newsletter.id);
+                                        }}
+                                        disabled={isDeploying}
+                                      >
+                                        <Send className="h-4 w-4 mr-2" />
+                                        {isDeploying ? t("newsletter.actions.sending") : t("newsletter.actions.sendNow")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {isScheduled && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          cancelScheduleMutation.mutate(newsletter.id);
+                                        }}
+                                        disabled={isCancellingSchedule}
+                                        className="text-orange-600 focus:text-orange-600 focus:bg-orange-50 dark:focus:bg-orange-950/50"
+                                      >
+                                        <CalendarClock className="h-4 w-4 mr-2" />
+                                        {isCancellingSchedule ? t("newsletter.actions.cancelling") : t("newsletter.actions.cancelSchedule")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {reviewerEnabled && (isDraft || isReadyToSend) && !isPendingReview && newsletter.reviewStatus !== 'approved' && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          submitForReviewMutation.mutate(newsletter.id);
+                                        }}
+                                        disabled={isSubmittingForReview}
+                                      >
+                                        <ClipboardCheck className="h-4 w-4 mr-2" />
+                                        {isSubmittingForReview ? t("newsletter.actions.submitting") : t("newsletter.actions.submitForReview")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {isPendingReview && isCurrentUserReviewer && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setLocation(`/newsletters/${newsletter.id}`);
+                                        }}
+                                      >
+                                        <ShieldCheck className="h-4 w-4 mr-2" />
+                                        {t("newsletter.actions.reviewNewsletter")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteId(newsletter.id);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      {t("newsletter.actions.delete")}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+
+                              {/* Row 2: Title + Subject */}
+                              <div>
+                                <h3 className="font-bold text-gray-900 dark:text-gray-100 text-base leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
+                                  {newsletter.title}
+                                </h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">
+                                  {newsletter.subject}
+                                </p>
+                              </div>
+
+                              {/* Row 4: Author + Date (with top divider) */}
+                              <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700/50">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-sm">
+                                    {(newsletter.user?.firstName?.[0] || '')}{(newsletter.user?.lastName?.[0] || '')}
+                                  </div>
+                                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                                    {newsletter.user?.firstName || ''} {newsletter.user?.lastName || ''}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                                  {newsletter.sentAt
+                                    ? formatDistanceToNow(new Date(newsletter.sentAt), { addSuffix: true, ...dateFnsLocale })
+                                    : newsletter.createdAt
+                                      ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true, ...dateFnsLocale })
+                                      : ''}
+                                </span>
+                              </div>
+
+                              {/* Row 5: Bottom info (with top divider) */}
+                              {isSent ? (
+                                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100 dark:border-gray-700/50">
+                                  <div className="text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Users className="h-3 w-3 text-blue-500" />
+                                      <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                                        {(newsletter.recipientCount || 0).toLocaleString()}
+                                      </span>
+                                    </div>
+                                    <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.sent")}</p>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Eye className="h-3 w-3 text-green-500" />
+                                      <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                                        {newsletter.opens || 0}
+                                      </span>
+                                    </div>
+                                    <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.opened", { rate: openRate })}</p>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <MousePointer className="h-3 w-3 text-purple-500" />
+                                      <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                                        {newsletter.clickCount || 0}
+                                      </span>
+                                    </div>
+                                    <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.clicks")}</p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="pt-3 border-t border-gray-100 dark:border-gray-700/50">
+                                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                    {newsletter.status === 'scheduled' && newsletter.scheduledAt ? (
+                                      <span className="truncate">{t("newsletter.card.scheduledFor", { date: t("newsletter.card.dateTimeAt", { date: format(new Date(newsletter.scheduledAt), 'MMM d, yyyy', { locale: currentLanguage === 'es' ? esLocale : undefined }), time: format(new Date(newsletter.scheduledAt), 'h:mm a', { locale: currentLanguage === 'es' ? esLocale : undefined }) }) })}</span>
+                                    ) : (
+                                      <span className="truncate">{newsletter.updatedAt ? t("newsletter.card.lastEdited", { time: formatDistanceToNow(new Date(newsletter.updatedAt), { addSuffix: true, ...dateFnsLocale }) }) : t("newsletter.card.lastEditedRecently")}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

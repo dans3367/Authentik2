@@ -2508,6 +2508,13 @@
       "scheduled": "Scheduled",
       "sent": "Sent"
     },
+    "kanban": {
+      "drafts": "Drafts",
+      "readyToSend": "Ready to Send",
+      "scheduled": "Scheduled",
+      "sent": "Sent",
+      "empty": "No newsletters here"
+    },
     "status": {
       "draft": "Draft",
       "readyToSend": "Ready to Send",

@@ -1171,7 +1171,7 @@ export default function NewsletterCreatePage() {
                             )}
 
                             {/* Body content zone — editor lives here */}
-                            <div className="notion-editor-embedded" style={{ padding: '32px 24px', fontSize: '16px', lineHeight: '1.625', color: '#334155' }}>
+                            <div className="notion-editor-embedded" style={{ padding: '20px 24px 32px 24px', fontSize: '16px', lineHeight: '1.625', color: '#334155' }}>
                               <LazyNotionEditor
                                 content={notionHtmlContent}
                                 onChange={(html) => {
