@@ -7,6 +7,7 @@ import { EmailService } from '../emailService';
 import { authenticateToken, requireRole, requireTenant } from '../middleware/auth-middleware';
 import { sanitizeString } from '../utils/sanitization';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
+import { replaceEmailPlaceholders } from '../utils/emailPlaceholders';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 
@@ -14,8 +15,30 @@ export const formsRoutes = Router();
 
 const emailService = new EmailService();
 
+// ─── Helper: Fetch the company name for a tenant (used for placeholder replacement) ─
+async function getCompanyName(tenantId: string): Promise<string> {
+  try {
+    const design = await db.query.masterEmailDesign.findFirst({
+      where: eq(masterEmailDesign.tenantId, tenantId),
+    });
+    if (design?.companyName) return design.companyName;
+
+    const company = await db.query.companies.findFirst({
+      where: eq(companies.tenantId, tenantId),
+    });
+    return company?.name || '';
+  } catch {
+    return '';
+  }
+}
+
 // ─── Helper: Send promotion email after successful email signup ──────────────
-async function sendPromotionEmailIfEnabled(form: any, recipientEmail: string, firstName?: string | null) {
+async function sendPromotionEmailIfEnabled(
+  form: any,
+  recipientEmail: string,
+  firstName?: string | null,
+  lastName?: string | null,
+) {
   try {
     // Parse form data to check for promotion settings
     let formData: any;
@@ -40,8 +63,16 @@ async function sendPromotionEmailIfEnabled(form: any, recipientEmail: string, fi
       return;
     }
 
+    // Fetch company name for placeholder replacement
+    const companyName = await getCompanyName(form.tenantId);
+    const contactInfo = { firstName, lastName, email: recipientEmail };
+
+    // Replace placeholders in promotion content before wrapping
+    const resolvedContent = replaceEmailPlaceholders(promotion.content, contactInfo, companyName);
+    const resolvedTitle = replaceEmailPlaceholders(promotion.title, contactInfo, companyName);
+
     // Wrap promotion content in the tenant's branded email design
-    let wrappedContent = await wrapNewsletterContent(form.tenantId, promotion.content);
+    let wrappedContent = await wrapNewsletterContent(form.tenantId, resolvedContent);
 
     // Generate unsubscribe token for the contact
     let unsubscribeUrl: string | undefined;
@@ -86,10 +117,10 @@ async function sendPromotionEmailIfEnabled(form: any, recipientEmail: string, fi
     // Send the promotion email
     await emailService.sendCustomEmail(
       recipientEmail,
-      promotion.title,
+      resolvedTitle,
       wrappedContent,
       {
-        text: promotion.description || undefined,
+        text: promotion.description ? replaceEmailPlaceholders(promotion.description, contactInfo, companyName) : undefined,
         headers: unsubscribeUrl ? {
           'List-Unsubscribe': `<${unsubscribeUrl}>`,
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
@@ -117,6 +148,7 @@ async function sendTemplateEmailIfEnabled(
   form: any,
   recipientEmail: string,
   firstName?: string | null,
+  lastName?: string | null,
 ) {
   try {
     let formData: any;
@@ -139,16 +171,16 @@ async function sendTemplateEmailIfEnabled(
       return;
     }
 
-    // Personalize body: replace common placeholders
-    let body = template.body || '';
-    if (firstName) {
-      body = body.replace(/\{\{\s*first_name\s*\}\}/gi, firstName)
-        .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
-        .replace(/\{customer_name\}/gi, firstName);
-    }
+    // Fetch company name for placeholder replacement
+    const companyName = await getCompanyName(form.tenantId);
+    const contactInfo = { firstName, lastName, email: recipientEmail };
+
+    // Replace all placeholders in body and subject line
+    const resolvedBody = replaceEmailPlaceholders(template.body || '', contactInfo, companyName);
+    const resolvedSubject = replaceEmailPlaceholders(template.subjectLine, contactInfo, companyName);
 
     // Wrap in the tenant's branded email design
-    const wrappedBody = await wrapNewsletterContent(form.tenantId, body);
+    const wrappedBody = await wrapNewsletterContent(form.tenantId, resolvedBody);
 
     // Build unsubscribe link if the contact exists
     let unsubscribeUrl: string | undefined;
@@ -193,10 +225,10 @@ async function sendTemplateEmailIfEnabled(
 
     await emailService.sendCustomEmail(
       recipientEmail,
-      template.subjectLine,
+      resolvedSubject,
       finalBody,
       {
-        text: template.preview || undefined,
+        text: template.preview ? replaceEmailPlaceholders(template.preview, contactInfo, companyName) : undefined,
         headers: unsubscribeUrl ? {
           'List-Unsubscribe': `<${unsubscribeUrl}>`,
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
@@ -720,7 +752,7 @@ formsRoutes.post("/public/google-signin", googleSignInLimiter, async (req: any, 
     });
 
     // Send promotion email if enabled for this form (non-blocking)
-    sendPromotionEmailIfEnabled(form, tokenInfo.email, tokenInfo.given_name);
+    sendPromotionEmailIfEnabled(form, tokenInfo.email, tokenInfo.given_name, tokenInfo.family_name);
 
     res.status(201).json({
       success: true,
@@ -864,24 +896,61 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
       (val) => typeof val === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
     ) as string | undefined;
 
-    // Derive first name from submission data if available
+    // Derive first/last name from submission data if available
     const submittedFirstName = (() => {
       const entries = Object.entries(submittedData);
       const firstNameEntry = entries.find(([k]) => /first.?name/i.test(k));
       return typeof firstNameEntry?.[1] === 'string' ? firstNameEntry[1] : null;
     })();
 
+    const submittedLastName = (() => {
+      const entries = Object.entries(submittedData);
+      const lastNameEntry = entries.find(([k]) => /last.?name/i.test(k));
+      return typeof lastNameEntry?.[1] === 'string' ? lastNameEntry[1] : null;
+    })();
+
     if (submittedEmail) {
       // Send template-based confirmation email (all form categories)
-      sendTemplateEmailIfEnabled(form, submittedEmail, submittedFirstName);
+      sendTemplateEmailIfEnabled(form, submittedEmail, submittedFirstName, submittedLastName);
 
-      // Send promotion email if this is an email-signup form (new emails only)
+      // For email-signup forms, add new subscribers to the email contacts list
       if (form.category === 'email-signup') {
-        const existingEmail = await db.query.emailContacts.findFirst({
+        const existingContact = await db.query.emailContacts.findFirst({
           where: sql`${emailContacts.tenantId} = ${form.tenantId} AND ${emailContacts.email} = ${submittedEmail}`,
         });
-        if (!existingEmail) {
-          sendPromotionEmailIfEnabled(form, submittedEmail);
+
+        if (existingContact) {
+          // Contact already exists — update last activity
+          await db.update(emailContacts)
+            .set({ lastActivity: new Date(), updatedAt: new Date() })
+            .where(sql`${emailContacts.id} = ${existingContact.id}`);
+        } else {
+          // Create new email contact — default to 'Preferred Customer' for email-only signups
+          const contactFirstName = submittedFirstName || 'Preferred';
+          const contactLastName = submittedLastName || 'Customer';
+          const clientIp = req.ip || 'unknown';
+          const userAgent = req.get('User-Agent') || 'unknown';
+
+          await db.insert(emailContacts).values({
+            tenantId: form.tenantId,
+            email: submittedEmail,
+            firstName: contactFirstName,
+            lastName: contactLastName,
+            status: 'active',
+            consentGiven: true,
+            consentDate: new Date(),
+            consentMethod: 'form_submission',
+            consentIpAddress: clientIp,
+            consentUserAgent: userAgent,
+            prefTransactional: true,
+            prefMarketing: true,
+            prefCustomerEngagement: true,
+            prefNewsletters: true,
+            prefSurveysForms: true,
+          });
+
+          // Send promotion email for new subscribers only
+          sendPromotionEmailIfEnabled(form, submittedEmail, contactFirstName, contactLastName);
         }
       }
     }

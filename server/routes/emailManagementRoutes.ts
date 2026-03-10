@@ -16,6 +16,7 @@ import xss from 'xss';
 import { emailAttachmentUpload, validateAttachmentSize, filesToBase64Attachments, handleEmailAttachmentError } from '../middleware/emailAttachmentUpload';
 import { fromZonedTime } from 'date-fns-tz';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
+import { replaceEmailPlaceholders } from '../utils/emailPlaceholders';
 
 // Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers
 export function sanitizeEmailHtml(html: string): string {
@@ -125,30 +126,7 @@ function escapeHtml(str: string): string {
   });
 }
 
-/**
- * Replace template placeholders (e.g. {{first_name}}, {{company_name}}) with actual contact/company data.
- * Handles both HTML body and subject lines.
- * All substituted values are HTML-escaped to prevent injection attacks.
- */
-function replaceEmailPlaceholders(
-  text: string,
-  contact: { firstName?: string | null; lastName?: string | null; email?: string | null },
-  companyName?: string,
-): string {
-  // HTML-escape all values before substitution to prevent injection
-  const escapedFirstName = escapeHtml(contact.firstName || '');
-  const escapedLastName = escapeHtml(contact.lastName || '');
-  const escapedFullName = escapeHtml(`${contact.firstName || ''} ${contact.lastName || ''}`.trim());
-  const escapedEmail = escapeHtml(contact.email || '');
-  const escapedCompanyName = escapeHtml(companyName || '');
-
-  return text
-    .replace(/\{\{\s*first_name\s*\}\}/gi, escapedFirstName)
-    .replace(/\{\{\s*last_name\s*\}\}/gi, escapedLastName)
-    .replace(/\{\{\s*full_name\s*\}\}/gi, escapedFullName)
-    .replace(/\{\{\s*email\s*\}\}/gi, escapedEmail)
-    .replace(/\{\{\s*company_name\s*\}\}/gi, escapedCompanyName);
-}
+// replaceEmailPlaceholders is now imported from '../utils/emailPlaceholders'
 
 function sanitizeFontFamily(fontFamily: string | undefined | null): string {
   if (!fontFamily) return 'Arial, sans-serif';
