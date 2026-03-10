@@ -32,7 +32,16 @@ import {
     ChevronDown,
     ListChecks,
     Braces,
+    Sparkles,
+    Wand2,
+    PartyPopper,
+    ArrowRightFromLine,
+    ArrowLeftToLine,
+    Languages,
+    ChevronRight,
+    Loader2,
 } from "lucide-react";
+import { improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText } from "@/lib/aiApi";
 import "./NotionLikeEditor.css";
 
 // ── Slash Command Menu ─────────────────────────────────────────────────────────
@@ -190,6 +199,14 @@ const HIGHLIGHT_COLORS = [
     { label: "Red", value: "#b91c1c" },
 ];
 
+const TRANSLATE_LANGUAGES = [
+    { key: 'english', label: 'English' },
+    { key: 'spanish', label: 'Spanish' },
+    { key: 'mandarin', label: 'Chinese' },
+    { key: 'hindi', label: 'Hindi' },
+    { key: 'bengali', label: 'Bengali' },
+];
+
 function FloatingToolbar({
     editor,
     onLinkClick,
@@ -204,6 +221,83 @@ function FloatingToolbar({
     const colorBtnRef = useRef<HTMLButtonElement>(null);
     const [recentColors, setRecentColors] = useState<string[]>([]);
     const [turnIntoOpen, setTurnIntoOpen] = useState(false);
+    const [aiMenuOpen, setAiMenuOpen] = useState(false);
+    const [aiProcessing, setAiProcessing] = useState<string | null>(null);
+    const [translateSubOpen, setTranslateSubOpen] = useState(false);
+
+    const closeAllDropdowns = () => {
+        setColorPickerOpen(false);
+        setTurnIntoOpen(false);
+        setAiMenuOpen(false);
+        setTranslateSubOpen(false);
+    };
+
+    const getSelectionInfo = () => {
+        const { state } = editor;
+        const { from, to } = state.selection;
+        const selectedText = state.doc.textBetween(from, to, ' ');
+        return { from, to, selectedText };
+    };
+
+    const replaceSelection = (range: { from: number; to: number }, replacement: string) => {
+        editor.chain().focus().insertContentAt({ from: range.from, to: range.to }, replacement).run();
+    };
+
+    const handleAiAction = async (action: string, targetLanguage?: string) => {
+        const { from, to, selectedText } = getSelectionInfo();
+        if (!selectedText.trim()) return;
+
+        setAiProcessing(action);
+        setAiMenuOpen(false);
+        setTranslateSubOpen(false);
+
+        try {
+            let result: any;
+            let replacement: string | undefined;
+
+            switch (action) {
+                case 'improve':
+                    result = await improveText({ text: selectedText });
+                    replacement = result.improvedText;
+                    break;
+                case 'casual':
+                    result = await makeMoreCasualText({ text: selectedText });
+                    replacement = result.casualText;
+                    break;
+                case 'formal':
+                    result = await makeMoreFormalText({ text: selectedText });
+                    replacement = result.formalText;
+                    break;
+                case 'emojify':
+                    result = await emojifyText({ text: selectedText });
+                    replacement = result.emojifiedText;
+                    break;
+                case 'expand':
+                    result = await expandText({ text: selectedText });
+                    replacement = result.expandedText;
+                    break;
+                case 'shorten':
+                    result = await shortenText({ text: selectedText });
+                    replacement = result.shortenedText;
+                    break;
+                case 'translate':
+                    if (!targetLanguage) return;
+                    result = await translateText({ text: selectedText, targetLanguage });
+                    replacement = result.translatedText;
+                    break;
+            }
+
+            if (result?.success && replacement) {
+                replaceSelection({ from, to }, replacement);
+            } else {
+                console.error(`AI ${action} failed:`, result?.error);
+            }
+        } catch (error: any) {
+            console.error(`AI ${action} error:`, error);
+        } finally {
+            setAiProcessing(null);
+        }
+    };
 
     useEffect(() => {
         if (!editor) return;
@@ -244,7 +338,7 @@ function FloatingToolbar({
         };
 
         editor.on("selectionUpdate", updatePosition);
-        editor.on("blur", () => { setVisible(false); setColorPickerOpen(false); setTurnIntoOpen(false); });
+        editor.on("blur", () => { setVisible(false); closeAllDropdowns(); });
 
         return () => {
             editor.off("selectionUpdate", updatePosition);
@@ -488,6 +582,107 @@ function FloatingToolbar({
             >
                 <AlignRight className="w-4 h-4" />
             </button>
+            <div className="notion-bubble-divider" />
+            {/* AI Menu */}
+            <div style={{ position: 'relative' }}>
+                <button
+                    onClick={() => { setAiMenuOpen((v) => !v); setColorPickerOpen(false); setTurnIntoOpen(false); setTranslateSubOpen(false); }}
+                    className={`notion-bubble-btn ${aiProcessing ? 'active' : ''}`}
+                    title="AI tools"
+                    style={{ gap: '4px', width: 'auto', padding: '0 8px' }}
+                    disabled={!!aiProcessing}
+                >
+                    {aiProcessing ? (
+                        <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#a78bfa' }} />
+                    ) : (
+                        <Sparkles className="w-4 h-4" style={{ color: '#a78bfa' }} />
+                    )}
+                    <ChevronDown className="w-3 h-3" style={{ opacity: 0.6 }} />
+                </button>
+                {aiMenuOpen && (
+                    <div className="notion-ai-menu" onMouseDown={(e) => e.preventDefault()}>
+                        <div className="notion-ai-menu-label">AI Tools</div>
+                        <button
+                            className="notion-ai-menu-item"
+                            onClick={() => handleAiAction('improve')}
+                            disabled={!!aiProcessing}
+                        >
+                            <Wand2 className="w-4 h-4" />
+                            <span>Improve with AI</span>
+                        </button>
+                        <button
+                            className="notion-ai-menu-item"
+                            onClick={() => handleAiAction('casual')}
+                            disabled={!!aiProcessing}
+                        >
+                            <Sparkles className="w-4 h-4" />
+                            <span>More casual</span>
+                        </button>
+                        <button
+                            className="notion-ai-menu-item"
+                            onClick={() => handleAiAction('formal')}
+                            disabled={!!aiProcessing}
+                        >
+                            <Sparkles className="w-4 h-4" />
+                            <span>More formal</span>
+                        </button>
+                        <button
+                            className="notion-ai-menu-item"
+                            onClick={() => handleAiAction('emojify')}
+                            disabled={!!aiProcessing}
+                        >
+                            <PartyPopper className="w-4 h-4" />
+                            <span>Emojify</span>
+                        </button>
+                        <button
+                            className="notion-ai-menu-item"
+                            onClick={() => handleAiAction('expand')}
+                            disabled={!!aiProcessing}
+                        >
+                            <ArrowRightFromLine className="w-4 h-4" />
+                            <span>Make longer</span>
+                        </button>
+                        <button
+                            className="notion-ai-menu-item"
+                            onClick={() => handleAiAction('shorten')}
+                            disabled={!!aiProcessing}
+                        >
+                            <ArrowLeftToLine className="w-4 h-4" />
+                            <span>Make shorter</span>
+                        </button>
+                        <div className="notion-ai-menu-divider" />
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                className="notion-ai-menu-item"
+                                onMouseEnter={() => setTranslateSubOpen(true)}
+                                disabled={!!aiProcessing}
+                            >
+                                <Languages className="w-4 h-4" />
+                                <span>Translate</span>
+                                <ChevronRight className="w-3 h-3" style={{ marginLeft: 'auto', opacity: 0.5 }} />
+                            </button>
+                            {translateSubOpen && (
+                                <div
+                                    className="notion-ai-submenu"
+                                    onMouseLeave={() => setTranslateSubOpen(false)}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                >
+                                    {TRANSLATE_LANGUAGES.map((lang) => (
+                                        <button
+                                            key={lang.key}
+                                            className="notion-ai-menu-item"
+                                            onClick={() => handleAiAction('translate', lang.key)}
+                                            disabled={!!aiProcessing}
+                                        >
+                                            <span>{lang.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

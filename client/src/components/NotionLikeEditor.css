@@ -167,7 +167,6 @@
 /* Bold, Italic, etc. */
 .notion-editor-content strong {
   font-weight: 700;
-  color: #111827;
 }
 
 .notion-editor-content em {
@@ -298,7 +297,6 @@
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
   z-index: 60;
   width: 200px;
-  animation: notion-fade-in 0.12s ease-out;
 }
 
 .notion-color-picker-label {
@@ -450,6 +448,81 @@
 
 .notion-turninto-item.active .notion-turninto-item-label {
   color: #c7d2fe;
+}
+
+/* ─── AI Menu (inside bubble menu) ───────────────────────────────────────── */
+
+.notion-ai-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #1f2937;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  z-index: 60;
+  min-width: 200px;
+  white-space: nowrap;
+}
+
+.notion-ai-menu-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  padding: 6px 10px 4px;
+}
+
+.notion-ai-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  text-align: left;
+  transition: background 0.1s;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.notion-ai-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.notion-ai-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.notion-ai-menu-item svg {
+  flex-shrink: 0;
+  color: #a78bfa;
+}
+
+.notion-ai-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 6px;
+}
+
+.notion-ai-submenu {
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 0;
+  background: #1f2937;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  z-index: 61;
+  min-width: 160px;
 }
 
 /* ─── Slash Command Menu ──────────────────────────────────────────────────── */
@@ -621,7 +694,7 @@
 }
 
 .dark .notion-editor-content strong {
-  color: #f9fafb;
+  color: inherit;
 }
 
 .dark .notion-editor-content code {
