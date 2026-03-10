@@ -432,6 +432,56 @@ export const defaultThemes: FormTheme[] = [
     }
   },
   {
+    id: 'brutalist-pop',
+    name: 'Brutalist Pop',
+    description: 'Bold brutalist design with vivid color accents and raw offset shadows',
+    preview: 'bg-yellow-300 border-4 border-black shadow-[6px_6px_0_0_#000]',
+    styles: {
+      container: 'max-w-2xl mx-auto p-8 bg-yellow-300 border-8 border-black shadow-[12px_12px_0_0_#ef4444]',
+      header: 'text-5xl font-black text-black mb-8 uppercase tracking-tight leading-none',
+      field: 'mb-6',
+      label: 'block text-sm font-black text-black mb-2 uppercase tracking-widest',
+      input: 'w-full px-4 py-3 h-12 border-4 border-black bg-white focus:outline-none focus:bg-red-50 focus:shadow-[4px_4px_0_0_#ef4444] transition-all duration-100 text-black font-bold placeholder-gray-500',
+      button: 'w-full bg-red-500 text-white py-4 px-6 border-4 border-black hover:bg-red-600 transition-all duration-100 font-black uppercase tracking-wider shadow-[6px_6px_0_0_#000000] hover:shadow-[3px_3px_0_0_#000000] hover:translate-x-[3px] hover:translate-y-[3px]',
+      background: 'bg-yellow-200',
+      booleanSwitch: {
+        track: 'border-4 data-[state=unchecked]:bg-white data-[state=unchecked]:border-black data-[state=checked]:bg-red-500 data-[state=checked]:border-black',
+        thumb: 'data-[state=unchecked]:bg-black data-[state=checked]:bg-yellow-300 shadow-[2px_2px_0_0_#000000]',
+        activeLabel: 'text-black font-black uppercase',
+        inactiveLabel: 'text-gray-600 font-black uppercase'
+      },
+      progressBar: {
+        container: 'w-full bg-white border-4 border-black h-6 mb-6',
+        fill: 'bg-red-500 h-6 transition-all duration-200 ease-linear'
+      }
+    }
+  },
+  {
+    id: 'brutalist-mono',
+    name: 'Brutalist Mono',
+    description: 'Monochrome brutalist design with stark contrasts and monospace typography',
+    preview: 'bg-white border-4 border-black',
+    styles: {
+      container: 'max-w-2xl mx-auto p-8 bg-white border-[6px] border-black relative before:content-[""] before:absolute before:inset-0 before:border-[3px] before:border-black before:m-2 before:pointer-events-none',
+      header: 'text-4xl font-black text-black mb-8 uppercase tracking-tighter font-mono border-b-4 border-black pb-4',
+      field: 'mb-6',
+      label: 'block text-xs font-black text-black mb-2 uppercase tracking-[0.3em] font-mono',
+      input: 'w-full px-4 py-3 h-12 border-[3px] border-black bg-gray-50 focus:outline-none focus:bg-white focus:shadow-[inset_0_0_0_3px_#000] transition-all duration-100 text-black font-mono placeholder-gray-400',
+      button: 'w-full bg-black text-white py-4 px-6 hover:bg-white hover:text-black border-[3px] border-black transition-all duration-150 font-mono font-black uppercase tracking-[0.2em] shadow-[5px_5px_0_0_#9ca3af] hover:shadow-[3px_3px_0_0_#9ca3af] hover:translate-x-[2px] hover:translate-y-[2px]',
+      background: 'bg-gray-100',
+      booleanSwitch: {
+        track: 'border-[3px] data-[state=unchecked]:bg-gray-200 data-[state=unchecked]:border-black data-[state=checked]:bg-black data-[state=checked]:border-black',
+        thumb: 'data-[state=unchecked]:bg-black data-[state=checked]:bg-white shadow-none',
+        activeLabel: 'text-black font-mono font-black uppercase tracking-widest',
+        inactiveLabel: 'text-gray-500 font-mono font-black uppercase tracking-widest'
+      },
+      progressBar: {
+        container: 'w-full bg-gray-200 border-[3px] border-black h-5 mb-6',
+        fill: 'bg-black h-5 transition-all duration-200 ease-linear'
+      }
+    }
+  },
+  {
     id: 'ocean-breeze',
     name: 'Ocean Breeze',
     description: 'Calming coastal design with teal gradients and wave-inspired elements',
