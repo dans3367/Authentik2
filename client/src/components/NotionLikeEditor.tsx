@@ -8,6 +8,7 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Link } from "@tiptap/extension-link";
 import { Underline } from "@tiptap/extension-underline";
+import { Highlight } from "@tiptap/extension-highlight";
 import {
     Bold,
     Italic,
@@ -27,6 +28,10 @@ import {
     AlignRight,
     Link as LinkIcon,
     Type,
+    Palette,
+    ChevronDown,
+    ListChecks,
+    Braces,
 } from "lucide-react";
 import "./NotionLikeEditor.css";
 
@@ -159,6 +164,32 @@ function SlashCommandMenu({
 
 // ── Custom Floating Toolbar ─────────────────────────────────────────────────────
 
+const TEXT_COLORS = [
+    { label: "Default", value: "" },
+    { label: "Gray", value: "#6b7280" },
+    { label: "Brown", value: "#92400e" },
+    { label: "Orange", value: "#ea580c" },
+    { label: "Yellow", value: "#ca8a04" },
+    { label: "Cyan", value: "#06b6d4" },
+    { label: "Blue", value: "#3b82f6" },
+    { label: "Purple", value: "#8b5cf6" },
+    { label: "Pink", value: "#ec4899" },
+    { label: "Red", value: "#ef4444" },
+];
+
+const HIGHLIGHT_COLORS = [
+    { label: "None", value: "" },
+    { label: "Gray", value: "#374151" },
+    { label: "Brown", value: "#78350f" },
+    { label: "Orange", value: "#c2410c" },
+    { label: "Yellow", value: "#a16207" },
+    { label: "Green", value: "#15803d" },
+    { label: "Cyan", value: "#0e7490" },
+    { label: "Purple", value: "#7c3aed" },
+    { label: "Pink", value: "#be185d" },
+    { label: "Red", value: "#b91c1c" },
+];
+
 function FloatingToolbar({
     editor,
     onLinkClick,
@@ -169,6 +200,10 @@ function FloatingToolbar({
     const toolbarRef = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
     const [visible, setVisible] = useState(false);
+    const [colorPickerOpen, setColorPickerOpen] = useState(false);
+    const colorBtnRef = useRef<HTMLButtonElement>(null);
+    const [recentColors, setRecentColors] = useState<string[]>([]);
+    const [turnIntoOpen, setTurnIntoOpen] = useState(false);
 
     useEffect(() => {
         if (!editor) return;
@@ -189,19 +224,27 @@ function FloatingToolbar({
             const editorRect = editor.view.dom.closest('.notion-editor-area')?.getBoundingClientRect()
                 || editor.view.dom.getBoundingClientRect();
 
-            // Position toolbar above the selection center
+            // Position toolbar above the selection with some spacing
             const centerX = (coords.left + endCoords.right) / 2 - editorRect.left;
-            const topY = coords.top - editorRect.top - 50;
+            const toolbarHeight = 36;
+            const spacing = 8;
+            const topY = coords.top - editorRect.top - toolbarHeight - spacing;
+
+            // If toolbar would be cut off at top, show it below the selection instead
+            const showBelow = topY < 4;
+            const finalTop = showBelow
+                ? endCoords.bottom - editorRect.top + spacing
+                : topY;
 
             setPosition({
-                top: Math.max(4, topY),
+                top: finalTop,
                 left: Math.max(8, centerX - 150), // roughly half toolbar width
             });
             setVisible(true);
         };
 
         editor.on("selectionUpdate", updatePosition);
-        editor.on("blur", () => setVisible(false));
+        editor.on("blur", () => { setVisible(false); setColorPickerOpen(false); setTurnIntoOpen(false); });
 
         return () => {
             editor.off("selectionUpdate", updatePosition);
@@ -223,6 +266,52 @@ function FloatingToolbar({
             }}
             onMouseDown={(e) => e.preventDefault()}
         >
+            {/* Turn Into dropdown */}
+            <div style={{ position: 'relative' }}>
+                <button
+                    onClick={() => { setTurnIntoOpen((v) => !v); setColorPickerOpen(false); }}
+                    className="notion-bubble-btn"
+                    style={{ gap: '3px', width: 'auto', padding: '0 8px', fontSize: '12px', fontWeight: 600 }}
+                    title="Turn into"
+                >
+                    <span style={{ color: '#d1d5db', whiteSpace: 'nowrap' }}>
+                        {editor.isActive('heading', { level: 1 }) ? 'Heading 1'
+                            : editor.isActive('heading', { level: 2 }) ? 'Heading 2'
+                            : editor.isActive('heading', { level: 3 }) ? 'Heading 3'
+                            : editor.isActive('bulletList') ? 'Bulleted list'
+                            : editor.isActive('orderedList') ? 'Numbered list'
+                            : editor.isActive('blockquote') ? 'Quote'
+                            : editor.isActive('codeBlock') ? 'Code block'
+                            : 'Text'}
+                    </span>
+                    <ChevronDown className="w-3 h-3" style={{ opacity: 0.6 }} />
+                </button>
+                {turnIntoOpen && (
+                    <div className="notion-turninto-menu" onMouseDown={(e) => e.preventDefault()}>
+                        <div className="notion-turninto-label">Turn Into</div>
+                        {[
+                            { label: 'Text', icon: <Type className="w-4 h-4" />, active: editor.isActive('paragraph') && !editor.isActive('bulletList') && !editor.isActive('orderedList') && !editor.isActive('blockquote') && !editor.isActive('codeBlock'), action: () => editor.chain().focus().setParagraph().run() },
+                            { label: 'Heading 1', icon: <Heading1 className="w-4 h-4" />, active: editor.isActive('heading', { level: 1 }), action: () => editor.chain().focus().setHeading({ level: 1 }).run() },
+                            { label: 'Heading 2', icon: <Heading2 className="w-4 h-4" />, active: editor.isActive('heading', { level: 2 }), action: () => editor.chain().focus().setHeading({ level: 2 }).run() },
+                            { label: 'Heading 3', icon: <Heading3 className="w-4 h-4" />, active: editor.isActive('heading', { level: 3 }), action: () => editor.chain().focus().setHeading({ level: 3 }).run() },
+                            { label: 'Bulleted list', icon: <List className="w-4 h-4" />, active: editor.isActive('bulletList'), action: () => editor.chain().focus().toggleBulletList().run() },
+                            { label: 'Numbered list', icon: <ListOrdered className="w-4 h-4" />, active: editor.isActive('orderedList'), action: () => editor.chain().focus().toggleOrderedList().run() },
+                            { label: 'Blockquote', icon: <Quote className="w-4 h-4" />, active: editor.isActive('blockquote'), action: () => editor.chain().focus().toggleBlockquote().run() },
+                            { label: 'Code block', icon: <Code className="w-4 h-4" />, active: editor.isActive('codeBlock'), action: () => editor.chain().focus().toggleCodeBlock().run() },
+                        ].map((item) => (
+                            <button
+                                key={item.label}
+                                className={`notion-turninto-item ${item.active ? 'active' : ''}`}
+                                onClick={() => { item.action(); setTurnIntoOpen(false); }}
+                            >
+                                <span className="notion-turninto-item-icon">{item.icon}</span>
+                                <span className="notion-turninto-item-label">{item.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+            <div className="notion-bubble-divider" />
             <button
                 onClick={() => editor.chain().focus().toggleBold().run()}
                 className={`notion-bubble-btn ${editor.isActive("bold") ? "active" : ""}`}
@@ -272,6 +361,111 @@ function FloatingToolbar({
             >
                 <LinkIcon className="w-4 h-4" />
             </button>
+            <div className="notion-bubble-divider" />
+            <div style={{ position: 'relative' }}>
+                <button
+                    ref={colorBtnRef}
+                    onClick={() => setColorPickerOpen((v) => !v)}
+                    className={`notion-bubble-btn ${editor.getAttributes("textStyle").color ? "active" : ""}`}
+                    title="Text color"
+                    style={{ gap: '4px', width: 'auto', padding: '0 8px' }}
+                >
+                    <span style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '22px',
+                        height: '22px',
+                        fontWeight: 700,
+                        fontSize: '14px',
+                        color: editor.getAttributes("textStyle").color || '#d1d5db',
+                        border: `2px solid ${editor.getAttributes("textStyle").color || '#6b7280'}`,
+                        borderRadius: '50%',
+                        lineHeight: 1,
+                    }}>A</span>
+                    <ChevronDown className="w-3 h-3" style={{ opacity: 0.6 }} />
+                </button>
+                {colorPickerOpen && (
+                    <div className="notion-color-picker" onMouseDown={(e) => e.preventDefault()}>
+                        {/* Recently Used */}
+                        {recentColors.length > 0 && (
+                            <div style={{ marginBottom: '10px' }}>
+                                <div className="notion-color-picker-label">Recently Used</div>
+                                <div className="notion-color-picker-grid">
+                                    {recentColors.slice(0, 5).map((color, i) => (
+                                        <button
+                                            key={`recent-${i}`}
+                                            className="notion-color-swatch-text"
+                                            title="Recent color"
+                                            onClick={() => {
+                                                editor.chain().focus().setColor(color).run();
+                                                setColorPickerOpen(false);
+                                            }}
+                                        >
+                                            <span style={{ color, border: `2px solid ${color}` }}>A</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Text Color */}
+                        <div style={{ marginBottom: '10px' }}>
+                            <div className="notion-color-picker-label">Text Color</div>
+                            <div className="notion-color-picker-grid">
+                                {TEXT_COLORS.map((c) => (
+                                    <button
+                                        key={c.label}
+                                        className={`notion-color-swatch-text ${!c.value && !editor.getAttributes("textStyle").color ? "active" : c.value && editor.getAttributes("textStyle").color === c.value ? "active" : ""}`}
+                                        title={c.label}
+                                        onClick={() => {
+                                            if (c.value) {
+                                                editor.chain().focus().setColor(c.value).run();
+                                                setRecentColors((prev) => {
+                                                    const filtered = prev.filter((col) => col !== c.value);
+                                                    return [c.value, ...filtered].slice(0, 5);
+                                                });
+                                            } else {
+                                                editor.chain().focus().unsetColor().run();
+                                            }
+                                            setColorPickerOpen(false);
+                                        }}
+                                    >
+                                        <span style={{
+                                            color: c.value || '#e2e8f0',
+                                            border: c.value ? `2px solid ${c.value}` : 'none',
+                                        }}>A</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Highlight Color */}
+                        <div>
+                            <div className="notion-color-picker-label">Highlight Color</div>
+                            <div className="notion-color-picker-grid">
+                                {HIGHLIGHT_COLORS.map((c) => (
+                                    <button
+                                        key={`hl-${c.label}`}
+                                        className={`notion-color-swatch-highlight ${!c.value && !editor.getAttributes("highlight")?.color ? "active" : c.value && editor.getAttributes("highlight")?.color === c.value ? "active" : ""}`}
+                                        title={c.label}
+                                        onClick={() => {
+                                            if (c.value) {
+                                                editor.chain().focus().setHighlight({ color: c.value }).run();
+                                            } else {
+                                                editor.chain().focus().unsetHighlight().run();
+                                            }
+                                            setColorPickerOpen(false);
+                                        }}
+                                    >
+                                        <span style={{ backgroundColor: c.value || '#374151' }} />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
             <div className="notion-bubble-divider" />
             <button
                 onClick={() => editor.chain().focus().setTextAlign("left").run()}
@@ -354,6 +548,7 @@ export default function NotionLikeEditor({
                 },
             }),
             Underline,
+            Highlight.configure({ multicolor: true }),
         ],
         content,
         onUpdate: ({ editor }) => {
