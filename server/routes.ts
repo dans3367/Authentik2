@@ -17,7 +17,7 @@ import { emailManagementRoutes } from "./routes/emailManagementRoutes";
 import { newsletterRoutes } from "./routes/newsletterRoutes";
 import { cardImageRoutes } from "./routes/cardImageRoutes";
 import { authenticateToken, requireTenant } from "./middleware/auth-middleware";
-import { campaignRoutes } from "./routes/campaignRoutes";
+
 import { webhookRoutes } from "./routes/webhookRoutes";
 import { devRoutes } from "./routes/devRoutes";
 import { emailRoutes } from "./routes/emailRoutes";
@@ -135,7 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.use("/api/campaigns", campaignRoutes);
+
   app.use("/api/webhooks", webhookRoutes);
   if (process.env.NODE_ENV !== 'production') {
     app.use("/api/dev", devRoutes);
@@ -396,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shops: "/api/shops/*",
         emailManagement: "/api/email-contacts/*, /api/email-lists/*, /api/bounced-emails/*, /api/contact-tags/*",
         newsletters: "/api/newsletters/*",
-        campaigns: "/api/campaigns/*",
+
         webhooks: "/api/webhooks/*",
         dev: "/api/dev/*",
         email: "/api/email/*",

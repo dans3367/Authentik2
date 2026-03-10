@@ -39,8 +39,7 @@ const Subscribe = lazy(() => import("@/pages/subscribe"));
 const VerifyEmailPage = lazy(() => import("@/pages/verify-email"));
 const PendingVerificationPage = lazy(() => import("@/pages/pending-verification"));
 const NotFound = lazy(() => import("@/pages/not-found"));
-const CreateCampaignPage = lazy(() => import("@/pages/campaigns/create"));
-const EmailCampaignsPage = lazy(() => import("@/pages/email-campaigns"));
+
 const EmailApprovalsPage = lazy(() => import("@/pages/email-approvals"));
 const EmailContactsPage = lazy(() => import("@/pages/email-contacts"));
 const NewEmailContactPage = lazy(() => import("@/pages/email-contacts/new"));
@@ -61,7 +60,7 @@ const CreatePromotionPage = lazy(() => import("@/pages/promotions/create"));
 const EditPromotionPage = lazy(() => import("@/pages/promotions/edit"));
 const TemplatesPage = lazy(() => import("@/pages/templates"));
 const CreateTemplatePage = lazy(() => import("@/pages/templates/create"));
-const EditEmailCampaignPage = lazy(() => import("@/pages/email-campaigns/edit"));
+
 const UpdateProfilePage = lazy(() => import("@/pages/update-profile"));
 const SegmentationPage = lazy(() => import("@/pages/segmentation"));
 const ManagementPage = lazy(() => import("@/pages/management"));
@@ -409,9 +408,7 @@ function Router() {
                   <Route path="/templates/create" component={CreateTemplatePage} />
                   <Route path="/templates" component={TemplatesPage} />
                   <Route path="/company" component={CompanyPage} />
-                  <Route path="/campaigns/create" component={CreateCampaignPage} />
-                  <Route path="/email-campaigns" component={EmailCampaignsPage} />
-                  <Route path="/email-campaigns/edit/:id" component={EditEmailCampaignPage} />
+
                   <Route path="/email-approvals" component={EmailApprovalsPage} />
                   <Route path="/email-compose" component={EmailComposePage} />
                   <Route path="/email-contacts" component={EmailContactsPage} />

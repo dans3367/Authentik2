@@ -85,12 +85,14 @@ const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, max
     { name: t?.('navigation.dashboard') || "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: t?.('navigation.newsletter') || "Newsletter", href: "/newsletter", icon: Newspaper },
     { name: t?.('navigation.promotions') || "Promotions", href: "/promotions", icon: Megaphone },
-    { name: t?.('navigation.forms') || "Forms", href: "/forms", icon: ClipboardList, children: [
-      { name: t?.('navigation.intakeForms') || "Intake Forms", href: "/forms", icon: ClipboardList },
-      { name: t?.('navigation.surveyForms') || "Survey Forms", href: "/forms", icon: FileQuestion },
-    ] },
+    {
+      name: t?.('navigation.forms') || "Forms", href: "/forms", icon: ClipboardList, children: [
+        { name: t?.('navigation.intakeForms') || "Intake Forms", href: "/forms", icon: ClipboardList },
+        { name: t?.('navigation.surveyForms') || "Survey Forms", href: "/forms", icon: FileQuestion },
+      ]
+    },
     { name: t?.('navigation.templates') || "Templates", href: "/templates", icon: FileText },
-    { name: t?.('navigation.campaigns') || "Campaigns", href: "/email-campaigns", icon: Target },
+
     { name: t?.('navigation.cards') || "e-Cards", href: "/cards", icon: Gift },
     { name: t?.('navigation.reminders') || "Appointments", href: "/reminders", icon: Bell },
     { name: t?.('navigation.contacts') || "Contacts", href: "/email-contacts", icon: UserCheck },
@@ -119,10 +121,10 @@ export function AppSidebar() {
   const { user } = useReduxAuth();
   const { logout } = useReduxLogout();
   const { t } = useTranslation();
-  
+
   // Cast user to extended type to access custom fields
   const extendedUser = user as ExtendedUser | null;
-  
+
   // Fetch tenant plan data for all users
   const { planName, canManageUsers, maxShops } = useTenantPlan();
 
@@ -156,9 +158,9 @@ export function AppSidebar() {
           <div className="flex items-center justify-between p-4 border-b md:hidden">
             <div className="flex items-center gap-3">
               <div className="bg-indigo-600 dark:bg-indigo-500 rounded-2xl p-2 flex items-center justify-center">
-                <img 
-                  src={logoUrl} 
-                  alt="Company Logo" 
+                <img
+                  src={logoUrl}
+                  alt="Company Logo"
                   className="w-6 h-6 object-contain filter brightness-0 invert"
                 />
               </div>
@@ -189,9 +191,9 @@ export function AppSidebar() {
           isMobile ? "hidden" : (isCollapsed ? "justify-center" : "justify-start")
         )}>
           <div className="bg-indigo-600 dark:bg-indigo-500 rounded-2xl p-2 flex items-center justify-center">
-            <img 
-              src={logoUrl} 
-              alt="Company Logo" 
+            <img
+              src={logoUrl}
+              alt="Company Logo"
               className="w-8 h-8 object-contain filter brightness-0 invert"
             />
           </div>
@@ -290,9 +292,9 @@ export function AppSidebar() {
 
                 return (
                   <SidebarMenuItem key={item.name} className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={isActive} 
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
                       className={cn(
                         "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0 hover:!bg-[#e1fce9] data-[active=true]:!bg-[#e1fce9] hover:!text-gray-800 data-[active=true]:!text-gray-800",
                         isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
@@ -346,7 +348,7 @@ export function AppSidebar() {
                   className="data-[state=open]:!bg-[#e1fce9] data-[state=open]:!text-gray-800 hover:!bg-[#e1fce9] hover:!text-gray-800 group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
                   tooltip="User Menu"
                 >
-                  <CustomAvatar 
+                  <CustomAvatar
                     user={extendedUser}
                     size="sm"
                     className="w-8 h-8 flex-shrink-0"
@@ -361,15 +363,15 @@ export function AppSidebar() {
                   </div>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent 
-                side="right" 
-                align="end" 
+              <DropdownMenuContent
+                side="right"
+                align="end"
                 className="w-64 rounded-2xl p-1"
                 sideOffset={8}
               >
                 {/* User Profile Header */}
                 <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-700">
-                  <CustomAvatar 
+                  <CustomAvatar
                     user={extendedUser}
                     size="sm"
                     className="w-10 h-10 ring-2 ring-gray-100 dark:ring-gray-700"
@@ -386,36 +388,36 @@ export function AppSidebar() {
 
                 {/* Menu Items */}
                 <div className="py-2">
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={() => {
                       setLocation('/profile');
                       handleMobileNavClick();
-                    }} 
+                    }}
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
                   >
-                    <User className="h-4 w-4" style={{color: "#3396D3"}} />
+                    <User className="h-4 w-4" style={{ color: "#3396D3" }} />
                     <span className="text-sm">Profile</span>
                   </DropdownMenuItem>
-                  
-                  <DropdownMenuItem 
+
+                  <DropdownMenuItem
                     onClick={() => {
                       setLocation('/company');
                       handleMobileNavClick();
-                    }} 
+                    }}
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
                   >
-                    <Building2 className="h-4 w-4" style={{color: "#3396D3"}} />
+                    <Building2 className="h-4 w-4" style={{ color: "#3396D3" }} />
                     <span className="text-sm">Company</span>
                   </DropdownMenuItem>
-                  
-                  <DropdownMenuItem 
+
+                  <DropdownMenuItem
                     onClick={() => {
                       setLocation('/sessions');
                       handleMobileNavClick();
-                    }} 
+                    }}
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
                   >
-                    <Activity className="h-4 w-4" style={{color: "#3396D3"}} />
+                    <Activity className="h-4 w-4" style={{ color: "#3396D3" }} />
                     <span className="text-sm">Sessions</span>
                   </DropdownMenuItem>
 
@@ -490,7 +492,7 @@ export function AppSidebar() {
                     onClick={handleLogout}
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
                   >
-                    <LogOut className="h-4 w-4" style={{color: "#3396D3"}} />
+                    <LogOut className="h-4 w-4" style={{ color: "#3396D3" }} />
                     <span className="text-sm">Logout</span>
                   </DropdownMenuItem>
                 </div>
