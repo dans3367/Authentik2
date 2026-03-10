@@ -457,27 +457,27 @@ export const defaultThemes: FormTheme[] = [
     }
   },
   {
-    id: 'brutalist-mono',
-    name: 'Brutalist Mono',
-    description: 'Monochrome brutalist design with stark contrasts and monospace typography',
-    preview: 'bg-white border-4 border-black',
+    id: 'brutalist-noir',
+    name: 'Brutalist Noir',
+    description: 'Dark industrial brutalism with electric blue accents and raw concrete textures',
+    preview: 'bg-gray-900 border-4 border-blue-500 shadow-[6px_6px_0_0_#3b82f6]',
     styles: {
-      container: 'max-w-2xl mx-auto p-8 bg-white border-[6px] border-black relative before:content-[""] before:absolute before:inset-0 before:border-[3px] before:border-black before:m-2 before:pointer-events-none',
-      header: 'text-4xl font-black text-black mb-8 uppercase tracking-tighter font-mono border-b-4 border-black pb-4',
+      container: 'max-w-2xl mx-auto p-8 bg-gray-900 border-8 border-blue-500 shadow-[12px_12px_0_0_#1d4ed8]',
+      header: 'text-5xl font-black text-blue-400 mb-8 uppercase tracking-tight leading-none',
       field: 'mb-6',
-      label: 'block text-xs font-black text-black mb-2 uppercase tracking-[0.3em] font-mono',
-      input: 'w-full px-4 py-3 h-12 border-[3px] border-black bg-gray-50 focus:outline-none focus:bg-white focus:shadow-[inset_0_0_0_3px_#000] transition-all duration-100 text-black font-mono placeholder-gray-400',
-      button: 'w-full bg-black text-white py-4 px-6 hover:bg-white hover:text-black border-[3px] border-black transition-all duration-150 font-mono font-black uppercase tracking-[0.2em] shadow-[5px_5px_0_0_#9ca3af] hover:shadow-[3px_3px_0_0_#9ca3af] hover:translate-x-[2px] hover:translate-y-[2px]',
-      background: 'bg-gray-100',
+      label: 'block text-sm font-black text-blue-300 mb-2 uppercase tracking-widest',
+      input: 'w-full px-4 py-3 h-12 border-4 border-blue-500 bg-gray-800 focus:outline-none focus:bg-gray-700 focus:shadow-[4px_4px_0_0_#3b82f6] transition-all duration-100 text-white font-bold placeholder-gray-500',
+      button: 'w-full bg-blue-500 text-black py-4 px-6 border-4 border-blue-300 hover:bg-blue-400 transition-all duration-100 font-black uppercase tracking-wider shadow-[6px_6px_0_0_#1e3a5f] hover:shadow-[3px_3px_0_0_#1e3a5f] hover:translate-x-[3px] hover:translate-y-[3px]',
+      background: 'bg-gray-950',
       booleanSwitch: {
-        track: 'border-[3px] data-[state=unchecked]:bg-gray-200 data-[state=unchecked]:border-black data-[state=checked]:bg-black data-[state=checked]:border-black',
-        thumb: 'data-[state=unchecked]:bg-black data-[state=checked]:bg-white shadow-none',
-        activeLabel: 'text-black font-mono font-black uppercase tracking-widest',
-        inactiveLabel: 'text-gray-500 font-mono font-black uppercase tracking-widest'
+        track: 'border-4 data-[state=unchecked]:bg-gray-800 data-[state=unchecked]:border-blue-500 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-300',
+        thumb: 'data-[state=unchecked]:bg-blue-400 data-[state=checked]:bg-gray-900 shadow-[2px_2px_0_0_#1d4ed8]',
+        activeLabel: 'text-blue-300 font-black uppercase',
+        inactiveLabel: 'text-gray-600 font-black uppercase'
       },
       progressBar: {
-        container: 'w-full bg-gray-200 border-[3px] border-black h-5 mb-6',
-        fill: 'bg-black h-5 transition-all duration-200 ease-linear'
+        container: 'w-full bg-gray-800 border-4 border-blue-500 h-6 mb-6',
+        fill: 'bg-blue-500 h-6 transition-all duration-200 ease-linear'
       }
     }
   },

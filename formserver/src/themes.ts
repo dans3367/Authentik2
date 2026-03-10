@@ -269,22 +269,22 @@ export const themes: Record<string, ThemeStyles> = {
     background: 'bg-yellow-200'
   },
 
-  'brutalist-mono': {
-    id: 'brutalist-mono',
-    name: 'Brutalist Mono',
+  'brutalist-noir': {
+    id: 'brutalist-noir',
+    name: 'Brutalist Noir',
     container: 'min-h-screen py-8',
-    card: 'bg-white border-[6px] border-black shadow-[5px_5px_0px_0px_rgba(156,163,175,1)]',
-    header: 'p-6 border-b-4 border-black',
-    title: 'text-3xl font-black text-black uppercase tracking-tighter font-mono',
-    description: 'text-black mt-2 font-mono font-bold uppercase text-xs tracking-widest',
-    label: 'text-xs font-black text-black uppercase tracking-[0.3em] font-mono',
-    input: 'w-full px-4 py-3 bg-gray-50 border-[3px] border-black transition-all duration-100 focus:bg-white focus:shadow-[inset_0_0_0_3px_#000] focus:outline-none font-mono',
-    textarea: 'w-full px-4 py-3 bg-gray-50 border-[3px] border-black transition-all duration-100 focus:bg-white focus:shadow-[inset_0_0_0_3px_#000] focus:outline-none font-mono resize-none',
-    select: 'w-full px-4 py-3 bg-gray-50 border-[3px] border-black transition-all duration-100 focus:bg-white focus:shadow-[inset_0_0_0_3px_#000] focus:outline-none font-mono',
-    radio: 'h-5 w-5 text-black focus:ring-black border-2 border-black',
-    checkbox: 'h-5 w-5 text-black focus:ring-black border-2 border-black',
-    button: 'w-full bg-black hover:bg-white hover:text-black text-white font-mono font-black py-4 px-6 border-[3px] border-black uppercase tracking-[0.2em] transition-all duration-150 transform shadow-[5px_5px_0px_0px_rgba(156,163,175,1)] hover:shadow-[3px_3px_0px_0px_rgba(156,163,175,1)] hover:translate-x-[2px] hover:translate-y-[2px] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
-    background: 'bg-gray-100'
+    card: 'bg-gray-900 border-4 border-blue-500 shadow-[12px_12px_0px_0px_rgba(29,78,216,1)]',
+    header: 'p-6 border-b-4 border-blue-500',
+    title: 'text-3xl font-black text-blue-400 uppercase tracking-tight',
+    description: 'text-blue-300 mt-2 font-bold uppercase text-sm',
+    label: 'text-xs font-black text-blue-300 uppercase tracking-widest',
+    input: 'w-full px-4 py-3 bg-gray-800 border-4 border-blue-500 transition-all duration-100 focus:bg-gray-700 focus:shadow-[4px_4px_0px_0px_rgba(59,130,246,1)] focus:outline-none font-bold text-white placeholder-gray-500',
+    textarea: 'w-full px-4 py-3 bg-gray-800 border-4 border-blue-500 transition-all duration-100 focus:bg-gray-700 focus:shadow-[4px_4px_0px_0px_rgba(59,130,246,1)] focus:outline-none font-bold text-white placeholder-gray-500 resize-none',
+    select: 'w-full px-4 py-3 bg-gray-800 border-4 border-blue-500 transition-all duration-100 focus:bg-gray-700 focus:shadow-[4px_4px_0px_0px_rgba(59,130,246,1)] focus:outline-none font-bold text-white',
+    radio: 'h-5 w-5 text-blue-500 focus:ring-blue-500 border-2 border-blue-500',
+    checkbox: 'h-5 w-5 text-blue-500 focus:ring-blue-500 border-2 border-blue-500',
+    button: 'w-full bg-blue-500 hover:bg-blue-400 text-black font-black py-4 px-6 border-4 border-blue-300 uppercase tracking-wider transition-all duration-100 transform shadow-[6px_6px_0px_0px_rgba(30,58,95,1)] hover:shadow-[3px_3px_0px_0px_rgba(30,58,95,1)] hover:translate-x-[3px] hover:translate-y-[3px] active:shadow-[1px_1px_0px_0px_rgba(30,58,95,1)] active:translate-x-[5px] active:translate-y-[5px] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
+    background: 'bg-gray-950'
   },
 
   'pastel-dream': {
