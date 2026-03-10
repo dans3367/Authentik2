@@ -41,7 +41,7 @@ import {
     ChevronRight,
     Loader2,
 } from "lucide-react";
-import { improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText } from "@/lib/aiApi";
+import { improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText, generateNewsletter } from "@/lib/aiApi";
 import "./NotionLikeEditor.css";
 
 // ── Slash Command Menu ─────────────────────────────────────────────────────────
@@ -51,9 +51,17 @@ interface SlashCommand {
     description: string;
     icon: React.ReactNode;
     command: (editor: any) => void;
+    isAiGenerate?: boolean;
 }
 
 const SLASH_COMMANDS: SlashCommand[] = [
+    {
+        title: "Generate with AI",
+        description: "Create a full newsletter with AI",
+        icon: <Sparkles className="w-4 h-4" style={{ color: '#a78bfa' }} />,
+        command: () => {},
+        isAiGenerate: true,
+    },
     {
         title: "Text",
         description: "Plain text block",
@@ -156,13 +164,13 @@ function SlashCommandMenu({
             {filtered.map((cmd, i) => (
                 <button
                     key={cmd.title}
-                    className={`notion-slash-item ${i === selectedIndex ? "notion-slash-item-active" : ""}`}
+                    className={`notion-slash-item ${i === selectedIndex ? "notion-slash-item-active" : ""} ${cmd.isAiGenerate ? "notion-slash-item-ai" : ""}`}
                     onClick={() => onSelect(cmd)}
                     onMouseDown={(e) => e.preventDefault()}
                 >
-                    <div className="notion-slash-item-icon">{cmd.icon}</div>
+                    <div className={`notion-slash-item-icon ${cmd.isAiGenerate ? "notion-slash-item-icon-ai" : ""}`}>{cmd.icon}</div>
                     <div className="notion-slash-item-text">
-                        <span className="notion-slash-item-title">{cmd.title}</span>
+                        <span className={`notion-slash-item-title ${cmd.isAiGenerate ? "notion-slash-item-title-ai" : ""}`}>{cmd.title}</span>
                         <span className="notion-slash-item-desc">{cmd.description}</span>
                     </div>
                 </button>
@@ -709,6 +717,9 @@ export default function NotionLikeEditor({
     const slashStartPos = useRef<number | null>(null);
     const [linkModalOpen, setLinkModalOpen] = useState(false);
     const [linkUrl, setLinkUrl] = useState("");
+    const [aiGenerateModalOpen, setAiGenerateModalOpen] = useState(false);
+    const [aiGeneratePrompt, setAiGeneratePrompt] = useState("");
+    const [aiGenerating, setAiGenerating] = useState(false);
 
     const filteredCommands = SLASH_COMMANDS.filter(
         (cmd) =>
@@ -845,14 +856,42 @@ export default function NotionLikeEditor({
                 .deleteRange({ from: slashStartPos.current, to: currentPos })
                 .run();
 
-            // Execute the command
-            cmd.command(editor);
+            // If this is the AI generate command, open the modal instead
+            if (cmd.isAiGenerate) {
+                setAiGenerateModalOpen(true);
+                setAiGeneratePrompt("");
+            } else {
+                cmd.command(editor);
+            }
 
             setSlashMenuOpen(false);
             slashStartPos.current = null;
         },
         [editor]
     );
+
+    const handleAiGenerate = useCallback(async () => {
+        if (!editor || !aiGeneratePrompt.trim()) return;
+
+        setAiGenerating(true);
+        try {
+            const result = await generateNewsletter({ prompt: aiGeneratePrompt.trim() });
+            if (result.success && result.html) {
+                editor.commands.setContent(result.html);
+                onChange(editor.getHTML());
+            } else {
+                console.error("Failed to generate newsletter:", result.error);
+                alert(result.error || "Failed to generate newsletter. Please try again.");
+            }
+        } catch (error: any) {
+            console.error("Error generating newsletter:", error);
+            alert("An error occurred while generating the newsletter. Please try again.");
+        } finally {
+            setAiGenerating(false);
+            setAiGenerateModalOpen(false);
+            setAiGeneratePrompt("");
+        }
+    }, [editor, aiGeneratePrompt, onChange]);
 
     const handleAddLink = useCallback(() => {
         if (!editor) return;
@@ -895,6 +934,66 @@ export default function NotionLikeEditor({
                         <button onClick={handleAddLink} className="notion-link-apply-btn">
                             Apply
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* AI Generate Newsletter Modal */}
+            {aiGenerateModalOpen && (
+                <div className="notion-link-modal-overlay" onClick={() => { if (!aiGenerating) { setAiGenerateModalOpen(false); setAiGeneratePrompt(""); } }}>
+                    <div className="notion-ai-generate-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="notion-ai-generate-header">
+                            <Sparkles className="w-5 h-5" style={{ color: '#a78bfa' }} />
+                            <span>Generate Newsletter with AI</span>
+                        </div>
+                        <p className="notion-ai-generate-desc">
+                            What kind of newsletter would you like to create?
+                        </p>
+                        <textarea
+                            value={aiGeneratePrompt}
+                            onChange={(e) => setAiGeneratePrompt(e.target.value)}
+                            placeholder="e.g. A monthly update about our new product launches, upcoming events, and a tip of the month for our customers..."
+                            className="notion-ai-generate-input"
+                            autoFocus
+                            rows={4}
+                            disabled={aiGenerating}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                                    e.preventDefault();
+                                    handleAiGenerate();
+                                }
+                                if (e.key === "Escape" && !aiGenerating) {
+                                    setAiGenerateModalOpen(false);
+                                    setAiGeneratePrompt("");
+                                }
+                            }}
+                        />
+                        <div className="notion-ai-generate-actions">
+                            <button
+                                onClick={() => { setAiGenerateModalOpen(false); setAiGeneratePrompt(""); }}
+                                className="notion-ai-generate-cancel"
+                                disabled={aiGenerating}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleAiGenerate}
+                                className="notion-ai-generate-submit"
+                                disabled={aiGenerating || !aiGeneratePrompt.trim()}
+                            >
+                                {aiGenerating ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-4 h-4" />
+                                        Generate
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

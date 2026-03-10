@@ -340,6 +340,48 @@ export async function translateText(
   }
 }
 
+interface GenerateNewsletterParams {
+  prompt: string;
+}
+
+interface GenerateNewsletterResponse {
+  success: boolean;
+  html?: string;
+  error?: string;
+}
+
+/**
+ * Generate a full newsletter from a user prompt
+ */
+export async function generateNewsletter(
+  params: GenerateNewsletterParams
+): Promise<GenerateNewsletterResponse> {
+  try {
+    const response = await fetch("/api/ai/generate-newsletter", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to generate newsletter");
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Error generating newsletter:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to generate newsletter",
+    };
+  }
+}
+
 interface TransformTextParams {
   text: string;
   prompt: string;

@@ -449,4 +449,61 @@ ${text}`;
   }
 });
 
+// POST /api/ai/generate-newsletter
+// Generate a full newsletter from a user prompt
+router.post("/generate-newsletter", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Prompt is required",
+      });
+    }
+
+    if (!ensureApiKey(res)) {
+      return;
+    }
+
+    const promptText = `You are a professional newsletter writer. Create a full, well-structured newsletter based on the following request:
+
+"${prompt}"
+
+RULES:
+1. Write engaging, professional content suitable for an email newsletter
+2. Use proper HTML formatting with semantic tags
+3. Structure the newsletter with:
+   - A compelling headline using <h1>
+   - Section headings using <h2> or <h3>
+   - Body paragraphs using <p> tags
+   - Bullet lists using <ul><li> where appropriate
+   - Bold key phrases using <strong> where it enhances readability
+4. Keep the tone warm, professional, and engaging
+5. Include 3-5 content sections depending on the topic
+6. Do NOT include email headers/footers, unsubscribe links, or meta information
+7. Do NOT include placeholder images or image tags
+8. Do NOT wrap in <html>, <body>, or <div> container tags — just the content
+9. Do NOT use markdown code fences or backticks — return raw HTML only
+10. Make it feel like a real, polished newsletter that's ready to send
+11. Keep total length between 300-600 words`;
+
+    const { text } = await generateText({
+      model: AI_MODEL,
+      prompt: promptText,
+    });
+
+    res.json({
+      success: true,
+      html: text.trim(),
+    });
+  } catch (error: any) {
+    console.error("Error generating newsletter:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to generate newsletter",
+    });
+  }
+});
+
 export default router;
