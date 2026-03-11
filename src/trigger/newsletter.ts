@@ -1,4 +1,4 @@
-import { task, wait, logger, metadata } from "@trigger.dev/sdk/v3";
+import { task, wait, logger, metadata, retry } from "@trigger.dev/sdk/v3";
 import { Resend } from "resend";
 import { createHmac, randomUUID } from "crypto";
 import { z } from "zod";
@@ -323,31 +323,41 @@ async function updateNewsletterStatusInternal(
     return;
   }
 
-  const timestamp = Date.now();
-  const body = { status, ...stats };
-  const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
-  const signature = createHmac("sha256", secret).update(signaturePayload).digest("hex");
+  // Retry the status update callback up to 5 times with exponential backoff
+  // This is critical — without it, newsletters get stuck in 'sending' status
+  await retry.onThrow(
+    async () => {
+      // Generate fresh timestamp + signature on each attempt (prevents replay rejection)
+      const timestamp = Date.now();
+      const body = { status, ...stats };
+      const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
+      const signature = createHmac("sha256", secret).update(signaturePayload).digest("hex");
 
-  try {
-    const response = await fetch(`${baseUrl}/api/newsletters/internal/${newsletterId}/status`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        "x-internal-service": "trigger.dev",
-        "x-internal-timestamp": timestamp.toString(),
-        "x-internal-signature": signature,
-      },
-      body: JSON.stringify(body),
-    });
+      const url = `${baseUrl}/api/newsletters/internal/${newsletterId}/status`;
+      logger.info(`Calling status update: ${url}`, { status, stats });
 
-    if (!response.ok) {
-      logger.warn(`Failed to update newsletter status: ${response.status}`);
-    } else {
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-service": "trigger.dev",
+          "x-internal-timestamp": timestamp.toString(),
+          "x-internal-signature": signature,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text().catch(() => "");
+        const msg = `Failed to update newsletter ${newsletterId} status: HTTP ${response.status} - ${responseText}`;
+        logger.error(msg);
+        throw new Error(msg);
+      }
+
       logger.info(`Newsletter ${newsletterId} status updated to: ${status}`);
-    }
-  } catch (err) {
-    logger.warn(`Error updating newsletter status: ${err}`);
-  }
+    },
+    { maxAttempts: 5, randomize: true, minTimeoutInMs: 2000, maxTimeoutInMs: 15000, factor: 2 }
+  );
 }
 
 /**

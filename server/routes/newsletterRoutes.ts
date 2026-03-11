@@ -2804,3 +2804,81 @@ newsletterRoutes.post("/:id/reject", authenticateToken, requireTenant, async (re
     res.status(500).json({ message: 'Failed to reject newsletter' });
   }
 });
+
+// ─── Safety net: finalize newsletters stuck in 'sending' status ───
+// If Trigger.dev's callback fails, newsletters can get permanently stuck.
+// This function detects newsletters in 'sending' for > 30 minutes and marks them 'sent'.
+
+async function finalizeStuckNewsletters(): Promise<number> {
+  try {
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+
+    const stuckNewsletters = await db.select({
+      id: newsletters.id,
+      title: newsletters.title,
+      tenantId: newsletters.tenantId,
+      recipientCount: newsletters.recipientCount,
+      updatedAt: newsletters.updatedAt,
+    })
+      .from(newsletters)
+      .where(and(
+        eq(newsletters.status, 'sending'),
+        sql`${newsletters.updatedAt} < ${thirtyMinutesAgo}`
+      ));
+
+    if (stuckNewsletters.length === 0) return 0;
+
+    console.log(`🔧 [Newsletter Safety Net] Found ${stuckNewsletters.length} newsletter(s) stuck in 'sending' status`);
+
+    for (const nl of stuckNewsletters) {
+      try {
+        // Generate web slug for publishing
+        const webSlug = await generateWebSlug(nl.title, nl.tenantId, nl.id);
+
+        await db.update(newsletters)
+          .set({
+            status: 'sent',
+            sentAt: new Date(),
+            publishedAt: new Date(),
+            webSlug,
+            updatedAt: new Date(),
+          })
+          .where(eq(newsletters.id, nl.id));
+
+        console.log(`✅ [Newsletter Safety Net] Finalized newsletter "${nl.title}" (${nl.id}) → sent`);
+      } catch (err) {
+        console.error(`❌ [Newsletter Safety Net] Failed to finalize newsletter ${nl.id}:`, err);
+      }
+    }
+
+    return stuckNewsletters.length;
+  } catch (error) {
+    console.error('❌ [Newsletter Safety Net] Error checking stuck newsletters:', error);
+    return 0;
+  }
+}
+
+// Run the safety net every 10 minutes
+setInterval(() => {
+  finalizeStuckNewsletters().catch(err =>
+    console.error('❌ [Newsletter Safety Net] Interval error:', err)
+  );
+}, 10 * 60 * 1000);
+
+// Also run once on startup (after a short delay to let the server initialize)
+setTimeout(() => {
+  finalizeStuckNewsletters().catch(err =>
+    console.error('❌ [Newsletter Safety Net] Startup check error:', err)
+  );
+}, 15_000);
+
+// Manual trigger endpoint for admins
+newsletterRoutes.post('/fix-stuck-sending', authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const count = await finalizeStuckNewsletters();
+    res.json({ message: `Finalized ${count} stuck newsletter(s)`, count });
+  } catch (error) {
+    console.error('Fix stuck newsletters error:', error);
+    res.status(500).json({ message: 'Failed to fix stuck newsletters' });
+  }
+});
