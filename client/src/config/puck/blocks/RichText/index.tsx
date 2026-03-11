@@ -10,17 +10,27 @@ import { Section } from "../../components/Section";
 import { WithLayout, withLayout } from "../../components/Layout";
 import { AiTextCreator } from "@/components/puck/AiTextCreator";
 
-const usePuck = createUsePuck();
-
-/* ── Shared TipTap extensions ── */
-const makeTiptapExtensions = (placeholder?: string) => [
+/* ── TipTap extensions created ONCE at module level ── */
+const canvasExtensions = [
   StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
   TextAlign.configure({ types: ["heading", "paragraph"] }),
   Underline,
   Link.configure({ openOnClick: false }),
-  ...(placeholder
-    ? [Placeholder.configure({ placeholder, showOnlyWhenEditable: true })]
-    : []),
+  Placeholder.configure({
+    placeholder: "Start typing or use AI Creator to generate content…",
+    showOnlyWhenEditable: true,
+  }),
+];
+
+const panelExtensions = [
+  StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+  TextAlign.configure({ types: ["heading", "paragraph"] }),
+  Underline,
+  Link.configure({ openOnClick: false }),
+  Placeholder.configure({
+    placeholder: "Write or paste content…",
+    showOnlyWhenEditable: true,
+  }),
 ];
 
 export type RichTextProps = WithLayout<{
@@ -96,16 +106,15 @@ function PanelRichTextEditor({
   onChange: (html: string) => void;
 }) {
   const [, forceUpdate] = useState(0);
-  const suppressSync = useRef(false);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   const editor = useEditor({
-    extensions: makeTiptapExtensions("Write or paste content…"),
+    extensions: panelExtensions,
     content: value || "",
     editable: true,
     onUpdate: ({ editor: ed }) => {
-      if (!suppressSync.current) {
-        onChange(ed.getHTML());
-      }
+      onChangeRef.current(ed.getHTML());
       forceUpdate((n) => n + 1);
     },
     onSelectionUpdate: () => forceUpdate((n) => n + 1),
@@ -115,13 +124,15 @@ function PanelRichTextEditor({
   });
 
   // Sync external value changes (e.g. from canvas editor blur or AI insert)
+  const lastExternalValue = useRef(value);
   useEffect(() => {
     if (!editor) return;
-    if (suppressSync.current) { suppressSync.current = false; return; }
-    if (value !== editor.getHTML()) {
-      suppressSync.current = true;
-      editor.commands.setContent(value || "");
-      suppressSync.current = false;
+    // Only sync if the value actually changed externally
+    if (value === lastExternalValue.current) return;
+    lastExternalValue.current = value;
+    const current = editor.getHTML();
+    if (value !== current) {
+      editor.commands.setContent(value || "", { emitUpdate: false });
     }
   }, [value, editor]);
 
@@ -177,67 +188,40 @@ function PanelRichTextEditor({
 
 /**
  * Live TipTap editor shown in the Puck canvas.
- * Owns its own state; pushes to Puck on blur so there's no
- * keystroke→dispatch→re-render→cursor-jump loop.
- * External HTML changes (AI insert) are synced in via the html prop.
+ * Does NOT subscribe to Puck state — receives an onBlur callback from the
+ * parent render function to push changes on blur only.
  */
-function InlineRichTextEditor({ html }: { html: string }) {
-  const selectedItem = usePuck((s: any) => s.selectedItem);
-  const dispatch = usePuck((s: any) => s.dispatch);
-  const suppressSync = useRef(false);
-
-  const pushToPuck = useCallback(
-    (newHtml: string) => {
-      if (!selectedItem) return;
-      const targetId = selectedItem.props.id;
-      const updateItem = (item: any) =>
-        item.props.id === targetId
-          ? { ...item, props: { ...item.props, html: newHtml } }
-          : item;
-
-      dispatch({
-        type: "setData",
-        data: (prev: any) => {
-          const updated: any = { ...prev, content: prev.content.map(updateItem) };
-          if (prev.zones) {
-            updated.zones = Object.fromEntries(
-              Object.entries(prev.zones).map(([zone, items]: [string, any]) => [
-                zone,
-                Array.isArray(items) ? items.map(updateItem) : items,
-              ])
-            );
-          }
-          return updated;
-        },
-      });
-    },
-    [selectedItem, dispatch]
-  );
+function InlineRichTextEditor({
+  html,
+  onBlurChange,
+}: {
+  html: string;
+  onBlurChange: (newHtml: string) => void;
+}) {
+  const onBlurRef = useRef(onBlurChange);
+  onBlurRef.current = onBlurChange;
 
   const editor = useEditor({
-    extensions: makeTiptapExtensions("Start typing or use AI Creator to generate content…"),
+    extensions: canvasExtensions,
     content: html || "",
     editable: true,
     onBlur: ({ editor: ed }) => {
-      pushToPuck(ed.getHTML());
+      onBlurRef.current(ed.getHTML());
     },
     editorProps: {
       attributes: { class: "puck-richtext-editor" },
     },
   });
 
-  // Sync external html changes (e.g. AI Creator insert) into editor.
-  // Only runs when `html` prop changes from Puck; we use suppressSync
-  // to avoid re-syncing our own blur push.
+  // Sync external html changes (e.g. AI Creator insert) into editor
+  const lastExternalHtml = useRef(html);
   useEffect(() => {
     if (!editor) return;
-    if (suppressSync.current) {
-      suppressSync.current = false;
-      return;
-    }
+    if (html === lastExternalHtml.current) return;
+    lastExternalHtml.current = html;
     const current = editor.getHTML();
     if (html !== current) {
-      editor.commands.setContent(html || "");
+      editor.commands.setContent(html || "", { emitUpdate: false });
     }
   }, [html, editor]);
 
@@ -274,21 +258,82 @@ const RichTextInner: ComponentConfig<RichTextProps> = {
   render: ({ html, maxWidth, puck }) => {
     const isEditing = !!(puck as any)?.isEditing;
 
-    if (isEditing) {
+    // Non-edit mode (email output / preview): emit raw HTML
+    if (!isEditing) {
       return (
         <Section maxWidth={maxWidth}>
-          <InlineRichTextEditor html={html ?? ""} />
+          <div dangerouslySetInnerHTML={{ __html: html || "" }} />
         </Section>
       );
     }
 
-    // Non-edit mode (email output / preview): emit raw HTML
+    // Edit mode: show inline TipTap editor.
+    // The canvas editor doesn't render at all in non-edit mode.
     return (
       <Section maxWidth={maxWidth}>
-        <div dangerouslySetInnerHTML={{ __html: html || "" }} />
+        <InlineCanvasEditor html={html ?? ""} />
       </Section>
     );
   },
 };
+
+/**
+ * Thin wrapper that lazily accesses Puck dispatch only when the component
+ * is actually mounted (i.e. a RichText block is on the canvas in edit mode).
+ * Stores selectedItem/dispatch in refs so the child editor never re-renders
+ * due to Puck state changes (selection, drag, hover, etc.).
+ */
+const lazyUsePuck = (() => {
+  let hook: any = null;
+  return () => {
+    if (!hook) {
+      hook = createUsePuck();
+    }
+    return hook;
+  };
+})();
+
+function InlineCanvasEditor({ html }: { html: string }) {
+  const usePuck = lazyUsePuck();
+  const selectedItem = usePuck((s: any) => s.selectedItem);
+  const dispatch = usePuck((s: any) => s.dispatch);
+
+  // Store in refs so InlineRichTextEditor gets a stable callback
+  const selectedItemRef = useRef(selectedItem);
+  selectedItemRef.current = selectedItem;
+  const dispatchRef = useRef(dispatch);
+  dispatchRef.current = dispatch;
+
+  const handleBlur = useCallback(
+    (newHtml: string) => {
+      const item = selectedItemRef.current;
+      if (!item) return;
+      const targetId = item.props.id;
+      const updateItem = (i: any) =>
+        i.props.id === targetId
+          ? { ...i, props: { ...i.props, html: newHtml } }
+          : i;
+
+      dispatchRef.current({
+        type: "setData",
+        data: (prev: any) => {
+          const updated: any = { ...prev, content: prev.content.map(updateItem) };
+          if (prev.zones) {
+            updated.zones = Object.fromEntries(
+              Object.entries(prev.zones).map(([zone, items]: [string, any]) => [
+                zone,
+                Array.isArray(items) ? items.map(updateItem) : items,
+              ])
+            );
+          }
+          return updated;
+        },
+      });
+    },
+    [] // stable — reads from refs
+  );
+
+  return <InlineRichTextEditor html={html} onBlurChange={handleBlur} />;
+}
 
 export const RichText = withLayout(RichTextInner);

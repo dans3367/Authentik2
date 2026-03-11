@@ -27,6 +27,102 @@ import {
 
 const AUTOSAVE_INTERVAL = 20000;
 
+/**
+ * Self-updating save status indicator that reads from refs.
+ * Polls refs every 300ms so puckOverrides stays referentially stable.
+ */
+function SaveStatusIndicator({
+  justSavedRef,
+  isSavingRef,
+  hasUnsavedChangesRef,
+  t,
+}: {
+  justSavedRef: React.MutableRefObject<boolean>;
+  isSavingRef: React.MutableRefObject<boolean>;
+  hasUnsavedChangesRef: React.MutableRefObject<boolean>;
+  t: (key: string, fallback: string) => string;
+}) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 300);
+    return () => clearInterval(id);
+  }, []);
+
+  const js = justSavedRef.current;
+  const is = isSavingRef.current;
+  const hu = hasUnsavedChangesRef.current;
+
+  return (
+    <span
+      style={{
+        fontSize: "11px",
+        fontWeight: 500,
+        color: js ? "#22c55e" : is ? "#3b82f6" : "#9ca3af",
+        whiteSpace: "nowrap",
+        transition: "color 0.3s ease",
+      }}
+    >
+      {is
+        ? t("newsletter.create.saving", "Saving...")
+        : js
+        ? t("newsletter.create.saved", "Saved")
+        : hu
+        ? t("newsletter.create.unsavedChanges", "Unsaved changes")
+        : ""}
+    </span>
+  );
+}
+
+/**
+ * Self-updating save draft button that reads from refs.
+ */
+function SaveDraftButton({
+  isSavingRef,
+  handleSaveDraftRef,
+  t,
+}: {
+  isSavingRef: React.MutableRefObject<boolean>;
+  handleSaveDraftRef: React.MutableRefObject<() => Promise<void>>;
+  t: (key: string, fallback: string) => string;
+}) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 300);
+    return () => clearInterval(id);
+  }, []);
+
+  const saving = isSavingRef.current;
+
+  return (
+    <button
+      onClick={() => handleSaveDraftRef.current()}
+      disabled={saving}
+      style={{
+        padding: "4px 12px",
+        marginRight: "8px",
+        background: "#059669",
+        color: "white",
+        border: "1px solid #059669",
+        borderRadius: "4px",
+        cursor: saving ? "not-allowed" : "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: "4px",
+        fontSize: "12px",
+        fontWeight: 500,
+        height: "32px",
+        boxSizing: "border-box" as const,
+        whiteSpace: "nowrap" as const,
+        opacity: saving ? 0.7 : 1,
+      }}
+      data-testid="button-save-draft"
+    >
+      {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+      {t("newsletter.create.saveDraft", "Save Draft")}
+    </button>
+  );
+}
+
 export default function NewsletterCreatePage() {
   const params = useParams<{ id?: string }>();
   const editId = params?.id;
@@ -74,6 +170,8 @@ export default function NewsletterCreatePage() {
       if (!response.ok) return { newsletterEditorType: 'classic' };
       return response.json();
     },
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 
   const managementEditorType = blogDesignData?.newsletterEditorType || 'classic';
@@ -178,6 +276,8 @@ export default function NewsletterCreatePage() {
       if (!response.ok) throw new Error('Failed to fetch email design');
       return response.json();
     },
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 
   const getHtmlContent = useCallback(() => {
@@ -402,6 +502,16 @@ export default function NewsletterCreatePage() {
 
   const iframeConfig = useMemo(() => ({ enabled: false }), []);
 
+  // Refs for volatile save-state so puckOverrides stays referentially stable
+  const justSavedRef = useRef(justSaved);
+  justSavedRef.current = justSaved;
+  const isSavingRef = useRef(isSaving);
+  isSavingRef.current = isSaving;
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  hasUnsavedChangesRef.current = hasUnsavedChanges;
+  const handleSaveDraftRef = useRef(handleSaveDraft);
+  handleSaveDraftRef.current = handleSaveDraft;
+
   const puckOverrides = useMemo(() => ({
     preview: ({ children }: { children: React.ReactNode }) => {
       const primaryColor = emailDesign?.primaryColor || '#3B82F6';
@@ -592,17 +702,12 @@ export default function NewsletterCreatePage() {
     headerActions: ({ children }: { children: React.ReactNode }) => (
       <>
         <div style={{ display: "flex", marginRight: "auto", alignItems: "center", minWidth: 0, flex: 1 }}>
-          <span
-            style={{
-              fontSize: "11px",
-              fontWeight: 500,
-              color: justSaved ? "#22c55e" : isSaving ? "#3b82f6" : "#9ca3af",
-              whiteSpace: "nowrap",
-              transition: "color 0.3s ease",
-            }}
-          >
-            {isSaving ? t("newsletter.create.saving", "Saving...") : justSaved ? t("newsletter.create.saved", "Saved") : hasUnsavedChanges ? t("newsletter.create.unsavedChanges", "Unsaved changes") : ""}
-          </span>
+          <SaveStatusIndicator
+            justSavedRef={justSavedRef}
+            isSavingRef={isSavingRef}
+            hasUnsavedChangesRef={hasUnsavedChangesRef}
+            t={t}
+          />
         </div>
         <div style={{ display: "flex", gap: "4px", marginRight: "8px" }}>
           <button
@@ -726,32 +831,11 @@ export default function NewsletterCreatePage() {
           <Mail size={16} />
           {t("newsletter.create.sendPreview", "Send Preview")}
         </button>
-        <button
-          onClick={handleSaveDraft}
-          disabled={isSaving}
-          style={{
-            padding: "4px 12px",
-            marginRight: "8px",
-            background: "#059669",
-            color: "white",
-            border: "1px solid #059669",
-            borderRadius: "4px",
-            cursor: isSaving ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            fontSize: "12px",
-            fontWeight: 500,
-            height: "32px",
-            boxSizing: "border-box",
-            whiteSpace: "nowrap",
-            opacity: isSaving ? 0.7 : 1,
-          }}
-          data-testid="button-save-draft"
-        >
-          {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          {t("newsletter.create.saveDraft", "Save Draft")}
-        </button>
+        <SaveDraftButton
+          isSavingRef={isSavingRef}
+          handleSaveDraftRef={handleSaveDraftRef}
+          t={t}
+        />
         <button
           onClick={() => {
             const bodyHtml = extractPuckEmailHtml();
@@ -820,7 +904,7 @@ export default function NewsletterCreatePage() {
         </button>
       </>
     ),
-  }), [emailDesign, viewport, zoom, handleZoomIn, handleZoomOut, handleZoomReset, justSaved, title, subject, hasUnsavedChanges, isSaving, handleSaveDraft]);
+  }), [emailDesign, viewport, zoom, handleZoomIn, handleZoomOut, handleZoomReset, t]);
 
   if (!isClient || (isEditMode && isLoadingNewsletter)) {
     return (
