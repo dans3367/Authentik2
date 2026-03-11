@@ -215,6 +215,7 @@ export function createConfig(t: TFunction): UserConfig {
         fields: {
           ...(Text as any).fields,
           text: { ...(Text as any).fields.text },
+          _aiCreator: { ...(Text as any).fields._aiCreator },
           size: { ...(Text as any).fields.size, label: f("size", "Size") },
           align: {
             ...(Text as any).fields.align,

@@ -382,6 +382,49 @@ export async function generateNewsletter(
   }
 }
 
+interface GenerateNewsletterTextParams {
+  prompt: string;
+  tone?: "professional" | "formal" | "casual" | "persuasive";
+}
+
+interface GenerateNewsletterTextResponse {
+  success: boolean;
+  text?: string;
+  error?: string;
+}
+
+/**
+ * Generate text content for a newsletter Text block based on a user prompt
+ */
+export async function generateNewsletterText(
+  params: GenerateNewsletterTextParams
+): Promise<GenerateNewsletterTextResponse> {
+  try {
+    const response = await fetch("/api/ai/generate-newsletter-text", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to generate newsletter text");
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Error generating newsletter text:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to generate newsletter text",
+    };
+  }
+}
+
 interface TransformTextParams {
   text: string;
   prompt: string;

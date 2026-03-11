@@ -2849,7 +2849,7 @@ async function finalizeStuckNewsletters(): Promise<number> {
       .from(newsletters)
       .where(and(
         eq(newsletters.status, 'sending'),
-        sql`${newsletters.updatedAt} < ${thirtyMinutesAgo}`
+        sql`${newsletters.updatedAt} < ${thirtyMinutesAgo.toISOString()}`
       ));
 
     if (stuckNewsletters.length === 0) return 0;

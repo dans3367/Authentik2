@@ -506,4 +506,70 @@ RULES:
   }
 });
 
+// POST /api/ai/generate-newsletter-text
+// Generate text content for a newsletter Text block based on a user prompt
+router.post("/generate-newsletter-text", async (req, res) => {
+  try {
+    const { prompt, tone } = req.body;
+
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Prompt is required",
+      });
+    }
+
+    if (!ensureApiKey(res)) {
+      return;
+    }
+
+    const toneInstruction = tone === "formal"
+      ? "Use a formal, professional tone."
+      : tone === "casual"
+      ? "Use a casual, friendly, conversational tone."
+      : tone === "persuasive"
+      ? "Use a persuasive, compelling tone that motivates action."
+      : "Use a warm, professional tone.";
+
+    const promptText = `You are a professional newsletter writer. Create a complete, well-formatted newsletter based on the following request:
+
+"${prompt}"
+
+RULES:
+1. ${toneInstruction}
+2. Output valid HTML with proper formatting:
+   - Use <h2> for the main newsletter title/headline
+   - Use <h3> for section headings
+   - Use <p> for body paragraphs
+   - Use <ul><li> or <ol><li> for lists and key points
+   - Use <strong> to bold important words, names, dates, and key phrases
+   - Use <em> for emphasis where appropriate
+   - Use <hr> to separate major sections if needed
+3. Structure the newsletter with 3-5 sections covering different aspects of the topic
+4. Each section should have a heading and 1-3 paragraphs or a mix of paragraphs and bullet lists
+5. Make it feel like a real, polished newsletter ready to send — engaging, informative, and well-organized
+6. Keep total length between 300-600 words
+7. Do NOT include email headers, footers, unsubscribe links, greetings like "Dear subscriber", or signatures
+8. Do NOT include <html>, <body>, <head>, or <div> wrapper tags — just the content HTML
+9. Do NOT use markdown — output raw HTML only, no code fences or backticks
+10. Do NOT include placeholder images or <img> tags`;
+
+    const { text } = await generateText({
+      model: AI_MODEL,
+      prompt: promptText,
+    });
+
+    res.json({
+      success: true,
+      text: text.trim(),
+    });
+  } catch (error: any) {
+    console.error("Error generating newsletter text:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to generate newsletter text",
+    });
+  }
+});
+
 export default router;
