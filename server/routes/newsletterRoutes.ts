@@ -452,10 +452,17 @@ newsletterRoutes.get('/internal/suppression-list', authenticateInternalService, 
 // Get all newsletters
 newsletterRoutes.get("/", authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
-    const { page = 1, limit = 50, search, status, emailType } = req.query;
+    const { page = 1, limit = 50, search, status, emailType, archived } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
     let whereClause = sql`${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`;
+
+    // Archive filtering: archived=true returns only archived, default excludes archived
+    if (archived === 'true') {
+      whereClause = sql`${whereClause} AND ${newsletters.archivedAt} IS NOT NULL`;
+    } else {
+      whereClause = sql`${whereClause} AND ${newsletters.archivedAt} IS NULL`;
+    }
 
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
@@ -844,6 +851,94 @@ newsletterRoutes.post("/:id/clone", authenticateToken, requireTenant, requirePer
   } catch (error) {
     console.error("Clone newsletter error:", error);
     res.status(500).json({ message: "Failed to clone newsletter" });
+  }
+});
+
+// Archive a sent newsletter
+newsletterRoutes.post("/:id/archive", authenticateToken, requireTenant, requirePermission('newsletters.create'), async (req: any, res) => {
+  try {
+    const { id } = req.params;
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    if (newsletter.status !== 'sent') {
+      return res.status(400).json({ message: 'Only sent newsletters can be archived' });
+    }
+
+    if (newsletter.archivedAt) {
+      return res.status(400).json({ message: 'Newsletter is already archived' });
+    }
+
+    const [updated] = await db.update(newsletters)
+      .set({ archivedAt: new Date(), updatedAt: new Date() })
+      .where(sql`${newsletters.id} = ${id}`)
+      .returning();
+
+    // Log activity
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'archived',
+      description: `Archived newsletter "${newsletter.title}"`,
+      metadata: {},
+      req,
+    });
+
+    res.json({ message: 'Newsletter archived successfully', newsletter: updated });
+  } catch (error) {
+    console.error('Archive newsletter error:', error);
+    res.status(500).json({ message: 'Failed to archive newsletter' });
+  }
+});
+
+// Unarchive a newsletter
+newsletterRoutes.post("/:id/unarchive", authenticateToken, requireTenant, requirePermission('newsletters.create'), async (req: any, res) => {
+  try {
+    const { id } = req.params;
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    if (!newsletter.archivedAt) {
+      return res.status(400).json({ message: 'Newsletter is not archived' });
+    }
+
+    const [updated] = await db.update(newsletters)
+      .set({ archivedAt: null, updatedAt: new Date() })
+      .where(sql`${newsletters.id} = ${id}`)
+      .returning();
+
+    // Log activity
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'unarchived',
+      description: `Unarchived newsletter "${newsletter.title}"`,
+      metadata: {},
+      req,
+    });
+
+    res.json({ message: 'Newsletter unarchived successfully', newsletter: updated });
+  } catch (error) {
+    console.error('Unarchive newsletter error:', error);
+    res.status(500).json({ message: 'Failed to unarchive newsletter' });
   }
 });
 

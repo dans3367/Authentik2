@@ -22,7 +22,11 @@ import {
   ShieldCheck,
   ClipboardCheck,
   CalendarClock,
-  ExternalLink
+  ExternalLink,
+  Archive,
+  ArchiveRestore,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
@@ -95,6 +99,7 @@ export default function NewsletterPage() {
   const [previewNewsletter, setPreviewNewsletter] = useState<NewsletterListItem | null>(null);
   const [editRecipientsNewsletter, setEditRecipientsNewsletter] = useState<NewsletterListItem | null>(null);
   const [showEditorPicker, setShowEditorPicker] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
@@ -235,6 +240,49 @@ export default function NewsletterPage() {
       });
     },
   });
+
+  // Archive mutation
+  const archiveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('POST', `/api/newsletters/${id}/archive`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({ title: t("newsletter.toast.archived", "Archived"), description: t("newsletter.toast.archivedDesc", "Newsletter has been archived.") });
+    },
+    onError: (error: any) => {
+      toast({ title: t("newsletter.toast.error"), description: error.message || t("newsletter.toast.archiveError", "Failed to archive newsletter"), variant: "destructive" });
+    },
+  });
+
+  // Unarchive mutation
+  const unarchiveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('POST', `/api/newsletters/${id}/unarchive`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({ title: t("newsletter.toast.unarchived", "Unarchived"), description: t("newsletter.toast.unarchivedDesc", "Newsletter has been restored from the archive.") });
+    },
+    onError: (error: any) => {
+      toast({ title: t("newsletter.toast.error"), description: error.message || t("newsletter.toast.unarchiveError", "Failed to unarchive newsletter"), variant: "destructive" });
+    },
+  });
+
+  // Fetch archived newsletters
+  const { data: archivedNewslettersData } = useQuery({
+    queryKey: ['/api/newsletters', { emailType: 'newsletter', archived: true }],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/newsletters?emailType=newsletter&archived=true');
+      const data = await response.json();
+      return data.newsletters || [];
+    },
+    enabled: showArchived,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
+  const archivedNewsletters: NewsletterListItem[] = archivedNewslettersData || [];
 
   const handleEditRecipientsSegmentSelected = async (segmentData: {
     segmentListId: string | null;
@@ -643,6 +691,20 @@ export default function NewsletterPage() {
                                         {t("newsletter.actions.reviewNewsletter")}
                                       </DropdownMenuItem>
                                     )}
+                                    {isSent && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          archiveMutation.mutate(newsletter.id);
+                                        }}
+                                        disabled={archiveMutation.isPending && archiveMutation.variables === newsletter.id}
+                                      >
+                                        <Archive className="h-4 w-4 mr-2" />
+                                        {archiveMutation.isPending && archiveMutation.variables === newsletter.id
+                                          ? t("newsletter.actions.archiving", "Archiving...")
+                                          : t("newsletter.actions.archive", "Archive")}
+                                      </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                       className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
@@ -741,6 +803,151 @@ export default function NewsletterPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Archived Newsletters Section */}
+        {newsletters.length > 0 && (
+          <div className="mt-8">
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors group"
+            >
+              {showArchived ? (
+                <ChevronDown className="h-4 w-4 transition-transform" />
+              ) : (
+                <ChevronRight className="h-4 w-4 transition-transform" />
+              )}
+              <Archive className="h-4 w-4" />
+              <span>{showArchived ? t('newsletter.archived.hideArchived', 'Hide Archived') : t('newsletter.archived.showArchived', 'Show Archived')}</span>
+              {showArchived && archivedNewsletters.length > 0 && (
+                <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">
+                  {archivedNewsletters.length}
+                </span>
+              )}
+            </button>
+
+            {showArchived && (
+              <div className="mt-4">
+                {archivedNewsletters.length === 0 ? (
+                  <div className="text-center py-10 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900/30">
+                    <Archive className="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                    <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                      {t('newsletter.archived.empty', 'No archived newsletters')}
+                    </h4>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 max-w-xs mx-auto">
+                      {t('newsletter.archived.emptyDesc', 'Newsletters you archive from the Sent column will appear here.')}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-800">
+                    <div className="px-5 py-3 bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center gap-2">
+                        <Archive className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          {t('newsletter.archived.title', 'Archived Newsletters')}
+                        </h3>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                          — {t('newsletter.archived.subtitle', 'Sent newsletters that have been archived')}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-100 dark:border-gray-700/50">
+                            <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              {t('newsletter.archived.name', 'Name')}
+                            </th>
+                            <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              {t('newsletter.archived.subject', 'Subject')}
+                            </th>
+                            <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              {t('newsletter.archived.sentDate', 'Sent Date')}
+                            </th>
+                            <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              {t('newsletter.archived.recipients', 'Recipients')}
+                            </th>
+                            <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              {t('newsletter.archived.archivedDate', 'Archived Date')}
+                            </th>
+                            <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              {t('newsletter.archived.actions', 'Actions')}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                          {archivedNewsletters.map((newsletter) => (
+                            <tr
+                              key={newsletter.id}
+                              className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors cursor-pointer"
+                              onClick={() => setLocation(`/newsletters/${newsletter.id}`)}
+                            >
+                              <td className="px-5 py-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                                    {(newsletter.user?.firstName?.[0] || '')}{(newsletter.user?.lastName?.[0] || '')}
+                                  </div>
+                                  <span className="font-medium text-gray-900 dark:text-gray-100 truncate max-w-[200px]">
+                                    {newsletter.title}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-5 py-3 text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+                                {newsletter.subject}
+                              </td>
+                              <td className="px-5 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                {newsletter.sentAt
+                                  ? format(new Date(newsletter.sentAt), 'MMM d, yyyy', { locale: currentLanguage === 'es' ? esLocale : undefined })
+                                  : '—'}
+                              </td>
+                              <td className="px-5 py-3 text-center">
+                                <span className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                                  <Users className="h-3 w-3" />
+                                  {(newsletter.recipientCount || 0).toLocaleString()}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                {(newsletter as any).archivedAt
+                                  ? formatDistanceToNow(new Date((newsletter as any).archivedAt), { addSuffix: true, ...dateFnsLocale })
+                                  : '—'}
+                              </td>
+                              <td className="px-5 py-3 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPreviewNewsletter(newsletter);
+                                    }}
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2 text-gray-500 hover:text-green-600 dark:text-gray-400 dark:hover:text-green-400"
+                                    disabled={unarchiveMutation.isPending && unarchiveMutation.variables === newsletter.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      unarchiveMutation.mutate(newsletter.id);
+                                    }}
+                                  >
+                                    <ArchiveRestore className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

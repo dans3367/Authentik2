@@ -2516,6 +2516,20 @@
       "sent": "Sent",
       "empty": "No newsletters here"
     },
+    "archived": {
+      "title": "Archived Newsletters",
+      "subtitle": "Sent newsletters that have been archived",
+      "empty": "No archived newsletters",
+      "emptyDesc": "Newsletters you archive from the Sent column will appear here.",
+      "showArchived": "Show Archived",
+      "hideArchived": "Hide Archived",
+      "name": "Name",
+      "subject": "Subject",
+      "sentDate": "Sent Date",
+      "recipients": "Recipients",
+      "archivedDate": "Archived Date",
+      "actions": "Actions"
+    },
     "status": {
       "draft": "Draft",
       "readyToSend": "Ready to Send",
@@ -2535,7 +2549,11 @@
       "submitForReview": "Submit for Review",
       "submitting": "Submitting...",
       "reviewNewsletter": "Review Newsletter",
-      "delete": "Delete"
+      "delete": "Delete",
+      "archive": "Archive",
+      "archiving": "Archiving...",
+      "unarchive": "Unarchive",
+      "unarchiving": "Unarchiving..."
     },
     "metrics": {
       "sent": "Sent",
@@ -2581,7 +2599,13 @@
       "recipientsUpdated": "Recipients Updated",
       "recipientsUpdatedDesc": "Newsletter recipients have been updated successfully.",
       "recipientsError": "Failed to update recipients",
-      "error": "Error"
+      "error": "Error",
+      "archived": "Archived",
+      "archivedDesc": "Newsletter has been archived.",
+      "archiveError": "Failed to archive newsletter",
+      "unarchived": "Unarchived",
+      "unarchivedDesc": "Newsletter has been restored from the archive.",
+      "unarchiveError": "Failed to unarchive newsletter"
     },
     "error": {
       "title": "Error",

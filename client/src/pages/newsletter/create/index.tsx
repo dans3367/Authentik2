@@ -148,6 +148,8 @@ export default function NewsletterCreatePage() {
   const [justSaved, setJustSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [newsletterId, setNewsletterId] = useState<string | null>(editId || null);
+  const newsletterIdRef = useRef<string | null>(newsletterId);
+  useEffect(() => { newsletterIdRef.current = newsletterId; }, [newsletterId]);
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -161,6 +163,10 @@ export default function NewsletterCreatePage() {
   const { toast } = useToast();
   const { t, currentLanguage } = useLanguage();
   const queryClient = useQueryClient();
+
+  // Stable key for the Puck editor — locked at mount time so auto-save
+  // (which sets newsletterId from null → real id) never remounts the editor.
+  const puckKeyRef = useRef<string>(`${editId || 'new'}-loaded`);
 
   // Fetch blog design to determine editor type
   const { data: blogDesignData } = useQuery<{ newsletterEditorType?: string }>({
@@ -296,9 +302,10 @@ export default function NewsletterCreatePage() {
 
     setIsSaving(true);
     try {
-      if (newsletterId) {
+      const currentId = newsletterIdRef.current;
+      if (currentId) {
         // Update existing
-        const response = await apiRequest('PUT', `/api/newsletters/${newsletterId}`, {
+        const response = await apiRequest('PUT', `/api/newsletters/${currentId}`, {
           title: currentTitle,
           subject: currentSubject,
           content: htmlContent,
@@ -342,7 +349,7 @@ export default function NewsletterCreatePage() {
     } finally {
       setIsSaving(false);
     }
-  }, [newsletterId, title, subject, reactionsEnabled, toast, queryClient, editorType, notionHtmlContent]);
+  }, [title, subject, reactionsEnabled, toast, queryClient, editorType, notionHtmlContent]);
 
   const handleSaveDraft = useCallback(async () => {
     try {
@@ -1323,7 +1330,7 @@ export default function NewsletterCreatePage() {
                 /* ─── Classic Puck Editor ─── */
                 dataReady ? (
                   <LazyPuck
-                    key={`${newsletterId || 'new'}-loaded`}
+                    key={puckKeyRef.current}
                     config={translatedConfig}
                     data={data}
                     onChange={handleDataChange}

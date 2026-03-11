@@ -2410,6 +2410,20 @@
       "sent": "Enviados",
       "empty": "No hay boletines aquí"
     },
+    "archived": {
+      "title": "Boletines Archivados",
+      "subtitle": "Boletines enviados que han sido archivados",
+      "empty": "No hay boletines archivados",
+      "emptyDesc": "Los boletines que archives de la columna de Enviados aparecerán aquí.",
+      "showArchived": "Mostrar Archivados",
+      "hideArchived": "Ocultar Archivados",
+      "name": "Nombre",
+      "subject": "Asunto",
+      "sentDate": "Fecha de Envío",
+      "recipients": "Destinatarios",
+      "archivedDate": "Fecha de Archivo",
+      "actions": "Acciones"
+    },
     "status": {
       "draft": "Borrador",
       "readyToSend": "Listo para Enviar",
@@ -2429,7 +2443,11 @@
       "submitForReview": "Enviar a Revisión",
       "submitting": "Enviando...",
       "reviewNewsletter": "Revisar Boletín",
-      "delete": "Eliminar"
+      "delete": "Eliminar",
+      "archive": "Archivar",
+      "archiving": "Archivando...",
+      "unarchive": "Desarchivar",
+      "unarchiving": "Desarchivando..."
     },
     "metrics": {
       "sent": "Enviados",
@@ -2475,7 +2493,13 @@
       "recipientsUpdated": "Destinatarios Actualizados",
       "recipientsUpdatedDesc": "Los destinatarios del boletín han sido actualizados correctamente.",
       "recipientsError": "Error al actualizar los destinatarios",
-      "error": "Error"
+      "error": "Error",
+      "archived": "Archivado",
+      "archivedDesc": "El boletín ha sido archivado.",
+      "archiveError": "Error al archivar el boletín",
+      "unarchived": "Desarchivado",
+      "unarchivedDesc": "El boletín ha sido restaurado del archivo.",
+      "unarchiveError": "Error al desarchivar el boletín"
     },
     "error": {
       "title": "Error",
