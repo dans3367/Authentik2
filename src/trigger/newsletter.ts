@@ -94,8 +94,9 @@ async function sendBulkEmails(opts: {
   // Build Resend batch payload (max 100 per call)
   const resendBatchPayload = recipients.map((r) => {
     const emailTrackingId = randomUUID();
+    // Substitute per-recipient template variables
+    let recipientHtml = substituteVariables(content, r);
     // Inject per-recipient reaction bar if enabled
-    let recipientHtml = content;
     if (reactionsEnabled && baseUrl) {
       recipientHtml = injectReactionBar(recipientHtml, baseUrl, newsletterId, r.id);
     }
@@ -176,9 +177,10 @@ async function sendBulkEmails(opts: {
     try {
       // SES sends per-recipient internally, so we can inject unique reaction bars
       for (const r of recipients) {
-        const recipientHtml = (reactionsEnabled && baseUrl)
-          ? injectReactionBar(content, baseUrl, newsletterId, r.id)
-          : content;
+        let recipientHtml = substituteVariables(content, r);
+        if (reactionsEnabled && baseUrl) {
+          recipientHtml = injectReactionBar(recipientHtml, baseUrl, newsletterId, r.id);
+        }
 
         const sesResult = await sendSESEmail({
           from: { email: fromEmail },
@@ -217,9 +219,10 @@ async function sendBulkEmails(opts: {
       // 3rd fallback: AhaSend (send per-recipient for unique reaction bars)
       try {
         for (const r of recipients) {
-          const recipientHtml = (reactionsEnabled && baseUrl)
-            ? injectReactionBar(content, baseUrl, newsletterId, r.id)
-            : content;
+          let recipientHtml = substituteVariables(content, r);
+          if (reactionsEnabled && baseUrl) {
+            recipientHtml = injectReactionBar(recipientHtml, baseUrl, newsletterId, r.id);
+          }
 
           const ahaResult = await sendAhaEmail({
             from: { email: fromEmail },
@@ -277,8 +280,23 @@ const recipientSchema = z.object({
   email: z.string().email(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  address: z.string().optional(),
   unsubscribeToken: z.string().optional(),
 });
+
+/**
+ * Replace {{variable}} placeholders in newsletter HTML with per-recipient values.
+ */
+function substituteVariables(html: string, recipient: NewsletterRecipient): string {
+  return html
+    .replace(/\{\{first_name\}\}/g, recipient.firstName || '')
+    .replace(/\{\{last_name\}\}/g, recipient.lastName || '')
+    .replace(/\{\{email\}\}/g, recipient.email || '')
+    .replace(/\{\{phone\}\}/g, recipient.phoneNumber || '')
+    .replace(/\{\{address\}\}/g, recipient.address || '')
+    .replace(/\{\{office_hours\}\}/g, '');
+}
 
 // Schema for newsletter job payload
 const newsletterJobSchema = z.object({
@@ -562,10 +580,11 @@ export const processNewsletterBatchTask = task({
           let emailData: any = null;
           let sendError: any = null;
 
-          // Inject per-recipient reaction bar if enabled
-          const recipientHtml = (payload.reactionsEnabled && payload.baseUrl)
-            ? injectReactionBar(payload.content, payload.baseUrl, payload.newsletterId, recipient.id)
-            : payload.content;
+          // Substitute variables and inject per-recipient reaction bar if enabled
+          let recipientHtml = substituteVariables(payload.content, recipient);
+          if (payload.reactionsEnabled && payload.baseUrl) {
+            recipientHtml = injectReactionBar(recipientHtml, payload.baseUrl, payload.newsletterId, recipient.id);
+          }
 
           const { data: resendData, error: resendError } = await resend.emails.send({
             from: fromEmail,
@@ -845,10 +864,11 @@ export const sendNewsletterTask = task({
             let emailData: any = null;
             let sendError: any = null;
 
-            // Inject per-recipient reaction bar if enabled
-            const recipientHtml = (data.reactionsEnabled && data.baseUrl)
-              ? injectReactionBar(data.content, data.baseUrl, data.newsletterId, recipient.id)
-              : data.content;
+            // Substitute variables and inject per-recipient reaction bar if enabled
+            let recipientHtml = substituteVariables(data.content, recipient);
+            if (data.reactionsEnabled && data.baseUrl) {
+              recipientHtml = injectReactionBar(recipientHtml, data.baseUrl, data.newsletterId, recipient.id);
+            }
 
             const { data: resendData, error: resendError } = await resend.emails.send({
               from: fromEmail,

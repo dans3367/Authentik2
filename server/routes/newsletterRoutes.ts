@@ -17,6 +17,19 @@ import crypto from 'crypto';
 export const newsletterRoutes = Router();
 
 /**
+ * Replace {{variable}} placeholders in newsletter HTML with contact field values.
+ */
+function substituteNewsletterVariables(html: string, contact: { email: string; firstName?: string; lastName?: string; phoneNumber?: string; address?: string }): string {
+  return html
+    .replace(/\{\{first_name\}\}/g, contact.firstName || '')
+    .replace(/\{\{last_name\}\}/g, contact.lastName || '')
+    .replace(/\{\{email\}\}/g, contact.email || '')
+    .replace(/\{\{phone\}\}/g, contact.phoneNumber || '')
+    .replace(/\{\{address\}\}/g, contact.address || '')
+    .replace(/\{\{office_hours\}\}/g, '');
+}
+
+/**
  * Generate a URL-friendly slug from a newsletter title.
  * Ensures uniqueness within a tenant by appending a numeric suffix if needed.
  */
@@ -172,6 +185,8 @@ async function getNewsletterRecipientsBase(newsletter: any, tenantId: string, op
       email: true,
       firstName: true,
       lastName: true,
+      phoneNumber: true,
+      address: true,
       ...(filterActiveOnly ? { prefNewsletters: true } : { status: true }),
     };
 
@@ -1615,7 +1630,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
 
         // Generate unsubscribe tokens for all recipients
         const recipientsWithTokens = await Promise.all(
-          allowedRecipients.map(async (contact: { id: string; email: string; firstName?: string; lastName?: string }) => {
+          allowedRecipients.map(async (contact: { id: string; email: string; firstName?: string; lastName?: string; phoneNumber?: string; address?: string }) => {
             let unsub = await db.query.unsubscribeTokens.findFirst({
               where: and(eq(unsubscribeTokens.tenantId, req.user.tenantId), eq(unsubscribeTokens.contactId, contact.id), sql`${unsubscribeTokens.usedAt} IS NULL`),
             });
@@ -1629,6 +1644,8 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
               email: contact.email,
               firstName: contact.firstName || '',
               lastName: contact.lastName || '',
+              phoneNumber: contact.phoneNumber || '',
+              address: contact.address || '',
               unsubscribeToken: unsub.token,
             };
           })
@@ -1715,7 +1732,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
         };
 
         // Prepare emails for batch sending (inject reaction buttons + unsubscribe link inside body)
-        const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => {
+        const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string; phoneNumber?: string; address?: string }) => {
           const token = tokenMap.get(contact.id)!;
           const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(token)}&type=newsletters`;
           const emailTrackingId = crypto.randomUUID();
@@ -1732,8 +1749,8 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
               </p>
             </div>`;
 
-          // Inject reaction buttons and unsubscribe block inside the document body
-          let html = wrappedContent;
+          // Substitute template variables for this recipient
+          let html = substituteNewsletterVariables(wrappedContent, contact);
           if (reactionHtml) {
             html = injectBeforeFooter(html, reactionHtml);
           }
@@ -2001,11 +2018,13 @@ newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, require
       groupUUID,
       subject: newsletter.subject,
       content: wrappedContent,
-      recipients: allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string }) => ({
+      recipients: allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string; phoneNumber?: string; address?: string }) => ({
         id: contact.id,
         email: contact.email,
         firstName: contact.firstName || '',
-        lastName: contact.lastName || ''
+        lastName: contact.lastName || '',
+        phoneNumber: contact.phoneNumber || '',
+        address: contact.address || '',
       })),
       batchSize: 25,
       priority: 'normal' as const,
