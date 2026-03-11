@@ -63,6 +63,7 @@ const CreateTemplatePage = lazy(() => import("@/pages/templates/create"));
 
 const UpdateProfilePage = lazy(() => import("@/pages/update-profile"));
 const SegmentationPage = lazy(() => import("@/pages/segmentation"));
+const AnalyticsPage = lazy(() => import("@/pages/analytics"));
 const ManagementPage = lazy(() => import("@/pages/management"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding"));
 const SelectPlanPage = lazy(() => import("@/pages/select-plan"));
@@ -420,6 +421,7 @@ function Router() {
                   <Route path="/email-contacts/customer/:id" component={CustomerViewPage} />
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
                   <Route path="/segmentation" component={SegmentationPage} />
+                  <Route path="/analytics" component={AnalyticsPage} />
                   <Route path="/cards" component={CardsPage} />
                   <Route path="/birthdays" component={BirthdaysRedirect} />
                   <Route path="/e-cards" component={ECardsRedirect} />

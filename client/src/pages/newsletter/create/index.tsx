@@ -856,45 +856,16 @@ export default function NewsletterCreatePage() {
             background: "#fff",
             flexShrink: 0,
           }}>
-            {isEditingTitle ? (
-              <input
-                ref={titleInputRef}
-                type="text"
-                value={title}
-                onChange={(e) => { setTitle(e.target.value); setHasUnsavedChanges(true); }}
-                onBlur={() => setIsEditingTitle(false)}
-                onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingTitle(false); if (e.key === 'Escape') setIsEditingTitle(false); }}
-                autoFocus
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "#374151",
-                  border: "1px solid #d1d5db",
-                  borderRadius: "4px",
-                  padding: "2px 8px",
-                  outline: "none",
-                  background: "#f9fafb",
-                  minWidth: "200px",
-                }}
-              />
-            ) : (
-              <span
-                onClick={() => setIsEditingTitle(true)}
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: title ? "#374151" : "#9ca3af",
-                  cursor: "pointer",
-                  padding: "2px 4px",
-                  borderRadius: "4px",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                title="Click to edit title"
-              >
-                {title || "Untitled Newsletter"}
-              </span>
-            )}
+            <span
+              style={{
+                fontSize: "13px",
+                fontWeight: 600,
+                color: title ? "#374151" : "#9ca3af",
+                padding: "2px 4px",
+              }}
+            >
+              {title || "Untitled Newsletter"}
+            </span>
             <button
               onClick={() => {
                 if (hasUnsavedChanges) {
@@ -943,21 +914,6 @@ export default function NewsletterCreatePage() {
                     background: '#fff',
                     flexShrink: 0,
                   }}>
-                    <input
-                      type="text"
-                      value={subject}
-                      onChange={(e) => { setSubject(e.target.value); setHasUnsavedChanges(true); }}
-                      placeholder="Email subject line..."
-                      style={{
-                        flex: 1,
-                        fontSize: '13px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '6px',
-                        padding: '6px 12px',
-                        outline: 'none',
-                        background: '#f9fafb',
-                      }}
-                    />
                     <span
                       style={{
                         fontSize: '11px',
@@ -967,6 +923,7 @@ export default function NewsletterCreatePage() {
                         transition: 'color 0.3s ease',
                         minWidth: '80px',
                         textAlign: 'center',
+                        marginRight: 'auto',
                       }}
                     >
                       {isSaving ? t("newsletter.create.saving", "Saving...") : justSaved ? t("newsletter.create.saved", "Saved") : hasUnsavedChanges ? t("newsletter.create.unsavedChanges", "Unsaved changes") : ""}
@@ -1058,11 +1015,62 @@ export default function NewsletterCreatePage() {
                         <div style={{
                           width: '100%',
                           display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'flex-start',
+                          flexDirection: 'column',
+                          alignItems: 'center',
                           padding: '24px 20px',
                           minHeight: '100%',
                         }}>
+                          {/* Newsletter name & subject — separate from the email card */}
+                          <div style={{
+                            width: '100%',
+                            maxWidth: '620px',
+                            marginBottom: '10px',
+                            padding: '20px 24px 16px',
+                            background: '#fff',
+                            borderRadius: '2px',
+                            boxShadow: '0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)',
+                            fontFamily,
+                          }}>
+                            <input
+                              type="text"
+                              value={title}
+                              onChange={(e) => { setTitle(e.target.value); setHasUnsavedChanges(true); }}
+                              placeholder="Newsletter Name"
+                              style={{
+                                width: '100%',
+                                border: 'none',
+                                outline: 'none',
+                                fontSize: '22px',
+                                fontWeight: 700,
+                                color: '#1e293b',
+                                background: 'transparent',
+                                padding: 0,
+                                margin: '0 0 4px 0',
+                                fontFamily,
+                                lineHeight: 1.3,
+                              }}
+                            />
+                            <input
+                              type="text"
+                              value={subject}
+                              onChange={(e) => { setSubject(e.target.value); setHasUnsavedChanges(true); }}
+                              placeholder="Email subject line..."
+                              style={{
+                                width: '100%',
+                                border: 'none',
+                                outline: 'none',
+                                fontSize: '14px',
+                                fontWeight: 400,
+                                color: '#94a3b8',
+                                background: 'transparent',
+                                padding: 0,
+                                margin: 0,
+                                fontFamily,
+                                lineHeight: 1.4,
+                              }}
+                            />
+                          </div>
+
                           <div style={{
                             width: '100%',
                             maxWidth: '620px',

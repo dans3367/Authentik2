@@ -48,6 +48,7 @@ import internalRoutes from "./routes/internalRoutes";
 import { statsRoutes } from "./routes/statsRoutes";
 import { newsletterReactionRoutes } from "./routes/newsletterReactionRoutes";
 import { publicNewsletterRoutes } from "./routes/publicNewsletterRoutes";
+import { analyticsRoutes } from "./routes/analyticsRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -100,6 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/axiom-activity-logs", authenticateToken, requireTenant, axiomActivityRoutes);
   app.use("/api/account-usage", accountUsageRoutes);
   app.use("/api/stats", statsRoutes);
+  app.use("/api/analytics", analyticsRoutes);
 
   // Newsletter stats endpoint
   app.get("/api/newsletter-stats", authenticateToken, requireTenant, async (req: any, res) => {
