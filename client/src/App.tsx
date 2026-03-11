@@ -23,6 +23,8 @@ const Dashboard = lazy(() => import("@/pages/dashboard"));
 const NewsletterPage = lazy(() => import("@/pages/newsletter"));
 const NewsletterCreatePage = lazy(() => import("@/pages/newsletter/create"));
 const NewsletterViewPage = lazy(() => import("@/pages/newsletter/view"));
+const AdvertisePage = lazy(() => import("@/pages/advertise"));
+const AdvertiseCreatePage = lazy(() => import("@/pages/advertise/create"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
 const SessionsPage = lazy(() => import("@/pages/sessions"));
 const UsersPage = lazy(() => import("@/pages/users"));
@@ -392,6 +394,8 @@ function Router() {
           <Route path="/confirm-appointment/:id" component={ConfirmAppointmentPage} />
           <Route path="/newsletter/create/:id" component={NewsletterCreatePage} />
           <Route path="/newsletter/create" component={NewsletterCreatePage} />
+          <Route path="/advertise/create/:id" component={AdvertiseCreatePage} />
+          <Route path="/advertise/create" component={AdvertiseCreatePage} />
 
           {/* Routes that should be wrapped in AppLayout */}
           {isAuthenticated && isEmailVerified === true ? (
@@ -403,6 +407,7 @@ function Router() {
                   <Route path="/newsletter" component={NewsletterPage} />
                   <Route path="/newsletters" component={NewsletterPage} />
                   <Route path="/newsletters/:id" component={NewsletterViewPage} />
+                  <Route path="/advertise" component={AdvertisePage} />
                   <Route path="/promotions" component={PromotionsPage} />
                   <Route path="/promotions/create" component={CreatePromotionPage} />
                   <Route path="/promotions/:id/edit" component={EditPromotionPage} />

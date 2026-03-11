@@ -32,6 +32,10 @@ export default function NewsletterCreatePage() {
   const editId = params?.id;
   const isEditMode = !!editId;
 
+  // Detect email type from URL path: /advertise/create → 'advertise', else 'newsletter'
+  const emailType = window.location.pathname.startsWith('/advertise') ? 'advertise' : 'newsletter';
+  const basePath = emailType === 'advertise' ? '/advertise' : '/newsletter';
+
   const [data, setData] = useState<UserData>(initialData);
   const [isClient, setIsClient] = useState(false);
   const [isEdit, setIsEdit] = useState(true);
@@ -217,6 +221,7 @@ export default function NewsletterCreatePage() {
           content: htmlContent,
           puckData: puckDataJson,
           status,
+          emailType,
         });
         const result = await response.json();
         setNewsletterId(result.id);
@@ -351,7 +356,7 @@ export default function NewsletterCreatePage() {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
       toast({ title: t("newsletter.create.recipientsSelected", "Recipients Selected"), description: t("newsletter.create.recipientsSaved", "Your newsletter recipients have been saved.") });
       setShowSendWizard(false);
-      setLocation('/newsletter');
+      setLocation(basePath);
     } catch (error: any) {
       toast({
         title: t("newsletter.create.error", "Error"),
@@ -869,10 +874,10 @@ export default function NewsletterCreatePage() {
             <button
               onClick={() => {
                 if (hasUnsavedChanges) {
-                  setPendingNavigation('/newsletter');
+                  setPendingNavigation(basePath);
                   setShowExitDialog(true);
                 } else {
-                  setLocation('/newsletter');
+                  setLocation(basePath);
                 }
               }}
               style={{
@@ -1260,9 +1265,9 @@ export default function NewsletterCreatePage() {
         <SendNewsletterWizardModal
           isOpen={showSendWizard}
           onClose={() => setShowSendWizard(false)}
-          onSuccess={() => { setHasUnsavedChanges(false); setLocation('/newsletter'); }}
+          onSuccess={() => { setHasUnsavedChanges(false); setLocation(basePath); }}
           newsletterId={newsletterId}
-          newsletterTitle={title || "Untitled Newsletter"}
+          newsletterTitle={title || `Untitled ${emailType === 'advertise' ? 'Advertisement' : 'Newsletter'}`}
           newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
           onSegmentSelected={handleSegmentSelected}
           initialRecipientType={initialRecipientType}
@@ -1270,6 +1275,8 @@ export default function NewsletterCreatePage() {
           initialSelectedTagIds={initialSelectedTagIds}
           reactionsEnabled={reactionsEnabled}
           onReactionsEnabledChange={setReactionsEnabled}
+          itemLabel={emailType === 'advertise' ? 'Advertisement' : 'Newsletter'}
+          returnPath={basePath}
         />
         {exitDialog}
       </>
@@ -1396,9 +1403,9 @@ export default function NewsletterCreatePage() {
       <SendNewsletterWizardModal
         isOpen={showSendWizard}
         onClose={() => setShowSendWizard(false)}
-        onSuccess={() => { setHasUnsavedChanges(false); setLocation('/newsletter'); }}
+        onSuccess={() => { setHasUnsavedChanges(false); setLocation(basePath); }}
         newsletterId={newsletterId}
-        newsletterTitle={title || "Untitled Newsletter"}
+        newsletterTitle={title || `Untitled ${emailType === 'advertise' ? 'Advertisement' : 'Newsletter'}`}
         newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
         onSegmentSelected={handleSegmentSelected}
         initialRecipientType={initialRecipientType}
@@ -1406,6 +1413,8 @@ export default function NewsletterCreatePage() {
         initialSelectedTagIds={initialSelectedTagIds}
         reactionsEnabled={reactionsEnabled}
         onReactionsEnabledChange={setReactionsEnabled}
+        itemLabel={emailType === 'advertise' ? 'Advertisement' : 'Newsletter'}
+        returnPath={basePath}
       />
       {exitDialog}
     </>

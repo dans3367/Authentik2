@@ -26,6 +26,7 @@ import {
   Crown,
   Scale,
   ChevronRight,
+  Tv2,
 } from "lucide-react";
 import logoUrl from "@assets/logo.png";
 import { cn } from "@/lib/utils";
@@ -84,6 +85,7 @@ const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, max
   const baseNavigation: any[] = [
     { name: t?.('navigation.dashboard') || "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: t?.('navigation.newsletter') || "Newsletter", href: "/newsletter", icon: Newspaper },
+    { name: t?.('navigation.advertise') || "Advertise", href: "/advertise", icon: Tv2 },
     { name: t?.('navigation.promotions') || "Promotions", href: "/promotions", icon: Megaphone },
     {
       name: t?.('navigation.forms') || "Forms", href: "/forms", icon: ClipboardList, children: [

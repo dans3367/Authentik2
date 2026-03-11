@@ -41,6 +41,8 @@ interface SendNewsletterWizardModalProps {
   initialSelectedTagIds?: string[];
   reactionsEnabled?: boolean;
   onReactionsEnabledChange?: (enabled: boolean) => void;
+  itemLabel?: string;
+  returnPath?: string;
 }
 
 interface SegmentListWithCount extends SegmentList {
@@ -60,6 +62,8 @@ export function SendNewsletterWizardModal({
   initialSelectedTagIds,
   reactionsEnabled = true,
   onReactionsEnabledChange,
+  itemLabel = "Newsletter",
+  returnPath = '/newsletter',
 }: SendNewsletterWizardModalProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -211,8 +215,8 @@ export function SendNewsletterWizardModal({
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
       toast({
-        title: t("newsletter.sendWizard.toastSending", "Newsletter Sending"),
-        description: t("newsletter.sendWizard.toastSendingDesc", "Your newsletter is being sent to all selected recipients."),
+        title: `${itemLabel} Sending`,
+        description: `Your ${itemLabel.toLowerCase()} is being sent to all selected recipients.`,
       });
       onClose();
       onSuccess?.();
@@ -220,7 +224,7 @@ export function SendNewsletterWizardModal({
     } catch (error: any) {
       toast({
         title: t("newsletter.sendWizard.toastSendFailed", "Send Failed"),
-        description: error.message || t("newsletter.sendWizard.toastSendFailedDesc", "Failed to send newsletter"),
+        description: error.message || `Failed to send ${itemLabel.toLowerCase()}`,
         variant: "destructive",
       });
     } finally {
@@ -251,15 +255,15 @@ export function SendNewsletterWizardModal({
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
       toast({
-        title: t("newsletter.sendWizard.toastScheduled", "Newsletter Scheduled"),
-        description: t("newsletter.sendWizard.toastScheduledDesc", "Your newsletter will be sent on {{date}}.", { date: new Date(scheduledAt).toLocaleString() }),
+        title: `${itemLabel} Scheduled`,
+        description: `Your ${itemLabel.toLowerCase()} will be sent on ${new Date(scheduledAt).toLocaleString()}.`,
       });
       onClose();
       onSuccess?.();
     } catch (error: any) {
       toast({
         title: t("newsletter.sendWizard.toastScheduleFailed", "Scheduling Failed"),
-        description: error.message || t("newsletter.sendWizard.toastScheduleFailedDesc", "Failed to schedule newsletter"),
+        description: error.message || `Failed to schedule ${itemLabel.toLowerCase()}`,
         variant: "destructive",
       });
     } finally {
@@ -307,15 +311,15 @@ export function SendNewsletterWizardModal({
       queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
       toast({
         title: t("newsletter.sendWizard.toastSavedForLater", "Saved for Later"),
-        description: t("newsletter.sendWizard.toastSavedForLaterDesc", "Your newsletter is ready to send. You can send it anytime from the newsletter list."),
+        description: `Your ${itemLabel.toLowerCase()} is ready to send. You can send it anytime from the list.`,
       });
       onClose();
       onSuccess?.();
-      setLocation('/newsletter');
+      setLocation(returnPath);
     } catch (error: any) {
       toast({
         title: t("newsletter.sendWizard.toastSaveError", "Error"),
-        description: error.message || t("newsletter.sendWizard.toastSaveErrorDesc", "Failed to save newsletter"),
+        description: error.message || `Failed to save ${itemLabel.toLowerCase()}`,
         variant: "destructive",
       });
     } finally {
@@ -403,10 +407,10 @@ export function SendNewsletterWizardModal({
             </div>
             <div>
               <DialogTitle className="text-lg">
-                {t("newsletter.sendWizard.title", "Send Newsletter")}
+                {`Send ${itemLabel}`}
               </DialogTitle>
               <DialogDescription className="mt-0.5">
-                {newsletterTitle ? t("newsletter.sendWizard.readyToSend", "\"{{title}}\" is ready to send", { title: newsletterTitle }) : t("newsletter.sendWizard.selectRecipients", "Select who will receive this newsletter")}
+                {newsletterTitle ? `"${newsletterTitle}" is ready to send` : `Select who will receive this ${itemLabel.toLowerCase()}`}
               </DialogDescription>
             </div>
           </div>
@@ -606,7 +610,7 @@ export function SendNewsletterWizardModal({
                       </div>
                       <p className="text-sm font-medium text-foreground">{t("newsletter.sendWizard.sendToAllCustomers", "Send to All Customers")}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {t("newsletter.sendWizard.sendToAllCustomersDesc", "Your newsletter will be sent to all active customers")}
+                        {`Your ${itemLabel.toLowerCase()} will be sent to all active customers`}
                       </p>
                     </div>
                   )}
@@ -790,7 +794,7 @@ export function SendNewsletterWizardModal({
                     <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground">{t("newsletter.sendWizard.newsletter", "Newsletter")}</p>
+                    <p className="text-sm font-medium text-foreground">{itemLabel}</p>
                     <p className="text-xs text-muted-foreground">{t("newsletter.sendWizard.detailsAboutSend", "Details about what will be sent")}</p>
                   </div>
                 </div>
@@ -798,7 +802,7 @@ export function SendNewsletterWizardModal({
                   <div className="flex items-start justify-between gap-4">
                     <span className="text-sm text-muted-foreground flex-shrink-0">{t("newsletter.sendWizard.titleLabel", "Title")}</span>
                     <span className="text-sm font-medium text-foreground text-right truncate" data-testid="text-review-title">
-                      {newsletterTitle || t("newsletter.sendWizard.untitledNewsletter", "Untitled Newsletter")}
+                      {newsletterTitle || `Untitled ${itemLabel}`}
                     </span>
                   </div>
                   <Separator />
@@ -888,7 +892,7 @@ export function SendNewsletterWizardModal({
                     </button>
                   </div>
                   <p className="text-xs text-muted-foreground mb-3">
-                    {t("newsletter.sendWizard.scheduleDesc", "Choose when this newsletter should be sent. The time is in your local timezone.")}
+                    {`Choose when this ${itemLabel.toLowerCase()} should be sent. The time is in your local timezone.`}
                   </p>
                   <div className="flex gap-3">
                     <div className="flex-1">
@@ -940,8 +944,8 @@ export function SendNewsletterWizardModal({
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {requiresReview
-                        ? t("newsletter.sendWizard.reviewerApprovalDesc", "This newsletter requires approval from a reviewer before it can be sent. It will be submitted for review and you'll be notified once approved.")
-                        : t("newsletter.sendWizard.readyToSendDesc", "Once sent, the newsletter will be delivered to all selected recipients. This action cannot be undone. You can also schedule it for later or save as draft.")}
+                        ? `This ${itemLabel.toLowerCase()} requires approval from a reviewer before it can be sent. It will be submitted for review and you'll be notified once approved.`
+                        : `Once sent, the ${itemLabel.toLowerCase()} will be delivered to all selected recipients. This action cannot be undone. You can also schedule it for later or save as draft.`}
                     </p>
                   </div>
                 </div>

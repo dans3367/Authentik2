@@ -15,9 +15,10 @@ import { Button } from "@/components/ui/button";
 interface EditorPickerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  createBasePath?: string;
 }
 
-export function EditorPickerModal({ open, onOpenChange }: EditorPickerModalProps) {
+export function EditorPickerModal({ open, onOpenChange, createBasePath = '/newsletter/create' }: EditorPickerModalProps) {
   const [, setLocation] = useLocation();
   const { t } = useLanguage();
 
@@ -41,7 +42,7 @@ export function EditorPickerModal({ open, onOpenChange }: EditorPickerModalProps
 
   const handleContinue = () => {
     onOpenChange(false);
-    setLocation(`/newsletter/create?editor=${selected}`);
+    setLocation(`${createBasePath}?editor=${selected}`);
   };
 
   return (

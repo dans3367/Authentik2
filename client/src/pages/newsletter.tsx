@@ -109,9 +109,9 @@ export default function NewsletterPage() {
   ]);
 
   const { data: newslettersData, isLoading, error, refetch } = useQuery({
-    queryKey: ['/api/newsletters'],
+    queryKey: ['/api/newsletters', { emailType: 'newsletter' }],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/newsletters');
+      const response = await apiRequest('GET', '/api/newsletters?emailType=newsletter');
       const data = await response.json();
       return data.newsletters || [];
     },
@@ -459,7 +459,7 @@ export default function NewsletterPage() {
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               {t("newsletter.noNewslettersFoundDesc")}
             </p>
-            <Button variant="outline" onClick={() => { setSearchQuery(""); setStatusFilter("all"); }}>
+            <Button variant="outline" onClick={() => setSearchQuery("")}>
               {t("newsletter.clearFilters")}
             </Button>
           </div>

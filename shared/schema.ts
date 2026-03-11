@@ -517,6 +517,7 @@ export const newsletters = pgTable("newsletters", {
   triggerRunId: text("trigger_run_id"), // Trigger.dev run ID for scheduled sends (used for cancellation)
   deletedAt: timestamp("deleted_at"), // Soft delete: when set, newsletter is hidden from UI but preserved for analytics
   reactionsEnabled: boolean("reactions_enabled").notNull().default(true), // Enable/disable emoji reactions for this newsletter
+  emailType: text("email_type").default('newsletter'), // 'newsletter' | 'advertise'
   // Web publication fields — allows newsletters to be viewed in a browser via /n/:tenantSlug/:webSlug
   publishedAt: timestamp("published_at"), // When set, newsletter is publicly viewable on the web
   webSlug: text("web_slug"), // URL-friendly slug for the newsletter (auto-generated from title)

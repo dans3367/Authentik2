@@ -452,7 +452,7 @@ newsletterRoutes.get('/internal/suppression-list', authenticateInternalService, 
 // Get all newsletters
 newsletterRoutes.get("/", authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
-    const { page = 1, limit = 50, search, status } = req.query;
+    const { page = 1, limit = 50, search, status, emailType } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
     let whereClause = sql`${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`;
@@ -468,6 +468,10 @@ newsletterRoutes.get("/", authenticateToken, requireTenant, requirePermission('n
     if (status) {
       whereClause = sql`${whereClause} AND ${newsletters.status} = ${status}`;
     }
+
+    // Filter by emailType — default to 'newsletter' when not specified
+    const resolvedType = (emailType as string) || 'newsletter';
+    whereClause = sql`${whereClause} AND (${newsletters.emailType} = ${resolvedType} OR (${newsletters.emailType} IS NULL AND ${resolvedType} = 'newsletter'))`;
 
     const allNewsletters = await db.query.newsletters.findMany({
       where: whereClause,
@@ -749,6 +753,8 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, requirePermission('
       return res.status(404).json({ message: 'User account not found. Please contact support.' });
     }
 
+    const emailType = (req.body.emailType === 'advertise') ? 'advertise' : 'newsletter';
+
     const newNewsletter = await db.insert(newsletters).values({
       tenantId: req.user.tenantId,
       userId: userRecord.id,
@@ -758,6 +764,7 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, requirePermission('
       puckData: puckData || null,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
       status: status || 'draft',
+      emailType,
       recipientType: 'all',
       recipientCount: 0,
       openCount: 0,
