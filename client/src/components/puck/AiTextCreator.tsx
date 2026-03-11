@@ -14,7 +14,7 @@ type Tone = (typeof toneOptions)[number]["value"];
 
 const usePuck = createUsePuck();
 
-export function AiTextCreator() {
+export function AiTextCreator({ fieldName = "text" }: { fieldName?: string }) {
   const [prompt, setPrompt] = useState("");
   const [tone, setTone] = useState<Tone>("professional");
   const [generatedText, setGeneratedText] = useState("");
@@ -53,7 +53,7 @@ export function AiTextCreator() {
     const targetId = selectedItem.props.id;
     const updateItem = (item: any) =>
       item.props.id === targetId
-        ? { ...item, props: { ...item.props, text: generatedText } }
+        ? { ...item, props: { ...item.props, [fieldName]: generatedText } }
         : item;
 
     dispatch({

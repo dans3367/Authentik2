@@ -8,6 +8,7 @@ import { FlexProps } from "./blocks/Flex";
 import { LogosProps } from "./blocks/Logos";
 import { StatsProps } from "./blocks/Stats";
 import { TextProps } from "./blocks/Text";
+import { RichTextProps } from "./blocks/RichText";
 import { SpaceProps } from "./blocks/Space";
 import { ProductGridProps } from "./blocks/ProductGrid";
 import { ProductShowcaseProps } from "./blocks/ProductShowcase";
@@ -30,6 +31,7 @@ export type Components = {
   Logos: LogosProps;
   Stats: StatsProps;
   Text: TextProps;
+  RichText: RichTextProps;
   Space: SpaceProps;
   ProductGrid: ProductGridProps;
   ProductShowcase: ProductShowcaseProps;

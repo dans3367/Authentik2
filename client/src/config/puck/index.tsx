@@ -9,6 +9,7 @@ import { Flex } from "./blocks/Flex";
 import { Logos } from "./blocks/Logos";
 import { Stats } from "./blocks/Stats";
 import { Text } from "./blocks/Text";
+import { RichText } from "./blocks/RichText";
 import { Space } from "./blocks/Space";
 import { ProductGrid } from "./blocks/ProductGrid";
 import { ProductShowcase } from "./blocks/ProductShowcase";
@@ -72,7 +73,7 @@ export function createConfig(t: TFunction): UserConfig {
       },
       typography: {
         title: t("puckEditor.categories.typography", "Typography"),
-        components: ["Heading", "Text"],
+        components: ["Heading", "Text", "RichText"],
       },
       interactive: {
         title: t("puckEditor.categories.interactive", "Actions"),
@@ -215,7 +216,6 @@ export function createConfig(t: TFunction): UserConfig {
         fields: {
           ...(Text as any).fields,
           text: { ...(Text as any).fields.text },
-          _aiCreator: { ...(Text as any).fields._aiCreator },
           size: { ...(Text as any).fields.size, label: f("size", "Size") },
           align: {
             ...(Text as any).fields.align,
@@ -231,6 +231,16 @@ export function createConfig(t: TFunction): UserConfig {
             ],
           },
           maxWidth: { ...(Text as any).fields.maxWidth, label: f("maxWidth", "Max Width") },
+        },
+      } as any,
+      RichText: {
+        ...RichText,
+        label: c("richText", "Rich Text"),
+        fields: {
+          ...(RichText as any).fields,
+          html: { ...(RichText as any).fields.html, label: f("htmlContent", "HTML Content") },
+          _aiCreator: { ...(RichText as any).fields._aiCreator },
+          maxWidth: { ...(RichText as any).fields.maxWidth, label: f("maxWidth", "Max Width") },
         },
       } as any,
       Space: {
@@ -414,7 +424,7 @@ export const config: UserConfig = {
       components: ["Grid", "Flex", "Space"],
     },
     typography: {
-      components: ["Heading", "Text"],
+      components: ["Heading", "Text", "RichText"],
     },
     interactive: {
       title: "Actions",
@@ -439,6 +449,7 @@ export const config: UserConfig = {
     Logos,
     Stats,
     Text,
+    RichText,
     Space,
     ProductGrid,
     ProductShowcase,
