@@ -102,7 +102,24 @@ export const ResizableImage = Node.create({
             src: { default: null },
             alt: { default: null },
             title: { default: null },
-            width: { default: null },
+            width: {
+                default: null,
+                parseHTML: (element: HTMLElement) => {
+                    // Try the width attribute first
+                    const attrWidth = element.getAttribute("width");
+                    if (attrWidth) return parseInt(attrWidth, 10) || null;
+                    // Then try inline style
+                    const styleWidth = element.style.width;
+                    if (styleWidth && styleWidth.endsWith("px")) {
+                        return parseInt(styleWidth, 10) || null;
+                    }
+                    return null;
+                },
+                renderHTML: (attributes: any) => {
+                    if (!attributes.width) return {};
+                    return { width: attributes.width };
+                },
+            },
         };
     },
 
@@ -112,8 +129,14 @@ export const ResizableImage = Node.create({
 
     renderHTML({ HTMLAttributes }) {
         const { width, ...rest } = HTMLAttributes;
-        const style = width ? `width: ${width}px; max-width: 100%;` : "max-width: 100%;";
-        return ["img", mergeAttributes(rest, { style })];
+        const attrs: Record<string, any> = { ...rest };
+        if (width) {
+            attrs.width = width;
+            attrs.style = `width: ${width}px; max-width: 100%;`;
+        } else {
+            attrs.style = "max-width: 100%;";
+        }
+        return ["img", mergeAttributes(attrs)];
     },
 
     addNodeView() {
