@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extension-placeholder";
-import { Image } from "@tiptap/extension-image";
+import { ResizableImage } from "./ResizableImage";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
@@ -737,9 +737,7 @@ export default function NotionLikeEditor({
                 showOnlyWhenEditable: true,
                 showOnlyCurrent: true,
             }),
-            Image.configure({
-                HTMLAttributes: { class: "notion-editor-image" },
-            }),
+            ResizableImage,
             TextAlign.configure({
                 types: ["heading", "paragraph"],
             }),

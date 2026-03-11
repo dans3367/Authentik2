@@ -155,13 +155,95 @@
   color: #1d4ed8;
 }
 
-/* Images */
+/* Images – old class kept for backwards compat */
 .notion-editor-image {
   max-width: 100%;
   height: auto;
   border-radius: 8px;
   margin: 1em 0;
   display: block;
+}
+
+/* ─── Resizable Image ────────────────────────────────────────────────────── */
+
+.notion-resizable-image-wrapper {
+  display: flex;
+  justify-content: center;
+  margin: 1em 0;
+}
+
+.notion-resizable-image {
+  position: relative;
+  display: inline-block;
+  border-radius: 8px;
+  overflow: hidden;
+  line-height: 0;
+  transition: box-shadow 0.15s;
+}
+
+.notion-resizable-image img {
+  border-radius: 8px;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.notion-resizable-image.selected {
+  box-shadow: 0 0 0 2px #6366f1;
+}
+
+.notion-resizable-image.resizing {
+  box-shadow: 0 0 0 2px #8b5cf6;
+  user-select: none;
+}
+
+/* Resize handles */
+.notion-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.notion-resizable-image:hover .notion-resize-handle,
+.notion-resizable-image.selected .notion-resize-handle,
+.notion-resizable-image.resizing .notion-resize-handle {
+  opacity: 1;
+}
+
+.notion-resize-handle-left {
+  left: 0;
+}
+
+.notion-resize-handle-right {
+  right: 0;
+}
+
+.notion-resize-handle-bar {
+  width: 4px;
+  height: 40px;
+  max-height: 50%;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  transition: background 0.15s, transform 0.15s;
+}
+
+.notion-resize-handle:hover .notion-resize-handle-bar {
+  background: #ffffff;
+  transform: scaleY(1.15);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.notion-resizable-image.resizing .notion-resize-handle-bar {
+  background: #a78bfa;
 }
 
 /* Bold, Italic, etc. */
