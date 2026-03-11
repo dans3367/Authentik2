@@ -1018,3 +1018,107 @@
 .dark .notion-link-input:focus {
   border-color: #818cf8;
 }
+
+/* ─── Variable Quick-Insert Bar ──────────────────────────────────────────── */
+
+.notion-variable-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.notion-variable-bar-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-right: 2px;
+  white-space: nowrap;
+}
+
+.notion-variable-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 9999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.notion-variable-btn:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.notion-variable-btn-code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 10px;
+  color: #60a5fa;
+}
+
+.notion-variable-btn-card {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.notion-variable-btn-card:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.notion-variable-btn-card .notion-variable-btn-code {
+  color: #34d399;
+}
+
+/* Dark mode */
+.dark .notion-variable-bar {
+  background: rgba(15, 23, 42, 0.5);
+  border-color: #334155;
+}
+
+.dark .notion-variable-bar-label {
+  color: #94a3b8;
+}
+
+.dark .notion-variable-btn {
+  border-color: #1e3a5f;
+  background: rgba(30, 58, 95, 0.5);
+  color: #93c5fd;
+}
+
+.dark .notion-variable-btn:hover {
+  background: rgba(30, 58, 95, 0.8);
+  border-color: #3b82f6;
+}
+
+.dark .notion-variable-btn-code {
+  color: #60a5fa;
+}
+
+.dark .notion-variable-btn-card {
+  border-color: #065f46;
+  background: rgba(6, 95, 70, 0.3);
+  color: #6ee7b7;
+}
+
+.dark .notion-variable-btn-card:hover {
+  background: rgba(6, 95, 70, 0.5);
+  border-color: #10b981;
+}

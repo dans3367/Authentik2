@@ -988,7 +988,7 @@ export function SendNewsletterWizardModal({
                       data-testid="button-schedule-send"
                     >
                       <CalendarClock className="h-4 w-4 mr-1.5" />
-                      {t("newsletter.sendWizard.scheduleSend", "Schedule Send")}
+                      {t("newsletter.sendWizard.sendLater", "Send Later")}
                     </Button>
                   )
                 )}

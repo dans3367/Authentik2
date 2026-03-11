@@ -40,9 +40,28 @@ import {
     Languages,
     ChevronRight,
     Loader2,
+    User,
+    Mail,
+    Phone,
+    MapPin,
+    Clock,
+    CreditCard,
 } from "lucide-react";
 import { improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText, generateNewsletter } from "@/lib/aiApi";
 import "./NotionLikeEditor.css";
+
+// ── Template Variables ──────────────────────────────────────────────────────────
+
+const TEMPLATE_VARIABLES = [
+    { key: 'first_name', icon: User, labelKey: 'ecards.editor.firstName' },
+    { key: 'last_name', icon: User, labelKey: 'ecards.editor.lastName' },
+    { key: 'email', icon: Mail, labelKey: 'ecards.editor.emailVar' },
+    { key: 'phone', icon: Phone, labelKey: 'ecards.editor.phone' },
+    { key: 'address', icon: MapPin, labelKey: 'ecards.editor.address' },
+    { key: 'office_hours', icon: Clock, labelKey: 'ecards.editor.officeHours' },
+] as const;
+
+const CONTACT_CARD_TEMPLATE = `<p><strong>{{company_name}}</strong></p><p>\u2709 {{email}}</p><p>\u260E {{phone}}</p><p>\u{1F4CD} {{address}}</p>`;
 
 // ── Slash Command Menu ─────────────────────────────────────────────────────────
 
@@ -52,6 +71,7 @@ interface SlashCommand {
     icon: React.ReactNode;
     command: (editor: any) => void;
     isAiGenerate?: boolean;
+    category?: string;
 }
 
 const SLASH_COMMANDS: SlashCommand[] = [
@@ -127,6 +147,55 @@ const SLASH_COMMANDS: SlashCommand[] = [
             }
         },
     },
+    {
+        title: "First Name",
+        description: "Insert {{first_name}} variable",
+        icon: <User className="w-4 h-4" style={{ color: '#3b82f6' }} />,
+        command: (editor) => editor.chain().focus().insertContent('{{first_name}}').run(),
+        category: "variables",
+    },
+    {
+        title: "Last Name",
+        description: "Insert {{last_name}} variable",
+        icon: <User className="w-4 h-4" style={{ color: '#3b82f6' }} />,
+        command: (editor) => editor.chain().focus().insertContent('{{last_name}}').run(),
+        category: "variables",
+    },
+    {
+        title: "Email",
+        description: "Insert {{email}} variable",
+        icon: <Mail className="w-4 h-4" style={{ color: '#3b82f6' }} />,
+        command: (editor) => editor.chain().focus().insertContent('{{email}}').run(),
+        category: "variables",
+    },
+    {
+        title: "Phone",
+        description: "Insert {{phone}} variable",
+        icon: <Phone className="w-4 h-4" style={{ color: '#3b82f6' }} />,
+        command: (editor) => editor.chain().focus().insertContent('{{phone}}').run(),
+        category: "variables",
+    },
+    {
+        title: "Address",
+        description: "Insert {{address}} variable",
+        icon: <MapPin className="w-4 h-4" style={{ color: '#3b82f6' }} />,
+        command: (editor) => editor.chain().focus().insertContent('{{address}}').run(),
+        category: "variables",
+    },
+    {
+        title: "Office Hours",
+        description: "Insert {{office_hours}} variable",
+        icon: <Clock className="w-4 h-4" style={{ color: '#3b82f6' }} />,
+        command: (editor) => editor.chain().focus().insertContent('{{office_hours}}').run(),
+        category: "variables",
+    },
+    {
+        title: "Contact Card",
+        description: "Insert formatted contact card block",
+        icon: <CreditCard className="w-4 h-4" style={{ color: '#10b981' }} />,
+        command: (editor) => editor.chain().focus().insertContent(CONTACT_CARD_TEMPLATE).run(),
+        category: "variables",
+    },
 ];
 
 function SlashCommandMenu({
@@ -154,27 +223,61 @@ function SlashCommandMenu({
 
     if (filtered.length === 0) return null;
 
+    const blockItems = filtered.filter((cmd) => cmd.category !== "variables");
+    const variableItems = filtered.filter((cmd) => cmd.category === "variables");
+
+    let globalIndex = 0;
+
     return (
         <div
             ref={menuRef}
             className="notion-slash-menu"
             style={{ top: position.top, left: position.left }}
         >
-            <div className="notion-slash-menu-label">Blocks</div>
-            {filtered.map((cmd, i) => (
-                <button
-                    key={cmd.title}
-                    className={`notion-slash-item ${i === selectedIndex ? "notion-slash-item-active" : ""} ${cmd.isAiGenerate ? "notion-slash-item-ai" : ""}`}
-                    onClick={() => onSelect(cmd)}
-                    onMouseDown={(e) => e.preventDefault()}
-                >
-                    <div className={`notion-slash-item-icon ${cmd.isAiGenerate ? "notion-slash-item-icon-ai" : ""}`}>{cmd.icon}</div>
-                    <div className="notion-slash-item-text">
-                        <span className={`notion-slash-item-title ${cmd.isAiGenerate ? "notion-slash-item-title-ai" : ""}`}>{cmd.title}</span>
-                        <span className="notion-slash-item-desc">{cmd.description}</span>
-                    </div>
-                </button>
-            ))}
+            {blockItems.length > 0 && (
+                <>
+                    <div className="notion-slash-menu-label">Blocks</div>
+                    {blockItems.map((cmd) => {
+                        const idx = globalIndex++;
+                        return (
+                            <button
+                                key={cmd.title}
+                                className={`notion-slash-item ${idx === selectedIndex ? "notion-slash-item-active" : ""} ${cmd.isAiGenerate ? "notion-slash-item-ai" : ""}`}
+                                onClick={() => onSelect(cmd)}
+                                onMouseDown={(e) => e.preventDefault()}
+                            >
+                                <div className={`notion-slash-item-icon ${cmd.isAiGenerate ? "notion-slash-item-icon-ai" : ""}`}>{cmd.icon}</div>
+                                <div className="notion-slash-item-text">
+                                    <span className={`notion-slash-item-title ${cmd.isAiGenerate ? "notion-slash-item-title-ai" : ""}`}>{cmd.title}</span>
+                                    <span className="notion-slash-item-desc">{cmd.description}</span>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </>
+            )}
+            {variableItems.length > 0 && (
+                <>
+                    <div className="notion-slash-menu-label" style={{ marginTop: blockItems.length > 0 ? '6px' : undefined }}>Variables</div>
+                    {variableItems.map((cmd) => {
+                        const idx = globalIndex++;
+                        return (
+                            <button
+                                key={cmd.title}
+                                className={`notion-slash-item ${idx === selectedIndex ? "notion-slash-item-active" : ""}`}
+                                onClick={() => onSelect(cmd)}
+                                onMouseDown={(e) => e.preventDefault()}
+                            >
+                                <div className="notion-slash-item-icon">{cmd.icon}</div>
+                                <div className="notion-slash-item-text">
+                                    <span className="notion-slash-item-title">{cmd.title}</span>
+                                    <span className="notion-slash-item-desc">{cmd.description}</span>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </>
+            )}
         </div>
     );
 }
