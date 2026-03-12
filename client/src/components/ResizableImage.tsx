@@ -53,12 +53,14 @@ function ResizableImageView({ node, updateAttributes, selected }: any) {
         };
     }, [resizing, resizeDir, updateAttributes]);
 
+    const textAlign = node.attrs.textAlign || "center";
+
     return (
-        <NodeViewWrapper className="notion-resizable-image-wrapper">
+        <NodeViewWrapper className="notion-resizable-image-wrapper" style={{ textAlign }}>
             <div
                 ref={containerRef}
                 className={`notion-resizable-image ${selected ? "selected" : ""} ${resizing ? "resizing" : ""}`}
-                style={{ width: width ? `${width}px` : "auto", maxWidth: "100%" }}
+                style={{ width: width ? `${width}px` : "auto", maxWidth: "100%", display: "inline-block" }}
             >
                 {/* Left resize handle */}
                 <div
@@ -99,17 +101,36 @@ export const ResizableImage = Node.create({
 
     addAttributes() {
         return {
-            src: { default: null },
-            alt: { default: null },
-            title: { default: null },
+            src: {
+                default: null,
+                parseHTML: (element: HTMLElement) => {
+                    const img = element.tagName === "IMG" ? element : element.querySelector("img");
+                    return img?.getAttribute("src") || null;
+                },
+            },
+            alt: {
+                default: null,
+                parseHTML: (element: HTMLElement) => {
+                    const img = element.tagName === "IMG" ? element : element.querySelector("img");
+                    return img?.getAttribute("alt") || null;
+                },
+            },
+            title: {
+                default: null,
+                parseHTML: (element: HTMLElement) => {
+                    const img = element.tagName === "IMG" ? element : element.querySelector("img");
+                    return img?.getAttribute("title") || null;
+                },
+            },
             width: {
                 default: null,
                 parseHTML: (element: HTMLElement) => {
-                    // Try the width attribute first
-                    const attrWidth = element.getAttribute("width");
+                    // If the element is a wrapper div, look at the child img
+                    const img = element.tagName === "IMG" ? element : element.querySelector("img");
+                    if (!img) return null;
+                    const attrWidth = img.getAttribute("width");
                     if (attrWidth) return parseInt(attrWidth, 10) || null;
-                    // Then try inline style
-                    const styleWidth = element.style.width;
+                    const styleWidth = (img as HTMLElement).style.width;
                     if (styleWidth && styleWidth.endsWith("px")) {
                         return parseInt(styleWidth, 10) || null;
                     }
@@ -120,23 +141,59 @@ export const ResizableImage = Node.create({
                     return { width: attributes.width };
                 },
             },
+            textAlign: {
+                default: "center",
+                parseHTML: (element: HTMLElement) => {
+                    // Check the wrapper div's text-align style
+                    const wrapper = element.tagName === "DIV" ? element : element.closest(".notion-resizable-image-wrapper");
+                    if (wrapper) {
+                        const style = (wrapper as HTMLElement).style.textAlign;
+                        if (style && ["left", "center", "right"].includes(style)) return style;
+                    }
+                    // Check inline style on the element itself
+                    const elStyle = element.style.textAlign;
+                    if (elStyle && ["left", "center", "right"].includes(elStyle)) return elStyle;
+                    return "center";
+                },
+                renderHTML: (attributes: any) => {
+                    // Don't render as an HTML attribute — we handle it in renderHTML below
+                    return {};
+                },
+            },
         };
     },
 
     parseHTML() {
-        return [{ tag: "img[src]" }];
+        return [
+            // Match wrapper div containing img (our saved output format)
+            { tag: "div.notion-resizable-image-wrapper" },
+            // Fallback: plain img tag
+            { tag: "img[src]" },
+        ];
     },
 
     renderHTML({ HTMLAttributes }) {
-        const { width, ...rest } = HTMLAttributes;
+        const { width, textAlign: alignAttr, style: incomingStyle, ...rest } = HTMLAttributes;
         const attrs: Record<string, any> = { ...rest };
+
+        // Determine alignment: prefer the explicit textAlign attribute, then try parsing style
+        let textAlign = alignAttr || "center";
+        if (!alignAttr && incomingStyle && typeof incomingStyle === "string" && incomingStyle.includes("text-align")) {
+            const match = incomingStyle.match(/text-align:\s*(left|center|right)/);
+            if (match) textAlign = match[1];
+        }
+
         if (width) {
             attrs.width = width;
-            attrs.style = `width: ${width}px; max-width: 100%;`;
+            attrs.style = `width: ${width}px; max-width: 100%; height: auto; display: inline-block; border-radius: 4px;`;
         } else {
-            attrs.style = "max-width: 100%;";
+            attrs.style = "max-width: 100%; height: auto; display: inline-block; border-radius: 4px;";
         }
-        return ["img", mergeAttributes(attrs)];
+        return [
+            "div",
+            { class: "notion-resizable-image-wrapper", style: `text-align: ${textAlign}; margin: 8px 0;` },
+            ["img", mergeAttributes(attrs)]
+        ];
     },
 
     addNodeView() {

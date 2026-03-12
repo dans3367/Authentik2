@@ -142,6 +142,171 @@
   margin: 1.5em 0;
 }
 
+/* ─── Table ───────────────────────────────────────────────────────────────── */
+
+/* tableWrapper is the outer div created by tiptap's TableView NodeView */
+.notion-editor-content .tableWrapper {
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.notion-editor-content table {
+  border-collapse: collapse;
+  table-layout: auto;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.notion-editor-content table td,
+.notion-editor-content table th {
+  border: 1px solid #e5e7eb;
+  padding: 8px 12px;
+  position: relative;
+  vertical-align: top;
+  min-width: 80px;
+  box-sizing: border-box;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.notion-editor-content table th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  color: #374151;
+}
+
+.notion-editor-content table td > *,
+.notion-editor-content table th > * {
+  margin: 0;
+}
+
+/* Selected cell */
+.notion-editor-content table .selectedCell {
+  background-color: rgba(99, 102, 241, 0.08);
+}
+
+.notion-editor-content table .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border: 2px solid #6366f1;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Column resize handle */
+.notion-editor-content .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: #6366f1;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Resize cursor on table */
+.notion-editor-content .tableWrapper.resize-cursor {
+  cursor: col-resize;
+}
+
+/* ─── Table Toolbar ───────────────────────────────────────────────────────── */
+
+.notion-table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 4px 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.03);
+  animation: notion-fade-in 0.12s ease-out;
+}
+
+.notion-table-toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+
+.notion-table-toolbar-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.notion-table-toolbar-btn-danger {
+  color: #9ca3af;
+}
+
+.notion-table-toolbar-btn-danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.notion-table-toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: #e5e7eb;
+  margin: 0 4px;
+}
+
+/* Dark mode table */
+.dark .notion-editor-content table {
+  border-color: #374151;
+}
+
+.dark .notion-editor-content table td,
+.dark .notion-editor-content table th {
+  border-color: #374151;
+}
+
+.dark .notion-editor-content table th {
+  background-color: #1f2937;
+  color: #e5e7eb;
+}
+
+.dark .notion-editor-content table .selectedCell {
+  background-color: rgba(99, 102, 241, 0.15);
+}
+
+.dark .notion-table-toolbar {
+  background: #1f2937;
+  border-color: #374151;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.dark .notion-table-toolbar-btn {
+  color: #9ca3af;
+}
+
+.dark .notion-table-toolbar-btn:hover {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+.dark .notion-table-toolbar-btn-danger:hover {
+  background: rgba(220, 38, 38, 0.15);
+  color: #f87171;
+}
+
+.dark .notion-table-toolbar-divider {
+  background: #374151;
+}
+
 /* Links */
 .notion-editor-link {
   color: #2563eb;

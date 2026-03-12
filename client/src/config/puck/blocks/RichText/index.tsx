@@ -6,16 +6,25 @@ import { TextAlign } from "@tiptap/extension-text-align";
 import { Underline } from "@tiptap/extension-underline";
 import { Link } from "@tiptap/extension-link";
 import { Placeholder } from "@tiptap/extension-placeholder";
+import { ResizableImage } from "@/components/ResizableImage";
 import { Section } from "../../components/Section";
 import { WithLayout, withLayout } from "../../components/Layout";
 import { AiTextCreator } from "@/components/puck/AiTextCreator";
 
 /* ── TipTap extensions created ONCE at module level ── */
 const canvasExtensions = [
-  StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-  TextAlign.configure({ types: ["heading", "paragraph"] }),
+  StarterKit.configure({ 
+    heading: { levels: [1, 2, 3] },
+    blockquote: {
+      HTMLAttributes: {
+        style: "border-left: 3px solid #d1d5db; padding-left: 12px; margin: 0 0 10px 0; color: #6b7280;"
+      }
+    }
+  }),
+  TextAlign.configure({ types: ["heading", "paragraph", "image"] }),
   Underline,
   Link.configure({ openOnClick: false }),
+  ResizableImage,
   Placeholder.configure({
     placeholder: "Start typing or use AI Creator to generate content…",
     showOnlyWhenEditable: true,
@@ -23,10 +32,18 @@ const canvasExtensions = [
 ];
 
 const panelExtensions = [
-  StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-  TextAlign.configure({ types: ["heading", "paragraph"] }),
+  StarterKit.configure({ 
+    heading: { levels: [1, 2, 3] },
+    blockquote: {
+      HTMLAttributes: {
+        style: "border-left: 3px solid #d1d5db; padding-left: 10px; margin: 0 0 8px 0; color: #6b7280;"
+      }
+    }
+  }),
+  TextAlign.configure({ types: ["heading", "paragraph", "image"] }),
   Underline,
   Link.configure({ openOnClick: false }),
+  ResizableImage,
   Placeholder.configure({
     placeholder: "Write or paste content…",
     showOnlyWhenEditable: true,
@@ -46,7 +63,8 @@ const EDITOR_STYLES = `
   .puck-richtext-editor h2 { font-size: 22px; font-weight: 700; margin: 0 0 10px 0; line-height: 1.3; }
   .puck-richtext-editor h3 { font-size: 18px; font-weight: 600; margin: 0 0 8px 0; line-height: 1.3; }
   .puck-richtext-editor p { margin: 0 0 10px 0; line-height: 1.6; }
-  .puck-richtext-editor ul, .puck-richtext-editor ol { margin: 0 0 10px 0; padding-left: 24px; }
+  .puck-richtext-editor ul { margin: 0 0 10px 0; padding-left: 24px; list-style-type: disc; }
+  .puck-richtext-editor ol { margin: 0 0 10px 0; padding-left: 24px; list-style-type: decimal; }
   .puck-richtext-editor li { margin-bottom: 4px; line-height: 1.5; }
   .puck-richtext-editor li p { margin: 0; }
   .puck-richtext-editor strong { font-weight: 700; }
@@ -59,6 +77,21 @@ const EDITOR_STYLES = `
     content: attr(data-placeholder);
     float: left; color: #9ca3af; pointer-events: none; height: 0;
   }
+  /* Resizable image styles for canvas editor */
+  .puck-richtext-editor .notion-resizable-image-wrapper { display: block; margin: 8px 0; text-align: center; }
+  .puck-richtext-editor .notion-resizable-image { position: relative; display: inline-block; border-radius: 4px; overflow: hidden; line-height: 0; transition: box-shadow 0.15s; }
+  .puck-richtext-editor .notion-resizable-image img { border-radius: 4px; display: block; pointer-events: none; user-select: none; }
+  .puck-richtext-editor .notion-resizable-image.selected { box-shadow: 0 0 0 2px #6366f1; }
+  .puck-richtext-editor .notion-resizable-image.resizing { box-shadow: 0 0 0 2px #8b5cf6; user-select: none; }
+  .puck-richtext-editor .notion-resize-handle { position: absolute; top: 0; bottom: 0; width: 20px; display: flex; align-items: center; justify-content: center; cursor: col-resize; z-index: 5; opacity: 0; transition: opacity 0.15s; }
+  .puck-richtext-editor .notion-resizable-image:hover .notion-resize-handle,
+  .puck-richtext-editor .notion-resizable-image.selected .notion-resize-handle,
+  .puck-richtext-editor .notion-resizable-image.resizing .notion-resize-handle { opacity: 1; }
+  .puck-richtext-editor .notion-resize-handle-left { left: 0; }
+  .puck-richtext-editor .notion-resize-handle-right { right: 0; }
+  .puck-richtext-editor .notion-resize-handle-bar { width: 4px; height: 40px; max-height: 50%; border-radius: 4px; background: rgba(255,255,255,0.85); box-shadow: 0 0 4px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.08); transition: background 0.15s, transform 0.15s; }
+  .puck-richtext-editor .notion-resize-handle:hover .notion-resize-handle-bar { background: #fff; transform: scaleY(1.15); box-shadow: 0 0 6px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.12); }
+  .puck-richtext-editor .notion-resizable-image.resizing .notion-resize-handle-bar { background: #a78bfa; }
 `;
 
 /* ── CSS for the panel (properties-pane) TipTap editor ── */
@@ -79,7 +112,8 @@ const PANEL_STYLES = `
   .puck-panel-content .tiptap h2 { font-size: 17px; font-weight: 700; margin: 0 0 6px; }
   .puck-panel-content .tiptap h3 { font-size: 15px; font-weight: 600; margin: 0 0 6px; }
   .puck-panel-content .tiptap p { margin: 0 0 8px; }
-  .puck-panel-content .tiptap ul, .puck-panel-content .tiptap ol { margin: 0 0 8px; padding-left: 20px; }
+  .puck-panel-content .tiptap ul { margin: 0 0 8px; padding-left: 20px; list-style-type: disc; }
+  .puck-panel-content .tiptap ol { margin: 0 0 8px; padding-left: 20px; list-style-type: decimal; }
   .puck-panel-content .tiptap li { margin-bottom: 2px; }
   .puck-panel-content .tiptap li p { margin: 0; }
   .puck-panel-content .tiptap strong { font-weight: 700; }
@@ -92,7 +126,109 @@ const PANEL_STYLES = `
   .puck-panel-content .tiptap .is-editor-empty:first-child::before {
     content: attr(data-placeholder); float: left; color: #9ca3af; pointer-events: none; height: 0;
   }
+  /* Resizable image styles for panel editor */
+  .puck-panel-content .tiptap .notion-resizable-image-wrapper { display: block; margin: 6px 0; text-align: center; }
+  .puck-panel-content .tiptap .notion-resizable-image { position: relative; display: inline-block; border-radius: 4px; overflow: hidden; line-height: 0; transition: box-shadow 0.15s; }
+  .puck-panel-content .tiptap .notion-resizable-image img { border-radius: 4px; display: block; pointer-events: none; user-select: none; }
+  .puck-panel-content .tiptap .notion-resizable-image.selected { box-shadow: 0 0 0 2px #6366f1; }
+  .puck-panel-content .tiptap .notion-resizable-image.resizing { box-shadow: 0 0 0 2px #8b5cf6; user-select: none; }
+  .puck-panel-content .tiptap .notion-resize-handle { position: absolute; top: 0; bottom: 0; width: 20px; display: flex; align-items: center; justify-content: center; cursor: col-resize; z-index: 5; opacity: 0; transition: opacity 0.15s; }
+  .puck-panel-content .tiptap .notion-resizable-image:hover .notion-resize-handle,
+  .puck-panel-content .tiptap .notion-resizable-image.selected .notion-resize-handle,
+  .puck-panel-content .tiptap .notion-resizable-image.resizing .notion-resize-handle { opacity: 1; }
+  .puck-panel-content .tiptap .notion-resize-handle-left { left: 0; }
+  .puck-panel-content .tiptap .notion-resize-handle-right { right: 0; }
+  .puck-panel-content .tiptap .notion-resize-handle-bar { width: 4px; height: 40px; max-height: 50%; border-radius: 4px; background: rgba(255,255,255,0.85); box-shadow: 0 0 4px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.08); transition: background 0.15s, transform 0.15s; }
+  .puck-panel-content .tiptap .notion-resize-handle:hover .notion-resize-handle-bar { background: #fff; transform: scaleY(1.15); box-shadow: 0 0 6px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.12); }
+  .puck-panel-content .tiptap .notion-resizable-image.resizing .notion-resize-handle-bar { background: #a78bfa; }
 `;
+
+/* ── CSS for the insert-image popover ── */
+const IMAGE_POPOVER_STYLES = `
+  .puck-img-popover-anchor { position: relative; display: inline-flex; }
+  .puck-img-popover {
+    position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    z-index: 50; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12); padding: 10px; width: 260px; margin-top: 4px;
+  }
+  .puck-img-popover label { display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+  .puck-img-popover input[type="text"] {
+    width: 100%; padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 5px;
+    font-size: 12px; outline: none; box-sizing: border-box;
+  }
+  .puck-img-popover input[type="text"]:focus { border-color: #6366f1; }
+  .puck-img-popover .puck-img-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .puck-img-popover .puck-img-actions button {
+    flex: 1; padding: 5px 0; border: none; border-radius: 5px; font-size: 12px;
+    font-weight: 600; cursor: pointer; transition: background 0.15s; width: auto; height: auto;
+    display: block; color: inherit; background: #f1f5f9;
+  }
+  .puck-img-popover .puck-img-actions button.primary { background: #6366f1; color: #fff; }
+  .puck-img-popover .puck-img-actions button.primary:hover { background: #4f46e5; }
+  .puck-img-popover .puck-img-actions button:hover { background: #e2e8f0; }
+`;
+
+/**
+ * Popover button for inserting images via URL.
+ */
+function InsertImageButton({
+  onInsert,
+}: {
+  onInsert: (src: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const handleUrlInsert = () => {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    onInsert(trimmed);
+    setUrl("");
+    setOpen(false);
+  };
+
+  return (
+    <div className="puck-img-popover-anchor" ref={popoverRef}>
+      <style>{IMAGE_POPOVER_STYLES}</style>
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); setOpen((v) => !v); }}
+        title="Insert Image"
+      >
+        🖼
+      </button>
+      {open && (
+        <div className="puck-img-popover">
+          <label>Image URL</label>
+          <input
+            type="text"
+            placeholder="https://example.com/image.jpg"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleUrlInsert(); }}
+          />
+          <div className="puck-img-actions">
+            <button type="button" className="primary" onClick={handleUrlInsert}>Insert</button>
+            <button type="button" onClick={() => setOpen(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Mini TipTap editor with toolbar rendered inside the Puck properties pane.
@@ -171,6 +307,7 @@ function PanelRichTextEditor({
         {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), "1.", "Ordered List")}
         {btn(editor.isActive("blockquote"), () => editor.chain().focus().toggleBlockquote().run(), "❝", "Blockquote")}
         {btn(false, () => editor.chain().focus().setHorizontalRule().run(), "―", "Horizontal Rule")}
+        <InsertImageButton onInsert={(src) => editor.chain().focus().setImage({ src }).run()} />
         <span className="sep" />
         {btn(editor.isActive({ textAlign: "left" }), () => editor.chain().focus().setTextAlign("left").run(), "≡←", "Align Left")}
         {btn(editor.isActive({ textAlign: "center" }), () => editor.chain().focus().setTextAlign("center").run(), "≡", "Align Center")}
@@ -262,7 +399,8 @@ const RichTextInner: ComponentConfig<RichTextProps> = {
     if (!isEditing) {
       return (
         <Section maxWidth={maxWidth}>
-          <div dangerouslySetInnerHTML={{ __html: html || "" }} />
+          <style>{EDITOR_STYLES}</style>
+          <div className="puck-richtext-editor" dangerouslySetInnerHTML={{ __html: html || "" }} />
         </Section>
       );
     }

@@ -9,6 +9,10 @@ import { Color } from "@tiptap/extension-color";
 import { Link } from "@tiptap/extension-link";
 import { Underline } from "@tiptap/extension-underline";
 import { Highlight } from "@tiptap/extension-highlight";
+import { Table } from "@tiptap/extension-table";
+import { TableRow } from "@tiptap/extension-table-row";
+import { TableCell } from "@tiptap/extension-table-cell";
+import { TableHeader } from "@tiptap/extension-table-header";
 import {
     Bold,
     Italic,
@@ -46,6 +50,13 @@ import {
     MapPin,
     Clock,
     CreditCard,
+    Table as TableIcon,
+    Rows3,
+    Columns3,
+    Plus,
+    Trash2,
+    TableCellsMerge,
+    TableCellsSplit,
 } from "lucide-react";
 import { improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText, generateNewsletter } from "@/lib/aiApi";
 import "./NotionLikeEditor.css";
@@ -135,6 +146,12 @@ const SLASH_COMMANDS: SlashCommand[] = [
         description: "Horizontal rule",
         icon: <Minus className="w-4 h-4" />,
         command: (editor) => editor.chain().focus().setHorizontalRule().run(),
+    },
+    {
+        title: "Table",
+        description: "Insert a table",
+        icon: <TableIcon className="w-4 h-4" />,
+        command: (editor) => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
     },
     {
         title: "Image",
@@ -798,6 +815,154 @@ function FloatingToolbar({
     );
 }
 
+// ── Table Toolbar (shown when cursor is inside a table) ─────────────────────────
+
+function TableToolbar({ editor }: { editor: any }) {
+    const [visible, setVisible] = useState(false);
+    const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+    useEffect(() => {
+        if (!editor) return;
+
+        const update = () => {
+            const isInTable = editor.isActive('table');
+            if (!isInTable) {
+                setVisible(false);
+                return;
+            }
+
+            // Find the table DOM element
+            const { state } = editor;
+            const { $from } = state.selection;
+            let domNode: HTMLElement | null = null;
+            try {
+                domNode = editor.view.domAtPos($from.start($from.depth)).node as HTMLElement;
+            } catch {
+                setVisible(false);
+                return;
+            }
+            const table = domNode?.closest?.('table') || editor.view.dom.querySelector('table');
+            if (!table) {
+                setVisible(false);
+                return;
+            }
+
+            const editorRect = editor.view.dom.closest('.notion-editor-area')?.getBoundingClientRect()
+                || editor.view.dom.getBoundingClientRect();
+            const tableRect = table.getBoundingClientRect();
+
+            setPosition({
+                top: tableRect.bottom - editorRect.top + 6,
+                left: tableRect.left - editorRect.left,
+            });
+            setVisible(true);
+        };
+
+        editor.on('selectionUpdate', update);
+        editor.on('transaction', update);
+        return () => {
+            editor.off('selectionUpdate', update);
+            editor.off('transaction', update);
+        };
+    }, [editor]);
+
+    if (!visible) return null;
+
+    const canMerge = editor.can().mergeCells();
+    const canSplit = editor.can().splitCell();
+
+    return (
+        <div
+            className="absolute flex items-center gap-1 flex-wrap bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-1.5 shadow-lg"
+            style={{ top: position.top, left: position.left, zIndex: 50 }}
+            onMouseDown={(e) => e.preventDefault()}
+        >
+            <button
+                onClick={() => editor.chain().focus().addRowBefore().run()}
+                className="flex items-center gap-1 px-2 py-1 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded text-xs font-medium transition-colors"
+                title="Add row above"
+            >
+                <Rows3 className="w-3.5 h-3.5" />
+                <Plus className="w-2.5 h-2.5 -ml-0.5" />
+                <span>Row above</span>
+            </button>
+            <button
+                onClick={() => editor.chain().focus().addRowAfter().run()}
+                className="flex items-center gap-1 px-2 py-1 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded text-xs font-medium transition-colors"
+                title="Add row below"
+            >
+                <Rows3 className="w-3.5 h-3.5" />
+                <Plus className="w-2.5 h-2.5 -ml-0.5" />
+                <span>Row below</span>
+            </button>
+            <button
+                onClick={() => editor.chain().focus().addColumnBefore().run()}
+                className="flex items-center gap-1 px-2 py-1 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded text-xs font-medium transition-colors"
+                title="Add column left"
+            >
+                <Columns3 className="w-3.5 h-3.5" />
+                <Plus className="w-2.5 h-2.5 -ml-0.5" />
+                <span>Col left</span>
+            </button>
+            <button
+                onClick={() => editor.chain().focus().addColumnAfter().run()}
+                className="flex items-center gap-1 px-2 py-1 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded text-xs font-medium transition-colors"
+                title="Add column right"
+            >
+                <Columns3 className="w-3.5 h-3.5" />
+                <Plus className="w-2.5 h-2.5 -ml-0.5" />
+                <span>Col right</span>
+            </button>
+            <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1" />
+            <button
+                onClick={() => editor.chain().focus().deleteRow().run()}
+                className="flex items-center gap-1 px-2 py-1 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded text-xs font-medium transition-colors"
+                title="Delete row"
+            >
+                <Rows3 className="w-3.5 h-3.5" />
+                <Trash2 className="w-2.5 h-2.5 -ml-0.5" />
+            </button>
+            <button
+                onClick={() => editor.chain().focus().deleteColumn().run()}
+                className="flex items-center gap-1 px-2 py-1 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded text-xs font-medium transition-colors"
+                title="Delete column"
+            >
+                <Columns3 className="w-3.5 h-3.5" />
+                <Trash2 className="w-2.5 h-2.5 -ml-0.5" />
+            </button>
+            {canMerge && (
+                <button
+                    onClick={() => editor.chain().focus().mergeCells().run()}
+                    className="flex items-center gap-1 px-2 py-1 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded text-xs font-medium transition-colors"
+                    title="Merge cells"
+                >
+                    <TableCellsMerge className="w-3.5 h-3.5" />
+                    <span>Merge</span>
+                </button>
+            )}
+            {canSplit && (
+                <button
+                    onClick={() => editor.chain().focus().splitCell().run()}
+                    className="flex items-center gap-1 px-2 py-1 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded text-xs font-medium transition-colors"
+                    title="Split cell"
+                >
+                    <TableCellsSplit className="w-3.5 h-3.5" />
+                    <span>Split</span>
+                </button>
+            )}
+            <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1" />
+            <button
+                onClick={() => editor.chain().focus().deleteTable().run()}
+                className="flex items-center gap-1 px-2 py-1 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded text-xs font-medium transition-colors"
+                title="Delete table"
+            >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete table</span>
+            </button>
+        </div>
+    );
+}
+
 // ── Main Editor Component ───────────────────────────────────────────────────────
 
 export interface NotionLikeEditorProps {
@@ -856,6 +1021,27 @@ export default function NotionLikeEditor({
             }),
             Underline,
             Highlight.configure({ multicolor: true }),
+            Table.configure({
+                resizable: true,
+                HTMLAttributes: {
+                    class: 'notion-editor-table border-collapse table-auto w-full my-4 overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg',
+                },
+            }),
+            TableRow.configure({
+                HTMLAttributes: {
+                    class: 'border-b border-gray-200 dark:border-gray-700',
+                },
+            }),
+            TableCell.configure({
+                HTMLAttributes: {
+                    class: 'border border-gray-200 dark:border-gray-700 p-2 align-top min-w-[80px]',
+                },
+            }),
+            TableHeader.configure({
+                HTMLAttributes: {
+                    class: 'border border-gray-200 dark:border-gray-700 p-2 align-top min-w-[80px] bg-gray-100 dark:bg-gray-800 font-semibold',
+                },
+            }),
         ],
         content,
         onUpdate: ({ editor }) => {
@@ -1109,6 +1295,9 @@ export default function NotionLikeEditor({
                         setLinkModalOpen(true);
                     }}
                 />
+
+                {/* Table toolbar (shown when cursor is in a table) */}
+                <TableToolbar editor={editor} />
 
                 <EditorContent editor={editor} />
 

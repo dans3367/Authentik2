@@ -1780,7 +1780,7 @@ export const createNewsletterSchema = z.object({
 export const updateNewsletterSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
   subject: z.string().min(1, "Subject is required").optional(),
-  content: z.string().min(1, "Content is required").optional(),
+  content: z.string().optional(),
   puckData: z.string().optional(),
   status: z.enum(['draft', 'ready_to_send', 'pending_review', 'scheduled', 'sending', 'sent']).optional(),
   scheduledAt: z.union([z.string(), z.date()]).optional().nullable(),
