@@ -407,7 +407,7 @@ export default function CreateTemplatePage() {
                         type="button"
                         onClick={() => {
                           if (editorRef.current) {
-                            editorRef.current.chain().focus().insertContent(`{{${v.key}}}`).run();
+                            editorRef.current.chain().focus().insertContent({ type: 'handlebarVariable', attrs: { variable: v.key } }).run();
                           } else {
                             setContent((prev) => appendIntoLastBlock(prev, `{{${v.key}}}`));
                           }

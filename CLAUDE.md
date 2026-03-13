@@ -1,9 +1,108 @@
+# Authentik - SaaS Authentication & Marketing Platform
+
+## Project Overview
+
+Full-stack multi-tenant SaaS platform for authentication, email marketing, newsletter publishing, birthday card automation, contact management, and subscription billing.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18 + TypeScript + Vite + Wouter routing |
+| UI | Tailwind CSS + shadcn/ui + Radix UI |
+| State | Redux + Redux Persist + TanStack Query + Convex |
+| Backend | Express.js + TypeScript (port 5002) |
+| Database | PostgreSQL + Drizzle ORM |
+| Auth | Better Auth v1.4.20 (JWT + sessions + 2FA TOTP) |
+| Email | Resend (primary) + AWS SES (failover) |
+| Task Queue | Trigger.dev v4.4.3 |
+| Workflows | Temporal (Go microservice, port 5004) |
+| Real-time | Convex (newsletter tracking webhooks) |
+| Billing | Stripe subscriptions |
+| AI | Google Gemini 2.5 Flash via Vercel AI SDK |
+| File Storage | AWS S3 / CloudFlare R2 |
+| Visual Editor | Puck v0.21 (newsletters) + Tiptap v3.6 (rich text) |
+| Validation | Zod + Drizzle Zod |
+| Logging | Pino + Axiom |
+| Testing | Playwright |
+
+## Architecture
+
+```
+client/          - React SPA (70+ pages, Wouter routing)
+server/          - Express API (40+ route files, Drizzle schema)
+shared/          - Shared types and schemas
+src/trigger/     - Trigger.dev tasks (17 task files)
+convex/          - Convex real-time backend (newsletter tracking)
+formserver/      - Independent public form hosting app
+cardprocessor-go/ - Go microservice (birthday cards, Temporal)
+migrations/      - Drizzle database migrations
+seeders/         - Database seeders
+scripts/         - Dev/build utility scripts
+tests/           - Playwright tests
+```
+
+## Key Directories
+
+- `server/routes/` - Express route handlers (auth, newsletters, emails, forms, etc.)
+- `server/db/schema.ts` - Drizzle schema (30+ tables, ~3000 lines)
+- `server/auth.ts` - Better Auth configuration
+- `client/src/pages/` - React page components
+- `client/src/components/` - Reusable UI components
+- `client/src/config/puck/` - Puck editor configuration and blocks
+
+## Build & Dev
+
+```bash
+npm run dev              # Start Express + Vite dev server
+npm run dev:trigger      # Start Trigger.dev local dev
+npm run build            # Production build (Vite + esbuild)
+npm run db:push          # Push Drizzle schema to PostgreSQL
+npm run db:init          # Initialize database
+npm run check            # TypeScript type check
+```
+
+## Multi-Tenant Model
+
+- All data is tenant-scoped via `tenantId` column
+- Roles: Owner, Administrator, Manager, Employee
+- `authenticateToken` middleware validates Better Auth sessions
+- `requireTenant` middleware enforces tenant context
+- `requireRole` middleware enforces RBAC
+
+## Email System
+
+- **Resend** as primary provider with **AWS SES** as failover
+- Rate limiting and retry logic per provider
+- Real-time tracking: sent, delivered, opened, clicked, bounced, complained
+- Bounce/suppression list management
+- Unsubscribe tokens per contact
+
+## Key Conventions
+
+- Use `@trigger.dev/sdk` v4 (NEVER `client.defineJob` from v2)
+- Check `result.ok` before accessing `result.output` on `triggerAndWait()`
+- Never wrap `triggerAndWait` or `wait` calls in `Promise.all`
+- All email HTML is sanitized with XSS library (CSS-preserving config)
+- Input validation at API boundaries with Zod + express-validator
+- i18n via i18next (client-side)
+
+## Security
+
+- Helmet security headers
+- Rate limiting (token bucket for auth, sliding window for API)
+- XSS sanitization on all public endpoints
+- Tenant isolation at middleware + query level
+- GDPR consent tracking (IP, user agent, timestamp)
+- Drizzle ORM parameterized queries (SQL injection prevention)
+- NEVER hardcode API keys or commit .env files
+
 <!-- TRIGGER.DEV basic START -->
-# Trigger.dev Basic Tasks (v4)
+## Trigger.dev Tasks (v4)
 
 **MUST use `@trigger.dev/sdk`, NEVER `client.defineJob`**
 
-## Basic Task
+### Basic Task
 
 ```ts
 import { task } from "@trigger.dev/sdk";
@@ -18,14 +117,13 @@ export const processData = task({
     randomize: false,
   },
   run: async (payload: { userId: string; data: any[] }) => {
-    // Task logic - runs for long time, no timeouts
     console.log(`Processing ${payload.data.length} items for user ${payload.userId}`);
     return { processed: payload.data.length };
   },
 });
 ```
 
-## Schema Task (with validation)
+### Schema Task (with validation)
 
 ```ts
 import { schemaTask } from "@trigger.dev/sdk";
@@ -39,164 +137,64 @@ export const validatedTask = schemaTask({
     email: z.string().email(),
   }),
   run: async (payload) => {
-    // Payload is automatically validated and typed
     return { message: `Hello ${payload.name}, age ${payload.age}` };
   },
 });
 ```
 
-## Triggering Tasks
+### Triggering Tasks
 
-### From Backend Code
+#### From Backend Code
 
 ```ts
 import { tasks } from "@trigger.dev/sdk";
 import type { processData } from "./trigger/tasks";
 
-// Single trigger
 const handle = await tasks.trigger<typeof processData>("process-data", {
   userId: "123",
   data: [{ id: 1 }, { id: 2 }],
 });
-
-// Batch trigger (up to 1,000 items, 3MB per payload)
-const batchHandle = await tasks.batchTrigger<typeof processData>("process-data", [
-  { payload: { userId: "123", data: [{ id: 1 }] } },
-  { payload: { userId: "456", data: [{ id: 2 }] } },
-]);
 ```
 
-### Debounced Triggering
-
-Consolidate multiple triggers into a single execution:
+#### From Inside Tasks (Result handling)
 
 ```ts
-// Multiple rapid triggers with same key = single execution
-await myTask.trigger(
-  { userId: "123" },
-  {
-    debounce: {
-      key: "user-123-update",  // Unique key for debounce group
-      delay: "5s",              // Wait before executing
-    },
-  }
-);
+const result = await childTask.triggerAndWait({ data: "value" });
+if (result.ok) {
+  console.log("Task output:", result.output);
+} else {
+  console.error("Task failed:", result.error);
+}
 
-// Trailing mode: use payload from LAST trigger
-await myTask.trigger(
-  { data: "latest-value" },
-  {
-    debounce: {
-      key: "trailing-example",
-      delay: "10s",
-      mode: "trailing",  // Default is "leading" (first payload)
-    },
-  }
-);
+// Quick unwrap (throws on error)
+const output = await childTask.triggerAndWait({ data: "value" }).unwrap();
 ```
 
-**Debounce modes:**
-- `leading` (default): Uses payload from first trigger, subsequent triggers only reschedule
-- `trailing`: Uses payload from most recent trigger
+> Never wrap triggerAndWait or batchTriggerAndWait in Promise.all/Promise.allSettled.
 
-### From Inside Tasks (with Result handling)
+### Waits
 
 ```ts
-export const parentTask = task({
-  id: "parent-task",
-  run: async (payload) => {
-    // Trigger and continue
-    const handle = await childTask.trigger({ data: "value" });
+import { wait } from "@trigger.dev/sdk";
 
-    // Trigger and wait - returns Result object, NOT task output
-    const result = await childTask.triggerAndWait({ data: "value" });
-    if (result.ok) {
-      console.log("Task output:", result.output); // Actual task return value
-    } else {
-      console.error("Task failed:", result.error);
-    }
-
-    // Quick unwrap (throws on error)
-    const output = await childTask.triggerAndWait({ data: "value" }).unwrap();
-
-    // Batch trigger and wait
-    const results = await childTask.batchTriggerAndWait([
-      { payload: { data: "item1" } },
-      { payload: { data: "item2" } },
-    ]);
-
-    for (const run of results) {
-      if (run.ok) {
-        console.log("Success:", run.output);
-      } else {
-        console.log("Failed:", run.error);
-      }
-    }
-  },
-});
-
-export const childTask = task({
-  id: "child-task",
-  run: async (payload: { data: string }) => {
-    return { processed: payload.data };
-  },
-});
+await wait.for({ seconds: 30 });
+await wait.for({ minutes: 5 });
+await wait.until({ date: new Date("2024-12-25") });
+await wait.forToken({ token: "approval-token", timeoutInSeconds: 3600 });
 ```
 
-> Never wrap triggerAndWait or batchTriggerAndWait calls in a Promise.all or Promise.allSettled as this is not supported in Trigger.dev tasks.
+> Never wrap wait calls in Promise.all/Promise.allSettled.
 
-## Waits
+### Key Points
 
-```ts
-import { task, wait } from "@trigger.dev/sdk";
+- `triggerAndWait()` returns a `Result` object with `ok`, `output`, `error` - NOT direct output
+- Use `import type` for task references when triggering from backend
+- Waits > 5 seconds are checkpointed and don't count toward compute
 
-export const taskWithWaits = task({
-  id: "task-with-waits",
-  run: async (payload) => {
-    console.log("Starting task");
-
-    // Wait for specific duration
-    await wait.for({ seconds: 30 });
-    await wait.for({ minutes: 5 });
-    await wait.for({ hours: 1 });
-    await wait.for({ days: 1 });
-
-    // Wait until specific date
-    await wait.until({ date: new Date("2024-12-25") });
-
-    // Wait for token (from external system)
-    await wait.forToken({
-      token: "user-approval-token",
-      timeoutInSeconds: 3600, // 1 hour timeout
-    });
-
-    console.log("All waits completed");
-    return { status: "completed" };
-  },
-});
-```
-
-> Never wrap wait calls in a Promise.all or Promise.allSettled as this is not supported in Trigger.dev tasks.
-
-## Key Points
-
-- **Result vs Output**: `triggerAndWait()` returns a `Result` object with `ok`, `output`, `error` properties - NOT the direct task output
-- **Type safety**: Use `import type` for task references when triggering from backend
-- **Waits > 5 seconds**: Automatically checkpointed, don't count toward compute usage
-- **Debounce + idempotency**: Idempotency keys take precedence over debounce settings
-
-## NEVER Use (v2 deprecated)
+### NEVER Use (v2 deprecated)
 
 ```ts
 // BREAKS APPLICATION
-client.defineJob({
-  id: "job-id",
-  run: async (payload, io) => {
-    /* ... */
-  },
-});
+client.defineJob({ id: "job-id", run: async (payload, io) => {} });
 ```
-
-Use SDK (`@trigger.dev/sdk`), check `result.ok` before accessing `result.output`
-
 <!-- TRIGGER.DEV basic END -->

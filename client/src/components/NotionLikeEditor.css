@@ -146,16 +146,17 @@
 
 /* tableWrapper is the outer div created by tiptap's TableView NodeView */
 .notion-editor-content .tableWrapper {
-  overflow-x: auto;
+  overflow: hidden;
   margin: 1em 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
 }
 
 .notion-editor-content table {
   border-collapse: collapse;
   table-layout: auto;
   width: 100%;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
+  border: none;
 }
 
 .notion-editor-content table td,
@@ -168,6 +169,27 @@
   box-sizing: border-box;
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* Remove outer borders so the wrapper's border-radius works cleanly */
+.notion-editor-content table tr:first-child td,
+.notion-editor-content table tr:first-child th {
+  border-top: none;
+}
+
+.notion-editor-content table tr:last-child td,
+.notion-editor-content table tr:last-child th {
+  border-bottom: none;
+}
+
+.notion-editor-content table td:first-child,
+.notion-editor-content table th:first-child {
+  border-left: none;
+}
+
+.notion-editor-content table td:last-child,
+.notion-editor-content table th:last-child {
+  border-right: none;
 }
 
 .notion-editor-content table th {
@@ -265,7 +287,7 @@
 }
 
 /* Dark mode table */
-.dark .notion-editor-content table {
+.dark .notion-editor-content .tableWrapper {
   border-color: #374151;
 }
 
@@ -1286,4 +1308,664 @@
 .dark .notion-variable-btn-card:hover {
   background: rgba(6, 95, 70, 0.5);
   border-color: #10b981;
+}
+
+/* ─── Handlebar Variable Pill (inline node) ──────────────────────────────── */
+
+.handlebar-variable-node {
+  display: inline;
+}
+
+.handlebar-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 7px;
+  background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 5px;
+  font-size: 0.875em;
+  line-height: 1.5;
+  vertical-align: baseline;
+  cursor: default;
+  user-select: all;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.handlebar-pill:hover {
+  background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+  border-color: #93c5fd;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.12);
+}
+
+.ProseMirror-selectednode .handlebar-pill {
+  background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.handlebar-pill-braces {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #6366f1;
+  opacity: 0.6;
+}
+
+.handlebar-pill-label {
+  font-weight: 600;
+  color: #3b82f6;
+  white-space: nowrap;
+  font-size: 0.92em;
+}
+
+/* Dark mode handlebar pill */
+.dark .handlebar-pill {
+  background: linear-gradient(135deg, rgba(30, 58, 95, 0.5) 0%, rgba(49, 46, 129, 0.3) 100%);
+  border-color: #1e3a5f;
+}
+
+.dark .handlebar-pill:hover {
+  background: linear-gradient(135deg, rgba(30, 58, 95, 0.7) 0%, rgba(49, 46, 129, 0.5) 100%);
+  border-color: #3b82f6;
+}
+
+.dark .handlebar-pill-braces {
+  color: #818cf8;
+}
+
+.dark .handlebar-pill-label {
+  color: #93c5fd;
+}
+
+/* ─── Handlebar Suggestion Popup ─────────────────────────────────────────── */
+
+.handlebar-suggestion-popup {
+  pointer-events: auto;
+}
+
+.handlebar-suggestion-menu {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  padding: 6px;
+  min-width: 260px;
+  max-width: 320px;
+  max-height: 340px;
+  overflow-y: auto;
+  animation: handlebar-slide-in 0.12s ease-out;
+}
+
+@keyframes handlebar-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.handlebar-suggestion-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 4px;
+}
+
+.handlebar-suggestion-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: #eef2ff;
+  color: #6366f1;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.handlebar-suggestion-category {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  padding: 6px 10px 3px;
+}
+
+.handlebar-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 7px;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.handlebar-suggestion-item:hover,
+.handlebar-suggestion-item-active {
+  background: #f3f4f6;
+}
+
+.handlebar-suggestion-item-key {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 5px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: #3b82f6;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.handlebar-suggestion-item-active .handlebar-suggestion-item-key {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.handlebar-suggestion-item-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.handlebar-suggestion-empty {
+  padding: 16px 10px;
+  text-align: center;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+/* Dark mode suggestion menu */
+.dark .handlebar-suggestion-menu {
+  background: #1f2937;
+  border-color: #374151;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.dark .handlebar-suggestion-header {
+  color: #e5e7eb;
+  border-bottom-color: #374151;
+}
+
+.dark .handlebar-suggestion-header-icon {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+}
+
+.dark .handlebar-suggestion-category {
+  color: #6b7280;
+}
+
+.dark .handlebar-suggestion-item:hover,
+.dark .handlebar-suggestion-item-active {
+  background: #374151;
+}
+
+.dark .handlebar-suggestion-item-key {
+  background: rgba(30, 58, 95, 0.5);
+  border-color: #1e3a5f;
+  color: #93c5fd;
+}
+
+.dark .handlebar-suggestion-item-active .handlebar-suggestion-item-key {
+  background: rgba(30, 58, 95, 0.8);
+  border-color: #3b82f6;
+}
+
+.dark .handlebar-suggestion-item-label {
+  color: #e5e7eb;
+}
+
+.dark .handlebar-suggestion-empty {
+  color: #6b7280;
+}
+
+/* ─── Table Floating Controls ──────────────────────────────────────────── */
+
+/* Portal root for table controls — rendered at body level via React portal */
+.table-floating-controls-portal {
+  pointer-events: none;
+}
+
+.table-floating-controls-portal * {
+  pointer-events: auto;
+}
+
+/* Column drag bar — wide horizontal bar above each column */
+.table-col-drag-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(100% - 8px);
+  max-width: 120px;
+  height: 22px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #9ca3af;
+  cursor: grab;
+  transition: all 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.table-col-drag-bar:hover {
+  background: #eef2ff;
+  color: #6366f1;
+  border-color: #c7d2fe;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.15);
+}
+
+.table-col-drag-bar-active {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  cursor: pointer;
+}
+
+/* Row drag bar — vertical bar left of each row */
+.table-row-drag-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  min-height: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #9ca3af;
+  cursor: grab;
+  transition: all 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.table-row-drag-bar:hover {
+  background: #eef2ff;
+  color: #6366f1;
+  border-color: #c7d2fe;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.15);
+}
+
+.table-row-drag-bar-active {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  cursor: pointer;
+}
+
+/* Column/Row dropdown menu (shared) */
+.table-col-dropdown,
+.table-row-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 4px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  padding: 4px;
+  min-width: 210px;
+  z-index: 10001;
+  animation: table-dropdown-in 0.12s ease-out;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.table-row-dropdown {
+  transform: none;
+  left: auto;
+}
+
+@keyframes table-dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.table-dropdown-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  padding: 6px 12px 2px;
+}
+
+.table-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  text-align: left;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+
+.table-dropdown-item:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.table-dropdown-item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.table-dropdown-item-danger {
+  color: #ef4444;
+}
+
+.table-dropdown-item-danger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.table-dropdown-divider {
+  height: 1px;
+  background: #f3f4f6;
+  margin: 3px 8px;
+}
+
+/* ─── Submenu (color / alignment picker) ──────────────────────────────── */
+
+.table-submenu {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  padding: 4px;
+  margin-top: 2px;
+  margin-left: 8px;
+  margin-bottom: 2px;
+  animation: table-dropdown-in 0.1s ease-out;
+}
+
+.table-color-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+/* ─── Drag states ─────────────────────────────────────────────────────── */
+
+.table-col-drag-bar-dragging {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #4f46e5;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  opacity: 0.7;
+  cursor: grabbing;
+}
+
+.table-row-drag-bar-dragging {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #4f46e5;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  opacity: 0.7;
+  cursor: grabbing;
+}
+
+/* ─── Drag drop indicator lines ───────────────────────────────────────── */
+
+.table-drag-indicator-col {
+  width: 3px;
+  background: #6366f1;
+  border-radius: 2px;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+  animation: table-drag-pulse 0.8s ease-in-out infinite alternate;
+}
+
+.table-drag-indicator-row {
+  height: 3px;
+  background: #6366f1;
+  border-radius: 2px;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+  animation: table-drag-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes table-drag-pulse {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+
+/* ─── Column / Row highlight overlay ──────────────────────────────────── */
+
+.table-col-highlight {
+  background: rgba(99, 102, 241, 0.06);
+  border-left: 2px solid rgba(99, 102, 241, 0.2);
+  border-right: 2px solid rgba(99, 102, 241, 0.2);
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+.table-row-highlight {
+  background: rgba(99, 102, 241, 0.06);
+  border-top: 2px solid rgba(99, 102, 241, 0.2);
+  border-bottom: 2px solid rgba(99, 102, 241, 0.2);
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+/* ─── Extend ("+") button ─────────────────────────────────────────────── */
+
+.table-extend-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px dashed #c7d2fe;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #6366f1;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  opacity: 0.6;
+}
+
+.table-extend-btn:hover {
+  opacity: 1;
+  background: #eef2ff;
+  border-color: #6366f1;
+  border-style: solid;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
+  transform: scale(1.1);
+}
+
+/* Delete table button below the table */
+.table-delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.table-delete-btn:hover {
+  background: #fef2f2;
+  border-color: #f87171;
+  color: #dc2626;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
+}
+
+/* Make sure table wrapper has enough top margin for the drag bars */
+.notion-editor-content .tableWrapper {
+  margin-top: 2.5rem;
+}
+
+/* ─── Dark mode table controls ────────────────────────────────────────── */
+
+.dark .table-col-drag-bar {
+  background: #1f2937;
+  border-color: #374151;
+  color: #6b7280;
+}
+
+.dark .table-col-drag-bar:hover {
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+  border-color: #4f46e5;
+}
+
+.dark .table-col-drag-bar-active {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
+}
+
+.dark .table-row-drag-bar {
+  background: #1f2937;
+  border-color: #374151;
+  color: #6b7280;
+}
+
+.dark .table-row-drag-bar:hover {
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+  border-color: #4f46e5;
+}
+
+.dark .table-row-drag-bar-active {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
+}
+
+.dark .table-col-dropdown,
+.dark .table-row-dropdown {
+  background: #1f2937;
+  border-color: #374151;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.dark .table-dropdown-section-label {
+  color: #6b7280;
+}
+
+.dark .table-dropdown-item {
+  color: #e5e7eb;
+}
+
+.dark .table-dropdown-item:hover:not(:disabled) {
+  background: #374151;
+}
+
+.dark .table-dropdown-item-danger {
+  color: #f87171;
+}
+
+.dark .table-dropdown-item-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.dark .table-dropdown-divider {
+  background: #374151;
+}
+
+.dark .table-submenu {
+  background: #1f2937;
+  border-color: #374151;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.dark .table-col-highlight {
+  background: rgba(99, 102, 241, 0.1);
+  border-left-color: rgba(99, 102, 241, 0.3);
+  border-right-color: rgba(99, 102, 241, 0.3);
+}
+
+.dark .table-row-highlight {
+  background: rgba(99, 102, 241, 0.1);
+  border-top-color: rgba(99, 102, 241, 0.3);
+  border-bottom-color: rgba(99, 102, 241, 0.3);
+}
+
+.dark .table-col-drag-bar-dragging,
+.dark .table-row-drag-bar-dragging {
+  background: #818cf8;
+  border-color: #6366f1;
+  box-shadow: 0 4px 12px rgba(129, 140, 248, 0.4);
+}
+
+.dark .table-drag-indicator-col,
+.dark .table-drag-indicator-row {
+  background: #818cf8;
+  box-shadow: 0 0 8px rgba(129, 140, 248, 0.6);
+}
+
+.dark .table-extend-btn {
+  background: #1f2937;
+  border-color: #4f46e5;
+  color: #818cf8;
+}
+
+.dark .table-extend-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: #6366f1;
+}
+
+.dark .table-delete-btn {
+  background: #1f2937;
+  border-color: #7f1d1d;
+  color: #f87171;
+}
+
+.dark .table-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+  color: #ef4444;
 }

@@ -6,6 +6,7 @@ import { TextAlign } from "@tiptap/extension-text-align";
 import { Underline } from "@tiptap/extension-underline";
 import { Link } from "@tiptap/extension-link";
 import { Placeholder } from "@tiptap/extension-placeholder";
+import { HandlebarVariable } from "@/extensions/HandlebarVariable";
 import { ResizableImage } from "@/components/ResizableImage";
 import { Section } from "../../components/Section";
 import { WithLayout, withLayout } from "../../components/Layout";
@@ -24,9 +25,10 @@ const canvasExtensions = [
   TextAlign.configure({ types: ["heading", "paragraph", "image"] }),
   Underline,
   Link.configure({ openOnClick: false }),
+  HandlebarVariable,
   ResizableImage,
   Placeholder.configure({
-    placeholder: "Start typing or use AI Creator to generate content…",
+    placeholder: "Start typing or use AI Creator to generate content… Type {{ for variables",
     showOnlyWhenEditable: true,
   }),
 ];
@@ -43,9 +45,10 @@ const panelExtensions = [
   TextAlign.configure({ types: ["heading", "paragraph", "image"] }),
   Underline,
   Link.configure({ openOnClick: false }),
+  HandlebarVariable,
   ResizableImage,
   Placeholder.configure({
-    placeholder: "Write or paste content…",
+    placeholder: "Write or paste content… Type {{ for variables",
     showOnlyWhenEditable: true,
   }),
 ];
@@ -92,6 +95,13 @@ const EDITOR_STYLES = `
   .puck-richtext-editor .notion-resize-handle-bar { width: 4px; height: 40px; max-height: 50%; border-radius: 4px; background: rgba(255,255,255,0.85); box-shadow: 0 0 4px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.08); transition: background 0.15s, transform 0.15s; }
   .puck-richtext-editor .notion-resize-handle:hover .notion-resize-handle-bar { background: #fff; transform: scaleY(1.15); box-shadow: 0 0 6px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.12); }
   .puck-richtext-editor .notion-resizable-image.resizing .notion-resize-handle-bar { background: #a78bfa; }
+  /* Handlebar variable pill */
+  .handlebar-variable-node { display: inline; }
+  .handlebar-pill { display: inline-flex; align-items: center; gap: 1px; padding: 1px 7px; background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%); border: 1px solid #bfdbfe; border-radius: 5px; font-size: 0.875em; line-height: 1.5; vertical-align: baseline; cursor: default; user-select: all; transition: background 0.15s, border-color 0.15s, box-shadow 0.15s; }
+  .handlebar-pill:hover { background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%); border-color: #93c5fd; box-shadow: 0 1px 3px rgba(59,130,246,0.12); }
+  .ProseMirror-selectednode .handlebar-pill { background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%); border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.2); }
+  .handlebar-pill-braces { font-family: 'JetBrains Mono','Fira Code','Cascadia Code',monospace; font-size: 0.8em; font-weight: 600; color: #6366f1; opacity: 0.6; }
+  .handlebar-pill-label { font-weight: 600; color: #3b82f6; white-space: nowrap; font-size: 0.92em; }
 `;
 
 /* ── CSS for the panel (properties-pane) TipTap editor ── */

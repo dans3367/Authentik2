@@ -8,6 +8,7 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Image } from "@tiptap/extension-image";
+import { HandlebarVariable } from "@/extensions/HandlebarVariable";
 import { Button } from "@/components/ui/button";
 import { Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, Droplet, User, Sparkles, Wand2, PartyPopper, ArrowRightFromLine, ArrowLeftToLine, Tag, Undo, Redo, Languages, List, ListOrdered, Heading1, Heading2, Link as LinkIcon, Minus, Mail, Phone, MapPin, Clock, CreditCard } from "lucide-react";
 import { generateBirthdayMessage, improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText } from "@/lib/aiApi";
@@ -84,7 +85,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
   // Placeholders are inserted in liquid-style format e.g. {{first_name}}
   const insertPlaceholder = (variable: string) => {
     if (editor) {
-      editor.chain().focus().insertContent(`{{${variable}}}`).run();
+      editor.chain().focus().insertContent({ type: 'handlebarVariable', attrs: { variable } }).run();
     }
   };
 
@@ -306,6 +307,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
         types: ['heading', 'paragraph'],
       }),
       Image,
+      HandlebarVariable,
     ],
     content: value,
     onUpdate: ({ editor }) => {
