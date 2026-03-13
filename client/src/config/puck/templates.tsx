@@ -332,6 +332,102 @@ function productMarketingTemplate(): Data {
   };
 }
 
+// ─── Template 4: Blog Post Newsletter ───
+function blogPostTemplate(): Data {
+  return {
+    root: { props: { title: "Blog Post Newsletter" } },
+    zones: {},
+    content: [
+      {
+        type: "Heading",
+        props: {
+          id: uid(),
+          text: "Never let your memories be greater than your dreams",
+          level: "1",
+          size: "xxl",
+          align: "left",
+        },
+      },
+      { type: "Space", props: { id: uid(), size: "8px", direction: "vertical" } },
+      {
+        type: "RichText",
+        props: {
+          id: uid(),
+          html: '<p style="color: #6b7280; font-size: 14px; margin: 0;">Apurba Talukdar &amp; Ishan Sharma &nbsp;&nbsp; May 2, 2022 &nbsp;&nbsp; 3 min read</p>',
+        },
+      },
+      { type: "Space", props: { id: uid(), size: "20px", direction: "vertical" } },
+      {
+        type: "RichText",
+        props: {
+          id: uid(),
+          html: "<p>Before long the searchlight discovered some distance away a schooner with all sails set, apparently the same vessel which had been noticed earlier in the evening. The wind had by this time backed to the east, and there was a shudder amongst the watchers on the cliff as they realized the terrible danger in which she now was. Between her and the port lay the great flat reef on which so many good ships have from time to time suffered, and, with the wind blowing from its present quarter, it would be quite impossible that she should fetch the entrance of the harbour.</p>",
+        },
+      },
+      { type: "Space", props: { id: uid(), size: "16px", direction: "vertical" } },
+      {
+        type: "Heading",
+        props: {
+          id: uid(),
+          text: "Wherever you go, go with all your heart",
+          level: "2",
+          size: "l",
+          align: "left",
+        },
+      },
+      { type: "Space", props: { id: uid(), size: "8px", direction: "vertical" } },
+      {
+        type: "RichText",
+        props: {
+          id: uid(),
+          html: '<p>It was now nearly the hour of high tide, but the waves were so great that in their troughs the shallows of the shore were almost visible, and the schooner, with all sails set, was rushing with such speed that, in the words of one old salt, "she must fetch up somewhere, if it was only in hell.</p>',
+        },
+      },
+      { type: "Space", props: { id: uid(), size: "24px", direction: "vertical" } },
+      {
+        type: "Image",
+        props: {
+          id: uid(),
+          images: [
+            {
+              src: "https://placehold.co/552x350/87CEEB/87CEEB?text=+",
+              alt: "Featured photo",
+            },
+          ],
+          align: "center",
+          sizing: "fill",
+          borderRadius: 8,
+          caption: "Photo by Jakob Owens / Unsplash",
+        },
+      },
+      { type: "Space", props: { id: uid(), size: "24px", direction: "vertical" } },
+      {
+        type: "RichText",
+        props: {
+          id: uid(),
+          html: "<p>Then came another rush of sea-fog, greater than any hitherto -- a mass of dank mist, which seemed to close on all things like a grey pall, and left available to men only the organ of hearing, for the roar of the tempest, and the crash of the thunder, and the booming of the mighty billows came through the damp oblivion even louder than before.</p>",
+        },
+      },
+      { type: "Space", props: { id: uid(), size: "24px", direction: "vertical" } },
+      {
+        type: "RichText",
+        props: {
+          id: uid(),
+          html: '<blockquote><p>A mind that is stretched by a new experience can never go back to its old dimensions</p></blockquote>',
+        },
+      },
+      { type: "Space", props: { id: uid(), size: "24px", direction: "vertical" } },
+      {
+        type: "RichText",
+        props: {
+          id: uid(),
+          html: "<p>The harbour lights of the port gleamed through the darkness, offering a beacon of hope for those aboard. The captain, weathered by years of such storms, stood firm at the helm, his eyes fixed on the narrow channel that would lead them to safety. Every soul aboard knew that the next few minutes would determine their fate.</p>",
+        },
+      },
+    ],
+  };
+}
+
 export const newsletterTemplates: NewsletterTemplate[] = [
   {
     id: "company-update",
@@ -356,5 +452,13 @@ export const newsletterTemplates: NewsletterTemplate[] = [
     category: "product",
     thumbnail: "https://placehold.co/280x180/fef3c7/d97706?text=Product+Spotlight",
     data: productMarketingTemplate(),
+  },
+  {
+    id: "blog-post",
+    name: "Blog Post",
+    description: "Clean article layout with title, metadata, body text, images, and blockquotes.",
+    category: "newsletter",
+    thumbnail: "https://placehold.co/280x180/f0fdf4/16a34a?text=Blog+Post",
+    data: blogPostTemplate(),
   },
 ];

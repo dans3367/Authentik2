@@ -93,6 +93,7 @@ const HeadingInternal: ComponentConfig<HeadingProps> = {
                   style={{
                     fontSize: sizeMap[size],
                     fontWeight: 700,
+                    lineHeight: 1.1,
                     margin: 0,
                   }}
                 >

@@ -61,7 +61,7 @@ export type RichTextProps = WithLayout<{
 
 /* ── CSS for the TipTap editor inside the Puck canvas ── */
 const EDITOR_STYLES = `
-  .puck-richtext-editor { outline: none; min-height: 40px; }
+  .puck-richtext-editor { outline: none; min-height: 40px; overflow-wrap: break-word; word-break: break-word; }
   .puck-richtext-editor h1 { font-size: 28px; font-weight: 700; margin: 0 0 12px 0; line-height: 1.3; }
   .puck-richtext-editor h2 { font-size: 22px; font-weight: 700; margin: 0 0 10px 0; line-height: 1.3; }
   .puck-richtext-editor h3 { font-size: 18px; font-weight: 600; margin: 0 0 8px 0; line-height: 1.3; }
@@ -179,6 +179,33 @@ const IMAGE_POPOVER_STYLES = `
 `;
 
 /**
+ * Local live-sync channel for panel -> canvas rich text updates.
+ * This keeps canvas preview live without writing to Puck state on each keystroke.
+ */
+const liveHtmlSubscribers = new Map<string, Set<(html: string) => void>>();
+
+function publishLiveHtml(blockId: string | null | undefined, html: string) {
+  if (!blockId) return;
+  const subscribers = liveHtmlSubscribers.get(blockId);
+  if (!subscribers) return;
+  subscribers.forEach((subscriber) => subscriber(html));
+}
+
+function subscribeLiveHtml(blockId: string, subscriber: (html: string) => void) {
+  const subscribers = liveHtmlSubscribers.get(blockId) ?? new Set<(html: string) => void>();
+  subscribers.add(subscriber);
+  liveHtmlSubscribers.set(blockId, subscribers);
+  return () => {
+    const current = liveHtmlSubscribers.get(blockId);
+    if (!current) return;
+    current.delete(subscriber);
+    if (current.size === 0) {
+      liveHtmlSubscribers.delete(blockId);
+    }
+  };
+}
+
+/**
  * Popover button for inserting images via URL.
  */
 function InsertImageButton({
@@ -241,46 +268,18 @@ function InsertImageButton({
 }
 
 /**
- * Mini TipTap editor with toolbar rendered inside the Puck properties pane.
- * value/onChange come from Puck's custom field interface.
+ * Isolated toolbar that re-renders on editor transactions without
+ * touching the parent PanelRichTextEditor or Puck's field tree.
  */
-function PanelRichTextEditor({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (html: string) => void;
-}) {
-  const [, forceUpdate] = useState(0);
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+function PanelToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  const [, tick] = useState(0);
 
-  const editor = useEditor({
-    extensions: panelExtensions,
-    content: value || "",
-    editable: true,
-    onUpdate: ({ editor: ed }) => {
-      onChangeRef.current(ed.getHTML());
-      forceUpdate((n) => n + 1);
-    },
-    onSelectionUpdate: () => forceUpdate((n) => n + 1),
-    editorProps: {
-      attributes: { style: "outline:none;" },
-    },
-  });
-
-  // Sync external value changes (e.g. from canvas editor blur or AI insert)
-  const lastExternalValue = useRef(value);
   useEffect(() => {
     if (!editor) return;
-    // Only sync if the value actually changed externally
-    if (value === lastExternalValue.current) return;
-    lastExternalValue.current = value;
-    const current = editor.getHTML();
-    if (value !== current) {
-      editor.commands.setContent(value || "", { emitUpdate: false });
-    }
-  }, [value, editor]);
+    const handler = () => tick((n) => n + 1);
+    editor.on("transaction", handler);
+    return () => { editor.off("transaction", handler); };
+  }, [editor]);
 
   if (!editor) return null;
 
@@ -301,31 +300,104 @@ function PanelRichTextEditor({
   );
 
   return (
+    <div className="puck-panel-toolbar">
+      {btn(editor.isActive("bold"), () => editor.chain().focus().toggleBold().run(), "B", "Bold")}
+      {btn(editor.isActive("italic"), () => editor.chain().focus().toggleItalic().run(), "I", "Italic")}
+      {btn(editor.isActive("underline"), () => editor.chain().focus().toggleUnderline().run(), "U", "Underline")}
+      {btn(editor.isActive("strike"), () => editor.chain().focus().toggleStrike().run(), "S̶", "Strikethrough")}
+      <span className="sep" />
+      {btn(editor.isActive("heading", { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run(), "H1", "Heading 1")}
+      {btn(editor.isActive("heading", { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), "H2", "Heading 2")}
+      {btn(editor.isActive("heading", { level: 3 }), () => editor.chain().focus().toggleHeading({ level: 3 }).run(), "H3", "Heading 3")}
+      <span className="sep" />
+      {btn(editor.isActive("bulletList"), () => editor.chain().focus().toggleBulletList().run(), "☰", "Bullet List")}
+      {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), "1.", "Ordered List")}
+      {btn(editor.isActive("blockquote"), () => editor.chain().focus().toggleBlockquote().run(), "❝", "Blockquote")}
+      {btn(false, () => editor.chain().focus().setHorizontalRule().run(), "―", "Horizontal Rule")}
+      <InsertImageButton onInsert={(src) => editor.chain().focus().setImage({ src }).run()} />
+      <span className="sep" />
+      {btn(editor.isActive({ textAlign: "left" }), () => editor.chain().focus().setTextAlign("left").run(), "≡←", "Align Left")}
+      {btn(editor.isActive({ textAlign: "center" }), () => editor.chain().focus().setTextAlign("center").run(), "≡", "Align Center")}
+      {btn(editor.isActive({ textAlign: "right" }), () => editor.chain().focus().setTextAlign("right").run(), "→≡", "Align Right")}
+      <span className="sep" />
+      {btn(false, () => editor.chain().focus().undo().run(), "↩", "Undo")}
+      {btn(false, () => editor.chain().focus().redo().run(), "↪", "Redo")}
+    </div>
+  );
+}
+
+/**
+ * Mini TipTap editor with toolbar rendered inside the Puck properties pane.
+ * value/onChange come from Puck's custom field interface.
+ *
+ * IMPORTANT: This component deliberately avoids any setState on every keystroke.
+ * Toolbar active-state updates are isolated inside <PanelToolbar>, so typing
+ * never triggers a re-render of this component or Puck's surrounding field tree
+ * (which was the root cause of the Blocks-panel flash).
+ */
+function PanelRichTextEditor({
+  value,
+  onChange,
+  blockId,
+}: {
+  value: string;
+  onChange: (html: string) => void;
+  blockId?: string | null;
+}) {
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const livePreviewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pushLivePreview = useCallback((html: string) => {
+    if (livePreviewDebounceRef.current) clearTimeout(livePreviewDebounceRef.current);
+    livePreviewDebounceRef.current = setTimeout(() => {
+      publishLiveHtml(blockId, html);
+    }, 120);
+  }, [blockId]);
+
+  useEffect(() => () => {
+    if (livePreviewDebounceRef.current) clearTimeout(livePreviewDebounceRef.current);
+  }, []);
+
+  const editor = useEditor({
+    extensions: panelExtensions,
+    content: value || "",
+    editable: true,
+    onUpdate: ({ editor: ed }) => {
+      // Live canvas sync without touching Puck field state.
+      pushLivePreview(ed.getHTML());
+    },
+    onBlur: ({ editor: ed }) => {
+      const html = ed.getHTML();
+      // Ensure final panel text is reflected in canvas immediately.
+      if (livePreviewDebounceRef.current) clearTimeout(livePreviewDebounceRef.current);
+      publishLiveHtml(blockId, html);
+      // Authoritative update via Puck field on blur only.
+      onChangeRef.current(html);
+    },
+    editorProps: {
+      attributes: { style: "outline:none;" },
+    },
+  });
+
+  // Sync external value changes (e.g. from canvas editor blur or AI insert)
+  const lastExternalValue = useRef(value);
+  useEffect(() => {
+    if (!editor) return;
+    // Only sync if the value actually changed externally
+    if (value === lastExternalValue.current) return;
+    lastExternalValue.current = value;
+    const current = editor.getHTML();
+    if (value !== current) {
+      editor.commands.setContent(value || "", { emitUpdate: false });
+    }
+  }, [value, editor]);
+
+  if (!editor) return null;
+
+  return (
     <div className="puck-panel-editor-wrap">
       <style>{PANEL_STYLES}</style>
-      <div className="puck-panel-toolbar">
-        {btn(editor.isActive("bold"), () => editor.chain().focus().toggleBold().run(), "B", "Bold")}
-        {btn(editor.isActive("italic"), () => editor.chain().focus().toggleItalic().run(), "I", "Italic")}
-        {btn(editor.isActive("underline"), () => editor.chain().focus().toggleUnderline().run(), "U", "Underline")}
-        {btn(editor.isActive("strike"), () => editor.chain().focus().toggleStrike().run(), "S̶", "Strikethrough")}
-        <span className="sep" />
-        {btn(editor.isActive("heading", { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run(), "H1", "Heading 1")}
-        {btn(editor.isActive("heading", { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), "H2", "Heading 2")}
-        {btn(editor.isActive("heading", { level: 3 }), () => editor.chain().focus().toggleHeading({ level: 3 }).run(), "H3", "Heading 3")}
-        <span className="sep" />
-        {btn(editor.isActive("bulletList"), () => editor.chain().focus().toggleBulletList().run(), "☰", "Bullet List")}
-        {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), "1.", "Ordered List")}
-        {btn(editor.isActive("blockquote"), () => editor.chain().focus().toggleBlockquote().run(), "❝", "Blockquote")}
-        {btn(false, () => editor.chain().focus().setHorizontalRule().run(), "―", "Horizontal Rule")}
-        <InsertImageButton onInsert={(src) => editor.chain().focus().setImage({ src }).run()} />
-        <span className="sep" />
-        {btn(editor.isActive({ textAlign: "left" }), () => editor.chain().focus().setTextAlign("left").run(), "≡←", "Align Left")}
-        {btn(editor.isActive({ textAlign: "center" }), () => editor.chain().focus().setTextAlign("center").run(), "≡", "Align Center")}
-        {btn(editor.isActive({ textAlign: "right" }), () => editor.chain().focus().setTextAlign("right").run(), "→≡", "Align Right")}
-        <span className="sep" />
-        {btn(false, () => editor.chain().focus().undo().run(), "↩", "Undo")}
-        {btn(false, () => editor.chain().focus().redo().run(), "↪", "Redo")}
-      </div>
+      <PanelToolbar editor={editor} />
       <div className="puck-panel-content">
         <EditorContent editor={editor} />
       </div>
@@ -341,9 +413,11 @@ function PanelRichTextEditor({
 function InlineRichTextEditor({
   html,
   onBlurChange,
+  liveBlockId,
 }: {
   html: string;
   onBlurChange: (newHtml: string) => void;
+  liveBlockId?: string | null;
 }) {
   const onBlurRef = useRef(onBlurChange);
   onBlurRef.current = onBlurChange;
@@ -372,6 +446,17 @@ function InlineRichTextEditor({
     }
   }, [html, editor]);
 
+  // Live updates pushed from the panel editor without mutating Puck state.
+  useEffect(() => {
+    if (!editor || !liveBlockId) return;
+    return subscribeLiveHtml(liveBlockId, (nextHtml) => {
+      const current = editor.getHTML();
+      if (nextHtml !== current) {
+        editor.commands.setContent(nextHtml || "", { emitUpdate: false });
+      }
+    });
+  }, [editor, liveBlockId]);
+
   if (!editor) return null;
 
   return (
@@ -381,49 +466,6 @@ function InlineRichTextEditor({
     </>
   );
 }
-
-const RichTextInner: ComponentConfig<RichTextProps> = {
-  fields: {
-    html: {
-      type: "custom",
-      label: "Content",
-      render: ({ value, onChange }) => (
-        <PanelRichTextEditor value={value} onChange={onChange} />
-      ),
-    },
-    _aiCreator: {
-      type: "custom",
-      label: "AI Creator",
-      render: () => <AiTextCreator fieldName="html" />,
-    },
-    maxWidth: { type: "text" },
-  },
-  defaultProps: {
-    html: "<p>Start typing your rich text content here…</p>",
-    maxWidth: undefined,
-  },
-  render: ({ html, maxWidth, puck }) => {
-    const isEditing = !!(puck as any)?.isEditing;
-
-    // Non-edit mode (email output / preview): emit raw HTML
-    if (!isEditing) {
-      return (
-        <Section maxWidth={maxWidth}>
-          <style>{EDITOR_STYLES}</style>
-          <div className="puck-richtext-editor" dangerouslySetInnerHTML={{ __html: html || "" }} />
-        </Section>
-      );
-    }
-
-    // Edit mode: show inline TipTap editor.
-    // The canvas editor doesn't render at all in non-edit mode.
-    return (
-      <Section maxWidth={maxWidth}>
-        <InlineCanvasEditor html={html ?? ""} />
-      </Section>
-    );
-  },
-};
 
 /**
  * Thin wrapper that lazily accesses Puck dispatch only when the component
@@ -441,22 +483,78 @@ const lazyUsePuck = (() => {
   };
 })();
 
-function InlineCanvasEditor({ html }: { html: string }) {
+/**
+ * Wrapper that connects PanelRichTextEditor to Puck's dispatch for live
+ * canvas updates without triggering the field onChange (which causes flash).
+ */
+function PanelFieldWrapper({ value, onChange }: { value: string; onChange: (html: string) => void }) {
   const usePuck = lazyUsePuck();
-  const selectedItem = usePuck((s: any) => s.selectedItem);
+  const selectedItemId = usePuck((s: any) => s.selectedItem?.props?.id ?? null);
+  return (
+    <PanelRichTextEditor
+      value={value}
+      onChange={onChange}
+      blockId={selectedItemId}
+    />
+  );
+}
+
+const RichTextInner: ComponentConfig<RichTextProps> = {
+  fields: {
+    html: {
+      type: "custom",
+      label: "Content",
+      render: ({ value, onChange }) => (
+        <PanelFieldWrapper value={value} onChange={onChange} />
+      ),
+    },
+    _aiCreator: {
+      type: "custom",
+      label: "AI Creator",
+      render: () => <AiTextCreator fieldName="html" />,
+    },
+    maxWidth: { type: "text" },
+  },
+  defaultProps: {
+    html: "<p>Start typing your rich text content here…</p>",
+    maxWidth: undefined,
+  },
+  render: ({ html, maxWidth, puck, id }: any) => {
+    const isEditing = !!(puck as any)?.isEditing;
+
+    // Non-edit mode (email output / preview): emit raw HTML
+    if (!isEditing) {
+      return (
+        <Section maxWidth={maxWidth}>
+          <style>{EDITOR_STYLES}</style>
+          <div className="puck-richtext-editor" dangerouslySetInnerHTML={{ __html: html || "" }} />
+        </Section>
+      );
+    }
+
+    // Edit mode: show inline TipTap editor.
+    // The canvas editor doesn't render at all in non-edit mode.
+    return (
+      <Section maxWidth={maxWidth}>
+        <InlineCanvasEditor html={html ?? ""} ownId={id} />
+      </Section>
+    );
+  },
+};
+
+function InlineCanvasEditor({ html, ownId }: { html: string; ownId?: string }) {
+  const usePuck = lazyUsePuck();
   const dispatch = usePuck((s: any) => s.dispatch);
 
-  // Store in refs so InlineRichTextEditor gets a stable callback
-  const selectedItemRef = useRef(selectedItem);
-  selectedItemRef.current = selectedItem;
+  const ownIdRef = useRef(ownId);
+  ownIdRef.current = ownId;
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
 
   const handleBlur = useCallback(
     (newHtml: string) => {
-      const item = selectedItemRef.current;
-      if (!item) return;
-      const targetId = item.props.id;
+      const targetId = ownIdRef.current;
+      if (!targetId) return;
       const updateItem = (i: any) =>
         i.props.id === targetId
           ? { ...i, props: { ...i.props, html: newHtml } }
@@ -481,7 +579,9 @@ function InlineCanvasEditor({ html }: { html: string }) {
     [] // stable — reads from refs
   );
 
-  return <InlineRichTextEditor html={html} onBlurChange={handleBlur} />;
+  // Subscribe using this block's OWN id, not the selected item id.
+  // This ensures only this specific block receives its panel editor's live updates.
+  return <InlineRichTextEditor html={html} onBlurChange={handleBlur} liveBlockId={ownId} />;
 }
 
 export const RichText = withLayout(RichTextInner);
