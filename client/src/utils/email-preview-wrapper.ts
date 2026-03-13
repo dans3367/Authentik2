@@ -16,6 +16,9 @@ export interface PreviewEmailDesign {
   bannerUrl?: string;
   showCompanyName?: string;
   fontFamily?: string;
+  contentBackgroundColor?: string;
+  bodyBackgroundColor?: string;
+  footerTextColor?: string;
   socialLinks?: {
     facebook?: string;
     twitter?: string;
@@ -36,6 +39,9 @@ const DEFAULT_DESIGN: Required<Omit<PreviewEmailDesign, 'socialLinks'>> & { soci
   bannerUrl: '',
   showCompanyName: 'true',
   fontFamily: 'Arial, Helvetica, sans-serif',
+  contentBackgroundColor: '#ffffff',
+  bodyBackgroundColor: '#f7fafc',
+  footerTextColor: '#64748b',
   socialLinks: undefined,
 };
 
@@ -288,6 +294,9 @@ export function wrapInEmailPreview(
   const showName = typeof d.showCompanyName === 'boolean'
     ? d.showCompanyName
     : (d.showCompanyName ?? 'true') === 'true';
+  const contentBgColor = sanitizeColor(d.contentBackgroundColor, '#ffffff');
+  const bodyBgColor = sanitizeColor(d.bodyBackgroundColor, '#f7fafc');
+  const footerTextColor = sanitizeColor(d.footerTextColor, '#64748b');
   const safeBodyContent = styleTablesForEmail(sanitizeBodyContent(bodyContent));
   const sanitizedLogoUrl = d.logoUrl && isValidHttpUrl(d.logoUrl) ? d.logoUrl : '';
   const sanitizedBannerUrl = d.bannerUrl && isValidHttpUrl(d.bannerUrl) ? d.bannerUrl : '';
@@ -306,7 +315,7 @@ export function wrapInEmailPreview(
   // Build social links HTML
   let socialLinksHtml = '';
   if (socialLinks) {
-    const linkStyle = "color:#64748b;text-decoration:none;margin:0 10px;font-weight:500;";
+    const linkStyle = `color:${footerTextColor};text-decoration:none;margin:0 10px;font-weight:500;`;
     const links: string[] = [];
     if (socialLinks.facebook && isValidHttpUrl(socialLinks.facebook)) {
       links.push(`<a href="${esc(socialLinks.facebook)}" style="${linkStyle}">Facebook</a>`);
@@ -342,8 +351,8 @@ export function wrapInEmailPreview(
     }
   </style>
 </head>
-<body style="font-family:${fontFamily};margin:0;padding:0;background-color:#ffffff;-webkit-font-smoothing:antialiased;min-height:100%;">
-  <div style="background-color:#ffffff;display:flex;flex-direction:column;min-height:100%;">
+<body style="font-family:${fontFamily};margin:0;padding:0;background-color:${bodyBgColor};-webkit-font-smoothing:antialiased;min-height:100%;">
+  <div style="background-color:${bodyBgColor};display:flex;flex-direction:column;min-height:100%;">
 
     <!-- Hero Header -->
     ${useBanner ? `
@@ -364,17 +373,17 @@ export function wrapInEmailPreview(
 
     <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;flex:1;">
       <tr>
-        <td style="padding:20px 24px 32px 24px;font-size:16px;line-height:1.625;color:#334155;border:none;background-color:#ffffff;vertical-align:top;">
+        <td style="padding:20px 24px 32px 24px;font-size:16px;line-height:1.625;color:#334155;border:none;background-color:${contentBgColor};vertical-align:top;">
           ${safeBodyContent}
         </td>
       </tr>
     </table>
 
     <!-- Footer -->
-    <div style="background-color:#f8fafc;padding:32px;text-align:center;border-top:1px solid #e2e8f0;color:#64748b;margin-top:auto;">
+    <div style="background-color:${contentBgColor};padding:32px;text-align:center;border-top:1px solid #e2e8f0;color:${footerTextColor};margin-top:auto;">
       ${socialLinksHtml}
-      ${footerText ? `<p style="margin:0 0 16px 0;font-size:12px;line-height:1.5;color:#64748b;">${footerText}</p>` : ''}
-      ${companyName && showName ? `<div style="font-size:12px;line-height:1.5;color:#94a3b8;"><p style="margin:0;">Sent via ${companyName}</p></div>` : ''}
+      ${footerText ? `<p style="margin:0 0 16px 0;font-size:12px;line-height:1.5;color:${footerTextColor};">${footerText}</p>` : ''}
+      ${companyName && showName ? `<div style="font-size:12px;line-height:1.5;color:${footerTextColor};opacity:0.7;"><p style="margin:0;">Sent via ${companyName}</p></div>` : ''}
     </div>
 
   </div>

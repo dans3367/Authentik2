@@ -1797,6 +1797,8 @@ export const updateNewsletterSchema = z.object({
   reviewStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
   reviewNotes: z.string().optional(),
   reactionsEnabled: z.boolean().optional(),
+  publishedAt: z.union([z.string(), z.date()]).optional().nullable(),
+  webSlug: z.string().optional().nullable(),
 });
 
 export const insertNewsletterSchema = createInsertSchema(newsletters).omit({

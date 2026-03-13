@@ -27,6 +27,7 @@ interface SendPreviewDialogProps {
   onOpenChange: (open: boolean) => void;
   getHtmlContent: () => string;
   subject?: string;
+  getPuckData?: () => string;
 }
 
 export function SendPreviewDialog({
@@ -34,6 +35,7 @@ export function SendPreviewDialog({
   onOpenChange,
   getHtmlContent,
   subject = "Newsletter Preview",
+  getPuckData,
 }: SendPreviewDialogProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -101,6 +103,7 @@ export function SendPreviewDialog({
         to: selectedEmails,
         subject,
         html,
+        puckData: getPuckData?.(),
       });
       const count = selectedEmails.length;
       toast({ title: "Preview sent", description: `Preview email sent to ${count} recipient${count > 1 ? "s" : ""}` });

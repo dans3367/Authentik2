@@ -5579,7 +5579,7 @@ emailManagementRoutes.post("/contact-custom-fields", authenticateToken, requireT
       return res.status(400).json({ message: 'A custom field with this name already exists' });
     }
 
-    const [field] = await db.insert(contactCustomFields).values({
+    const [field] = await db.insert(contactCustomFields).values([{
       tenantId: req.user.tenantId,
       name: sanitizeString(name),
       label: sanitizeString(label),
@@ -5590,7 +5590,7 @@ emailManagementRoutes.post("/contact-custom-fields", authenticateToken, requireT
       sortOrder: sortOrder ?? 0,
       createdAt: new Date(),
       updatedAt: new Date(),
-    }).returning();
+    }]).returning();
 
     res.status(201).json({
       ...field,

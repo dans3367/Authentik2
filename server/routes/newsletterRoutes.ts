@@ -7,7 +7,7 @@ import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema,
 import { sanitizeString } from '../utils/sanitization';
 import { sanitizeEmailHtml } from './emailManagementRoutes';
 import { emailService, enhancedEmailService } from '../emailService';
-import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
+import { wrapNewsletterContent, extractPuckColorOverrides } from '../utils/newsletterEmailWrapper';
 import { initNewsletterTracking, trackNewsletterEmailSend, getNewsletterStats, getNewsletterSends, getNewsletterEvents } from '../utils/convexNewsletterTracker';
 import { logActivity, computeChanges, NEWSLETTER_TRACKED_FIELDS } from '../utils/activityLogger';
 import { buildReactionButtonsHtml } from '../utils/newsletterReactionHtml';
@@ -363,7 +363,7 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, as
 // Send preview email via Trigger.dev + Resend (supports up to 5 recipients)
 newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, requirePermission('newsletters.send'), async (req: any, res) => {
   try {
-    const { to, subject, html } = req.body;
+    const { to, subject, html, puckData } = req.body;
 
     if (!to || !subject || !html) {
       return res.status(400).json({ message: 'Missing required fields: to, subject, html' });
@@ -386,7 +386,8 @@ newsletterRoutes.post("/send-preview", authenticateToken, requireTenant, require
     const { sendNewsletterPreviewTask } = await import('../../src/trigger/newsletterPreview');
 
     const sanitizedHtml = sanitizeEmailHtml(html);
-    const wrappedHtml = await wrapNewsletterContent(req.user.tenantId, sanitizedHtml);
+    const colorOverrides = extractPuckColorOverrides(typeof puckData === 'string' ? puckData : JSON.stringify(puckData));
+    const wrappedHtml = await wrapNewsletterContent(req.user.tenantId, sanitizedHtml, colorOverrides);
 
     const handles = await Promise.all(
       recipients.map((recipientEmail) =>
@@ -1561,7 +1562,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
     // If test email is provided, send test email
     if (testEmail) {
       try {
-        const wrappedTestHtml = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
+        const wrappedTestHtml = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
         const testTrackingId = crypto.randomUUID();
         await emailService.sendCustomEmail(testEmail, newsletter.subject, wrappedTestHtml, {
           tags: [
@@ -1728,7 +1729,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
         console.log(`[Newsletter] Triggering Trigger.dev sendNewsletterTask`);
 
         // Wrap newsletter content in the tenant's global email design template
-        const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
+        const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
 
         // Generate unsubscribe tokens for all recipients
         const recipientsWithTokens = await Promise.all(
@@ -1816,7 +1817,7 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
         }
 
         // Wrap newsletter content in the branded email design template
-        const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
+        const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
 
         // Helper to inject content before the footer marker (inside the document body)
         const injectBeforeFooter = (content: string, injection: string): string => {
@@ -2107,7 +2108,7 @@ newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, require
     }
 
     // Wrap newsletter content
-    const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content);
+    const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
 
     // Trigger the schedule task via Trigger.dev
     const { scheduleNewsletterTask } = await import('../../src/trigger/newsletter');
@@ -2395,14 +2396,14 @@ newsletterRoutes.post('/:id/send-single', authenticateInternalService, async (re
     }
     const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(unsub.token)}&type=newsletters`;
 
-    // Wrap newsletter content in the branded email design template
-    const wrappedSingleContent = await wrapNewsletterContent(tenantId, content);
-
     // Check if reactions are enabled for this newsletter
     const singleNewsletter = await db.query.newsletters.findFirst({
       where: and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)),
-      columns: { reactionsEnabled: true },
+      columns: { reactionsEnabled: true, puckData: true },
     });
+
+    // Wrap newsletter content in the branded email design template
+    const wrappedSingleContent = await wrapNewsletterContent(tenantId, content, extractPuckColorOverrides(singleNewsletter?.puckData));
     const singleReactionHtml = singleNewsletter?.reactionsEnabled
       ? buildReactionButtonsHtml(`${req.protocol}://${req.get('host')}`, id, recipient.id)
       : '';

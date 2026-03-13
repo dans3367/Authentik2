@@ -120,6 +120,28 @@ export async function fetchNewsletterDesign(tenantId: string): Promise<Newslette
   };
 }
 
+// ── Puck data color extraction ───────────────────────────────────────────
+
+/**
+ * Extract content and body background colors from stored puckData JSON.
+ * Returns undefined values if puckData is missing or invalid.
+ */
+export function extractPuckColorOverrides(puckDataJson: string | null | undefined): NewsletterColorOverrides | undefined {
+  if (!puckDataJson) return undefined;
+  try {
+    const puckData = JSON.parse(puckDataJson);
+    const rootProps = puckData?.root?.props;
+    if (!rootProps) return undefined;
+    const overrides: NewsletterColorOverrides = {};
+    if (rootProps.backgroundColor) overrides.contentBackgroundColor = rootProps.backgroundColor;
+    if (rootProps.bodyBackgroundColor) overrides.bodyBackgroundColor = rootProps.bodyBackgroundColor;
+    if (rootProps.footerTextColor) overrides.footerTextColor = rootProps.footerTextColor;
+    return Object.keys(overrides).length > 0 ? overrides : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // ── HTML builder ────────────────────────────────────────────────────────
 
 /**
@@ -275,7 +297,13 @@ function styleContentForEmail(html: string): string {
   return html;
 }
 
-export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: string): string {
+export interface NewsletterColorOverrides {
+  contentBackgroundColor?: string;
+  bodyBackgroundColor?: string;
+  footerTextColor?: string;
+}
+
+export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: string, colorOverrides?: NewsletterColorOverrides): string {
   bodyContent = stripOuterHtmlWrapper(bodyContent);
   bodyContent = styleTablesForEmail(bodyContent);
   bodyContent = styleContentForEmail(bodyContent);
@@ -285,6 +313,9 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
   const safeHeaderText = design.headerText ? escapeHtml(design.headerText) : null;
   const safeFooterText = design.footerText ? escapeHtml(design.footerText) : null;
   const showName = design.showCompanyName;
+  const contentBgColor = sanitizeColor(colorOverrides?.contentBackgroundColor, '#ffffff');
+  const bodyBgColor = sanitizeColor(colorOverrides?.bodyBackgroundColor, '#ffffff');
+  const footerTextColor = sanitizeColor(colorOverrides?.footerTextColor, '#64748b');
 
   // Logo sizing
   const logoSizeMap: Record<string, string> = { small: '64px', medium: '96px', large: '128px', xlarge: '160px' };
@@ -306,7 +337,7 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
   // Social links
   let socialLinksHtml = '';
   if (design.socialLinks) {
-    const linkStyle = "color: #64748b; text-decoration: none; margin: 0 10px; font-weight: 500;";
+    const linkStyle = `color: ${footerTextColor}; text-decoration: none; margin: 0 10px; font-weight: 500;`;
     const links: string[] = [];
     if (design.socialLinks.facebook && isValidHttpUrl(design.socialLinks.facebook))
       links.push(`<a href="${escapeHtml(design.socialLinks.facebook)}" style="${linkStyle}">Facebook</a>`);
@@ -334,9 +365,9 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
       img { max-width: 100% !important; height: auto !important; }
     </style>
   </head>
-  <body style="font-family: ${fontFamily}; margin: 0; padding: 0; background-color: #ffffff; -webkit-font-smoothing: antialiased;">
+  <body style="font-family: ${fontFamily}; margin: 0; padding: 0; background-color: ${bodyBgColor}; -webkit-font-smoothing: antialiased;">
     <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center" style="width:600px;"><tr><td><![endif]-->
-    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; overflow: hidden;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: ${contentBgColor}; overflow: hidden;">
 
       <!-- Hero Header -->
       ${useBanner ? `
@@ -357,18 +388,18 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
 
       <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;">
         <tr>
-          <td style="padding: 20px 24px 32px 24px; font-size: 16px; line-height: 1.625; color: #334155; border: none; background-color: #ffffff;">
+          <td style="padding: 20px 24px 32px 24px; font-size: 16px; line-height: 1.625; color: #334155; border: none; background-color: ${contentBgColor};">
             ${bodyContent}
           </td>
         </tr>
       </table>
 
       <!-- Footer -->
-      <div style="background-color: #f8fafc; padding: 32px; text-align: center; border-top: 1px solid #e2e8f0; color: #64748b;">
+      <div style="background-color: ${contentBgColor}; padding: 32px; text-align: center; border-top: 1px solid #e2e8f0; color: ${footerTextColor};">
         ${socialLinksHtml}
-        ${safeFooterText ? `<p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: #64748b;">${safeFooterText}</p>` : ''}
+        ${safeFooterText ? `<p style="margin: 0 0 16px 0; font-size: 12px; line-height: 1.5; color: ${footerTextColor};">${safeFooterText}</p>` : ''}
         ${safeCompanyName && showName ? `
-          <div style="font-size: 12px; line-height: 1.5; color: #94a3b8;">
+          <div style="font-size: 12px; line-height: 1.5; color: ${footerTextColor}; opacity: 0.7;">
             <p style="margin: 0;">Sent via ${safeCompanyName}</p>
           </div>
         ` : ''}
@@ -383,10 +414,10 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
 /**
  * Convenience: fetch design + wrap content in one call.
  */
-export async function wrapNewsletterContent(tenantId: string, bodyContent: string): Promise<string> {
+export async function wrapNewsletterContent(tenantId: string, bodyContent: string, colorOverrides?: NewsletterColorOverrides): Promise<string> {
   try {
     const design = await fetchNewsletterDesign(tenantId);
-    return buildNewsletterEmailHtml(design, bodyContent);
+    return buildNewsletterEmailHtml(design, bodyContent, colorOverrides);
   } catch (err) {
     console.error(`⚠️ [wrapNewsletterContent] Failed to wrap email in master design for tenant ${tenantId}, sending unwrapped:`, err);
     return bodyContent;

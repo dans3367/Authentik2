@@ -540,26 +540,34 @@ export default function NewsletterCreatePage() {
       const logoMR = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? '0' : 'auto';
       const viewportWidths: Record<string, string> = { mobile: "360px", desktop: "100%" };
 
+      const rootProps = dataRef.current?.root?.props;
+      const bodyBg = rootProps?.bodyBackgroundColor || "#f7fafc";
+      const contentBg = rootProps?.backgroundColor || "#ffffff";
+      const footerTextColor = rootProps?.footerTextColor || "#64748b";
+
       return (
         <div style={{
           width: "100%",
+          minHeight: "100%",
           display: "flex",
           justifyContent: "center",
-          alignItems: "flex-start",
+          alignItems: "stretch",
           padding: viewport !== "desktop" ? "20px" : "0",
-          background: viewport !== "desktop" ? "#f5f5f5" : "#f7fafc",
+          background: bodyBg,
           overflow: "auto",
         }}>
           <div style={{
             width: viewport === "desktop" ? "100%" : viewportWidths[viewport],
             maxWidth: viewport === "desktop" ? "620px" : viewportWidths[viewport],
             boxShadow: "0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)",
-            background: "#fff",
+            background: contentBg,
             transform: `scale(${zoom / 100})`,
             transformOrigin: "top center",
             transition: "transform 0.2s ease-out",
             margin: "0 auto",
             fontFamily,
+            display: "flex",
+            flexDirection: "column" as const,
           }}>
             {/* Branded email header from master email design */}
             {useBanner ? (
@@ -660,10 +668,10 @@ export default function NewsletterCreatePage() {
             )}
 
             {/* Puck editor content */}
-            <table width="100%" cellPadding={0} cellSpacing={0} role="presentation" style={{ borderCollapse: "collapse" as const, border: "none" }}>
+            <table width="100%" cellPadding={0} cellSpacing={0} role="presentation" style={{ borderCollapse: "collapse" as const, border: "none", flex: 1 }}>
               <tbody>
                 <tr>
-                  <td style={{ padding: 0, fontSize: "16px", lineHeight: "1.625", color: "#334155" }}>
+                  <td style={{ padding: 0, fontSize: "16px", lineHeight: "1.625", color: "#334155", verticalAlign: "top" }}>
                     {children}
                   </td>
                 </tr>
@@ -672,11 +680,12 @@ export default function NewsletterCreatePage() {
 
             {/* Branded email footer from master email design */}
             <div style={{
-              backgroundColor: "#f8fafc",
+              backgroundColor: contentBg,
               padding: "32px",
               textAlign: "center",
               borderTop: "1px solid #e2e8f0",
-              color: "#64748b",
+              color: footerTextColor,
+              marginTop: "auto",
             }}>
               {socialLinks && (socialLinks.facebook || socialLinks.twitter || socialLinks.instagram || socialLinks.linkedin) && (
                 <div style={{ marginBottom: "24px" }}>
@@ -686,19 +695,19 @@ export default function NewsletterCreatePage() {
                     socialLinks.instagram && "Instagram",
                     socialLinks.linkedin && "LinkedIn",
                   ].filter(Boolean).map((name, i, arr) => (
-                    <span key={name} style={{ color: "#64748b", fontSize: "13px", fontWeight: 500 }}>
+                    <span key={name} style={{ color: footerTextColor, fontSize: "13px", fontWeight: 500 }}>
                       {name}{i < arr.length - 1 ? " | " : ""}
                     </span>
                   ))}
                 </div>
               )}
               {footerText && (
-                <p style={{ margin: "0 0 16px 0", fontSize: "12px", lineHeight: "1.5", color: "#64748b" }}>
+                <p style={{ margin: "0 0 16px 0", fontSize: "12px", lineHeight: "1.5", color: footerTextColor }}>
                   {footerText}
                 </p>
               )}
               {companyName && showName && (
-                <div style={{ fontSize: "12px", lineHeight: "1.5", color: "#94a3b8" }}>
+                <div style={{ fontSize: "12px", lineHeight: "1.5", color: footerTextColor, opacity: 0.7 }}>
                   <p style={{ margin: 0 }}>Sent via {companyName}</p>
                 </div>
               )}
@@ -847,6 +856,7 @@ export default function NewsletterCreatePage() {
         <button
           onClick={() => {
             const bodyHtml = extractPuckEmailHtml();
+            const currentRootProps = dataRef.current?.root?.props;
             const fullHtml = wrapInEmailPreview(bodyHtml, {
               companyName: emailDesign?.companyName || '',
               headerMode: emailDesign?.headerMode,
@@ -860,6 +870,8 @@ export default function NewsletterCreatePage() {
               footerText: emailDesign?.footerText,
               fontFamily: emailDesign?.fontFamily,
               socialLinks: emailDesign?.socialLinks,
+              contentBackgroundColor: currentRootProps?.backgroundColor,
+              bodyBackgroundColor: currentRootProps?.bodyBackgroundColor,
             });
             setPreviewHtml(fullHtml);
             setIsEdit(false);
@@ -1354,6 +1366,7 @@ export default function NewsletterCreatePage() {
           onOpenChange={setPreviewOpen}
           getHtmlContent={getHtmlContent}
           subject={subject || data.root?.props?.title || "Newsletter Preview"}
+          getPuckData={() => JSON.stringify(dataRef.current)}
         />
         <SendNewsletterWizardModal
           isOpen={showSendWizard}
