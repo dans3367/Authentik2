@@ -43,57 +43,142 @@ function TemplatePreviewModal({
         bottom: 0,
         zIndex: 99999,
         display: "flex",
-        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
         background: "rgba(0,0,0,0.6)",
+        padding: "40px 20px",
       }}
       onClick={onClose}
     >
-      {/* Header bar */}
+      {/* Single modal card */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "12px 20px",
+          width: "640px",
+          maxWidth: "100%",
+          maxHeight: "100%",
           background: "#fff",
-          borderBottom: "1px solid #e5e7eb",
-          flexShrink: 0,
-          minHeight: "48px",
-          boxSizing: "border-box",
+          borderRadius: "12px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <span style={{ fontWeight: 600, fontSize: "14px", color: "#111827" }}>
-            {template.name}
-          </span>
-          <span
-            style={{
-              fontSize: "11px",
-              fontWeight: 500,
-              padding: "2px 8px",
-              borderRadius: "4px",
-              background: template.category === "product" ? "#fef3c7" : "#dbeafe",
-              color: template.category === "product" ? "#92400e" : "#1e40af",
-              textTransform: "capitalize",
-            }}
-          >
-            {template.category}
-          </span>
-        </div>
-        <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+        {/* Title row */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "16px 20px 12px",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontWeight: 600, fontSize: "16px", color: "#111827" }}>
+              {template.name}
+            </span>
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 500,
+                padding: "2px 8px",
+                borderRadius: "4px",
+                background: template.category === "product" ? "#fef3c7" : "#dbeafe",
+                color: template.category === "product" ? "#92400e" : "#1e40af",
+                textTransform: "capitalize",
+              }}
+            >
+              {template.category}
+            </span>
+          </div>
+          {/* X close button */}
           <button
             onClick={onClose}
             style={{
-              padding: "6px 16px",
+              width: "28px",
+              height: "28px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "none",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              color: "#6b7280",
+              fontSize: "18px",
+              lineHeight: 1,
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#f3f4f6")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+          >
+            &#x2715;
+          </button>
+        </div>
+
+        <p
+          style={{
+            margin: "0",
+            padding: "0 20px 12px",
+            fontSize: "13px",
+            lineHeight: "1.4",
+            color: "#6b7280",
+            flexShrink: 0,
+          }}
+        >
+          {template.description}
+        </p>
+
+        {/* Scrollable preview */}
+        <div
+          style={{
+            flex: "1 1 0%",
+            overflowY: "auto",
+            overflowX: "hidden",
+            WebkitOverflowScrolling: "touch",
+            borderTop: "1px solid #e5e7eb",
+            borderBottom: "1px solid #e5e7eb",
+            background: "#f9fafb",
+            padding: "24px 20px",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: "580px",
+              margin: "0 auto",
+              background: "#fff",
+              borderRadius: "6px",
+              border: "1px solid #e5e7eb",
+              padding: "20px",
+            }}
+          >
+            <Render config={config} data={template.data} />
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: "8px",
+            padding: "14px 20px",
+            flexShrink: 0,
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              padding: "8px 20px",
               fontSize: "13px",
               fontWeight: 500,
               color: "#374151",
-              background: "#f3f4f6",
+              background: "#fff",
               border: "1px solid #d1d5db",
               borderRadius: "6px",
               cursor: "pointer",
-              lineHeight: "20px",
             }}
           >
             Close
@@ -101,7 +186,7 @@ function TemplatePreviewModal({
           <button
             onClick={onApply}
             style={{
-              padding: "6px 16px",
+              padding: "8px 20px",
               fontSize: "13px",
               fontWeight: 600,
               color: "#fff",
@@ -109,40 +194,10 @@ function TemplatePreviewModal({
               border: "none",
               borderRadius: "6px",
               cursor: "pointer",
-              lineHeight: "20px",
             }}
           >
             Use this template
           </button>
-        </div>
-      </div>
-
-      {/* Scrollable preview area */}
-      <div
-        style={{
-          flex: "1 1 0%",
-          overflowY: "auto",
-          overflowX: "hidden",
-          WebkitOverflowScrolling: "touch",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "flex-start",
-          padding: "32px 20px",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          style={{
-            width: "600px",
-            maxWidth: "100%",
-            background: "#fff",
-            borderRadius: "8px",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.15)",
-          }}
-        >
-          <div style={{ padding: "24px" }}>
-            <Render config={config} data={template.data} />
-          </div>
         </div>
       </div>
     </div>,
