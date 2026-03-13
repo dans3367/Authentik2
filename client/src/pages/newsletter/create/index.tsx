@@ -5,6 +5,7 @@ const LazyNotionEditor = lazy(() => import("@/components/NotionLikeEditor"));
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createConfig, initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
+import { templatesPlugin } from "@/config/puck/templates-plugin";
 import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X, Rocket, Eye } from "lucide-react";
 import { SendPreviewDialog } from "@/components/SendPreviewDialog";
 import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
@@ -1337,6 +1338,7 @@ export default function NewsletterCreatePage() {
                     onPublish={handlePublish}
                     iframe={iframeConfig}
                     overrides={puckOverrides}
+                    plugins={[templatesPlugin()]}
                   />
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
