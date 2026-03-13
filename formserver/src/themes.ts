@@ -339,6 +339,42 @@ export const themes: Record<string, ThemeStyles> = {
     checkbox: 'h-5 w-5 text-blue-600 focus:ring-blue-600 border-2 border-blue-300 rounded',
     button: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 px-6 rounded-xl uppercase tracking-wide transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
     background: 'bg-gradient-to-br from-blue-50 to-indigo-100'
+  },
+
+  'earthy': {
+    id: 'earthy',
+    name: 'Earthy',
+    container: 'min-h-screen py-8',
+    card: 'bg-amber-50/90 backdrop-blur-sm rounded-2xl shadow-lg border border-amber-200',
+    header: 'p-6 border-b border-amber-200',
+    title: 'text-2xl font-semibold text-amber-900 tracking-tight',
+    description: 'text-amber-700 mt-2',
+    label: 'text-sm font-medium text-amber-800',
+    input: 'w-full px-4 py-3 bg-white/70 border border-amber-300 rounded-xl transition-all duration-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:outline-none text-amber-900 placeholder-amber-400',
+    textarea: 'w-full px-4 py-3 bg-white/70 border border-amber-300 rounded-xl transition-all duration-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:outline-none text-amber-900 placeholder-amber-400 resize-none',
+    select: 'w-full px-4 py-3 bg-white/70 border border-amber-300 rounded-xl transition-all duration-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:outline-none text-amber-900',
+    radio: 'h-4 w-4 text-orange-600 focus:ring-orange-500 border-amber-400',
+    checkbox: 'h-4 w-4 text-orange-600 focus:ring-orange-500 border-amber-400 rounded',
+    button: 'w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
+    background: 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'
+  },
+
+  'newspaper': {
+    id: 'newspaper',
+    name: 'Newspaper',
+    container: 'min-h-screen py-8',
+    card: 'bg-stone-50 rounded-none shadow-md border-t-4 border-b-4 border-stone-800',
+    header: 'p-6 border-b-2 border-stone-300',
+    title: 'text-3xl font-serif font-bold text-stone-900 tracking-tight leading-tight',
+    description: 'text-stone-600 mt-2 font-serif italic',
+    label: 'text-xs font-bold text-stone-700 uppercase tracking-widest',
+    input: 'w-full px-3 py-2 bg-white border-b-2 border-stone-300 rounded-none transition-colors duration-200 focus:border-stone-800 focus:outline-none text-stone-900 font-serif',
+    textarea: 'w-full px-3 py-2 bg-white border-b-2 border-stone-300 rounded-none transition-colors duration-200 focus:border-stone-800 focus:outline-none text-stone-900 font-serif resize-none',
+    select: 'w-full px-3 py-2 bg-white border-b-2 border-stone-300 rounded-none transition-colors duration-200 focus:border-stone-800 focus:outline-none text-stone-900 font-serif',
+    radio: 'h-4 w-4 text-stone-800 focus:ring-stone-600 border-stone-400',
+    checkbox: 'h-4 w-4 text-stone-800 focus:ring-stone-600 border-stone-400',
+    button: 'w-full bg-stone-800 hover:bg-stone-900 text-stone-50 font-serif font-bold py-3 px-6 rounded-none border-2 border-stone-800 uppercase tracking-wider transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
+    background: 'bg-stone-100'
   }
 };
 

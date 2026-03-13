@@ -1623,8 +1623,6 @@
 .table-row-dropdown {
   position: absolute;
   top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
   margin-top: 4px;
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -1633,17 +1631,33 @@
   padding: 4px;
   min-width: 210px;
   z-index: 10001;
-  animation: table-dropdown-in 0.12s ease-out;
   max-height: 400px;
   overflow-y: auto;
 }
 
-.table-row-dropdown {
-  transform: none;
-  left: auto;
+.table-col-dropdown {
+  left: 50%;
+  transform: translateX(-50%);
+  animation: table-col-dropdown-in 0.12s ease-out;
 }
 
-@keyframes table-dropdown-in {
+.table-row-dropdown {
+  left: auto;
+  animation: table-row-dropdown-in 0.12s ease-out;
+}
+
+@keyframes table-col-dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes table-row-dropdown-in {
   from {
     opacity: 0;
     transform: translateY(-4px);
@@ -1716,7 +1730,7 @@
   margin-top: 2px;
   margin-left: 8px;
   margin-bottom: 2px;
-  animation: table-dropdown-in 0.1s ease-out;
+  animation: table-row-dropdown-in 0.1s ease-out;
 }
 
 .table-color-swatch {
