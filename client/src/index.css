@@ -95,6 +95,17 @@
     @apply border-border;
   }
 
+  /* Puck editor layout tables use role="presentation" and must never show
+     borders.  The global border-border rule above sets border-color on every
+     element; combined with any inherited border-style/width this can cause
+     unwanted visible borders on Puck's table-based email layout. */
+  table[role="presentation"],
+  table[role="presentation"] td,
+  table[role="presentation"] th,
+  table[role="presentation"] tr {
+    border: none !important;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }

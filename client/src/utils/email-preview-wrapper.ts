@@ -138,77 +138,94 @@ function esc(str: string): string {
  * Puck (classic editor) uses `<table role="presentation">` for layout;
  * those must NOT receive borders/padding.  Only TipTap data tables
  * (which lack role="presentation") get styled.
+ *
+ * Uses a linear scan with a depth counter to correctly handle nested tables.
  */
 function styleTablesForEmail(html: string): string {
+  // Track nesting depth inside presentation tables.
+  // When presDepth > 0 we are inside a layout table and must not add borders.
+  let presDepth = 0;
+  // Also track whether we're inside a data table (for margin zeroing)
+  let dataDepth = 0;
+
+  // Match every table-related opening/closing tag in one pass
   html = html.replace(
-    /<table\b[^>]*>[\s\S]*?<\/table>/gi,
-    (tableBlock) => {
-      const openTagMatch = tableBlock.match(/^<table\b([^>]*)>/i);
-      if (!openTagMatch) return tableBlock;
-      const attrs = openTagMatch[1];
+    /<(\/?)(?:table|td|th)\b[^>]*>/gi,
+    (fullTag) => {
+      const tagLower = fullTag.toLowerCase();
 
-      // Skip layout tables – Puck blocks always set role="presentation"
-      if (/role\s*=\s*["']presentation["']/i.test(attrs)) {
-        return tableBlock;
+      // ── Closing tags: adjust depth ──
+      if (tagLower.startsWith('</table')) {
+        if (presDepth > 0) { presDepth--; return fullTag; }
+        if (dataDepth > 0) { dataDepth--; }
+        return fullTag;
       }
 
-      // ── Data table: apply border / padding styles ──
-
-      let styled = tableBlock.replace(
-        /^<table([^>]*?)style="([^"]*?)"([^>]*?)>/i,
-        (_: string, before: string, existingStyle: string, after: string) =>
-          `<table${before}style="border-collapse: collapse; width: 100%; ${existingStyle}"${after}>`
-      );
-      if (styled === tableBlock) {
-        styled = styled.replace(
-          /^<table(?![^>]*style=)([^>]*?)>/i,
-          '<table style="border-collapse: collapse; width: 100%;"$1>'
-        );
-      }
-
-      // Style <th> tags
-      styled = styled.replace(
-        /<th([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
-        (_: string, before: string, existingStyle: string, after: string) => {
-          const newStyle = `border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top; ${existingStyle}`;
-          return `<th${before}style="${newStyle}"${after}>`;
+      // ── Opening <table> ──
+      if (tagLower.startsWith('<table')) {
+        const isPresentation = /role\s*=\s*["']presentation["']/i.test(fullTag);
+        if (isPresentation || presDepth > 0) {
+          presDepth++;
+          return fullTag;
         }
-      );
-      styled = styled.replace(
-        /<th(?![^>]*style=)([^>]*?)>/gi,
-        '<th style="border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top;"$1>'
-      );
-
-      // Style <td> tags
-      styled = styled.replace(
-        /<td([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
-        (_: string, before: string, existingStyle: string, after: string) => {
-          const newStyle = `border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top; ${existingStyle}`;
-          return `<td${before}style="${newStyle}"${after}>`;
-        }
-      );
-      styled = styled.replace(
-        /<td(?![^>]*style=)([^>]*?)>/gi,
-        '<td style="border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top;"$1>'
-      );
-
-      // Zero-out margins on block elements inside table cells
-      styled = styled.replace(
-        /<(t[dh])\b[^>]*>[\s\S]*?<\/\1>/gi,
-        (cellBlock) => {
-          return cellBlock.replace(
-            /<(p|div|ul|ol|h[1-6])(\s[^>]*?)style="([^"]*?)"([^>]*?)>/gi,
-            (_m: string, tag: string, before: string, style: string, after: string) =>
-              `<${tag}${before}style="margin: 0; padding: 0; ${style}"${after}>`
-          ).replace(
-            /<(p|div|ul|ol|h[1-6])(?![^>]*style=)(\s[^>]*?)?>/gi,
-            (_m: string, tag: string, attrs: string) =>
-              `<${tag} style="margin: 0; padding: 0;"${attrs || ''}>`
+        // Data table
+        dataDepth++;
+        // Add border-collapse and width
+        if (/style\s*=\s*"/i.test(fullTag)) {
+          return fullTag.replace(
+            /style="([^"]*)"/i,
+            (_: string, s: string) => `style="border-collapse: collapse; width: 100%; ${s}"`
           );
         }
-      );
+        return fullTag.replace(/<table/i, '<table style="border-collapse: collapse; width: 100%;"');
+      }
 
-      return styled;
+      // Inside a presentation table → don't touch td/th
+      if (presDepth > 0) return fullTag;
+
+      // Inside a data table → style td/th
+      if (dataDepth > 0) {
+        if (tagLower.startsWith('<th')) {
+          const thStyle = 'border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top;';
+          if (/style\s*=\s*"/i.test(fullTag)) {
+            return fullTag.replace(
+              /style="([^"]*)"/i,
+              (_: string, s: string) => `style="${thStyle} ${s}"`
+            );
+          }
+          return fullTag.replace(/<th/i, `<th style="${thStyle}"`);
+        }
+        if (tagLower.startsWith('<td')) {
+          const tdStyle = 'border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top;';
+          if (/style\s*=\s*"/i.test(fullTag)) {
+            return fullTag.replace(
+              /style="([^"]*)"/i,
+              (_: string, s: string) => `style="${tdStyle} ${s}"`
+            );
+          }
+          return fullTag.replace(/<td/i, `<td style="${tdStyle}"`);
+        }
+      }
+
+      return fullTag;
+    }
+  );
+
+  // Second pass: zero-out margins on block elements inside data-table cells.
+  // Data table cells now have the injected "border: 1px solid" marker so we
+  // can identify them without nesting logic.
+  html = html.replace(
+    /<(t[dh])\b[^>]*border: 1px solid[^>]*>[\s\S]*?<\/\1>/gi,
+    (cellBlock) => {
+      return cellBlock.replace(
+        /<(p|div|ul|ol|h[1-6])(\s[^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+        (_m: string, tag: string, before: string, style: string, after: string) =>
+          `<${tag}${before}style="margin: 0; padding: 0; ${style}"${after}>`
+      ).replace(
+        /<(p|div|ul|ol|h[1-6])(?![^>]*style=)(\s[^>]*?)?>/gi,
+        (_m: string, tag: string, attrs: string) =>
+          `<${tag} style="margin: 0; padding: 0;"${attrs || ''}>`
+      );
     }
   );
 
@@ -345,9 +362,9 @@ export function wrapInEmailPreview(
     </div>
     `}
 
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">
       <tr>
-        <td style="padding:20px 24px 32px 24px;font-size:16px;line-height:1.625;color:#334155;">
+        <td style="padding:20px 24px 32px 24px;font-size:16px;line-height:1.625;color:#334155;border:none;">
           ${safeBodyContent}
         </td>
       </tr>

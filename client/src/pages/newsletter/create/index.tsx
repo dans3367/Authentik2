@@ -660,7 +660,7 @@ export default function NewsletterCreatePage() {
             )}
 
             {/* Puck editor content */}
-            <table width="100%" cellPadding={0} cellSpacing={0} style={{ borderCollapse: "collapse" as const }}>
+            <table width="100%" cellPadding={0} cellSpacing={0} role="presentation" style={{ borderCollapse: "collapse" as const, border: "none" }}>
               <tbody>
                 <tr>
                   <td style={{ padding: 0, fontSize: "16px", lineHeight: "1.625", color: "#334155" }}>
