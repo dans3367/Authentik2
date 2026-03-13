@@ -40,3 +40,5 @@ xxcardprocessor-go/cardprocessor
 .env.local
 env.local
 .claude-flow
+.claude
+.mcp.json

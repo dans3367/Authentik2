@@ -1452,7 +1452,7 @@ export default function NewsletterCreatePage() {
             display: "flex",
             justifyContent: "center",
             alignItems: "flex-start",
-            padding: "24px",
+            padding: "24px 0",
             overflow: "auto",
           }}
         >

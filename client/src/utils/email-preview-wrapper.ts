@@ -332,7 +332,7 @@ export function wrapInEmailPreview(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     /* Reset for email-like rendering inside iframe */
-    body { margin: 0; padding: 0; }
+    html, body { margin: 0; padding: 0; height: 100%; }
     img { max-width: 100%; }
     * { box-sizing: border-box; }
     /* Match editor table cell spacing */
@@ -342,8 +342,8 @@ export function wrapInEmailPreview(
     }
   </style>
 </head>
-<body style="font-family:${fontFamily};margin:0;padding:0;background-color:#f7fafc;-webkit-font-smoothing:antialiased;">
-  <div style="max-width:600px;margin:0 auto;background:white;overflow:hidden;">
+<body style="font-family:${fontFamily};margin:0;padding:0;background-color:#ffffff;-webkit-font-smoothing:antialiased;min-height:100%;">
+  <div style="background-color:#ffffff;display:flex;flex-direction:column;min-height:100%;">
 
     <!-- Hero Header -->
     ${useBanner ? `
@@ -356,22 +356,22 @@ export function wrapInEmailPreview(
     ` : ''}
     ` : `
     <div style="padding:40px 24px;text-align:${logoAlign};background-color:${primaryColor};color:#ffffff;">
-      ${logoSection}
+      ${logoSection}sdsdsdddsdsd
       ${companyName && showName ? `<h1 style="margin:0 0 10px 0;font-size:24px;font-weight:bold;letter-spacing:-0.025em;color:#ffffff;">${companyName}</h1>` : ''}
       ${headerText ? `<p style="margin:0 ${logoMR} 0 ${logoML};font-size:16px;opacity:0.95;max-width:400px;line-height:1.5;color:#ffffff;">${headerText}</p>` : ''}
     </div>
     `}
 
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;flex:1;">
       <tr>
-        <td style="padding:20px 24px 32px 24px;font-size:16px;line-height:1.625;color:#334155;border:none;">
+        <td style="padding:20px 24px 32px 24px;font-size:16px;line-height:1.625;color:#334155;border:none;background-color:#ffffff;vertical-align:top;">
           ${safeBodyContent}
         </td>
       </tr>
     </table>
 
     <!-- Footer -->
-    <div style="background-color:#f8fafc;padding:32px;text-align:center;border-top:1px solid #e2e8f0;color:#64748b;">
+    <div style="background-color:#f8fafc;padding:32px;text-align:center;border-top:1px solid #e2e8f0;color:#64748b;margin-top:auto;">
       ${socialLinksHtml}
       ${footerText ? `<p style="margin:0 0 16px 0;font-size:12px;line-height:1.5;color:#64748b;">${footerText}</p>` : ''}
       ${companyName && showName ? `<div style="font-size:12px;line-height:1.5;color:#94a3b8;"><p style="margin:0;">Sent via ${companyName}</p></div>` : ''}

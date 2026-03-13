@@ -334,9 +334,9 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
       img { max-width: 100% !important; height: auto !important; }
     </style>
   </head>
-  <body style="font-family: ${fontFamily}; margin: 0; padding: 0; background-color: #f7fafc; -webkit-font-smoothing: antialiased;">
+  <body style="font-family: ${fontFamily}; margin: 0; padding: 0; background-color: #ffffff; -webkit-font-smoothing: antialiased;">
     <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center" style="width:600px;"><tr><td><![endif]-->
-    <div style="max-width: 600px; margin: 0 auto; background: white; overflow: hidden;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; overflow: hidden;">
 
       <!-- Hero Header -->
       ${useBanner ? `
@@ -357,7 +357,7 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
 
       <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;">
         <tr>
-          <td style="padding: 20px 24px 32px 24px; font-size: 16px; line-height: 1.625; color: #334155; border: none;">
+          <td style="padding: 20px 24px 32px 24px; font-size: 16px; line-height: 1.625; color: #334155; border: none; background-color: #ffffff;">
             ${bodyContent}
           </td>
         </tr>
