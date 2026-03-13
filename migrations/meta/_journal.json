@@ -421,6 +421,13 @@
       "when": 1772995878661,
       "tag": "0059_vengeful_ser_duncan",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1773417937861,
+      "tag": "0060_supreme_menace",
+      "breakpoints": true
     }
   ]
 }

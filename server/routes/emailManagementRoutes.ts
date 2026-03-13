@@ -3489,6 +3489,7 @@ emailManagementRoutes.get("/blog-design", authenticateToken, requireTenant, asyn
         primaryColor: '#3B82F6',
         secondaryColor: '#1E40AF',
         accentColor: '#10B981',
+        pageBackgroundColor: '#F3F4F6',
         fontFamily: 'Arial, sans-serif',
         headerText: null,
         footerText: company?.name ? `© ${new Date().getFullYear()} ${company.name}. All rights reserved.` : null,
@@ -3522,6 +3523,7 @@ emailManagementRoutes.put("/blog-design", authenticateToken, requireTenant, requ
       primaryColor,
       secondaryColor,
       accentColor,
+      pageBackgroundColor,
       fontFamily,
       headerText,
       footerText,
@@ -3571,6 +3573,11 @@ emailManagementRoutes.put("/blog-design", authenticateToken, requireTenant, requ
       const validated = validateDesignColor(accentColor);
       if (!validated) return res.status(400).json({ message: 'Invalid accentColor. Must be a hex color (e.g. #10B981)' });
       safeColors.accentColor = validated;
+    }
+    if (pageBackgroundColor !== undefined) {
+      const validated = validateDesignColor(pageBackgroundColor);
+      if (!validated) return res.status(400).json({ message: 'Invalid pageBackgroundColor. Must be a hex color (e.g. #F3F4F6)' });
+      safeColors.pageBackgroundColor = validated;
     }
 
     // URLs
@@ -3622,6 +3629,7 @@ emailManagementRoutes.put("/blog-design", authenticateToken, requireTenant, requ
         primaryColor: safeColors.primaryColor ?? existingDesign.primaryColor,
         secondaryColor: safeColors.secondaryColor ?? existingDesign.secondaryColor,
         accentColor: safeColors.accentColor ?? existingDesign.accentColor,
+        pageBackgroundColor: safeColors.pageBackgroundColor ?? existingDesign.pageBackgroundColor,
         fontFamily: safeFontFamily ?? existingDesign.fontFamily,
         headerText: headerText !== undefined ? safeHeaderText : existingDesign.headerText,
         footerText: footerText !== undefined ? safeFooterText : existingDesign.footerText,
@@ -3651,6 +3659,7 @@ emailManagementRoutes.put("/blog-design", authenticateToken, requireTenant, requ
           primaryColor: safeColors.primaryColor || '#3B82F6',
           secondaryColor: safeColors.secondaryColor || '#1E40AF',
           accentColor: safeColors.accentColor || '#10B981',
+          pageBackgroundColor: safeColors.pageBackgroundColor || '#F3F4F6',
           fontFamily: safeFontFamily || 'Arial, sans-serif',
           headerText: safeHeaderText || null,
           footerText: safeFooterText || null,

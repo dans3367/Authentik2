@@ -14,6 +14,7 @@ interface Branding {
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
+  pageBackgroundColor?: string;
   fontFamily: string;
   headerText: string | null;
   footerText: string | null;
@@ -99,7 +100,7 @@ export default function PublicNewsletterHub() {
   const logoHeight = logoSizeMap[branding.logoSize] || "56px";
 
   return (
-    <div className="min-h-screen bg-gray-100" style={{ fontFamily: branding.fontFamily }}>
+    <div className="min-h-screen" style={{ fontFamily: branding.fontFamily, backgroundColor: branding.pageBackgroundColor || '#F3F4F6' }}>
       {/* Boxed layout container */}
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">

@@ -51,6 +51,7 @@ async function getBrandingForTenant(tenantId: string, tenantName: string) {
     primaryColor: designRow?.primaryColor || '#3B82F6',
     secondaryColor: designRow?.secondaryColor || '#1E40AF',
     accentColor: designRow?.accentColor || '#10B981',
+    pageBackgroundColor: (designRow as any)?.pageBackgroundColor || '#F3F4F6',
     fontFamily: designRow?.fontFamily || 'Arial, sans-serif',
     headerText: designRow?.headerText || null,
     footerText: designRow?.footerText || null,

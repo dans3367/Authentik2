@@ -2989,6 +2989,7 @@ export const blogDesign = pgTable("blog_design", {
   primaryColor: text("primary_color").default('#3B82F6'),
   secondaryColor: text("secondary_color").default('#1E40AF'),
   accentColor: text("accent_color").default('#10B981'),
+  pageBackgroundColor: text("page_background_color").default('#F3F4F6'),
   fontFamily: text("font_family").default('Arial, sans-serif'),
   headerText: text("header_text"),
   footerText: text("footer_text"),

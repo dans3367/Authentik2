@@ -50,6 +50,7 @@ interface BlogDesignData {
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
+  pageBackgroundColor?: string;
   fontFamily: string;
   headerText?: string;
   footerText?: string;
@@ -608,7 +609,7 @@ export default function ManagementBlogDesign() {
                       </div>
                       <div className="text-left">
                         <h3 className="font-semibold text-base">Color Scheme</h3>
-                        <p className="text-sm text-muted-foreground font-normal">Primary, secondary & accent colors</p>
+                        <p className="text-sm text-muted-foreground font-normal">Primary, secondary, accent & background colors</p>
                       </div>
                     </div>
                   </AccordionTrigger>
@@ -629,6 +630,12 @@ export default function ManagementBlogDesign() {
                       label="Accent Color"
                       color={draft.accentColor || "#000000"}
                       onChange={(c) => updateField("accentColor", c)}
+                    />
+                    <Separator />
+                    <ColorPicker
+                      label="Page Background Color"
+                      color={draft.pageBackgroundColor || "#F3F4F6"}
+                      onChange={(c) => updateField("pageBackgroundColor", c)}
                     />
                   </AccordionContent>
                 </AccordionItem>
@@ -817,7 +824,7 @@ export default function ManagementBlogDesign() {
 
                 {previewPage === "hub" ? (
                   /* ─── Newsletter Hub Preview ─── */
-                  <div className="min-h-[500px]">
+                  <div className="min-h-[500px]" style={{ backgroundColor: draft.pageBackgroundColor || '#F3F4F6' }}>
                     {/* Header */}
                     {(draft.headerMode || 'logo') === 'banner' && draft.bannerUrl && isSafeUrl(draft.bannerUrl) ? (
                       <div>
