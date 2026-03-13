@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { betterAuthUser, betterAuthSession, temp2faSessions } from '@shared/schema';
-import { eq, and, sql, lt } from 'drizzle-orm';
+import { eq, and, sql, lt, not } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth-middleware';
@@ -72,10 +72,10 @@ loginRoutes.post('/resend-verification', async (req, res) => {
     if (user) {
       if (user.emailVerified) {
         console.log('ℹ️ [Resend Verification] User already verified:', normalizedEmail);
+        // Return identical response to prevent account enumeration
         return res.json({
           message: 'Verification email sent successfully',
-          success: true,
-          alreadyVerified: true
+          success: true
         });
       }
 
@@ -711,11 +711,6 @@ loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
         requiresTwoFactor: false,
         twoFactorEnabled: false,
         verified: true, // No 2FA means always verified
-        debug: {
-          userEmail: user.email,
-          twoFactorEnabled: user.twoFactorEnabled,
-          hasSecret: !!user.twoFactorSecret
-        }
       });
     }
 
@@ -729,10 +724,6 @@ loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
         requiresTwoFactor: true,
         twoFactorEnabled: true,
         verified: false,
-        debug: {
-          userEmail: user.email,
-          sessionToken: 'none'
-        }
       });
     }
 
@@ -1019,6 +1010,25 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
         updatedAt: new Date(),
       })
       .where(eq(betterAuthUser.id, userId));
+
+    // Invalidate all existing sessions for this user (except current) to prevent
+    // stale sessions from being used with the old email
+    const currentSessionToken = req.cookies?.['better-auth.session_token'];
+    if (currentSessionToken) {
+      const baseToken = currentSessionToken.indexOf('.') > 0
+        ? currentSessionToken.substring(0, currentSessionToken.indexOf('.'))
+        : currentSessionToken;
+      // Delete all sessions except the current one
+      await db.delete(betterAuthSession)
+        .where(and(
+          eq(betterAuthSession.userId, userId),
+          not(eq(betterAuthSession.token, baseToken))
+        ));
+    } else {
+      // No current session token — invalidate all sessions
+      await db.delete(betterAuthSession)
+        .where(eq(betterAuthSession.userId, userId));
+    }
 
     // Generate new verification token
     const secret = getAuthSecret();

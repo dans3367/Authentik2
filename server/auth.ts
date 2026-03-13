@@ -26,6 +26,8 @@ const authInstance = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    minPasswordLength: 10,
+    maxPasswordLength: 128,
     // Password reset functionality will be handled by custom implementation
     // Better Auth hooks will manage tenant synchronization
   },

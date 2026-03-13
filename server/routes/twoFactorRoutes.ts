@@ -8,6 +8,35 @@ import * as qrcode from 'qrcode';
 
 export const twoFactorRoutes = Router();
 
+// Server-side store for pending 2FA secrets (keyed by userId, auto-expires)
+const pending2FASecrets = new Map<string, { secret: string; expiresAt: number }>();
+const PENDING_2FA_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function storePending2FASecret(userId: string, secret: string) {
+  // Clean up expired entries (cap at 1000)
+  if (pending2FASecrets.size > 1000) {
+    const now = Date.now();
+    Array.from(pending2FASecrets.entries()).forEach(([key, val]) => {
+      if (val.expiresAt < now) pending2FASecrets.delete(key);
+    });
+  }
+  pending2FASecrets.set(userId, { secret, expiresAt: Date.now() + PENDING_2FA_TTL_MS });
+}
+
+function getPending2FASecret(userId: string): string | null {
+  const entry = pending2FASecrets.get(userId);
+  if (!entry) return null;
+  if (entry.expiresAt < Date.now()) {
+    pending2FASecrets.delete(userId);
+    return null;
+  }
+  return entry.secret;
+}
+
+function clearPending2FASecret(userId: string) {
+  pending2FASecrets.delete(userId);
+}
+
 // Helper function to get user from betterAuthUser table
 export async function getUser(userId: string) {
   const user = await db.query.betterAuthUser.findFirst({
@@ -48,12 +77,10 @@ twoFactorRoutes.post('/setup', authenticateToken, async (req: any, res) => {
     // Generate QR code
     const qrCodeDataURL = await qrcode.toDataURL(otpauth);
 
-    // Store temporary secret (not yet enabled)
-    // We'll store it in a temporary field or cache for now
-    // In production, consider using Redis or a temporary table
+    // Store secret server-side until user verifies and enables 2FA
+    storePending2FASecret(userId, secret);
 
     res.json({
-      secret,
       qrCode: qrCodeDataURL,
       otpauth,
     });
@@ -68,10 +95,16 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const tenantId = req.user.tenantId;
-    const { token, secret } = req.body;
+    const { token } = req.body;
 
-    if (!token || !secret) {
-      return res.status(400).json({ message: 'Token and secret are required' });
+    if (!token) {
+      return res.status(400).json({ message: 'Verification token is required' });
+    }
+
+    // Retrieve the pending secret from server-side storage (NOT from client)
+    const secret = getPending2FASecret(userId);
+    if (!secret) {
+      return res.status(400).json({ message: '2FA setup has expired or was not initiated. Please start setup again.' });
     }
 
     // Get or create user using helper function
@@ -85,10 +118,11 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
 
     // Check if 2FA is already enabled
     if (user.twoFactorEnabled) {
+      clearPending2FASecret(userId);
       return res.status(400).json({ message: '2FA is already enabled' });
     }
 
-    // Verify the token with the provided secret
+    // Verify the token with the server-stored secret
     const isValid = authenticator.verify({ token, secret });
 
     if (!isValid) {
@@ -121,16 +155,10 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
 
     console.log(`🔍 [2FA Enable] Verification - Updated user 2FA status: ${updatedUser?.twoFactorEnabled}, has secret: ${!!updatedUser?.twoFactorSecret}`);
 
-    res.json({ 
-      message: '2FA enabled successfully',
-      debug: {
-        originalUserId: userId,
-        actualUserId: user.id,
-        rowsAffected: updateResult.rowCount,
-        verifiedEnabled: updatedUser?.twoFactorEnabled,
-        verifiedHasSecret: !!updatedUser?.twoFactorSecret
-      }
-    });
+    // Clear the pending secret now that 2FA is enabled
+    clearPending2FASecret(userId);
+
+    res.json({ message: '2FA enabled successfully' });
   } catch (error) {
     console.error('2FA enable error:', error);
     res.status(500).json({ message: 'Failed to enable 2FA' });
@@ -254,16 +282,8 @@ twoFactorRoutes.get('/status', authenticateToken, async (req: any, res) => {
     const result = {
       enabled: user.twoFactorEnabled || false,
       hasSecret: !!user.twoFactorSecret,
-      debug: {
-        userId: user.id,
-        email: user.email,
-        tenantId: user.tenantId,
-        twoFactorEnabled: user.twoFactorEnabled,
-        hasSecret: !!user.twoFactorSecret
-      }
     };
 
-    console.log(`📊 [2FA Status] Response:`, result);
     res.json(result);
   } catch (error) {
     console.error('❌ [2FA Status] Error:', error);

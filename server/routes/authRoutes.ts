@@ -160,9 +160,12 @@ authRoutes.delete("/user-sessions", authenticateToken, async (req: any, res) => 
       return res.status(400).json({ message: 'Cannot delete current session. Use logout instead.' });
     }
 
-    // Delete the session from Better Auth table
+    // Delete the session from Better Auth table (scoped to user for defense-in-depth)
     const deletedSession = await db.delete(betterAuthSession)
-      .where(eq(betterAuthSession.id, sessionId))
+      .where(and(
+        eq(betterAuthSession.id, sessionId),
+        eq(betterAuthSession.userId, userId)
+      ))
       .returning({ id: betterAuthSession.id });
 
     console.log('✅ [Session Delete] Successfully deleted session:', sessionId);

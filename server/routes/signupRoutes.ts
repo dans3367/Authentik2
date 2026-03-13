@@ -44,16 +44,22 @@ signupRoutes.post("/store-company-name", storeCompanyNameLimiter, async (req, re
     // Limit total pending entries to prevent memory DoS
     global.pendingCompanyNames = global.pendingCompanyNames || {};
     const pendingCount = Object.keys(global.pendingCompanyNames).length;
-    if (pendingCount >= 1000) {
-      return res.status(503).json({ message: 'Service temporarily unavailable, please try again later' });
+    if (pendingCount >= 500) {
+      // Evict oldest entries (those closest to expiry) to make room
+      const keys = Object.keys(global.pendingCompanyNames);
+      const toRemove = keys.slice(0, Math.max(1, Math.floor(keys.length * 0.1)));
+      for (const key of toRemove) {
+        delete global.pendingCompanyNames[key];
+      }
     }
 
-    global.pendingCompanyNames[email.toLowerCase()] = companyName;
+    const normalizedKey = email.toLowerCase();
+    global.pendingCompanyNames[normalizedKey] = companyName;
 
     // Clean up after 5 minutes to prevent memory leaks
     setTimeout(() => {
-      if (global.pendingCompanyNames && global.pendingCompanyNames[email.toLowerCase()]) {
-        delete global.pendingCompanyNames[email.toLowerCase()];
+      if (global.pendingCompanyNames && global.pendingCompanyNames[normalizedKey]) {
+        delete global.pendingCompanyNames[normalizedKey];
       }
     }, 5 * 60 * 1000);
 

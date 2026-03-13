@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { sql } from 'drizzle-orm';
-import { betterAuthUser, tenants, companies, forms } from '@shared/schema';
+import { sql, and, eq } from 'drizzle-orm';
+import { betterAuthUser, tenants, companies, forms, refreshTokens } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 
 export const adminRoutes = Router();
@@ -250,9 +250,12 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
       return res.status(400).json({ message: 'Invalid role' });
     }
 
-    // Check if user exists
+    // Check if user exists within the same tenant
     const existingUser = await db.query.betterAuthUser.findFirst({
-      where: sql`${betterAuthUser.id} = ${userId}`,
+      where: and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ),
     });
 
     if (!existingUser) {
@@ -274,14 +277,17 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
     if (existingUser.role === 'Owner' && role !== 'Owner') {
       const ownerCount = await db.select({
         count: sql<number>`count(*)`,
-      }).from(betterAuthUser).where(sql`${betterAuthUser.role} = 'Owner'`);
+      }).from(betterAuthUser).where(and(
+        eq(betterAuthUser.role, 'Owner'),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ));
 
       if (ownerCount[0].count <= 1) {
         return res.status(400).json({ message: 'Cannot demote the only owner' });
       }
     }
 
-    // Update user
+    // Update user (tenant-scoped)
     await db.update(betterAuthUser)
       .set({
         firstName,
@@ -291,7 +297,10 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
         isActive: isActive ?? true,
         updatedAt: new Date(),
       })
-      .where(sql`${betterAuthUser.id} = ${userId}`);
+      .where(and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ));
 
     res.json({ message: 'User updated successfully' });
   } catch (error) {
@@ -310,9 +319,12 @@ adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Admin
       return res.status(400).json({ message: 'isActive must be a boolean value' });
     }
 
-    // Check if user exists
+    // Check if user exists within the same tenant
     const user = await db.query.betterAuthUser.findFirst({
-      where: sql`${betterAuthUser.id} = ${userId}`,
+      where: and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ),
     });
 
     if (!user) {
@@ -328,20 +340,27 @@ adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Admin
     if (user.role === 'Owner' && !isActive) {
       const ownerCount = await db.select({
         count: sql<number>`count(*)`,
-      }).from(betterAuthUser).where(sql`${betterAuthUser.role} = 'Owner' AND ${betterAuthUser.isActive} = true`);
+      }).from(betterAuthUser).where(and(
+        eq(betterAuthUser.role, 'Owner'),
+        eq(betterAuthUser.isActive, true),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ));
 
       if (ownerCount[0].count <= 1) {
         return res.status(400).json({ message: 'Cannot deactivate the only active owner' });
       }
     }
 
-    // Update user status
+    // Update user status (tenant-scoped)
     await db.update(betterAuthUser)
       .set({
         isActive,
         updatedAt: new Date(),
       })
-      .where(sql`${betterAuthUser.id} = ${userId}`);
+      .where(and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ));
 
     res.json({
       message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
@@ -364,9 +383,12 @@ adminRoutes.patch("/users/:userId/role", authenticateToken, requireRole('Adminis
       return res.status(400).json({ message: 'Invalid role' });
     }
 
-    // Check if user exists
+    // Check if user exists within the same tenant
     const user = await db.query.betterAuthUser.findFirst({
-      where: sql`${betterAuthUser.id} = ${userId}`,
+      where: and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ),
     });
 
     if (!user) {
@@ -377,20 +399,26 @@ adminRoutes.patch("/users/:userId/role", authenticateToken, requireRole('Adminis
     if (user.role === 'Owner' && role !== 'Owner') {
       const ownerCount = await db.select({
         count: sql<number>`count(*)`,
-      }).from(betterAuthUser).where(sql`${betterAuthUser.role} = 'Owner'`);
+      }).from(betterAuthUser).where(and(
+        eq(betterAuthUser.role, 'Owner'),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ));
 
       if (ownerCount[0].count <= 1) {
         return res.status(400).json({ message: 'Cannot demote the only owner' });
       }
     }
 
-    // Update user role
+    // Update user role (tenant-scoped)
     await db.update(betterAuthUser)
       .set({
         role,
         updatedAt: new Date(),
       })
-      .where(sql`${betterAuthUser.id} = ${userId}`);
+      .where(and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ));
 
     res.json({ message: 'User role updated successfully' });
   } catch (error) {
@@ -404,9 +432,12 @@ adminRoutes.delete("/users/:userId", authenticateToken, requireRole('Administrat
   try {
     const { userId } = req.params;
 
-    // Check if user exists
+    // Check if user exists within the same tenant
     const user = await db.query.betterAuthUser.findFirst({
-      where: sql`${betterAuthUser.id} = ${userId}`,
+      where: and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ),
     });
 
     if (!user) {
@@ -418,9 +449,12 @@ adminRoutes.delete("/users/:userId", authenticateToken, requireRole('Administrat
       return res.status(400).json({ message: 'Cannot delete your own account' });
     }
 
-    // Delete user (this will cascade to related records)
+    // Delete user (tenant-scoped, cascades to related records)
     await db.delete(betterAuthUser)
-      .where(sql`${betterAuthUser.id} = ${userId}`);
+      .where(and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ));
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
@@ -432,38 +466,40 @@ adminRoutes.delete("/users/:userId", authenticateToken, requireRole('Administrat
 // Get system statistics
 adminRoutes.get("/stats", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
   try {
+    const tenantId = req.user.tenantId;
+
     const [
       userStats,
       sessionStats,
       companyStats,
       formStats,
     ] = await Promise.all([
-      // User statistics
+      // User statistics (tenant-scoped)
       db.select({
         totalUsers: sql<number>`count(*)`,
         verifiedUsers: sql<number>`count(*) filter (where email_verified = true)`,
         unverifiedUsers: sql<number>`count(*) filter (where email_verified = false)`,
         twoFactorUsers: sql<number>`count(*) filter (where two_factor_enabled = true)`,
-      }).from(betterAuthUser),
+      }).from(betterAuthUser).where(eq(betterAuthUser.tenantId, tenantId)),
 
-      // Session statistics
+      // Session statistics (tenant-scoped)
       db.select({
         totalSessions: sql<number>`count(*)`,
         activeSessions: sql<number>`count(*) filter (where expires_at > now())`,
         expiredSessions: sql<number>`count(*) filter (where expires_at <= now())`,
-      }).from(refreshTokens),
+      }).from(refreshTokens).where(eq(refreshTokens.tenantId, tenantId)),
 
-      // Company statistics
+      // Company statistics (tenant-scoped)
       db.select({
         totalCompanies: sql<number>`count(*)`,
-      }).from(companies),
+      }).from(companies).where(eq(companies.tenantId, tenantId)),
 
-      // Form statistics
+      // Form statistics (tenant-scoped)
       db.select({
         totalForms: sql<number>`count(*)`,
         publishedForms: sql<number>`count(*) filter (where published = true)`,
         draftForms: sql<number>`count(*) filter (where published = false)`,
-      }).from(forms),
+      }).from(forms).where(eq(forms.tenantId, tenantId)),
     ]);
 
     res.json({
