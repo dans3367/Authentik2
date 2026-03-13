@@ -138,8 +138,80 @@ function stripOuterHtmlWrapper(html: string): string {
   return content;
 }
 
+/**
+ * Add email-compatible inline styles to Tiptap-generated table HTML.
+ * Tiptap outputs tables with minimal styles (just min-width) which renders
+ * as unstyled plain text in most email clients. This function injects
+ * proper borders, padding, and formatting.
+ */
+function styleTablesForEmail(html: string): string {
+  // Style <table> tags: add border-collapse and full width
+  html = html.replace(
+    /<table([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+    (match, before, existingStyle, after) => {
+      const newStyle = `border-collapse: collapse; width: 100%; ${existingStyle}`;
+      return `<table${before}style="${newStyle}"${after}>`;
+    }
+  );
+  // Handle <table> tags without a style attribute
+  html = html.replace(
+    /<table(?![^>]*style=)([^>]*?)>/gi,
+    '<table style="border-collapse: collapse; width: 100%;"$1>'
+  );
+
+  // Style <th> tags: header cells with background and borders
+  html = html.replace(
+    /<th([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+    (match, before, existingStyle, after) => {
+      const newStyle = `border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top; ${existingStyle}`;
+      return `<th${before}style="${newStyle}"${after}>`;
+    }
+  );
+  html = html.replace(
+    /<th(?![^>]*style=)([^>]*?)>/gi,
+    '<th style="border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top;"$1>'
+  );
+
+  // Style <td> tags: body cells with borders and padding
+  html = html.replace(
+    /<td([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+    (match, before, existingStyle, after) => {
+      const newStyle = `border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top; ${existingStyle}`;
+      return `<td${before}style="${newStyle}"${after}>`;
+    }
+  );
+  html = html.replace(
+    /<td(?![^>]*style=)([^>]*?)>/gi,
+    '<td style="border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top;"$1>'
+  );
+
+  // Strip margins from all elements inside table cells to prevent extra padding.
+  // Tiptap wraps cell content in <p> tags which have default browser margins.
+  // The editor CSS zeros these out (table td > * { margin: 0 }) but emails
+  // don't have that stylesheet, so we inline margin:0 on every <p> (and other
+  // block elements) found between <td>/<th> and their closing tags.
+  html = html.replace(
+    /<(t[dh])\b[^>]*>[\s\S]*?<\/\1>/gi,
+    (cellBlock) => {
+      // Within each cell block, zero-out margins on <p>, <div>, <ul>, <ol>, <h1>-<h6>
+      return cellBlock.replace(
+        /<(p|div|ul|ol|h[1-6])(\s[^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+        (m, tag, before, style, after) =>
+          `<${tag}${before}style="margin: 0; padding: 0; ${style}"${after}>`
+      ).replace(
+        /<(p|div|ul|ol|h[1-6])(?![^>]*style=)(\s[^>]*?)?>/gi,
+        (m, tag, attrs) =>
+          `<${tag} style="margin: 0; padding: 0;"${attrs || ''}>`
+      );
+    }
+  );
+
+  return html;
+}
+
 export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: string): string {
   bodyContent = stripOuterHtmlWrapper(bodyContent);
+  bodyContent = styleTablesForEmail(bodyContent);
   const fontFamily = design.fontFamily;
   const primaryColor = design.primaryColor;
   const safeCompanyName = escapeHtml(design.displayCompanyName || '');

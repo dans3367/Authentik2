@@ -131,6 +131,63 @@ function esc(str: string): string {
   });
 }
 
+/**
+ * Add email-compatible inline styles to Tiptap-generated table HTML.
+ * Mirrors server-side styleTablesForEmail() in newsletterEmailWrapper.ts.
+ */
+function styleTablesForEmail(html: string): string {
+  // Style <table> tags
+  html = html.replace(
+    /<table([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+    (_, before, style, after) =>
+      `<table${before}style="border-collapse: collapse; width: 100%; ${style}"${after}>`
+  );
+  html = html.replace(
+    /<table(?![^>]*style=)([^>]*?)>/gi,
+    '<table style="border-collapse: collapse; width: 100%;"$1>'
+  );
+
+  // Style <th> tags
+  html = html.replace(
+    /<th([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+    (_, before, style, after) =>
+      `<th${before}style="border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top; ${style}"${after}>`
+  );
+  html = html.replace(
+    /<th(?![^>]*style=)([^>]*?)>/gi,
+    '<th style="border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top;"$1>'
+  );
+
+  // Style <td> tags
+  html = html.replace(
+    /<td([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+    (_, before, style, after) =>
+      `<td${before}style="border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top; ${style}"${after}>`
+  );
+  html = html.replace(
+    /<td(?![^>]*style=)([^>]*?)>/gi,
+    '<td style="border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top;"$1>'
+  );
+
+  // Zero-out margins on block elements inside table cells
+  html = html.replace(
+    /<(t[dh])\b[^>]*>[\s\S]*?<\/\1>/gi,
+    (cellBlock) => {
+      return cellBlock.replace(
+        /<(p|div|ul|ol|h[1-6])(\s[^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+        (m, tag, before, style, after) =>
+          `<${tag}${before}style="margin: 0; padding: 0; ${style}"${after}>`
+      ).replace(
+        /<(p|div|ul|ol|h[1-6])(?![^>]*style=)(\s[^>]*?)?>/gi,
+        (m, tag, attrs) =>
+          `<${tag} style="margin: 0; padding: 0;"${attrs || ''}>`
+      );
+    }
+  );
+
+  return html;
+}
+
 function sanitizeBodyContent(html: string): string {
   if (!html) {
     return '';
@@ -187,7 +244,7 @@ export function wrapInEmailPreview(
   const showName = typeof d.showCompanyName === 'boolean'
     ? d.showCompanyName
     : (d.showCompanyName ?? 'true') === 'true';
-  const safeBodyContent = sanitizeBodyContent(bodyContent);
+  const safeBodyContent = styleTablesForEmail(sanitizeBodyContent(bodyContent));
   const sanitizedLogoUrl = d.logoUrl && isValidHttpUrl(d.logoUrl) ? d.logoUrl : '';
   const sanitizedBannerUrl = d.bannerUrl && isValidHttpUrl(d.bannerUrl) ? d.bannerUrl : '';
   const headerMode = d.headerMode || 'logo';
@@ -234,6 +291,11 @@ export function wrapInEmailPreview(
     body { margin: 0; padding: 0; }
     img { max-width: 100%; }
     * { box-sizing: border-box; }
+    /* Match editor table cell spacing */
+    td p, td div, td ul, td ol, td h1, td h2, td h3, td h4, td h5, td h6,
+    th p, th div, th ul, th ol, th h1, th h2, th h3, th h4, th h5, th h6 {
+      margin: 0;
+    }
   </style>
 </head>
 <body style="font-family:${fontFamily};margin:0;padding:0;background-color:#f7fafc;-webkit-font-smoothing:antialiased;">

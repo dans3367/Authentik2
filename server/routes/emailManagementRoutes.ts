@@ -55,6 +55,8 @@ export function sanitizeEmailHtml(html: string): string {
       code: ['style', 'class'],
       // Tables (common in emails)
       table: ['style', 'class', 'width', 'height', 'border', 'cellpadding', 'cellspacing', 'align', 'role'],
+      colgroup: ['style'],
+      col: ['style', 'span', 'width'],
       thead: ['style', 'class'],
       tbody: ['style', 'class'],
       tr: ['style', 'class'],

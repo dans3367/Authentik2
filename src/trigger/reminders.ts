@@ -448,9 +448,15 @@ async function generateReminderEmailHtml(data: ReminderPayload): Promise<string>
       </table>
     </div>
 
-    <div style="padding: 24px 32px 32px 32px;">
+    <div style="padding: 24px 32px 12px 32px;">
       <p style="margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.5;">
         Best regards,<br/><span style="font-weight: 600; color: #64748b;">Your Team</span>
+      </p>
+    </div>
+
+    <div style="padding: 0 32px 32px 32px;">
+      <p style="margin: 0; color: #94a3b8; font-size: 12px; font-style: italic; line-height: 1.5;">
+        Please disregard this message if you have already called us to confirm your appointment.
       </p>
     </div>
   `;
