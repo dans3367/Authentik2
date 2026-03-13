@@ -139,70 +139,136 @@ function stripOuterHtmlWrapper(html: string): string {
 }
 
 /**
- * Add email-compatible inline styles to Tiptap-generated table HTML.
- * Tiptap outputs tables with minimal styles (just min-width) which renders
- * as unstyled plain text in most email clients. This function injects
- * proper borders, padding, and formatting.
+ * Add email-compatible inline styles to Tiptap-generated data tables.
+ *
+ * Puck (classic editor) uses `<table role="presentation">` for layout;
+ * those must NOT receive borders/padding.  Only TipTap data tables
+ * (which lack role="presentation") get styled.
  */
 function styleTablesForEmail(html: string): string {
-  // Style <table> tags: add border-collapse and full width
+  // Process each <table>…</table> block individually so we can skip
+  // layout (role="presentation") tables from the Puck editor.
   html = html.replace(
-    /<table([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
-    (match, before, existingStyle, after) => {
-      const newStyle = `border-collapse: collapse; width: 100%; ${existingStyle}`;
-      return `<table${before}style="${newStyle}"${after}>`;
-    }
-  );
-  // Handle <table> tags without a style attribute
-  html = html.replace(
-    /<table(?![^>]*style=)([^>]*?)>/gi,
-    '<table style="border-collapse: collapse; width: 100%;"$1>'
-  );
+    /<table\b[^>]*>[\s\S]*?<\/table>/gi,
+    (tableBlock) => {
+      // Extract the opening <table …> tag to inspect its attributes
+      const openTagMatch = tableBlock.match(/^<table\b([^>]*)>/i);
+      if (!openTagMatch) return tableBlock;
+      const attrs = openTagMatch[1];
 
-  // Style <th> tags: header cells with background and borders
-  html = html.replace(
-    /<th([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
-    (match, before, existingStyle, after) => {
-      const newStyle = `border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top; ${existingStyle}`;
-      return `<th${before}style="${newStyle}"${after}>`;
-    }
-  );
-  html = html.replace(
-    /<th(?![^>]*style=)([^>]*?)>/gi,
-    '<th style="border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top;"$1>'
-  );
+      // Skip layout tables – Puck blocks always set role="presentation"
+      if (/role\s*=\s*["']presentation["']/i.test(attrs)) {
+        return tableBlock;
+      }
 
-  // Style <td> tags: body cells with borders and padding
-  html = html.replace(
-    /<td([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
-    (match, before, existingStyle, after) => {
-      const newStyle = `border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top; ${existingStyle}`;
-      return `<td${before}style="${newStyle}"${after}>`;
-    }
-  );
-  html = html.replace(
-    /<td(?![^>]*style=)([^>]*?)>/gi,
-    '<td style="border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top;"$1>'
-  );
+      // ── Data table: apply border / padding styles ──
 
-  // Strip margins from all elements inside table cells to prevent extra padding.
-  // Tiptap wraps cell content in <p> tags which have default browser margins.
-  // The editor CSS zeros these out (table td > * { margin: 0 }) but emails
-  // don't have that stylesheet, so we inline margin:0 on every <p> (and other
-  // block elements) found between <td>/<th> and their closing tags.
-  html = html.replace(
-    /<(t[dh])\b[^>]*>[\s\S]*?<\/\1>/gi,
-    (cellBlock) => {
-      // Within each cell block, zero-out margins on <p>, <div>, <ul>, <ol>, <h1>-<h6>
-      return cellBlock.replace(
-        /<(p|div|ul|ol|h[1-6])(\s[^>]*?)style="([^"]*?)"([^>]*?)>/gi,
-        (m, tag, before, style, after) =>
-          `<${tag}${before}style="margin: 0; padding: 0; ${style}"${after}>`
-      ).replace(
-        /<(p|div|ul|ol|h[1-6])(?![^>]*style=)(\s[^>]*?)?>/gi,
-        (m, tag, attrs) =>
-          `<${tag} style="margin: 0; padding: 0;"${attrs || ''}>`
+      // Style the <table> tag itself
+      let styled = tableBlock.replace(
+        /^<table([^>]*?)style="([^"]*?)"([^>]*?)>/i,
+        (_m: string, before: string, existingStyle: string, after: string) =>
+          `<table${before}style="border-collapse: collapse; width: 100%; ${existingStyle}"${after}>`
       );
+      if (styled === tableBlock) {
+        // No existing style attr – add one
+        styled = styled.replace(
+          /^<table(?![^>]*style=)([^>]*?)>/i,
+          '<table style="border-collapse: collapse; width: 100%;"$1>'
+        );
+      }
+
+      // Style <th> tags
+      styled = styled.replace(
+        /<th([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+        (_m: string, before: string, existingStyle: string, after: string) => {
+          const newStyle = `border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top; ${existingStyle}`;
+          return `<th${before}style="${newStyle}"${after}>`;
+        }
+      );
+      styled = styled.replace(
+        /<th(?![^>]*style=)([^>]*?)>/gi,
+        '<th style="border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top;"$1>'
+      );
+
+      // Style <td> tags
+      styled = styled.replace(
+        /<td([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+        (_m: string, before: string, existingStyle: string, after: string) => {
+          const newStyle = `border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top; ${existingStyle}`;
+          return `<td${before}style="${newStyle}"${after}>`;
+        }
+      );
+      styled = styled.replace(
+        /<td(?![^>]*style=)([^>]*?)>/gi,
+        '<td style="border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top;"$1>'
+      );
+
+      // Zero-out margins on block elements inside table cells
+      styled = styled.replace(
+        /<(t[dh])\b[^>]*>[\s\S]*?<\/\1>/gi,
+        (cellBlock) => {
+          return cellBlock.replace(
+            /<(p|div|ul|ol|h[1-6])(\s[^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+            (_m: string, tag: string, before: string, style: string, after: string) =>
+              `<${tag}${before}style="margin: 0; padding: 0; ${style}"${after}>`
+          ).replace(
+            /<(p|div|ul|ol|h[1-6])(?![^>]*style=)(\s[^>]*?)?>/gi,
+            (_m: string, tag: string, attrs: string) =>
+              `<${tag} style="margin: 0; padding: 0;"${attrs || ''}>`
+          );
+        }
+      );
+
+      return styled;
+    }
+  );
+
+  return html;
+}
+
+/**
+ * Constrain images, headings, and block-level elements so they don't overflow
+ * the 600px email container.  The Notion-like (TipTap) editor outputs bare
+ * <img>, <h1>–<h3>, <p>, etc. without inline max-width, which causes content
+ * to burst past the header/footer width in email clients.
+ */
+function styleContentForEmail(html: string): string {
+  // Images: max-width 100%, height auto, display block
+  html = html.replace(
+    /<img([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+    (match, before, existingStyle, after) => {
+      // Skip if already has max-width
+      if (/max-width/i.test(existingStyle)) return match;
+      const newStyle = `max-width: 100%; height: auto; display: block; ${existingStyle}`;
+      return `<img${before}style="${newStyle}"${after}>`;
+    }
+  );
+  html = html.replace(
+    /<img(?![^>]*style=)([^>]*?)>/gi,
+    '<img style="max-width: 100%; height: auto; display: block;"$1>'
+  );
+
+  // Headings h1-h3: word-wrap to prevent long text overflow
+  html = html.replace(
+    /<(h[1-3])([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+    (match, tag, before, existingStyle, after) => {
+      if (/word-wrap|overflow-wrap|word-break/i.test(existingStyle)) return match;
+      const newStyle = `word-wrap: break-word; overflow-wrap: break-word; ${existingStyle}`;
+      return `<${tag}${before}style="${newStyle}"${after}>`;
+    }
+  );
+  html = html.replace(
+    /<(h[1-3])(?![^>]*style=)([^>]*?)>/gi,
+    '<$1 style="word-wrap: break-word; overflow-wrap: break-word;"$2>'
+  );
+
+  // Divs and paragraphs: word-wrap
+  html = html.replace(
+    /<(p|div)([^>]*?)style="([^"]*?)"([^>]*?)>/gi,
+    (match, tag, before, existingStyle, after) => {
+      if (/word-wrap|overflow-wrap|word-break/i.test(existingStyle)) return match;
+      const newStyle = `word-wrap: break-word; overflow-wrap: break-word; ${existingStyle}`;
+      return `<${tag}${before}style="${newStyle}"${after}>`;
     }
   );
 
@@ -212,6 +278,7 @@ function styleTablesForEmail(html: string): string {
 export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: string): string {
   bodyContent = stripOuterHtmlWrapper(bodyContent);
   bodyContent = styleTablesForEmail(bodyContent);
+  bodyContent = styleContentForEmail(bodyContent);
   const fontFamily = design.fontFamily;
   const primaryColor = design.primaryColor;
   const safeCompanyName = escapeHtml(design.displayCompanyName || '');
@@ -257,9 +324,19 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--[if mso]>
+    <style type="text/css">
+      table { border-collapse: collapse; }
+      img { display: block; outline: none; border: 0; }
+    </style>
+    <![endif]-->
+    <style type="text/css">
+      img { max-width: 100% !important; height: auto !important; }
+    </style>
   </head>
   <body style="font-family: ${fontFamily}; margin: 0; padding: 0; background-color: #f7fafc; -webkit-font-smoothing: antialiased;">
-    <div style="max-width: 600px; margin: 0 auto; background: white;">
+    <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center" style="width:600px;"><tr><td><![endif]-->
+    <div style="max-width: 600px; margin: 0 auto; background: white; overflow: hidden;">
 
       <!-- Hero Header -->
       ${useBanner ? `
@@ -298,6 +375,7 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
       </div>
 
     </div>
+    <!--[if mso]></td></tr></table><![endif]-->
   </body>
 </html>`;
 }

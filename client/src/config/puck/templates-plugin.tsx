@@ -19,18 +19,13 @@ function TemplatePreviewModal({
 }) {
   const { config } = usePuck();
 
-  // Close on Escape & prevent body scroll while open
+  // Close on Escape
   useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey);
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
   return createPortal(
@@ -42,10 +37,11 @@ function TemplatePreviewModal({
         right: 0,
         bottom: 0,
         zIndex: 99999,
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        background: "rgba(0,0,0,0.6)",
         display: "flex",
         justifyContent: "center",
-        alignItems: "center",
-        background: "rgba(0,0,0,0.6)",
         padding: "40px 20px",
       }}
       onClick={onClose}
@@ -55,12 +51,9 @@ function TemplatePreviewModal({
         style={{
           width: "640px",
           maxWidth: "100%",
-          maxHeight: "100%",
           background: "#fff",
           borderRadius: "12px",
           boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-          display: "flex",
-          flexDirection: "column",
           overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -131,13 +124,9 @@ function TemplatePreviewModal({
           {template.description}
         </p>
 
-        {/* Scrollable preview */}
+        {/* Preview */}
         <div
           style={{
-            flex: "1 1 0%",
-            overflowY: "auto",
-            overflowX: "hidden",
-            WebkitOverflowScrolling: "touch",
             borderTop: "1px solid #e5e7eb",
             borderBottom: "1px solid #e5e7eb",
             background: "#f9fafb",
