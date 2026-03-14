@@ -1,11 +1,18 @@
 import express from 'express';
-import { authenticateToken, requireTenant, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { birthdayWorkerService } from '../services/BirthdayWorkerService';
 
 const birthdayWorkerRoutes = express.Router();
 
+const requireSuperAdmin = (req: any, res: any, next: any) => {
+  if (req.user?.role !== 'SuperAdmin') {
+    return res.status(403).json({ message: 'SuperAdmin access required' });
+  }
+  next();
+};
+
 // Get birthday worker status and statistics
-birthdayWorkerRoutes.get("/status", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+birthdayWorkerRoutes.get("/status", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     const stats = birthdayWorkerService.getStats();
     
@@ -34,7 +41,7 @@ birthdayWorkerRoutes.get("/status", authenticateToken, requireTenant, requireRol
 });
 
 // Get specific job status
-birthdayWorkerRoutes.get("/jobs/:jobId/status", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+birthdayWorkerRoutes.get("/jobs/:jobId/status", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     const { jobId } = req.params;
     
@@ -61,7 +68,7 @@ birthdayWorkerRoutes.get("/jobs/:jobId/status", authenticateToken, requireTenant
 });
 
 // Get all job statuses
-birthdayWorkerRoutes.get("/jobs", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+birthdayWorkerRoutes.get("/jobs", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     const allJobs = birthdayWorkerService.getAllJobStatuses();
     
@@ -80,7 +87,7 @@ birthdayWorkerRoutes.get("/jobs", authenticateToken, requireTenant, requireRole(
 });
 
 // Start the birthday worker
-birthdayWorkerRoutes.post("/start", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+birthdayWorkerRoutes.post("/start", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     if (birthdayWorkerService.isRunning()) {
       return res.status(400).json({
@@ -105,7 +112,7 @@ birthdayWorkerRoutes.post("/start", authenticateToken, requireTenant, requireRol
 });
 
 // Stop the birthday worker
-birthdayWorkerRoutes.post("/stop", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+birthdayWorkerRoutes.post("/stop", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     if (!birthdayWorkerService.isRunning()) {
       return res.status(400).json({
@@ -130,7 +137,7 @@ birthdayWorkerRoutes.post("/stop", authenticateToken, requireTenant, requireRole
 });
 
 // Restart the birthday worker
-birthdayWorkerRoutes.post("/restart", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+birthdayWorkerRoutes.post("/restart", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     console.log('🔄 [BirthdayWorker] Restarting birthday worker...');
     
@@ -157,7 +164,7 @@ birthdayWorkerRoutes.post("/restart", authenticateToken, requireTenant, requireR
 });
 
 // Force cleanup of old jobs
-birthdayWorkerRoutes.post("/cleanup", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+birthdayWorkerRoutes.post("/cleanup", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     const { maxAge } = req.body;
     
@@ -178,7 +185,7 @@ birthdayWorkerRoutes.post("/cleanup", authenticateToken, requireTenant, requireR
 });
 
 // Get birthday worker health check
-birthdayWorkerRoutes.get("/health", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+birthdayWorkerRoutes.get("/health", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     const stats = birthdayWorkerService.getStats();
     const isHealthy = stats.isRunning && stats.enabled;

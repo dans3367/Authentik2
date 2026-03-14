@@ -3,10 +3,17 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { tenants, betterAuthUser } from '@shared/schema';
 // Note: bcrypt removed - better-auth handles password hashing
-import { authenticateToken, requireTenant, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { randomUUID } from 'crypto';
 
 export const devRoutes = Router();
+
+const requireSuperAdmin = (req: any, res: any, next: any) => {
+  if (req.user?.role !== 'SuperAdmin') {
+    return res.status(403).json({ message: 'SuperAdmin access required' });
+  }
+  next();
+};
 
 // Health check endpoint with temporal status
 devRoutes.get("/health", async (req, res) => {
@@ -74,7 +81,7 @@ devRoutes.get("/health", async (req, res) => {
 });
 
 // Create test managers
-devRoutes.post("/create-test-managers", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+devRoutes.post("/create-test-managers", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     // This endpoint is for development/testing purposes only
     if (process.env.NODE_ENV === 'production') {
@@ -123,7 +130,7 @@ devRoutes.post("/create-test-managers", authenticateToken, requireTenant, requir
 });
 
 // Update test user
-devRoutes.post("/update-test-user", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+devRoutes.post("/update-test-user", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     // This endpoint is for development/testing purposes only
     if (process.env.NODE_ENV === 'production') {
@@ -164,7 +171,7 @@ devRoutes.post("/update-test-user", authenticateToken, requireTenant, requireRol
 });
 
 // Test token generation
-devRoutes.post("/test-token", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+devRoutes.post("/test-token", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     // This endpoint is for development/testing purposes only
     if (process.env.NODE_ENV === 'production') {
@@ -197,7 +204,7 @@ devRoutes.post("/test-token", authenticateToken, requireTenant, requireRole(['Su
 });
 
 // Test email verification
-devRoutes.post("/test-verification", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+devRoutes.post("/test-verification", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     // This endpoint is for development/testing purposes only
     if (process.env.NODE_ENV === 'production') {
@@ -289,7 +296,7 @@ devRoutes.get("/debug/info", authenticateToken, async (req: any, res) => {
 });
 
 // Reset user password (dev only)
-devRoutes.post("/reset-password", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
+devRoutes.post("/reset-password", authenticateToken, requireTenant, requireSuperAdmin, async (req: any, res) => {
   try {
     // This endpoint is for development/testing purposes only
     if (process.env.NODE_ENV === 'production') {
