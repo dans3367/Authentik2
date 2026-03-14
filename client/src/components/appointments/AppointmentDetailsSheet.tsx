@@ -28,8 +28,22 @@ import {
   BellOff,
 } from "lucide-react";
 import { getCustomerName, formatDateTime } from "@/utils/appointment-utils";
-import type { AppointmentWithCustomer, Customer } from "@/hooks/useAppointments";
-import type { AppointmentReminder, AppointmentNote } from "@shared/schema";
+import type { AppointmentWithCustomer, Customer, AppointmentReminder } from "@/utils/appointment-utils";
+
+interface AppointmentNote {
+  id: string;
+  appointmentId: string;
+  userId: string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+  user?: {
+    id: string;
+    name: string;
+    firstName?: string;
+    lastName?: string;
+  };
+}
 
 interface AppointmentDetailsSheetProps {
   open: boolean;

@@ -1,6 +1,9 @@
 export { AppointmentFormDialog } from './AppointmentFormDialog';
 export type { NewAppointmentData, ReminderData } from './AppointmentFormDialog';
 
+export { AppointmentEditDialog } from './AppointmentEditDialog';
+export type { EditReminderData } from './AppointmentEditDialog';
+
 export { ReminderScheduleDialog } from './ReminderScheduleDialog';
 export type { ScheduleReminderData } from './ReminderScheduleDialog';
 

@@ -3,7 +3,7 @@ import { db } from '../db';
 import { emailContacts, birthdaySettings, promotions, bouncedEmails } from '@shared/schema';
 import { eq, and, sql, isNotNull } from 'drizzle-orm';
 import { enhancedEmailService } from '../emailService';
-import { sanitizeEmailHtml } from '../routes/emailManagementRoutes';
+import { sanitizeEmailHtml } from '../routes/email';
 
 function maskEmail(email: string): string {
   const parts = email.split('@');

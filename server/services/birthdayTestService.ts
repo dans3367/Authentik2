@@ -10,7 +10,7 @@ import { birthdaySettings, companies, emailContacts, unsubscribeTokens } from '@
 import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import { tasks } from '@trigger.dev/sdk/v3';
-import { renderBirthdayTemplate, sanitizeEmailHtml } from '../routes/emailManagementRoutes';
+import { renderBirthdayTemplate, sanitizeEmailHtml } from '../routes/email';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 
 export interface BirthdayTestRequest {

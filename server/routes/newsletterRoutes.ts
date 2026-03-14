@@ -5,7 +5,7 @@ import { authenticateToken, requireTenant, requireRole, requirePermission } from
 import { authenticateInternalService } from '../middleware/internal-service-auth';
 import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, newsletterTaskStatus, newsletterReviewerSettings, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
-import { sanitizeEmailHtml } from './emailManagementRoutes';
+import { sanitizeEmailHtml } from './email';
 import { emailService, enhancedEmailService } from '../emailService';
 import { wrapNewsletterContent, extractPuckColorOverrides } from '../utils/newsletterEmailWrapper';
 import { initNewsletterTracking, trackNewsletterEmailSend, getNewsletterStats, getNewsletterSends, getNewsletterEvents } from '../utils/convexNewsletterTracker';

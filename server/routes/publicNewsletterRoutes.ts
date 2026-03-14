@@ -3,7 +3,7 @@ import { db } from '../db';
 import { sql, eq, and, desc, isNotNull } from 'drizzle-orm';
 import { newsletters, tenants, companies, masterEmailDesign, blogDesign } from '@shared/schema';
 import rateLimit from 'express-rate-limit';
-import { sanitizeEmailHtml } from './emailManagementRoutes';
+import { sanitizeEmailHtml } from './email';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 
 export const publicNewsletterRoutes = Router();

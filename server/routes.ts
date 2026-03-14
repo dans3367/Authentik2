@@ -13,7 +13,7 @@ import { formTagsRoutes } from "./routes/formTagsRoutes";
 import { subscriptionRoutes } from "./routes/subscriptionRoutes";
 import { companyRoutes } from "./routes/companyRoutes";
 import { shopsRoutes } from "./routes/shopsRoutes";
-import { emailManagementRoutes } from "./routes/emailManagementRoutes";
+import { emailManagementRoutes } from "./routes/email";
 import { newsletterRoutes } from "./routes/newsletterRoutes";
 import { cardImageRoutes } from "./routes/cardImageRoutes";
 import { newsletterImageRoutes } from "./routes/newsletterImageRoutes";

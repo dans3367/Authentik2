@@ -136,9 +136,15 @@ export function escapeLikePattern(input: string): string {
  * Get client IP address from request
  */
 export function getClientIP(req: any): string {
-  return req.ip || 
-         req.connection?.remoteAddress || 
-         req.socket?.remoteAddress || 
-         req.headers['x-forwarded-for']?.split(',')[0] || 
+  return req.ip ||
+         req.connection?.remoteAddress ||
+         req.socket?.remoteAddress ||
+         req.headers['x-forwarded-for']?.split(',')[0] ||
          'unknown';
 }
+
+/**
+ * Sanitize HTML content for emails - allows safe formatting tags, strips scripts and event handlers.
+ * Re-exported from server/routes/email/emailUtils.ts for convenience.
+ */
+export { sanitizeEmailHtml } from '../routes/email/emailUtils';
