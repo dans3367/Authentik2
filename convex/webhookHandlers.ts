@@ -46,6 +46,19 @@ export const handleResendWebhook = action({
       const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
 
       if (ids) {
+        // For delivered/opened/clicked: ensure "sent" event exists first
+        // so the status progression is always Queued → Sent → Delivered → Opened
+        if (normalisedType === "delivered" || normalisedType === "opened" || normalisedType === "clicked") {
+          await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+            tenantId: ids.tenantId,
+            newsletterId: ids.newsletterId,
+            recipientEmail,
+            providerMessageId,
+            eventType: "sent" as any,
+            metadata: { ...buildMetadata(data), synthetic: true },
+          });
+        }
+
         await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
           tenantId: ids.tenantId,
           newsletterId: ids.newsletterId,
@@ -107,6 +120,19 @@ export const handlePostmarkWebhook = action({
       const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
 
       if (ids) {
+        // For delivered/opened/clicked: ensure "sent" event exists first
+        // so the status progression is always Queued → Sent → Delivered → Opened
+        if (normalisedType === "delivered" || normalisedType === "opened" || normalisedType === "clicked") {
+          await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+            tenantId: ids.tenantId,
+            newsletterId: ids.newsletterId,
+            recipientEmail,
+            providerMessageId,
+            eventType: "sent" as any,
+            metadata: { ...buildMetadata(event), synthetic: true },
+          });
+        }
+
         await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
           tenantId: ids.tenantId,
           newsletterId: ids.newsletterId,
@@ -284,6 +310,19 @@ export const handleSESWebhook = action({
       const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
 
       if (ids) {
+        // For delivered/opened/clicked: ensure "sent" event exists first
+        // so the status progression is always Queued → Sent → Delivered → Opened
+        if (normalisedType === "delivered" || normalisedType === "opened" || normalisedType === "clicked") {
+          await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+            tenantId: ids.tenantId,
+            newsletterId: ids.newsletterId,
+            recipientEmail,
+            providerMessageId,
+            eventType: "sent" as any,
+            metadata: { ...buildSESMetadata(event), synthetic: true },
+          });
+        }
+
         await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
           tenantId: ids.tenantId,
           newsletterId: ids.newsletterId,

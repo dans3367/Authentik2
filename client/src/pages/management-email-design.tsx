@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -196,6 +198,8 @@ export default function ManagementEmailDesign() {
   const [hasChanges, setHasChanges] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   const [activeTab, setActiveTab] = useState("brand");
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: masterDesign, isLoading, error } = useQuery({
     queryKey: ["/api/master-email-design"],
@@ -239,6 +243,33 @@ export default function ManagementEmailDesign() {
       }
       return newDraft;
     });
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch('/api/newsletter-images/upload-logo', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const data = await response.json();
+      if (data.success && data.url) {
+        updateField('logoUrl', data.url);
+        toast({ title: 'Logo uploaded and resized' });
+      } else {
+        toast({ title: 'Upload failed', description: data.message || 'Unknown error', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Upload failed', description: 'Could not upload logo', variant: 'destructive' });
+    } finally {
+      setIsUploadingLogo(false);
+      if (logoFileInputRef.current) logoFileInputRef.current.value = '';
+    }
   };
 
   const updateMutation = useMutation({
@@ -435,21 +466,42 @@ export default function ManagementEmailDesign() {
                     {/* Logo fields — shown when headerMode is 'logo' */}
                     {(draft.headerMode || 'logo') === 'logo' && (
                       <div className="space-y-2.5">
-                        <Label htmlFor="logoUrl">{t('management.emailDesign.brandInfo.logoUrl')}</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            id="logoUrl"
-                            value={draft.logoUrl || ""}
-                            onChange={(e) => updateField("logoUrl", e.target.value)}
-                            placeholder="https://..."
+                        <Label>{t('management.emailDesign.brandInfo.logoUrl')}</Label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            ref={logoFileInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={handleLogoUpload}
                           />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isUploadingLogo}
+                            onClick={() => logoFileInputRef.current?.click()}
+                          >
+                            {isUploadingLogo ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+                            {draft.logoUrl ? 'Replace Logo' : 'Upload Logo'}
+                          </Button>
                           {draft.logoUrl && isSafeUrl(draft.logoUrl) && (
-                            <div className="w-10 h-10 rounded border bg-white p-1 flex items-center justify-center shrink-0">
-                              <img src={draft.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
-                            </div>
+                            <>
+                              <div className="w-10 h-10 rounded border bg-white p-1 flex items-center justify-center shrink-0">
+                                <img src={draft.logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => updateField("logoUrl", "")}
+                              >
+                                Remove
+                              </Button>
+                            </>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground">Recommended height: 128px</p>
+                        <p className="text-xs text-muted-foreground">Upload a logo image (JPEG, PNG, or WebP). It will be automatically resized for email use.</p>
                         <div className="space-y-2 pt-1">
                           <Label>Logo Size</Label>
                           <div className="flex gap-2">

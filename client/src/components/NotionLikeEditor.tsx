@@ -7,8 +7,6 @@ import { ResizableImage } from "./ResizableImage";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
-import { Link } from "@tiptap/extension-link";
-import { Underline } from "@tiptap/extension-underline";
 import { Highlight } from "@tiptap/extension-highlight";
 import { HandlebarVariable, DEFAULT_HANDLEBAR_VARIABLES } from "@/extensions/HandlebarVariable";
 import { Table } from "@tiptap/extension-table";
@@ -525,6 +523,7 @@ function FloatingToolbar({
         if (!editor) return;
 
         const updatePosition = () => {
+            try {
             const { state } = editor;
             const { from, to } = state.selection;
 
@@ -557,6 +556,7 @@ function FloatingToolbar({
                 left: Math.max(8, centerX - 150), // roughly half toolbar width
             });
             setVisible(true);
+            } catch { /* editor view not available yet */ }
         };
 
         editor.on("selectionUpdate", updatePosition);
@@ -1555,8 +1555,15 @@ function TableFloatingControls({ editor }: { editor: any }) {
 
     useEffect(() => {
         if (!editor) return;
+        // In tiptap v3, editor.view throws if not mounted yet — guard with try/catch
+        let viewDom: HTMLElement | undefined;
+        try { viewDom = editor.view?.dom; } catch { /* not mounted yet */ }
+        if (!viewDom) return;
 
         const update = () => {
+            let dom: HTMLElement | undefined;
+            try { dom = editor.view?.dom; } catch { return; }
+            if (!dom) return;
             const active = editor.isActive('table');
             if (!active) {
                 setIsInTable(false);
@@ -1574,7 +1581,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 setIsInTable(false);
                 return;
             }
-            const table = (domNode?.closest?.('table') || editor.view.dom.querySelector('table')) as HTMLTableElement | null;
+            const table = (domNode?.closest?.('table') || dom.querySelector('table')) as HTMLTableElement | null;
             if (!table) {
                 setIsInTable(false);
                 return;
@@ -1611,7 +1618,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
         };
 
         // Also re-measure on scroll so fixed-position handles track the table
-        const scrollEl = editor.view.dom.closest('.notion-editor-area') as HTMLElement | null;
+        const scrollEl = viewDom.closest('.notion-editor-area') as HTMLElement | null;
         const onScroll = () => { if (editor.isActive('table')) update(); };
 
         editor.on('selectionUpdate', update);
@@ -2309,6 +2316,14 @@ export default function NotionLikeEditor({
         extensions: [
             StarterKit.configure({
                 heading: { levels: [1, 2, 3] },
+                link: {
+                    openOnClick: false,
+                    HTMLAttributes: {
+                        class: "notion-editor-link",
+                        rel: "noopener noreferrer",
+                        target: "_blank",
+                    },
+                },
             }),
             Placeholder.configure({
                 placeholder,
@@ -2321,15 +2336,6 @@ export default function NotionLikeEditor({
             }),
             TextStyle,
             Color.configure({ types: ["textStyle"] }),
-            Link.configure({
-                openOnClick: false,
-                HTMLAttributes: {
-                    class: "notion-editor-link",
-                    rel: "noopener noreferrer",
-                    target: "_blank",
-                },
-            }),
-            Underline,
             Highlight.configure({ multicolor: true }),
             HandlebarVariable,
             Table.configure({

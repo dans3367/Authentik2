@@ -292,9 +292,18 @@ export const trackEmailEvent = internalMutation({
       const sendUpdates: any = {};
 
       switch (args.eventType) {
+        case "sent":
+          // Only update to "sent" if still queued (don't regress from delivered/opened/etc.)
+          if (sendRecord.status === "queued") {
+            sendUpdates.status = "sent";
+          }
+          if (!sendRecord.sentAt) sendUpdates.sentAt = now;
+          break;
         case "delivered":
           sendUpdates.status = "delivered";
           sendUpdates.deliveredAt = now;
+          // Backfill sentAt if the "sent" webhook was missed or arrived late
+          if (!sendRecord.sentAt) sendUpdates.sentAt = now;
           break;
         case "opened":
           sendUpdates.status = sendRecord.status === "clicked" ? "clicked" : "opened";
@@ -342,8 +351,20 @@ export const trackEmailEvent = internalMutation({
     const deltas: Record<string, number> = {};
 
     switch (args.eventType) {
+      case "sent":
+        deltas.sent = 1;
+        deltas.queued = -1;
+        break;
       case "delivered":
         deltas.delivered = 1;
+        // If "sent" webhook was missed, also count the sent transition.
+        // Note: webhook handlers fire a synthetic "sent" event before "delivered",
+        // which transitions status from "queued" → "sent" before we get here.
+        // This fallback only fires if the synthetic sent didn't run (e.g. direct call).
+        if (sendRecord && sendRecord.status === "queued") {
+          deltas.sent = 1;
+          deltas.queued = -1;
+        }
         break;
       case "opened":
         deltas.opened = 1;

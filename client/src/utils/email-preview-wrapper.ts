@@ -307,7 +307,7 @@ export function wrapInEmailPreview(
   const logoMR = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? '0' : 'auto';
 
   const logoSection = sanitizedLogoUrl
-    ? `<img src="${esc(sanitizedLogoUrl)}" alt="${companyName}" style="display:block;height:${logoHeight};width:auto;margin:0 ${logoMR} 20px ${logoML};object-fit:contain;" />`
+    ? `<img src="${esc(sanitizedLogoUrl)}" alt="${companyName}" style="display:block;max-height:${logoHeight};width:auto;margin:0 ${logoMR} 20px ${logoML};object-fit:contain;" />`
     : (companyName && showName)
       ? `<div style="height:48px;width:48px;background-color:rgba(255,255,255,0.2);border-radius:50%;margin:0 ${logoMR} 16px ${logoML};line-height:48px;font-size:20px;font-weight:bold;color:#ffffff;text-align:center;">${esc(d.companyName.charAt(0))}</div>`
       : '';

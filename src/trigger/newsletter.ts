@@ -331,51 +331,76 @@ async function updateNewsletterStatusInternal(
   const apiUrl = process.env.API_URL;
   const secret = process.env.INTERNAL_SERVICE_SECRET;
 
-  // Use web.zendwise.work as base host for status updates when API_URL points to localhost
-  const baseUrl = (!apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1"))
-    ? "https://web.zendwise.work"
-    : apiUrl;
-
   if (!secret) {
     logger.warn("INTERNAL_SERVICE_SECRET not configured, skipping status update");
     return;
   }
 
-  // Retry the status update callback up to 5 times with exponential backoff
-  // This is critical — without it, newsletters get stuck in 'sending' status
-  await retry.onThrow(
-    async () => {
-      // Generate fresh timestamp + signature on each attempt (prevents replay rejection)
-      const timestamp = Date.now();
-      const body = { status, ...stats };
-      const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
-      const signature = createHmac("sha256", secret).update(signaturePayload).digest("hex");
+  // Build ordered list of base URLs to try.
+  // Primary: remote (web.zendwise.work) for production reliability.
+  // Fallback: localhost for dev or when Cloudflare tunnel is down.
+  const urls: string[] = [];
+  const remoteUrl = "https://web.zendwise.work";
+  const localUrl = apiUrl && (apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1"))
+    ? apiUrl
+    : `http://localhost:${process.env.PORT || "5002"}`;
 
-      const url = `${baseUrl}/api/newsletters/internal/${newsletterId}/status`;
-      logger.info(`Calling status update: ${url}`, { status, stats });
+  if (apiUrl && !apiUrl.includes("localhost") && !apiUrl.includes("127.0.0.1")) {
+    // API_URL is a real remote URL — use it as primary
+    urls.push(apiUrl);
+  } else {
+    // API_URL is localhost or unset — try remote first, then local fallback
+    urls.push(remoteUrl, localUrl);
+  }
 
-      const response = await fetch(url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "x-internal-service": "trigger.dev",
-          "x-internal-timestamp": timestamp.toString(),
-          "x-internal-signature": signature,
+  const body = { status, ...stats };
+
+  for (const baseUrl of urls) {
+    try {
+      await retry.onThrow(
+        async () => {
+          // Generate fresh timestamp + signature on each attempt (prevents replay rejection)
+          const timestamp = Date.now();
+          const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
+          const signature = createHmac("sha256", secret).update(signaturePayload).digest("hex");
+
+          const url = `${baseUrl}/api/newsletters/internal/${newsletterId}/status`;
+          logger.info(`Calling status update: ${url}`, { status, stats });
+
+          const response = await fetch(url, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-service": "trigger.dev",
+              "x-internal-timestamp": timestamp.toString(),
+              "x-internal-signature": signature,
+            },
+            body: JSON.stringify(body),
+          });
+
+          if (!response.ok) {
+            const responseText = await response.text().catch(() => "");
+            const msg = `Failed to update newsletter ${newsletterId} status via ${baseUrl}: HTTP ${response.status} - ${responseText.slice(0, 200)}`;
+            logger.error(msg);
+            throw new Error(msg);
+          }
+
+          logger.info(`Newsletter ${newsletterId} status updated to: ${status} via ${baseUrl}`);
         },
-        body: JSON.stringify(body),
+        { maxAttempts: 3, randomize: true, minTimeoutInMs: 2000, maxTimeoutInMs: 10000, factor: 2 }
+      );
+      // Success — stop trying other URLs
+      return;
+    } catch (err) {
+      logger.warn(`Status update via ${baseUrl} failed, trying next URL if available`, {
+        error: err instanceof Error ? err.message : String(err),
+        newsletterId,
       });
+    }
+  }
 
-      if (!response.ok) {
-        const responseText = await response.text().catch(() => "");
-        const msg = `Failed to update newsletter ${newsletterId} status: HTTP ${response.status} - ${responseText}`;
-        logger.error(msg);
-        throw new Error(msg);
-      }
-
-      logger.info(`Newsletter ${newsletterId} status updated to: ${status}`);
-    },
-    { maxAttempts: 5, randomize: true, minTimeoutInMs: 2000, maxTimeoutInMs: 15000, factor: 2 }
-  );
+  // All URLs exhausted — throw so the caller's try/catch can log it
+  throw new Error(`All status update endpoints failed for newsletter ${newsletterId}`);
 }
 
 /**
@@ -744,11 +769,18 @@ export const sendNewsletterTask = task({
         logger.warn("Failed to complete Convex tracking for zero recipients (non-fatal)", { error: String(err) });
       }
 
-      await updateNewsletterStatusInternal(data.newsletterId, "sent", {
-        sentCount: 0,
-        failedCount: 0,
-        totalCount: 0,
-      });
+      try {
+        await updateNewsletterStatusInternal(data.newsletterId, "sent", {
+          sentCount: 0,
+          failedCount: 0,
+          totalCount: 0,
+        });
+      } catch (statusErr) {
+        logger.error("Failed to update newsletter status to 'sent' (non-fatal, emails were not sent)", {
+          error: statusErr instanceof Error ? statusErr.message : String(statusErr),
+          newsletterId: data.newsletterId,
+        });
+      }
       return {
         success: true,
         jobId: data.jobId,
@@ -1005,11 +1037,23 @@ export const sendNewsletterTask = task({
     metadata.set("progress", 100);
 
     // Update newsletter status in database
-    await updateNewsletterStatusInternal(data.newsletterId, "sent", {
-      sentCount: totalSent,
-      failedCount: totalFailed,
-      totalCount: validRecipients.length,
-    });
+    // CRITICAL: This must NOT throw — if it does, the entire task retries and
+    // all emails are re-sent. The status update is best-effort; the emails
+    // have already been delivered at this point.
+    try {
+      await updateNewsletterStatusInternal(data.newsletterId, "sent", {
+        sentCount: totalSent,
+        failedCount: totalFailed,
+        totalCount: validRecipients.length,
+      });
+    } catch (statusErr) {
+      logger.error("Failed to update newsletter status to 'sent' (non-fatal, emails already sent)", {
+        error: statusErr instanceof Error ? statusErr.message : String(statusErr),
+        newsletterId: data.newsletterId,
+        sentCount: totalSent,
+        failedCount: totalFailed,
+      });
+    }
 
     // Complete Convex tracking
     try {

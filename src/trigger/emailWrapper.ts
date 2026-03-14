@@ -404,7 +404,7 @@ function buildEmailHtml(design: EmailDesign, bodyContent: string): string {
   const logoMarginLeft = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? 'auto' : '0';
   const logoMarginRight = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? '0' : 'auto';
   const logoSection = design.logoUrl && isValidHttpUrl(design.logoUrl)
-    ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="display: block; height: ${logoHeight}; width: auto; margin: 0 ${logoMarginRight} 20px ${logoMarginLeft}; object-fit: contain;" />`
+    ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="display: block; max-height: ${logoHeight}; width: auto; margin: 0 ${logoMarginRight} 20px ${logoMarginLeft}; object-fit: contain;" />`
     : (safeCompanyName && showCompanyName)
       ? `<div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 ${logoMarginRight} 16px ${logoMarginLeft}; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">${escapeHtml((design.companyName || 'C').charAt(0))}</div>`
       : '';

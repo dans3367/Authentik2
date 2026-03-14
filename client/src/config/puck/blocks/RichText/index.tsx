@@ -3,8 +3,6 @@ import { ComponentConfig, createUsePuck } from "@puckeditor/core";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { TextAlign } from "@tiptap/extension-text-align";
-import { Underline } from "@tiptap/extension-underline";
-import { Link } from "@tiptap/extension-link";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { HandlebarVariable } from "@/extensions/HandlebarVariable";
 import { ResizableImage } from "@/components/ResizableImage";
@@ -20,11 +18,10 @@ const canvasExtensions = [
       HTMLAttributes: {
         style: "border-left: 3px solid #d1d5db; padding-left: 12px; margin: 0 0 10px 0; color: #6b7280;"
       }
-    }
+    },
+    link: { openOnClick: false },
   }),
   TextAlign.configure({ types: ["heading", "paragraph", "image"] }),
-  Underline,
-  Link.configure({ openOnClick: false }),
   HandlebarVariable,
   ResizableImage,
   Placeholder.configure({
@@ -40,11 +37,10 @@ const panelExtensions = [
       HTMLAttributes: {
         style: "border-left: 3px solid #d1d5db; padding-left: 10px; margin: 0 0 8px 0; color: #6b7280;"
       }
-    }
+    },
+    link: { openOnClick: false },
   }),
   TextAlign.configure({ types: ["heading", "paragraph", "image"] }),
-  Underline,
-  Link.configure({ openOnClick: false }),
   HandlebarVariable,
   ResizableImage,
   Placeholder.configure({
