@@ -3,7 +3,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { tenants, betterAuthUser } from '@shared/schema';
 // Note: bcrypt removed - better-auth handles password hashing
-import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requireRole } from '../middleware/auth-middleware';
 import { randomUUID } from 'crypto';
 
 export const devRoutes = Router();
@@ -74,7 +74,7 @@ devRoutes.get("/health", async (req, res) => {
 });
 
 // Create test managers
-devRoutes.post("/create-test-managers", async (req, res) => {
+devRoutes.post("/create-test-managers", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
   try {
     // This endpoint is for development/testing purposes only
     if (process.env.NODE_ENV === 'production') {
@@ -123,7 +123,7 @@ devRoutes.post("/create-test-managers", async (req, res) => {
 });
 
 // Update test user
-devRoutes.post("/update-test-user", async (req, res) => {
+devRoutes.post("/update-test-user", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
   try {
     // This endpoint is for development/testing purposes only
     if (process.env.NODE_ENV === 'production') {
@@ -164,7 +164,7 @@ devRoutes.post("/update-test-user", async (req, res) => {
 });
 
 // Test token generation
-devRoutes.post("/test-token", async (req, res) => {
+devRoutes.post("/test-token", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
   try {
     // This endpoint is for development/testing purposes only
     if (process.env.NODE_ENV === 'production') {
@@ -197,7 +197,7 @@ devRoutes.post("/test-token", async (req, res) => {
 });
 
 // Test email verification
-devRoutes.post("/test-verification", async (req, res) => {
+devRoutes.post("/test-verification", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
   try {
     // This endpoint is for development/testing purposes only
     if (process.env.NODE_ENV === 'production') {
@@ -289,7 +289,7 @@ devRoutes.get("/debug/info", authenticateToken, async (req: any, res) => {
 });
 
 // Reset user password (dev only)
-devRoutes.post("/reset-password", async (req, res) => {
+devRoutes.post("/reset-password", authenticateToken, requireTenant, requireRole(['SuperAdmin']), async (req: any, res) => {
   try {
     // This endpoint is for development/testing purposes only
     if (process.env.NODE_ENV === 'production') {

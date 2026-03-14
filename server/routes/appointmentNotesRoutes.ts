@@ -9,12 +9,13 @@ import {
   createAppointmentNoteSchema,
   updateAppointmentNoteSchema,
 } from '@shared/schema';
-import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 
 const router = Router();
 
 // Apply authentication to all routes
 router.use(authenticateToken);
+router.use(requireTenant);
 
 // GET /api/appointment-notes/:appointmentId - Get all notes for an appointment
 router.get('/:appointmentId', async (req: Request, res: Response) => {

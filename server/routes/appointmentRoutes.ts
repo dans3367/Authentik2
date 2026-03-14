@@ -13,7 +13,7 @@ import {
   Appointment,
   AppointmentReminder
 } from '@shared/schema';
-import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { requireRole } from '../middleware/auth-middleware';
 import { logActivity, computeChanges } from '../utils/activityLogger';
 import { v4 as uuidv4 } from 'uuid';
@@ -86,6 +86,7 @@ async function cancelPendingRemindersForAppointment(appointmentId: string): Prom
 
 // Apply authentication to all routes
 router.use(authenticateToken);
+router.use(requireTenant);
 
 // GET /api/appointments - List appointments with filters
 router.get('/', async (req: Request, res: Response) => {

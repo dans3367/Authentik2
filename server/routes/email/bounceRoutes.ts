@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db';
 import { sql, and, eq } from 'drizzle-orm';
-import { bouncedEmails } from '@shared/schema';
+import { bouncedEmails, emailContacts } from '@shared/schema';
 import { authenticateToken, requireTenant } from '../../middleware/auth-middleware';
 import { sanitizeString, sanitizeEmail } from '../../utils/sanitization';
 
@@ -13,7 +13,7 @@ bounceRoutes.get("/bounced-emails", authenticateToken, requireTenant, async (req
     const { page = 1, limit = 50, email, reason, startDate, endDate } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = sql`1=1`;
+    let whereClause = sql`${bouncedEmails.email} IN (SELECT ${emailContacts.email} FROM ${emailContacts} WHERE ${emailContacts.tenantId} = ${req.user.tenantId})`;
 
     if (email) {
       const sanitizedEmail = sanitizeEmail(email as string);
@@ -68,6 +68,24 @@ bounceRoutes.get("/bounced-emails/check/:email", authenticateToken, requireTenan
       return res.status(400).json({ message: 'Invalid email address' });
     }
 
+    const contactInTenant = await db.query.emailContacts.findFirst({
+      where: and(
+        eq(emailContacts.tenantId, req.user.tenantId),
+        sql`LOWER(${emailContacts.email}) = ${sanitizedEmail.toLowerCase().trim()}`,
+      ),
+      columns: { id: true },
+    });
+
+    if (!contactInTenant) {
+      return res.json({
+        isBounced: false,
+        isSuppressed: false,
+        bounceType: null,
+        suppressedSince: null,
+        suppressionReason: null,
+      });
+    }
+
     const bouncedEmail = await db.query.bouncedEmails.findFirst({
       where: and(
         sql`LOWER(${bouncedEmails.email}) = ${sanitizedEmail.toLowerCase().trim()}`,
@@ -96,8 +114,27 @@ bounceRoutes.delete("/bounced-emails/:email", authenticateToken, requireTenant, 
     const { email } = req.params;
     const sanitizedEmail = sanitizeEmail(email);
 
+    if (!sanitizedEmail) {
+      return res.status(400).json({ message: 'Invalid email address' });
+    }
+
+    const contactInTenant = await db.query.emailContacts.findFirst({
+      where: and(
+        eq(emailContacts.tenantId, req.user.tenantId),
+        sql`LOWER(${emailContacts.email}) = ${sanitizedEmail.toLowerCase().trim()}`,
+      ),
+      columns: { id: true },
+    });
+
+    if (!contactInTenant) {
+      return res.status(404).json({ message: 'Bounced email record not found' });
+    }
+
     const deletedBounce = await db.delete(bouncedEmails)
-      .where(sql`${bouncedEmails.email} = ${sanitizedEmail}`)
+      .where(and(
+        sql`LOWER(${bouncedEmails.email}) = ${sanitizedEmail.toLowerCase().trim()}`,
+        eq(bouncedEmails.sourceTenantId, req.user.tenantId),
+      ))
       .returning();
 
     if (deletedBounce.length === 0) {
@@ -124,9 +161,28 @@ bounceRoutes.post("/bounced-emails", authenticateToken, requireTenant, async (re
     const sanitizedReason = sanitizeString(reason);
     const sanitizedDescription = description ? sanitizeString(description) : null;
 
+    if (!sanitizedEmail || !sanitizedReason) {
+      return res.status(400).json({ message: 'Invalid email or reason' });
+    }
+
+    const contactInTenant = await db.query.emailContacts.findFirst({
+      where: and(
+        eq(emailContacts.tenantId, req.user.tenantId),
+        sql`LOWER(${emailContacts.email}) = ${sanitizedEmail.toLowerCase().trim()}`,
+      ),
+      columns: { id: true },
+    });
+
+    if (!contactInTenant) {
+      return res.status(400).json({ message: 'Email does not belong to a contact in your tenant' });
+    }
+
     // Check if already exists
     const existingBounce = await db.query.bouncedEmails.findFirst({
-      where: sql`${bouncedEmails.email} = ${sanitizedEmail}`,
+      where: and(
+        sql`LOWER(${bouncedEmails.email}) = ${sanitizedEmail.toLowerCase().trim()}`,
+        eq(bouncedEmails.sourceTenantId, req.user.tenantId),
+      ),
     });
 
     if (existingBounce) {
@@ -135,6 +191,7 @@ bounceRoutes.post("/bounced-emails", authenticateToken, requireTenant, async (re
 
     const newBouncedEmail = await db.insert(bouncedEmails).values({
       email: sanitizedEmail!,
+      sourceTenantId: req.user.tenantId,
       bounceType: 'hard',
       bounceReason: sanitizedReason,
       firstBouncedAt: new Date(),
@@ -160,7 +217,9 @@ bounceRoutes.get("/bounced-emails/stats", authenticateToken, requireTenant, asyn
       hardBounces: sql<number>`count(*) filter (where reason = 'hard_bounce')`,
       softBounces: sql<number>`count(*) filter (where reason = 'soft_bounce')`,
       spamComplaints: sql<number>`count(*) filter (where reason = 'spam_complaint')`,
-    }).from(bouncedEmails);
+    }).from(bouncedEmails).where(
+      sql`${bouncedEmails.email} IN (SELECT ${emailContacts.email} FROM ${emailContacts} WHERE ${emailContacts.tenantId} = ${req.user.tenantId})`
+    );
 
     res.json(stats[0]);
   } catch (error) {

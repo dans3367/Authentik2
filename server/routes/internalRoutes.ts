@@ -70,7 +70,10 @@ router.post(
       // Also check contact status
       if (contactId) {
         const contact = await db.query.emailContacts.findFirst({
-          where: eq(emailContacts.id, contactId),
+          where: and(
+            eq(emailContacts.id, contactId),
+            eq(emailContacts.tenantId, tenantId)
+          ),
           columns: { status: true },
         });
         if (contact && (contact.status === 'suppressed' || contact.status === 'bounced' || contact.status === 'unsubscribed')) {
