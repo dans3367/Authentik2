@@ -1,11 +1,11 @@
 import express from 'express';
-import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requireRole } from '../middleware/auth-middleware';
 import { birthdayWorkerService } from '../services/BirthdayWorkerService';
 
 const birthdayWorkerRoutes = express.Router();
 
 // Get birthday worker status and statistics
-birthdayWorkerRoutes.get("/status", authenticateToken, async (req: any, res) => {
+birthdayWorkerRoutes.get("/status", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const stats = birthdayWorkerService.getStats();
     
@@ -34,7 +34,7 @@ birthdayWorkerRoutes.get("/status", authenticateToken, async (req: any, res) => 
 });
 
 // Get specific job status
-birthdayWorkerRoutes.get("/jobs/:jobId/status", authenticateToken, async (req: any, res) => {
+birthdayWorkerRoutes.get("/jobs/:jobId/status", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { jobId } = req.params;
     
@@ -61,7 +61,7 @@ birthdayWorkerRoutes.get("/jobs/:jobId/status", authenticateToken, async (req: a
 });
 
 // Get all job statuses
-birthdayWorkerRoutes.get("/jobs", authenticateToken, async (req: any, res) => {
+birthdayWorkerRoutes.get("/jobs", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const allJobs = birthdayWorkerService.getAllJobStatuses();
     
@@ -80,7 +80,7 @@ birthdayWorkerRoutes.get("/jobs", authenticateToken, async (req: any, res) => {
 });
 
 // Start the birthday worker
-birthdayWorkerRoutes.post("/start", authenticateToken, async (req: any, res) => {
+birthdayWorkerRoutes.post("/start", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     if (birthdayWorkerService.isRunning()) {
       return res.status(400).json({
@@ -105,7 +105,7 @@ birthdayWorkerRoutes.post("/start", authenticateToken, async (req: any, res) => 
 });
 
 // Stop the birthday worker
-birthdayWorkerRoutes.post("/stop", authenticateToken, async (req: any, res) => {
+birthdayWorkerRoutes.post("/stop", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     if (!birthdayWorkerService.isRunning()) {
       return res.status(400).json({
@@ -130,7 +130,7 @@ birthdayWorkerRoutes.post("/stop", authenticateToken, async (req: any, res) => {
 });
 
 // Restart the birthday worker
-birthdayWorkerRoutes.post("/restart", authenticateToken, async (req: any, res) => {
+birthdayWorkerRoutes.post("/restart", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     console.log('🔄 [BirthdayWorker] Restarting birthday worker...');
     
@@ -157,7 +157,7 @@ birthdayWorkerRoutes.post("/restart", authenticateToken, async (req: any, res) =
 });
 
 // Force cleanup of old jobs
-birthdayWorkerRoutes.post("/cleanup", authenticateToken, async (req: any, res) => {
+birthdayWorkerRoutes.post("/cleanup", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { maxAge } = req.body;
     
@@ -178,7 +178,7 @@ birthdayWorkerRoutes.post("/cleanup", authenticateToken, async (req: any, res) =
 });
 
 // Get birthday worker health check
-birthdayWorkerRoutes.get("/health", authenticateToken, async (req: any, res) => {
+birthdayWorkerRoutes.get("/health", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const stats = birthdayWorkerService.getStats();
     const isHealthy = stats.isRunning && stats.enabled;

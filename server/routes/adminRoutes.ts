@@ -13,7 +13,7 @@ adminRoutes.get("/sessions/stats", authenticateToken, requireRole('Administrator
       totalSessions: sql<number>`count(*)`,
       activeSessions: sql<number>`count(*) filter (where expires_at > now())`,
       expiredSessions: sql<number>`count(*) filter (where expires_at <= now())`,
-    }).from(refreshTokens);
+    }).from(refreshTokens).where(eq(refreshTokens.tenantId, req.user.tenantId));
 
     res.json(stats[0]);
   } catch (error) {
@@ -29,7 +29,7 @@ adminRoutes.get("/sessions", authenticateToken, requireRole('Administrator'), as
     const { page = 1, limit = 50, userId, deviceId, ipAddress } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let whereClause = sql`1=1`;
+    let whereClause = sql`${refreshTokens.tenantId} = ${req.user.tenantId}`;
     const params: any[] = [];
 
     if (userId) {
@@ -93,7 +93,7 @@ adminRoutes.delete("/sessions", authenticateToken, requireRole('Administrator'),
 
     // Delete session
     const deletedSession = await db.delete(refreshTokens)
-      .where(sql`${refreshTokens.id} = ${sessionId}`)
+      .where(and(eq(refreshTokens.id, sessionId), eq(refreshTokens.tenantId, req.user.tenantId)))
       .returning();
 
     if (deletedSession.length === 0) {
@@ -523,7 +523,7 @@ adminRoutes.get("/activity", authenticateToken, requireRole('Administrator'), as
 
     // This is a placeholder - you would need to implement an activity log table
     // For now, we'll return session activity as a proxy
-    let whereClause = sql`1=1`;
+    let whereClause = sql`${refreshTokens.tenantId} = ${req.user.tenantId}`;
 
     if (userId) {
       whereClause = sql`${whereClause} AND ${refreshTokens.userId} = ${userId}`;
@@ -588,7 +588,7 @@ adminRoutes.get("/activity", authenticateToken, requireRole('Administrator'), as
 adminRoutes.get("/health", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
   try {
     // Database connectivity check
-    const dbCheck = await db.select({ count: sql<number>`count(*)` }).from(betterAuthUser);
+    const dbCheck = await db.select({ count: sql<number>`count(*)` }).from(betterAuthUser).where(eq(betterAuthUser.tenantId, req.user.tenantId));
 
     const health = {
       database: {

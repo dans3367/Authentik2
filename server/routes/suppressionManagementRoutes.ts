@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requireRole } from '../middleware/auth-middleware';
 import { db } from '../db';
 import { bouncedEmails, emailContacts } from '@shared/schema';
 import { eq, and, sql, count, inArray, ilike } from 'drizzle-orm';
@@ -7,13 +7,16 @@ import { eq, and, sql, count, inArray, ilike } from 'drizzle-orm';
 export const suppressionManagementRoutes = Router();
 
 // Get suppression statistics for debugging
-suppressionManagementRoutes.get("/stats", authenticateToken, requireTenant, async (req: any, res) => {
+suppressionManagementRoutes.get("/stats", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
-    // Get total suppressed emails
+    // Get total suppressed emails that match this tenant's contacts
     const [totalSuppressed] = await db
       .select({ count: count() })
       .from(bouncedEmails)
-      .where(eq(bouncedEmails.isActive, true));
+      .where(and(
+        eq(bouncedEmails.isActive, true),
+        sql`${bouncedEmails.email} IN (SELECT ${emailContacts.email} FROM ${emailContacts} WHERE ${emailContacts.tenantId} = ${req.user.tenantId})`
+      ));
 
     // Get total active email contacts for this tenant
     const [totalContacts] = await db
@@ -24,14 +27,17 @@ suppressionManagementRoutes.get("/stats", authenticateToken, requireTenant, asyn
         eq(emailContacts.status, 'active')
       ));
 
-    // Get suppressed emails by type
+    // Get suppressed emails by type (filtered to tenant's contacts)
     const suppressedByType = await db
-      .select({ 
-        type: bouncedEmails.bounceType, 
-        count: count() 
+      .select({
+        type: bouncedEmails.bounceType,
+        count: count()
       })
       .from(bouncedEmails)
-      .where(eq(bouncedEmails.isActive, true))
+      .where(and(
+        eq(bouncedEmails.isActive, true),
+        sql`${bouncedEmails.email} IN (SELECT ${emailContacts.email} FROM ${emailContacts} WHERE ${emailContacts.tenantId} = ${req.user.tenantId})`
+      ))
       .groupBy(bouncedEmails.bounceType);
 
     // Get contacts that are suppressed for this tenant
@@ -57,7 +63,7 @@ suppressionManagementRoutes.get("/stats", authenticateToken, requireTenant, asyn
     res.json({
       status: 'success',
       statistics: {
-        totalSuppressedGlobally: totalSuppressed.count,
+        totalSuppressed: totalSuppressed.count,
         totalActiveContacts: totalContacts.count,
         suppressedContactsForTenant: suppressedContacts.length,
         suppressionRate: totalContacts.count > 0 ? 
@@ -77,18 +83,21 @@ suppressionManagementRoutes.get("/stats", authenticateToken, requireTenant, asyn
   }
 });
 
-// Get all suppressed emails (paginated)
-suppressionManagementRoutes.get("/list", authenticateToken, requireTenant, async (req: any, res) => {
+// Get suppressed emails for this tenant's contacts (paginated)
+suppressionManagementRoutes.get("/list", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { page = 1, limit = 50, search = '', type = '' } = req.query;
     const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    let whereConditions = [eq(bouncedEmails.isActive, true)];
-    
+    let whereConditions: any[] = [
+      eq(bouncedEmails.isActive, true),
+      sql`${bouncedEmails.email} IN (SELECT ${emailContacts.email} FROM ${emailContacts} WHERE ${emailContacts.tenantId} = ${req.user.tenantId})`,
+    ];
+
     if (search) {
       whereConditions.push(ilike(bouncedEmails.email, `%${search}%`));
     }
-    
+
     if (type) {
       whereConditions.push(eq(bouncedEmails.bounceType, type as string));
     }
@@ -128,7 +137,7 @@ suppressionManagementRoutes.get("/list", authenticateToken, requireTenant, async
 
   } catch (error) {
     console.error('Get suppressed emails error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to get suppressed emails',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -136,12 +145,8 @@ suppressionManagementRoutes.get("/list", authenticateToken, requireTenant, async
 });
 
 // Remove email from suppression list (admin only)
-suppressionManagementRoutes.delete("/remove/:email", authenticateToken, async (req: any, res) => {
+suppressionManagementRoutes.delete("/remove/:email", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
-    // Check if user has admin privileges
-    if (req.user?.role !== 'Owner' && req.user?.role !== 'Administrator') {
-      return res.status(403).json({ message: 'Insufficient privileges' });
-    }
 
     const { email } = req.params;
     const { reason = 'Manually removed by admin' } = req.body;
@@ -195,12 +200,8 @@ suppressionManagementRoutes.delete("/remove/:email", authenticateToken, async (r
 });
 
 // Bulk remove emails from suppression list (admin only)
-suppressionManagementRoutes.post("/bulk-remove", authenticateToken, async (req: any, res) => {
+suppressionManagementRoutes.post("/bulk-remove", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
-    // Check if user has admin privileges
-    if (req.user?.role !== 'Owner' && req.user?.role !== 'Administrator') {
-      return res.status(403).json({ message: 'Insufficient privileges' });
-    }
 
     const { emails, reason = 'Bulk removal by admin' } = req.body;
 
@@ -258,12 +259,8 @@ suppressionManagementRoutes.post("/bulk-remove", authenticateToken, async (req: 
 });
 
 // Clear all suppressions (emergency admin function)
-suppressionManagementRoutes.post("/clear-all", authenticateToken, async (req: any, res) => {
+suppressionManagementRoutes.post("/clear-all", authenticateToken, requireTenant, requireRole(['Owner']), async (req: any, res) => {
   try {
-    // Check if user has admin privileges
-    if (req.user?.role !== 'Owner') {
-      return res.status(403).json({ message: 'Only owners can clear all suppressions' });
-    }
 
     const { confirmationCode, reason = 'Emergency clearance by owner' } = req.body;
 
@@ -312,7 +309,7 @@ suppressionManagementRoutes.post("/clear-all", authenticateToken, async (req: an
 });
 
 // Check specific email suppression status
-suppressionManagementRoutes.get("/check/:email", authenticateToken, async (req: any, res) => {
+suppressionManagementRoutes.get("/check/:email", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { email } = req.params;
     

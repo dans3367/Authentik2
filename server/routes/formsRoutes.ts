@@ -134,7 +134,7 @@ async function sendPromotionEmailIfEnabled(
         usageCount: sql`${promotions.usageCount} + 1`,
         updatedAt: new Date(),
       })
-      .where(sql`${promotions.id} = ${promotion.id}`);
+      .where(and(eq(promotions.id, promotion.id), eq(promotions.tenantId, form.tenantId)));
 
     console.log(`[Promotion] Sent promotion "${promotion.title}" to ${recipientEmail} for form ${form.id}`);
   } catch (error) {
@@ -239,7 +239,7 @@ async function sendTemplateEmailIfEnabled(
     // Increment template usage count
     await db.update(templates)
       .set({ usageCount: sql`${templates.usageCount} + 1`, lastUsed: new Date(), updatedAt: new Date() })
-      .where(sql`${templates.id} = ${template.id}`);
+      .where(and(eq(templates.id, template.id), eq(templates.tenantId, form.tenantId)));
 
     console.log(`[TemplateEmail] Sent template "${template.name}" to ${recipientEmail} for form ${form.id}`);
   } catch (error) {

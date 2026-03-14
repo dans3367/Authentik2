@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, or } from 'drizzle-orm';
 import { betterAuthUser, subscriptionPlans, forms, formResponses, companies, subscriptions, subscriptionPlanRelations, tenants, shopLimitEvents, shops } from '@shared/schema';
-import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requireRole } from '../middleware/auth-middleware';
 import { storage } from '../storage';
 import Stripe from 'stripe';
 
@@ -30,12 +30,8 @@ subscriptionRoutes.get("/plans", async (req, res) => {
 });
 
 // Get current tenant's effective plan (accessible to all authenticated users)
-subscriptionRoutes.get("/tenant-plan", authenticateToken, async (req: any, res) => {
+subscriptionRoutes.get("/tenant-plan", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    if (!req.user || !req.user.tenantId) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-
     const tenantId = req.user.tenantId;
     const plan = await storage.getTenantPlan(tenantId);
 
@@ -94,13 +90,8 @@ subscriptionRoutes.post("/free-trial-signup", async (req: any, res) => {
 });
 
 // Get user's subscription
-subscriptionRoutes.get("/my-subscription", authenticateToken, async (req: any, res) => {
+subscriptionRoutes.get("/my-subscription", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    // Validate authentication
-    if (!req.user || !req.user.tenantId) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-
     const tenantId = req.user.tenantId;
     console.log('🔍 [Subscription] Fetching subscription for tenant:', tenantId);
 

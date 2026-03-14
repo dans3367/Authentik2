@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { generateText } from "ai";
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ function ensureApiKey(res: any) {
 
 // POST /api/ai/generate-birthday-message
 // Generate an occasion-specific greeting message using AI
-router.post("/generate-birthday-message", async (req, res) => {
+router.post("/generate-birthday-message", authenticateToken, requireTenant, async (req, res) => {
   try {
     const { customerName, businessName, occasionType, defaultTitle } = req.body;
 
@@ -97,7 +98,7 @@ router.post("/generate-birthday-message", async (req, res) => {
 
 // POST /api/ai/improve-text
 // Improve selected text using AI
-router.post("/improve-text", async (req, res) => {
+router.post("/improve-text", authenticateToken, requireTenant, async (req, res) => {
   try {
     const { text } = req.body;
 
@@ -136,7 +137,7 @@ ${text}`;
 
 // POST /api/ai/emojify-text
 // Add celebratory emojis to selected text while keeping tone appropriate
-router.post("/emojify-text", async (req, res) => {
+router.post("/emojify-text", authenticateToken, requireTenant, async (req, res) => {
   try {
     const { text } = req.body;
 
@@ -175,7 +176,7 @@ ${text}`;
 
 // POST /api/ai/expand-text
 // Make selected text longer and more detailed
-router.post("/expand-text", async (req, res) => {
+router.post("/expand-text", authenticateToken, requireTenant, async (req, res) => {
   try {
     const { text } = req.body;
 
@@ -214,7 +215,7 @@ ${text}`;
 
 // POST /api/ai/shorten-text
 // Make selected text shorter and more concise
-router.post("/shorten-text", async (req, res) => {
+router.post("/shorten-text", authenticateToken, requireTenant, async (req, res) => {
   try {
     const { text } = req.body;
 
@@ -262,7 +263,7 @@ ${text}`;
 
 // POST /api/ai/more-casual-text
 // Make selected text feel more casual and friendly
-router.post("/more-casual-text", async (req, res) => {
+router.post("/more-casual-text", authenticateToken, requireTenant, async (req, res) => {
   try {
     const { text } = req.body;
 
@@ -301,7 +302,7 @@ ${text}`;
 
 // POST /api/ai/more-formal-text
 // Make selected text sound more formal and polished
-router.post("/more-formal-text", async (req, res) => {
+router.post("/more-formal-text", authenticateToken, requireTenant, async (req, res) => {
   try {
     const { text } = req.body;
 
@@ -340,7 +341,7 @@ ${text}`;
 
 // POST /api/ai/transform-text
 // Generic text transformation endpoint for Puck editor
-router.post("/transform-text", async (req, res) => {
+router.post("/transform-text", authenticateToken, requireTenant, async (req, res) => {
   try {
     const { text, prompt } = req.body;
 
@@ -387,7 +388,7 @@ ${text}`;
 
 // POST /api/ai/translate
 // Translate selected text to various languages
-router.post("/translate", async (req, res) => {
+router.post("/translate", authenticateToken, requireTenant, async (req, res) => {
   try {
     const { text, targetLanguage } = req.body;
 
@@ -451,7 +452,7 @@ ${text}`;
 
 // POST /api/ai/generate-newsletter
 // Generate a full newsletter from a user prompt
-router.post("/generate-newsletter", async (req, res) => {
+router.post("/generate-newsletter", authenticateToken, requireTenant, async (req, res) => {
   try {
     const { prompt } = req.body;
 
@@ -508,7 +509,7 @@ RULES:
 
 // POST /api/ai/generate-newsletter-text
 // Generate text content for a newsletter Text block based on a user prompt
-router.post("/generate-newsletter-text", async (req, res) => {
+router.post("/generate-newsletter-text", authenticateToken, requireTenant, async (req, res) => {
   try {
     const { prompt, tone } = req.body;
 

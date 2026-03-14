@@ -171,7 +171,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
         content: validatedData.content,
         updatedAt: new Date(),
       })
-      .where(eq(appointmentNotes.id, id))
+      .where(and(eq(appointmentNotes.id, id), eq(appointmentNotes.tenantId, tenantId)))
       .returning();
 
     // Fetch the note with user details
@@ -235,7 +235,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     // Delete note
     await db
       .delete(appointmentNotes)
-      .where(eq(appointmentNotes.id, id));
+      .where(and(eq(appointmentNotes.id, id), eq(appointmentNotes.tenantId, tenantId)));
 
     res.json({ message: 'Note deleted successfully' });
   } catch (error) {
