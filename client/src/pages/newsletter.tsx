@@ -165,12 +165,31 @@ export default function NewsletterPage() {
     mutationFn: async (id: string) => {
       await apiRequest('DELETE', `/api/newsletters/${id}`);
     },
+    onMutate: async (id: string) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['/api/newsletters'] });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData<NewsletterListItem[]>(['/api/newsletters', { emailType: 'newsletter' }]);
+
+      // Optimistically remove the newsletter from the list
+      queryClient.setQueryData<NewsletterListItem[]>(
+        ['/api/newsletters', { emailType: 'newsletter' }],
+        (old) => old ? old.filter((n) => n.id !== id) : []
+      );
+
+      return { previousData };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       toast({ title: t("newsletter.toast.deleted"), description: t("newsletter.toast.deletedDesc") });
       setDeleteId(null);
     },
-    onError: (error: any) => {
+    onError: (error: any, _id, context) => {
+      // Roll back optimistic update on error
+      if (context?.previousData) {
+        queryClient.setQueryData(['/api/newsletters', { emailType: 'newsletter' }], context.previousData);
+      }
       toast({ title: t("newsletter.toast.error"), description: error.message || t("newsletter.toast.deleteError"), variant: "destructive" });
     },
   });

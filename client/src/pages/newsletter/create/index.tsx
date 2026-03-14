@@ -585,9 +585,11 @@ export default function NewsletterCreatePage() {
     };
   }, [viewport, isClient]);
 
-  // Auto-save to database periodically
+  // Auto-save to database periodically — only for existing newsletters.
+  // New newsletters must be explicitly saved first (via "Save Draft") to avoid
+  // creating orphan "Untitled Newsletter" records on every editor open.
   useEffect(() => {
-    if (!hasUnsavedChanges) return;
+    if (!hasUnsavedChanges || !newsletterId) return;
     const interval = setInterval(async () => {
       try {
         await saveToDatabase('draft');
@@ -596,7 +598,7 @@ export default function NewsletterCreatePage() {
       }
     }, AUTOSAVE_INTERVAL);
     return () => clearInterval(interval);
-  }, [hasUnsavedChanges, saveToDatabase]);
+  }, [hasUnsavedChanges, newsletterId, saveToDatabase]);
 
   // Warn on browser close / refresh
   useEffect(() => {
