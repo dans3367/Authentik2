@@ -1,38 +1,32 @@
-import { useToast } from "@/hooks/use-toast"
-import {
-  Toast,
-  ToastClose,
-  ToastDescription,
-  ToastProvider,
-  ToastTitle,
-  ToastViewport,
-} from "@/components/ui/toast"
+import { Toaster as SonnerToaster, toast } from "sonner"
+import { useEffect } from "react"
+
+function ClickToDismiss() {
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const toastEl = (e.target as HTMLElement).closest('[data-sonner-toast]')
+      if (toastEl) {
+        const id = toastEl.getAttribute('data-sonner-toast')
+        if (id) toast.dismiss(id)
+      }
+    }
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  }, [])
+  return null
+}
 
 export function Toaster() {
-  const { toasts, dismiss } = useToast()
-
   return (
-    <ToastProvider duration={4000}>
-      {toasts.map(function ({ id, title, description, action, duration, ...props }) {
-        return (
-          <Toast 
-            key={id} 
-            duration={duration} 
-            onClick={() => dismiss(id)}
-            {...props}
-          >
-            <div className="grid gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
-              {description && (
-                <ToastDescription>{description}</ToastDescription>
-              )}
-            </div>
-            {action}
-            <ToastClose />
-          </Toast>
-        )
-      })}
-      <ToastViewport />
-    </ToastProvider>
+    <>
+      <ClickToDismiss />
+      <SonnerToaster
+        position="top-center"
+        toastOptions={{
+          duration: 4000,
+          className: "font-sans border border-border bg-background text-foreground shadow-lg rounded-lg cursor-pointer",
+        }}
+      />
+    </>
   )
 }

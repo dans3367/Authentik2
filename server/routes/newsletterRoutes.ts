@@ -797,7 +797,10 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, requirePermission('
 
     res.status(201).json(newNewsletter[0]);
   } catch (error) {
-    console.error('Create newsletter error:', error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : undefined;
+    console.error('Create newsletter error:', errMsg);
+    if (errStack) console.error(errStack);
     res.status(500).json({ message: 'Failed to create newsletter' });
   }
 });
