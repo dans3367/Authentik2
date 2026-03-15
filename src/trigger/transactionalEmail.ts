@@ -309,11 +309,11 @@ function buildPasswordResetEmailHtml(displayName: string, resetUrl: string, appN
           <tr>
             <td style="padding: 40px 40px 20px;">
               <h1 style="font-size: 24px; font-weight: 600; color: #1a202c; margin: 0 0 16px;">Reset your password</h1>
-              <p style="font-size: 16px; color: #4a5568; margin: 0 0 24px;">Hi${displayName}, we received a request to reset your ${appName} password. Click the button below to choose a new password.</p>
+              <p style="font-size: 16px; color: #4a5568; margin: 0 0 24px;">Hi${escapeHtml(displayName)}, we received a request to reset your ${escapeHtml(appName)} password. Click the button below to choose a new password.</p>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto 24px;">
                 <tr>
                   <td style="background-color: #4f46e5; border-radius: 6px;">
-                    <a href="${resetUrl}" style="display: inline-block; padding: 12px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600;">Reset Password</a>
+                    <a href="${escapeHtml(resetUrl)}" style="display: inline-block; padding: 12px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600;">Reset Password</a>
                   </td>
                 </tr>
               </table>
@@ -321,7 +321,7 @@ function buildPasswordResetEmailHtml(displayName: string, resetUrl: string, appN
               <p style="font-size: 14px; color: #718096; margin: 0 0 8px;">If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.</p>
               <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
               <p style="font-size: 12px; color: #a0aec0; margin: 0;">If the button doesn't work, copy and paste this link into your browser:</p>
-              <p style="font-size: 12px; color: #4f46e5; word-break: break-all; margin: 4px 0 0;">${resetUrl}</p>
+              <p style="font-size: 12px; color: #4f46e5; word-break: break-all; margin: 4px 0 0;">${escapeHtml(resetUrl)}</p>
             </td>
           </tr>
         </table>

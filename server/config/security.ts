@@ -41,7 +41,7 @@ export const securityConfig = {
 
   // Password policy
   passwordPolicy: {
-    minLength: 8,
+    minLength: 10,
     requireUppercase: true,
     requireLowercase: true,
     requireNumbers: true,

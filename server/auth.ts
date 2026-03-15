@@ -75,31 +75,19 @@ const authInstance = betterAuth({
   trustedOrigins: [
     `http://localhost:${process.env.PORT || "5002"}`,
     "http://localhost:5173",
-    "http://127.0.0.1:35145", // Browser preview URL
     "https://weby.zendwise.work",
-    "http://weby.zendwise.work:3001",
-    "http://websy.zendwise.work:3001",
     "https://websy.zendwise.work",
-    "http://webx.zendwise.work",
     "https://webx.zendwise.work",
-    "https://2850dacc-d7a0-40e0-a90b-43f06888d139-00-18hp2u206zmhk.kirk.replit.dev",
-    "https://057ace97-08a0-4add-bf8a-36081a149b23-00-2keem4p96xbcw.janeway.replit.dev",
     process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "",
-    // Allow any IP address on local networks
-    ...(() => {
-      const origins = [];
-      const port = process.env.PORT || "5002";
-      // Support common private IP ranges
-      for (let i = 1; i <= 254; i++) {
-        origins.push(`http://192.168.${i}:${port}`);
-        origins.push(`https://192.168.${i}:${port}`);
-      }
-      for (let i = 0; i <= 255; i++) {
-        origins.push(`http://10.0.${i}:${port}`);
-        origins.push(`https://10.0.${i}:${port}`);
-      }
-      return origins;
-    })()
+    // Additional trusted origins from environment (comma-separated)
+    ...(process.env.TRUSTED_ORIGINS?.split(",").map(o => o.trim()) || []),
+    // Development-only: allow local network access
+    ...(process.env.NODE_ENV !== "production" ? [
+      "http://127.0.0.1:35145",
+      "http://weby.zendwise.work:3001",
+      "http://websy.zendwise.work:3001",
+      "http://webx.zendwise.work",
+    ] : []),
   ].filter(Boolean),
   // Add session callback to include custom user fields
   session: {

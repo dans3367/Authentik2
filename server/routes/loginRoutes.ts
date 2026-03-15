@@ -261,7 +261,15 @@ loginRoutes.post('/verify-login', async (req, res) => {
       });
     }
 
-    // Step 4: User has 2FA enabled - create temporary 2FA session
+    // Step 4: User has 2FA enabled - clean up the session that signInEmail created
+    // since the user must complete 2FA before getting a real session
+    if (authSessionToken) {
+      await db.delete(betterAuthSession)
+        .where(eq(betterAuthSession.token, authSessionToken))
+        .catch(err => console.warn('⚠️ [Login] Could not clean up pre-2FA session:', err));
+    }
+
+    // Create temporary 2FA session
     console.log(`🔐 [Login] 2FA required for user ${userRecord.email}`);
 
     // For 2FA flow, we create our own temporary session token
@@ -398,7 +406,15 @@ loginRoutes.post('/check-2fa-requirement', async (req, res) => {
       });
     }
 
-    // User has 2FA enabled - create temporary session for verification
+    // User has 2FA enabled - clean up the session that signInEmail created
+    // since the user must complete 2FA before getting a real session
+    if (loginResult.token) {
+      await db.delete(betterAuthSession)
+        .where(eq(betterAuthSession.token, loginResult.token))
+        .catch(err => console.warn('⚠️ [2FA Check] Could not clean up pre-2FA session:', err));
+    }
+
+    // Create temporary session for verification
     console.log(`🔐 [2FA Check] 2FA required for user ${userRecord.email}`);
 
     const sessionToken = `temp_${userRecord.id}_${Date.now()}_${randomBytes(16).toString('base64url')}`;

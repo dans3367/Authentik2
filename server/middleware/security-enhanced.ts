@@ -85,30 +85,19 @@ export const securityAuditLogger = (req: Request, res: Response, next: NextFunct
 
 // Prevent timing attacks on string comparison
 export const safeCompare = (a: string, b: string): boolean => {
-  if (a.length !== b.length) {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    // Compare against self to consume constant time, then return false
+    require('crypto').timingSafeEqual(bufA, bufA);
     return false;
   }
-
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  
-  return result === 0;
+  return require('crypto').timingSafeEqual(bufA, bufB);
 };
 
-// Generate secure random tokens
+// Generate secure random tokens (uses crypto.randomBytes to avoid modulo bias)
 export const generateSecureToken = (length: number = 32): string => {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let token = "";
-  const randomValues = new Uint8Array(length);
-  crypto.getRandomValues(randomValues);
-  
-  for (let i = 0; i < length; i++) {
-    token += chars[randomValues[i] % chars.length];
-  }
-  
-  return token;
+  return require('crypto').randomBytes(length).toString('base64url').slice(0, length);
 };
 
 // CSRF protection middleware (for non-API routes)
