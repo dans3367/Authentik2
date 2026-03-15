@@ -100,30 +100,45 @@ export const createRateLimiter = (options: {
   });
 };
 
-// Default rate limiters - 10x RELAXED FOR DEBUGGING
+// Default rate limiters
 export const generalRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10000, // 10x relaxed (was 1000)
+  max: 1000,
 });
 
 export const authRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // 10x relaxed (was 50)
+  max: 50,
   message: "Too many authentication attempts, please try again later.",
   skipSuccessfulRequests: true,
 });
 
 export const apiRateLimiter = createRateLimiter({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 3000, // 10x relaxed (was 300)
+  max: 300,
 });
 
-// JWT Token generation rate limiter - 10x relaxed
 export const jwtTokenRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 10x relaxed (was 10)
+  max: 10,
   message: "Too many token generation requests. Please try again later.",
-  skipSuccessfulRequests: false, // Count both successful and failed attempts
+  skipSuccessfulRequests: false,
+});
+
+// Rate limiter for 2FA verification attempts
+export const twoFactorRateLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000, // 10 minutes (matches temp session TTL)
+  max: 5,
+  message: "Too many 2FA verification attempts. Please try again later.",
+  skipSuccessfulRequests: false,
+});
+
+// Rate limiter for password reset requests
+export const passwordResetRateLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: "Too many password reset requests. Please try again later.",
+  skipSuccessfulRequests: false,
 });
 
 // MongoDB injection protection

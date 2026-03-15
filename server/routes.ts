@@ -148,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/users", userRoutes);
   app.use("/api/roles", roleRoutes);
   app.use("/api/2fa", twoFactorRoutes);
-  app.use("/api/auth", loginRoutes);
+  app.use("/api/auth", authRateLimiter, loginRoutes);
   app.use("/api/tenant-limits", tenantLimitsRoutes);
 
   // Temporal workflow endpoints - proxy to server-node

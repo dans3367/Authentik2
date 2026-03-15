@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { betterAuthUser, betterAuthSession, temp2faSessions } from '@shared/schema';
+import { betterAuthUser, betterAuthSession, betterAuthVerification, temp2faSessions } from '@shared/schema';
 import { eq, and, sql, lt, not } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 import { z } from 'zod';
@@ -10,6 +10,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { triggerTransactionalEmail } from '../lib/trigger';
 import { randomBytes } from 'crypto';
+import { twoFactorRateLimiter, passwordResetRateLimiter } from '../middleware/security';
+import { validatePasswordStrength } from '../middleware/security-enhanced';
 
 export const loginRoutes = Router();
 
@@ -442,7 +444,7 @@ loginRoutes.post('/check-2fa-requirement', async (req, res) => {
 });
 
 // New 2FA verification endpoint that follows the flow in the image
-loginRoutes.post('/verify-2fa', async (req, res) => {
+loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
   try {
     const { token, tempSessionToken } = req.body;
 
@@ -1082,6 +1084,198 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
     });
   } catch (error) {
     console.error('❌ [Change Email] Error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Forgot password - send reset link
+loginRoutes.post('/forgot-password', passwordResetRateLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ message: 'Email address is required' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Always return success to prevent email enumeration
+    const successResponse = {
+      success: true,
+      message: 'If an account with that email exists, a password reset link has been sent.',
+    };
+
+    // Find user
+    const user = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.email, normalizedEmail),
+    });
+
+    if (!user) {
+      console.log('⚠️ [Forgot Password] No user found for:', normalizedEmail);
+      return res.json(successResponse);
+    }
+
+    if (!user.isActive) {
+      console.log('⚠️ [Forgot Password] Inactive user:', normalizedEmail);
+      return res.json(successResponse);
+    }
+
+    // Generate a secure reset token (JWT with 1-hour expiry)
+    const secret = getAuthSecret();
+    const resetToken = jwt.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        purpose: 'password-reset',
+        iat: Math.floor(Date.now() / 1000),
+      },
+      secret,
+      { expiresIn: '1h' }
+    );
+
+    // Store the token in betterAuthVerification table for single-use enforcement
+    const tokenId = randomBytes(16).toString('base64url');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Delete any existing password-reset tokens for this user
+    await db.delete(betterAuthVerification)
+      .where(eq(betterAuthVerification.identifier, `password-reset:${user.id}`));
+
+    // Insert new token
+    await db.insert(betterAuthVerification).values({
+      id: tokenId,
+      identifier: `password-reset:${user.id}`,
+      value: resetToken,
+      expiresAt,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    console.log('✅ [Forgot Password] Reset token stored for user:', user.email);
+
+    // Send password reset email
+    try {
+      const triggerResult = await triggerTransactionalEmail({
+        type: 'password-reset',
+        recipientEmail: user.email,
+        recipientName: user.firstName || user.name?.split(' ')[0],
+        resetToken,
+        baseUrl: process.env.BASE_URL || 'http://localhost:5002',
+        appName: process.env.APP_NAME || 'Zendwise',
+      });
+      if (triggerResult.success) {
+        console.log('✅ [Forgot Password] Reset email dispatched, runId:', triggerResult.runId);
+      } else {
+        console.error('❌ [Forgot Password] Failed to dispatch reset email:', triggerResult.error);
+      }
+    } catch (emailError) {
+      console.error('❌ [Forgot Password] Failed to dispatch reset email:', emailError);
+    }
+
+    return res.json(successResponse);
+  } catch (error) {
+    console.error('❌ [Forgot Password] Error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Reset password - verify token and set new password
+loginRoutes.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ message: 'Token and new password are required' });
+    }
+
+    // Validate password strength server-side
+    const strengthCheck = validatePasswordStrength(password);
+    if (!strengthCheck.valid) {
+      return res.status(400).json({
+        message: 'Password does not meet security requirements',
+        errors: strengthCheck.errors,
+      });
+    }
+
+    // Verify JWT token
+    const secret = getAuthSecret();
+    let decoded: { sub: string; email: string; purpose: string };
+    try {
+      decoded = jwt.verify(token, secret, { algorithms: ['HS256'] }) as any;
+    } catch (jwtError: any) {
+      console.error('❌ [Reset Password] JWT verification failed:', jwtError.message);
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    if (decoded.purpose !== 'password-reset') {
+      return res.status(400).json({ message: 'Invalid reset token' });
+    }
+
+    // Enforce single-use: check that token exists in verification table
+    const [storedVerification] = await db.select()
+      .from(betterAuthVerification)
+      .where(and(
+        eq(betterAuthVerification.identifier, `password-reset:${decoded.sub}`),
+        eq(betterAuthVerification.value, token),
+      ))
+      .limit(1);
+
+    if (!storedVerification) {
+      return res.status(400).json({ message: 'Reset token has already been used or is invalid' });
+    }
+
+    if (new Date() > storedVerification.expiresAt) {
+      // Clean up expired token
+      await db.delete(betterAuthVerification)
+        .where(eq(betterAuthVerification.id, storedVerification.id));
+      return res.status(400).json({ message: 'Reset token has expired. Please request a new one.' });
+    }
+
+    // Find user
+    const user = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, decoded.sub),
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'User not found' });
+    }
+
+    // Hash new password using bcrypt (matching Better Auth's hashing)
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Delete the used reset token (single-use enforcement)
+    await db.delete(betterAuthVerification)
+      .where(eq(betterAuthVerification.id, storedVerification.id));
+
+    // Update password in the credential account (Better Auth stores password hash here)
+    try {
+      await db.execute(
+        sql`UPDATE better_auth_account SET password = ${hashedPassword} WHERE user_id = ${user.id} AND provider_id = 'credential'`
+      );
+      console.log('✅ [Reset Password] Password updated for user:', user.email);
+    } catch (updateError) {
+      console.error('❌ [Reset Password] Failed to update password:', updateError);
+      return res.status(500).json({ message: 'Failed to update password' });
+    }
+
+    // Invalidate all existing sessions for this user
+    await db.delete(betterAuthSession)
+      .where(eq(betterAuthSession.userId, user.id));
+
+    // Update tokenValidAfter to invalidate any cached tokens
+    await db.update(betterAuthUser)
+      .set({
+        tokenValidAfter: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(betterAuthUser.id, user.id));
+
+    return res.json({
+      success: true,
+      message: 'Password has been reset successfully. Please log in with your new password.',
+    });
+  } catch (error) {
+    console.error('❌ [Reset Password] Error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

@@ -20,11 +20,13 @@ function maskEmail(email: string): string {
  * Supports: verification, welcome, and generic transactional emails.
  */
 const transactionalEmailSchema = z.object({
-  type: z.enum(["verification", "welcome"]),
+  type: z.enum(["verification", "welcome", "password-reset"]),
   recipientEmail: z.string().email(),
   recipientName: z.string().nullable().optional(),
   /** Required for verification emails */
   verificationToken: z.string().optional(),
+  /** Required for password-reset emails */
+  resetToken: z.string().optional(),
   /** Base URL of the application (for building links) */
   baseUrl: z.string().optional(),
   /** Application name for branding */
@@ -84,6 +86,21 @@ export const sendTransactionalEmailTask = task({
         subject = `Welcome to ${appName}! Your account is now verified`;
         htmlContent = buildWelcomeEmailHtml(displayName, baseUrl, appName);
         textContent = buildWelcomeEmailText(displayName, baseUrl, appName);
+        break;
+      }
+
+      case "password-reset": {
+        if (!data.resetToken) {
+          throw new Error("resetToken is required for password-reset emails");
+        }
+
+        const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(data.resetToken)}`;
+
+        subject = `Reset your ${appName} password`;
+        htmlContent = buildPasswordResetEmailHtml(displayName, resetUrl, appName);
+        textContent = buildPasswordResetEmailText(displayName, resetUrl, appName);
+
+        logger.info("Password reset URL generated", { recipientHash, resetUrl: resetUrl.replace(/([?&]token=)[^&]+/, "$1[REDACTED]") });
         break;
       }
 
@@ -272,6 +289,62 @@ function buildWelcomeEmailText(displayName: string, baseUrl: string, appName: st
     `Go to Dashboard: ${baseUrl}`,
     "",
     `Thank you for joining us!`,
+    `The ${appName} Team`,
+  ].join("\n");
+}
+
+function buildPasswordResetEmailHtml(displayName: string, resetUrl: string, appName: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Your Password</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f7fafc;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f7fafc;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px;">
+              <h1 style="font-size: 24px; font-weight: 600; color: #1a202c; margin: 0 0 16px;">Reset your password</h1>
+              <p style="font-size: 16px; color: #4a5568; margin: 0 0 24px;">Hi${displayName}, we received a request to reset your ${appName} password. Click the button below to choose a new password.</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto 24px;">
+                <tr>
+                  <td style="background-color: #4f46e5; border-radius: 6px;">
+                    <a href="${resetUrl}" style="display: inline-block; padding: 12px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600;">Reset Password</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="font-size: 14px; color: #718096; margin: 0 0 8px;">This link will expire in 1 hour.</p>
+              <p style="font-size: 14px; color: #718096; margin: 0 0 8px;">If you didn't request a password reset, you can safely ignore this email. Your password will not be changed.</p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+              <p style="font-size: 12px; color: #a0aec0; margin: 0;">If the button doesn't work, copy and paste this link into your browser:</p>
+              <p style="font-size: 12px; color: #4f46e5; word-break: break-all; margin: 4px 0 0;">${resetUrl}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+function buildPasswordResetEmailText(displayName: string, resetUrl: string, appName: string): string {
+  return [
+    `Hi${displayName},`,
+    "",
+    `We received a request to reset your ${appName} password.`,
+    "",
+    `Click the link below to choose a new password:`,
+    resetUrl,
+    "",
+    `This link will expire in 1 hour.`,
+    "",
+    `If you didn't request a password reset, you can safely ignore this email.`,
+    "",
     `The ${appName} Team`,
   ].join("\n");
 }
