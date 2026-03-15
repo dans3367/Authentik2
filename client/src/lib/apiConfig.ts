@@ -5,7 +5,6 @@
 
 // Get the API server port from environment or default
 const API_PORT = import.meta.env.VITE_API_PORT || '5002';
-const CARDPROCESSOR_PORT = import.meta.env.VITE_CARDPROCESSOR_PORT || '5004';
 
 /**
  * Determines if the current access is via localhost
@@ -48,27 +47,6 @@ export const getApiBaseUrl = (): string => {
  */
 export const getFormsServerUrl = (): string => {
   return getApiBaseUrl();
-};
-
-/**
- * Gets the base URL for the cardprocessor server
- */
-export const getCardprocessorUrl = (): string => {
-  if (import.meta.env.VITE_CARDPROCESSOR_URL) {
-    return import.meta.env.VITE_CARDPROCESSOR_URL;
-  }
-  
-  if (typeof window === 'undefined') {
-    return `http://localhost:${CARDPROCESSOR_PORT}`;
-  }
-  
-  const { hostname, protocol } = window.location;
-  
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return `http://localhost:${CARDPROCESSOR_PORT}`;
-  }
-  
-  return `${protocol}//${hostname}:${CARDPROCESSOR_PORT}`;
 };
 
 /**

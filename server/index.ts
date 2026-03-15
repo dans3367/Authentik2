@@ -172,20 +172,7 @@ app.use((req, res, next) => {
     process.exit(1);
   }
 
-  // Birthday Worker Service - DISABLED
-  // Workers are now handled by cardprocessor-go on port 5004
-  // Uncomment below to re-enable if needed
-  /*
-  try {
-    serverLogger.info('🎂 Starting Birthday Worker Service...');
-    birthdayWorkerService.start();
-    serverLogger.info('✅ Birthday Worker Service started');
-  } catch (error) {
-    serverLogger.error("Failed to initialize Birthday Worker Service:", error);
-    // Don't exit - continue without worker service
-  }
-  */
-  serverLogger.info('🚫 Birthday Worker Service: DISABLED (handled by cardprocessor-go)');
+  // Birthday cards are handled by Trigger.dev tasks (src/trigger/requestBdayEmail.ts)
 
   // Appointment Reminder Worker - handled by Trigger.dev (src/trigger/reminders.ts)
   serverLogger.info('🚫 Appointment Reminder Worker: handled by Trigger.dev');
@@ -193,13 +180,11 @@ app.use((req, res, next) => {
   // Display service architecture
   serverLogger.info('🔄 Service Architecture:');
   serverLogger.info('   🌐 Main Server: localhost:5002 (Authentication & API)');
-  serverLogger.info('   🎂 cardprocessor-go: localhost:5004 (Birthday Cards, Email Tracking & Unsubscribe)');
   serverLogger.info('   📝 Public Forms: Merged into Main Server (/form/:id)');
   serverLogger.info('   🪝 Webhook Server: localhost:3505 (Webhook Handling)');
-  serverLogger.info('   ⚡ Temporal Server: localhost:50051 (GRPC Bridge - Optional)');
+  serverLogger.info('   🎂 Birthday Cards: Trigger.dev tasks');
   serverLogger.info('');
-  serverLogger.info('📊 Email Tracking: Handled automatically by cardprocessor-go → Database');
-  serverLogger.info('   Tables: email_sends, email_events, email_content');
+  serverLogger.info('📊 Email Tracking: email_sends, email_events, email_content tables');
 
   const server = await registerRoutes(app);
 

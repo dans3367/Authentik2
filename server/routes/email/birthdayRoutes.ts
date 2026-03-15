@@ -1090,7 +1090,6 @@ birthdayRoutes.post("/email-contacts/send-birthday-card", authenticateToken, req
     }
 
     const results = [];
-    const cardprocessorUrl = process.env.CARDPROCESSOR_URL || 'http://localhost:5004';
 
     // Import email service
     const { enhancedEmailService } = await import('../../emailService');

@@ -36,7 +36,6 @@ import appointmentNotesRoutes from "./routes/appointmentNotesRoutes";
 import appointmentConfirmationRoutes from "./routes/appointmentConfirmationRoutes";
 import suppressionManagementRoutes from "./routes/suppressionManagementRoutes";
 import aiRoutes from "./routes/aiRoutes";
-import { birthdayWorkerRoutes } from "./routes/birthdayWorkerRoutes";
 import { templateRoutes } from "./routes/templateRoutes";
 import { signupRoutes } from "./routes/signupRoutes";
 import { tenantFixRoutes } from "./routes/tenantFixRoutes";
@@ -94,7 +93,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/appointments", appointmentRoutes);
   app.use("/api/appointment-reminders", appointmentRemindersRoutes);
   app.use("/api/appointment-notes", appointmentNotesRoutes);
-  app.use("/api/birthday-worker", birthdayWorkerRoutes);
   app.use("/api/ai", aiRoutes);
   app.use("/api/suppression", suppressionManagementRoutes);
   app.use("/api/templates", authenticateToken, requireTenant, templateRoutes);
@@ -151,47 +149,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/auth", authRateLimiter, loginRoutes);
   app.use("/api/tenant-limits", tenantLimitsRoutes);
 
-  // Temporal workflow endpoints - proxy to server-node
-  app.post("/api/temporal/clear-workflows", authenticateToken, async (req: any, res) => {
-    try {
-      console.log('🧹 [Temporal Proxy] Forwarding workflow cleanup request to server-node for tenant:', req.user.tenantId);
-
-      // Forward request to server-node with authentication
-      const response = await fetch('http://localhost:3502/api/temporal/clear-workflows', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': req.headers.authorization || '',
-        },
-        body: JSON.stringify({
-          tenantId: req.user.tenantId,
-          userId: req.user.id
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [Temporal Proxy] server-node returned error:', response.status, errorText);
-        return res.status(response.status).json({
-          success: false,
-          message: 'server-node request failed',
-          error: errorText
-        });
-      }
-
-      const result = await response.json();
-      console.log('✅ [Temporal Proxy] server-node response:', result);
-      res.json(result);
-    } catch (error) {
-      console.error('❌ [Temporal Proxy] Failed to communicate with server-node:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to communicate with temporal service',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  });
-
   // Birthday test endpoint - sends a test birthday card via Trigger.dev + Resend
   // Business logic extracted to server/services/birthdayTestService.ts for testability
   app.post("/api/birthday-test", authenticateToken, async (req: any, res) => {
@@ -219,119 +176,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Unsubscribe endpoints - proxy to cardprocessor-go main server (port 5004)
-  // These routes are public (no authentication) for customer-facing unsubscribe functionality
-  app.get("/api/unsubscribe/birthday", async (req: any, res) => {
-    try {
-      console.log('🔗 [Unsubscribe Proxy] Forwarding GET request to cardprocessor-go:5004, token:', req.query.token?.substring(0, 10) + '...');
-
-      // Build query string
-      const queryParams = new URLSearchParams(req.query as any).toString();
-      const url = `http://localhost:5004/api/unsubscribe/birthday${queryParams ? '?' + queryParams : ''}`;
-
-      // Forward request to cardprocessor-go server
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'text/html',
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [Unsubscribe Proxy] cardprocessor-go returned error:', response.status, errorText);
-        return res.status(response.status).send(errorText);
-      }
-
-      const html = await response.text();
-      res.set('Content-Type', 'text/html');
-      res.send(html);
-    } catch (error) {
-      console.error('❌ [Unsubscribe Proxy] Failed to communicate with cardprocessor-go:', error);
-      res.status(500).send('<html><body><h1>Service Temporarily Unavailable</h1><p>Unable to process unsubscribe request. Please try again later.</p></body></html>');
+  // Birthday unsubscribe/resubscribe - redirect to native unsubscribe preferences page
+  // These were previously proxied to cardprocessor-go; now handled natively via /api/email/unsubscribe
+  app.get("/api/unsubscribe/birthday", (req: any, res) => {
+    const token = req.query.token as string;
+    if (!token) {
+      return res.status(400).type('text/html').send('<html><body><h1>Invalid request</h1><p>Missing token.</p></body></html>');
     }
+    res.redirect(`/api/email/unsubscribe?token=${encodeURIComponent(token)}&type=customer_engagement`);
   });
 
-  app.post("/api/unsubscribe/birthday", async (req: any, res) => {
-    try {
-      console.log('🔗 [Unsubscribe Proxy] Forwarding POST request to cardprocessor-go:5004');
-
-      // Forward request to cardprocessor-go server
-      const response = await fetch('http://localhost:5004/api/unsubscribe/birthday', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams(req.body).toString()
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [Unsubscribe Proxy] cardprocessor-go returned error:', response.status, errorText);
-        return res.status(response.status).send(errorText);
-      }
-
-      const html = await response.text();
-      console.log('✅ [Unsubscribe Proxy] Successfully processed unsubscribe request');
-      res.set('Content-Type', 'text/html');
-      res.send(html);
-    } catch (error) {
-      console.error('❌ [Unsubscribe Proxy] Failed to communicate with cardprocessor-go:', error);
-      res.status(500).send('<html><body><h1>Service Temporarily Unavailable</h1><p>Unable to process unsubscribe request. Please try again later.</p></body></html>');
+  app.get("/api/resubscribe/birthday", (req: any, res) => {
+    const token = req.query.token as string;
+    if (!token) {
+      return res.status(400).type('text/html').send('<html><body><h1>Invalid request</h1><p>Missing token.</p></body></html>');
     }
+    res.redirect(`/api/email/unsubscribe?token=${encodeURIComponent(token)}&type=customer_engagement`);
   });
-
-  // Resubscribe endpoint - proxy to cardprocessor-go main server (port 5004)
-  app.get("/api/resubscribe/birthday", async (req: any, res) => {
-    try {
-      console.log("🔗 [Resubscribe Proxy] Forwarding GET request to cardprocessor-go:5004, token:", req.query.token?.substring(0, 10) + "...");
-
-      // Build query string
-      const queryParams = new URLSearchParams(req.query as any).toString();
-      const url = `http://localhost:5004/api/resubscribe/birthday${queryParams ? "?" + queryParams : ""}`;
-
-      // Forward request to cardprocessor-go server
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "User-Agent": "birthday-service-proxy",
-        },
-      });
-
-      // Forward the HTML response
-      const html = await response.text();
-      res.status(response.status).type("text/html").send(html);
-
-    } catch (error) {
-      console.error("❌ [Resubscribe Proxy] Failed to communicate with cardprocessor-go:", error);
-      res.status(500).send("<html><body><h1>Service Temporarily Unavailable</h1><p>Unable to process resubscribe request. Please try again later.</p></body></html>");
-    }
-  });
-
-  // Email tracking endpoints - DISABLED (legacy server-node service no longer exists)
-  // Email tracking is now handled directly in the database via email_sends, email_events, and email_content tables
-  // Data is tracked automatically by cardprocessor-go when emails are sent
-  // To query email tracking data, query these tables directly or create new API endpoints
-
-  app.get("/api/email-tracking", authenticateToken, async (req: any, res) => {
-    res.status(501).json({
-      success: false,
-      message: 'Email tracking endpoints are disabled. Use database queries on email_sends, email_events, and email_content tables instead.',
-      note: 'Legacy server-node service has been replaced. Email tracking is now in the database.'
-    });
-  });
-
-  app.post("/api/email-tracking", authenticateToken, async (req: any, res) => {
-    res.status(501).json({
-      success: false,
-      message: 'Email tracking endpoints are disabled. Email tracking is handled automatically by cardprocessor-go.',
-      note: 'Legacy server-node service has been replaced. Check email_sends table for tracking data.'
-    });
-  });
-
-  // Legacy routes for backward compatibility (if needed)
-  // These can be removed once all clients are updated
-  // Note: Auth routes removed - better-auth handles authentication
 
   // Generate external service token endpoint
   app.post("/api/external-token", authenticateToken, jwtTokenRateLimiter, async (req: any, res) => {

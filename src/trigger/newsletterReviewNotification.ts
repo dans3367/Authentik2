@@ -47,11 +47,8 @@ export const sendReviewNotificationTask = task({
       submitterEmail: data.submitterEmail,
     });
 
-    // Build the review link — use production URL when running in Trigger.dev cloud
-    const apiUrl = process.env.API_URL;
-    const baseUrl = (!apiUrl || apiUrl.includes("localhost") || apiUrl.includes("127.0.0.1"))
-      ? "https://web.zendwise.work"
-      : apiUrl;
+    // Build the review link using the frontend URL from environment
+    const baseUrl = process.env.FRONTEND_URL || process.env.BASE_URL || "http://localhost:5173";
 
     const reviewLink = `${baseUrl}/newsletters/${data.newsletterId}?reviewer=true&code=${data.approvalCode}`;
     const submittedDate = new Date(data.submittedAt).toLocaleDateString('en-US', {

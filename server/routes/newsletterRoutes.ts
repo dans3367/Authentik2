@@ -571,15 +571,10 @@ newsletterRoutes.get("/reviewer-settings", authenticateToken, requireTenant, req
 });
 
 // Update tenant reviewer settings
-newsletterRoutes.put("/reviewer-settings", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.put("/reviewer-settings", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { enabled, reviewerId } = req.body;
-
-    // Only owners/admins can manage reviewer settings
-    if (!['Owner', 'Administrator'].includes(req.user.role)) {
-      return res.status(403).json({ message: 'Only owners and administrators can manage reviewer settings' });
-    }
 
     // Get existing settings to compute effective reviewerId
     const existing = await db.query.newsletterReviewerSettings.findFirst({

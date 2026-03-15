@@ -38,7 +38,6 @@ export const serverLogger = logger.child({ context: 'server' });
 export const dbLogger = logger.child({ context: 'database' });
 export const authLogger = logger.child({ context: 'auth' });
 export const apiLogger = logger.child({ context: 'api' });
-export const temporalLogger = logger.child({ context: 'temporal' });
 export const storageLogger = logger.child({ context: 'storage' });
 export const routeLogger = logger.child({ context: 'routes' });
 

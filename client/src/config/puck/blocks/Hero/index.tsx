@@ -41,7 +41,7 @@ export const Hero: ComponentConfig<HeroProps> = {
     description: { type: "textarea", contentEditable: true },
     buttons: {
       type: "array",
-      min: 1,
+      min: 0,
       max: 4,
       getItemSummary: (item) => item.label || "Button",
       arrayFields: {
@@ -224,7 +224,7 @@ export const Hero: ComponentConfig<HeroProps> = {
                           </p>
 
                           {/* Buttons */}
-                          {buttons.length > 0 && (
+                          {buttons?.length > 0 && (
                             <table
                               role="presentation"
                               cellPadding={0}

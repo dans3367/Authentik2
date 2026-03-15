@@ -97,31 +97,6 @@
         "<node_internals>/**",
         "**/node_modules/**"
       ]
-    },
-    {
-      "name": "Debug CardProcessor Go",
-      "type": "go",
-      "request": "launch",
-      "mode": "debug",
-      "program": "${workspaceFolder}/cardprocessor-go",
-      "cwd": "${workspaceFolder}/cardprocessor-go",
-      "env": {
-        "GIN_MODE": "debug",
-        "PORT": "5004",
-        "LOG_LEVEL": "debug"
-      },
-      "console": "integratedTerminal",
-      "showLog": true,
-      "trace": "verbose",
-      "logOutput": "rpc"
-    },
-    {
-      "name": "Debug CardProcessor Go (Attach)",
-      "type": "go",
-      "request": "attach",
-      "mode": "local",
-      "processId": "${command:pickProcess}",
-      "cwd": "${workspaceFolder}/cardprocessor-go"
     }
   ]
 }
