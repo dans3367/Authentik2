@@ -943,7 +943,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
   try {
     const { id } = req.params;
     const validatedData = updateNewsletterSchema.parse(req.body);
-    const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds, reactionsEnabled, publishedAt: _ignoredPublishedAt, webSlug: _ignoredWebSlug, ...rest } = validatedData;
+    const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds, reactionsEnabled, publishToBlog, publishedAt: _ignoredPublishedAt, webSlug: _ignoredWebSlug, ...rest } = validatedData;
 
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
@@ -998,6 +998,15 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
 
     if (reactionsEnabled !== undefined) {
       updateData.reactionsEnabled = reactionsEnabled;
+    }
+
+    if (publishToBlog !== undefined) {
+      updateData.publishToBlog = publishToBlog;
+      // If toggling off blog publishing on an already-published newsletter, clear the web slug
+      if (publishToBlog === false && newsletter.webSlug) {
+        updateData.webSlug = null;
+        updateData.publishedAt = null;
+      }
     }
 
     const updatedNewsletter = await db.update(newsletters)
@@ -1911,18 +1920,21 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
           failed
         });
 
-        // Generate web slug and publish for browser viewing
-        const webSlug = await generateWebSlug(newsletter.title, req.user.tenantId, id);
+        // Generate web slug and publish for browser viewing (only if publishToBlog is enabled)
+        const sendUpdate: Record<string, any> = {
+          status: 'sent',
+          recipientCount: successful,
+          sentAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        if (newsletter.publishToBlog !== false) {
+          sendUpdate.webSlug = await generateWebSlug(newsletter.title, req.user.tenantId, id);
+          sendUpdate.publishedAt = new Date();
+        }
 
         await db.update(newsletters)
-          .set({
-            status: 'sent',
-            recipientCount: successful,
-            sentAt: new Date(),
-            publishedAt: new Date(),
-            webSlug,
-            updatedAt: new Date(),
-          })
+          .set(sendUpdate)
           .where(eq(newsletters.id, id));
 
         res.json({
@@ -2317,13 +2329,13 @@ newsletterRoutes.put('/internal/:id/status', authenticateInternalService, async 
       updateData.recipientCount = sentCount;
     }
 
-    // When marking as 'sent', also publish for web viewing
+    // When marking as 'sent', also publish for web viewing (if publishToBlog is enabled)
     if (status === 'sent') {
       const newsletter = await db.query.newsletters.findFirst({
         where: eq(newsletters.id, id),
-        columns: { id: true, title: true, tenantId: true, webSlug: true },
+        columns: { id: true, title: true, tenantId: true, webSlug: true, publishToBlog: true },
       });
-      if (newsletter && !newsletter.webSlug) {
+      if (newsletter && !newsletter.webSlug && newsletter.publishToBlog !== false) {
         updateData.publishedAt = new Date();
         updateData.webSlug = await generateWebSlug(newsletter.title, newsletter.tenantId, id);
         console.log(`[Newsletter Internal] Auto-publishing newsletter ${id} with webSlug: ${updateData.webSlug}`);
@@ -2922,6 +2934,58 @@ newsletterRoutes.post("/:id/reject", authenticateToken, requireTenant, async (re
   }
 });
 
+// Recall newsletter from review — returns it to draft and invalidates the reviewer's approval link
+newsletterRoutes.post("/:id/recall-review", authenticateToken, requireTenant, requirePermission(['newsletters.create', 'newsletters.send']), async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${tenantId} AND ${newsletters.deletedAt} IS NULL`,
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    if (newsletter.status !== 'pending_review') {
+      return res.status(400).json({ message: 'Newsletter is not pending review' });
+    }
+
+    const [updated] = await db.update(newsletters)
+      .set({
+        status: 'draft',
+        reviewStatus: null,
+        reviewedAt: null,
+        reviewNotes: null,
+        reviewerApprovalCode: null, // Invalidate any existing approval code/link
+        reviewerId: null,
+        requiresReviewerApproval: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(newsletters.id, id))
+      .returning();
+
+    // Log activity
+    await logActivity({
+      tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter',
+      entityId: id,
+      entityName: newsletter.title,
+      activityType: 'recalled_from_review',
+      description: `Recalled newsletter "${newsletter.title}" from review back to draft`,
+      metadata: { previousReviewerId: newsletter.reviewerId },
+      req,
+    });
+
+    res.json({ message: 'Newsletter recalled to draft', newsletter: updated });
+  } catch (error) {
+    console.error('Recall from review error:', error);
+    res.status(500).json({ message: 'Failed to recall newsletter from review' });
+  }
+});
+
 // ─── Safety net: finalize newsletters stuck in 'sending' status ───
 // If Trigger.dev's callback fails, newsletters can get permanently stuck.
 // This function detects newsletters in 'sending' for > 30 minutes and marks them 'sent'.
@@ -2949,17 +3013,34 @@ async function finalizeStuckNewsletters(): Promise<number> {
 
     for (const nl of stuckNewsletters) {
       try {
-        // Generate web slug for publishing
-        const webSlug = await generateWebSlug(nl.title, nl.tenantId, nl.id);
+        // Read the full row to check publishToBlog safely (column may not exist in DB yet)
+        let shouldPublishToBlog = true;
+        try {
+          const fullNl = await db.query.newsletters.findFirst({
+            where: eq(newsletters.id, nl.id),
+            columns: { publishToBlog: true },
+          });
+          if (fullNl && fullNl.publishToBlog === false) {
+            shouldPublishToBlog = false;
+          }
+        } catch {
+          // Column doesn't exist in DB yet — default to publishing
+        }
+
+        const finalizeUpdate: Record<string, any> = {
+          status: 'sent',
+          sentAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        // Only publish to blog if publishToBlog is enabled
+        if (shouldPublishToBlog) {
+          finalizeUpdate.webSlug = await generateWebSlug(nl.title, nl.tenantId, nl.id);
+          finalizeUpdate.publishedAt = new Date();
+        }
 
         await db.update(newsletters)
-          .set({
-            status: 'sent',
-            sentAt: new Date(),
-            publishedAt: new Date(),
-            webSlug,
-            updatedAt: new Date(),
-          })
+          .set(finalizeUpdate)
           .where(eq(newsletters.id, nl.id));
 
         console.log(`✅ [Newsletter Safety Net] Finalized newsletter "${nl.title}" (${nl.id}) → sent`);

@@ -924,8 +924,8 @@ roleRoutes.patch("/users/:userId/role", authenticateToken, requireRole(['Owner',
     const { role } = req.body;
     const tenantId = req.user.tenantId;
 
-    if (!role || !['Owner', 'Administrator', 'Manager', 'Employee'].includes(role)) {
-      return res.status(400).json({ message: 'Invalid role. Must be Owner, Administrator, Manager, or Employee.' });
+    if (!role || !['Administrator', 'Manager', 'Employee'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role. Must be Administrator, Manager, or Employee.' });
     }
 
     // Check if user exists and belongs to the same tenant
@@ -945,28 +945,12 @@ roleRoutes.patch("/users/:userId/role", authenticateToken, requireRole(['Owner',
       return res.status(400).json({ message: 'Cannot change your own role' });
     }
 
-    // Cannot modify Owner accounts unless you are an Owner
-    if (existingUser.role === 'Owner' && req.user.role !== 'Owner') {
-      return res.status(403).json({ message: 'Only owners can modify other owner accounts' });
+    // Owner account cannot be modified and Owner role cannot be assigned to others
+    if (existingUser.role === 'Owner') {
+      return res.status(403).json({ message: 'Owner account cannot be modified. The Owner is assigned at signup.' });
     }
-
-    // Prevent demoting the only owner
-    if (existingUser.role === 'Owner' && role !== 'Owner') {
-      const ownerCount = await db.select({
-        count: sql<number>`count(*)::int`,
-      }).from(betterAuthUser).where(and(
-        eq(betterAuthUser.role, 'Owner'),
-        eq(betterAuthUser.tenantId, tenantId)
-      ));
-
-      if (ownerCount[0].count <= 1) {
-        return res.status(400).json({ message: 'Cannot demote the only owner. Assign another owner first.' });
-      }
-    }
-
-    // Only Owners can promote to Owner
-    if (role === 'Owner' && req.user.role !== 'Owner') {
-      return res.status(403).json({ message: 'Only owners can promote users to the Owner role' });
+    if (role === 'Owner') {
+      return res.status(403).json({ message: 'There can only be one Owner per account. The Owner is assigned at signup and cannot be changed.' });
     }
 
     // Update user role

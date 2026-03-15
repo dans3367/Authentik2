@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserCheck, UserX, Calendar, Mail, MapPin, Eye, EyeOff, X, User as UserIcon } from "lucide-react";
+import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserCheck, UserX, Calendar, Mail, MapPin, Eye, EyeOff, X, User as UserIcon, KeyRound, AlertTriangle } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -118,6 +118,15 @@ export default function UsersPage() {
   const [hasUnsavedEditChanges, setHasUnsavedEditChanges] = useState(false);
   const [showEditConfirmDialog, setShowEditConfirmDialog] = useState(false);
   const [initialEditValues, setInitialEditValues] = useState<UpdateUserData | null>(null);
+
+  // Set password dialog state
+  const [isSetPasswordDialogOpen, setIsSetPasswordDialogOpen] = useState(false);
+  const [setPasswordUser, setSetPasswordUser] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+  const [passwordConfirmed, setPasswordConfirmed] = useState(false);
 
   const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'Administrator';
   const hasAccess = currentUser && (currentUser.role === 'Owner' || currentUser.role === 'Administrator' || currentUser.role === 'Manager');
@@ -358,6 +367,64 @@ export default function UsersPage() {
       });
     },
   });
+
+  // Set password mutation
+  const setPasswordMutation = useMutation({
+    mutationFn: async ({ userId, password, confirmPassword }: { userId: string; password: string; confirmPassword: string }) => {
+      const response = await apiRequest('POST', `/api/users/${userId}/set-password`, { password, confirmPassword });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to set password');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsSetPasswordDialogOpen(false);
+      setSetPasswordUser(null);
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setShowNewPassword(false);
+      setShowConfirmNewPassword(false);
+      setPasswordConfirmed(false);
+      toast({
+        title: t('toast.success'),
+        description: t('users.toasts.passwordSet', 'Password has been set successfully.'),
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: t('users.toasts.error'),
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleOpenSetPassword = (user: User) => {
+    setSetPasswordUser(user);
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setShowNewPassword(false);
+    setShowConfirmNewPassword(false);
+    setPasswordConfirmed(false);
+    setIsSetPasswordDialogOpen(true);
+  };
+
+  const handleSetPassword = () => {
+    if (setPasswordUser && newPassword && confirmNewPassword) {
+      setPasswordMutation.mutate({
+        userId: setPasswordUser.id,
+        password: newPassword,
+        confirmPassword: confirmNewPassword,
+      });
+    }
+  };
+
+  const isPasswordValid = newPassword.length >= 8 &&
+    /[a-z]/.test(newPassword) &&
+    /[A-Z]/.test(newPassword) &&
+    /[0-9]/.test(newPassword);
+  const doPasswordsMatch = newPassword === confirmNewPassword && confirmNewPassword.length > 0;
 
   // Check authentication first
   if (authLoading) {
@@ -677,7 +744,7 @@ export default function UsersPage() {
         const user = row.original;
         if (!isAdmin) return null;
 
-        // Current Owner: show profile link
+        // Current Owner: show profile link + set own password
         if (user.id === currentUser.id && user.role === 'Owner') {
           return (
             <div className="flex items-center space-x-2">
@@ -691,6 +758,15 @@ export default function UsersPage() {
                   <UserIcon className="h-4 w-4" />
                 </Button>
               </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                onClick={() => handleOpenSetPassword(user)}
+                title="Set Password"
+              >
+                <KeyRound className="h-4 w-4" />
+              </Button>
             </div>
           );
         }
@@ -715,6 +791,11 @@ export default function UsersPage() {
           );
         }
 
+        // Check if current user can set password for this user
+        // Managers cannot set passwords for Admins/Owners
+        const canSetPassword = currentUser.role === 'Owner' || currentUser.role === 'Administrator' ||
+          (currentUser.role === 'Manager' && user.role !== 'Administrator' && user.role !== 'Owner');
+
         return (
           <div className="flex items-center space-x-2">
             <Button
@@ -725,6 +806,17 @@ export default function UsersPage() {
             >
               <Edit className="h-4 w-4" />
             </Button>
+            {canSetPassword && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                onClick={() => handleOpenSetPassword(user)}
+                title="Set Password"
+              >
+                <KeyRound className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -1166,17 +1258,28 @@ export default function UsersPage() {
                           {isAdmin && (
                             <div className="flex items-center gap-1">
                               {user.id === currentUser.id && user.role === 'Owner' ? (
-                                <Link href="/profile">
+                                <>
+                                  <Link href="/profile">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                                      data-testid={`button-profile-owner-card-${user.id}`}
+                                      title="Go to Profile"
+                                    >
+                                      <UserIcon className="h-4 w-4" />
+                                    </Button>
+                                  </Link>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-                                    data-testid={`button-profile-owner-card-${user.id}`}
-                                    title="Go to Profile"
+                                    className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                                    onClick={() => handleOpenSetPassword(user)}
+                                    title="Set Password"
                                   >
-                                    <UserIcon className="h-4 w-4" />
+                                    <KeyRound className="h-4 w-4" />
                                   </Button>
-                                </Link>
+                                </>
                               ) : user.role === 'Owner' ? (
                                 <Button
                                   variant="ghost"
@@ -1198,6 +1301,18 @@ export default function UsersPage() {
                                   >
                                     <Edit className="h-4 w-4" />
                                   </Button>
+                                  {(currentUser.role === 'Owner' || currentUser.role === 'Administrator' ||
+                                    (currentUser.role === 'Manager' && user.role !== 'Administrator' && user.role !== 'Owner')) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                                      onClick={() => handleOpenSetPassword(user)}
+                                      title="Set Password"
+                                    >
+                                      <KeyRound className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                       <Button
@@ -1440,6 +1555,118 @@ export default function UsersPage() {
                   )}
                 </form>
               </Form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Set Password Dialog */}
+          <Dialog open={isSetPasswordDialogOpen} onOpenChange={(open) => {
+            if (!open) {
+              setIsSetPasswordDialogOpen(false);
+              setSetPasswordUser(null);
+              setNewPassword("");
+              setConfirmNewPassword("");
+              setShowNewPassword(false);
+              setShowConfirmNewPassword(false);
+              setPasswordConfirmed(false);
+            }
+          }}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Set Password</DialogTitle>
+                <DialogDescription>
+                  Set a new password for {setPasswordUser?.firstName} {setPasswordUser?.lastName} ({setPasswordUser?.email})
+                </DialogDescription>
+              </DialogHeader>
+
+              {!passwordConfirmed ? (
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/50 p-4">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                        This will replace the current password
+                      </p>
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        The user's existing password will be permanently replaced. They will need to use the new password to log in. All active sessions for this user will be terminated.
+                      </p>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsSetPasswordDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => setPasswordConfirmed(true)}
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      I understand, continue
+                    </Button>
+                  </DialogFooter>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">New Password</label>
+                    <div className="relative">
+                      <Input
+                        type={showNewPassword ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Enter new password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                      >
+                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    {newPassword && !isPasswordValid && (
+                      <p className="text-xs text-red-500">
+                        Password must be at least 8 characters with uppercase, lowercase, and a number.
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Confirm Password</label>
+                    <div className="relative">
+                      <Input
+                        type={showConfirmNewPassword ? "text" : "password"}
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
+                      >
+                        {showConfirmNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    {confirmNewPassword && !doPasswordsMatch && (
+                      <p className="text-xs text-red-500">Passwords do not match.</p>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setPasswordConfirmed(false)}>
+                      Back
+                    </Button>
+                    <Button
+                      onClick={handleSetPassword}
+                      disabled={!isPasswordValid || !doPasswordsMatch || setPasswordMutation.isPending}
+                      className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                    >
+                      {setPasswordMutation.isPending ? "Setting..." : "Set Password"}
+                    </Button>
+                  </DialogFooter>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
 

@@ -37,7 +37,8 @@ import {
   Hash,
   Smile,
   ThumbsUp,
-  ThumbsDown
+  ThumbsDown,
+  Undo2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -249,6 +250,29 @@ export default function NewsletterViewPage() {
       toast({
         title: "Submission Failed",
         description: error.message || "Failed to submit newsletter for review",
+        variant: "destructive"
+      });
+    },
+  });
+
+  // Recall from review mutation
+  const recallReviewMutation = useMutation({
+    mutationFn: async (newsletterId: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${newsletterId}/recall-review`);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters', id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: "Recalled to Draft",
+        description: data.message || "Newsletter has been recalled from review and returned to draft.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Recall Failed",
+        description: error.message || "Failed to recall newsletter from review",
         variant: "destructive"
       });
     },
@@ -876,6 +900,27 @@ export default function NewsletterViewPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Reviewer Actions - Only show to the assigned reviewer */}
+              {/* Recall to Draft - show to non-reviewer users who can edit/send newsletters */}
+              {newsletter.reviewerId !== currentUserId && (
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={() => recallReviewMutation.mutate(newsletter.id)}
+                    size="sm"
+                    variant="outline"
+                    className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900/20"
+                    disabled={recallReviewMutation.isPending}
+                    data-testid="button-recall-review"
+                  >
+                    {recallReviewMutation.isPending ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("newsletter.view.recalling", "Recalling...")}</>
+                    ) : (
+                      <><Undo2 className="h-4 w-4 mr-2" strokeWidth={1.5} /> {t("newsletter.view.recallToDraft", "Recall to Draft")}</>
+                    )}
+                  </Button>
+                </div>
+              )}
 
               {/* Reviewer Actions - Only show to the assigned reviewer */}
               {newsletter.reviewerId === currentUserId && (

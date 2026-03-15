@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck, CalendarClock, X, Smile } from "lucide-react";
+import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck, CalendarClock, X, Smile, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,8 @@ interface SendNewsletterWizardModalProps {
   initialSelectedTagIds?: string[];
   reactionsEnabled?: boolean;
   onReactionsEnabledChange?: (enabled: boolean) => void;
+  publishToBlog?: boolean;
+  onPublishToBlogChange?: (enabled: boolean) => void;
   itemLabel?: string;
   returnPath?: string;
 }
@@ -62,6 +64,8 @@ export function SendNewsletterWizardModal({
   initialSelectedTagIds,
   reactionsEnabled = true,
   onReactionsEnabledChange,
+  publishToBlog = true,
+  onPublishToBlogChange,
   itemLabel = "Newsletter",
   returnPath = '/newsletter',
 }: SendNewsletterWizardModalProps) {
@@ -869,6 +873,30 @@ export function SendNewsletterWizardModal({
                     >
                       <span
                         className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${reactionsEnabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                          }`}
+                      />
+                    </button>
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <Globe className={`h-4 w-4 ${publishToBlog ? 'text-blue-500' : 'text-muted-foreground'}`} />
+                      <div>
+                        <span className="text-sm text-muted-foreground">{t("newsletter.sendWizard.publishToBlog", "Publish to Blog")}</span>
+                        <p className="text-[11px] text-muted-foreground/70">{t("newsletter.sendWizard.publishToBlogDesc", "Make this newsletter available on your public blog site after sending")}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={publishToBlog}
+                      onClick={() => onPublishToBlogChange?.(!publishToBlog)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer flex-shrink-0 ${publishToBlog ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}
+                      data-testid="toggle-publish-to-blog"
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${publishToBlog ? 'translate-x-[18px]' : 'translate-x-[3px]'
                           }`}
                       />
                     </button>

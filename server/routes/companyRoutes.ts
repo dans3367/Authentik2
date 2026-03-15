@@ -265,7 +265,7 @@ companyRoutes.patch("/users/:userId/role", authenticateToken, requireRole(["Owne
     const { userId } = req.params;
     const { role } = req.body;
 
-    if (!role || !['Owner', 'Administrator', 'Manager', 'Employee'].includes(role)) {
+    if (!role || !['Administrator', 'Manager', 'Employee'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
@@ -278,9 +278,9 @@ companyRoutes.patch("/users/:userId/role", authenticateToken, requireRole(["Owne
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Prevent non-owners from promoting users to Owner role
-    if (role === 'Owner' && req.user.role !== 'Owner') {
-      return res.status(403).json({ message: 'Only owners can promote users to Owner role' });
+    // Owner role cannot be assigned — each tenant has exactly one Owner, created at signup
+    if (role === 'Owner') {
+      return res.status(403).json({ message: 'There can only be one Owner per account. The Owner is assigned at signup and cannot be changed.' });
     }
 
     // Prevent users from demoting themselves

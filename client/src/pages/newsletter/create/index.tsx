@@ -368,6 +368,7 @@ export default function NewsletterCreatePage() {
   const [initialSelectedContactIds, setInitialSelectedContactIds] = useState<string[]>([]);
   const [initialSelectedTagIds, setInitialSelectedTagIds] = useState<string[]>([]);
   const [reactionsEnabled, setReactionsEnabled] = useState(true);
+  const [publishToBlog, setPublishToBlog] = useState(true);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { t, currentLanguage } = useLanguage();
@@ -464,6 +465,10 @@ export default function NewsletterCreatePage() {
       if (nl.reactionsEnabled !== undefined && nl.reactionsEnabled !== null) {
         setReactionsEnabled(nl.reactionsEnabled);
       }
+      // Load publish to blog preference
+      if (nl.publishToBlog !== undefined && nl.publishToBlog !== null) {
+        setPublishToBlog(nl.publishToBlog);
+      }
       setDataReady(true);
     }
   }, [existingNewsletter]);
@@ -521,6 +526,7 @@ export default function NewsletterCreatePage() {
           puckData: puckDataJson,
           status,
           reactionsEnabled,
+          publishToBlog,
         });
         const result = await response.json();
         setHasUnsavedChanges(false);
@@ -558,7 +564,7 @@ export default function NewsletterCreatePage() {
     } finally {
       setIsSaving(false);
     }
-  }, [title, subject, reactionsEnabled, toast, queryClient, editorType, notionHtmlContent]);
+  }, [title, subject, reactionsEnabled, publishToBlog, toast, queryClient, editorType, notionHtmlContent]);
 
   const handleSaveDraft = useCallback(async () => {
     try {
@@ -1402,6 +1408,8 @@ export default function NewsletterCreatePage() {
           initialSelectedTagIds={initialSelectedTagIds}
           reactionsEnabled={reactionsEnabled}
           onReactionsEnabledChange={setReactionsEnabled}
+          publishToBlog={publishToBlog}
+          onPublishToBlogChange={setPublishToBlog}
           itemLabel={emailType === 'advertise' ? 'Advertisement' : 'Newsletter'}
           returnPath={basePath}
         />

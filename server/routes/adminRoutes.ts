@@ -246,7 +246,7 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
       return res.status(400).json({ message: 'First name, last name, email, and role are required' });
     }
 
-    if (!['Owner', 'Administrator', 'Manager', 'Employee'].includes(role)) {
+    if (!['Administrator', 'Manager', 'Employee'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
@@ -273,18 +273,12 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
       }
     }
 
-    // Prevent owner from being demoted if they're the only owner
-    if (existingUser.role === 'Owner' && role !== 'Owner') {
-      const ownerCount = await db.select({
-        count: sql<number>`count(*)`,
-      }).from(betterAuthUser).where(and(
-        eq(betterAuthUser.role, 'Owner'),
-        eq(betterAuthUser.tenantId, req.user.tenantId)
-      ));
-
-      if (ownerCount[0].count <= 1) {
-        return res.status(400).json({ message: 'Cannot demote the only owner' });
-      }
+    // Owner account cannot be modified and Owner role cannot be assigned
+    if (existingUser.role === 'Owner') {
+      return res.status(403).json({ message: 'Owner account cannot be edited' });
+    }
+    if (role === 'Owner') {
+      return res.status(403).json({ message: 'There can only be one Owner per account. The Owner is assigned at signup and cannot be changed.' });
     }
 
     // Update user (tenant-scoped)

@@ -520,6 +520,7 @@ export const newsletters = pgTable("newsletters", {
   emailType: text("email_type").default('newsletter'), // 'newsletter' | 'advertise'
   archivedAt: timestamp("archived_at"), // When set, newsletter is hidden from the main kanban view
   // Web publication fields — allows newsletters to be viewed in a browser via /n/:tenantSlug/:webSlug
+  publishToBlog: boolean("publish_to_blog").notNull().default(true), // Whether to publish this newsletter on the public blog after sending
   publishedAt: timestamp("published_at"), // When set, newsletter is publicly viewable on the web
   webSlug: text("web_slug"), // URL-friendly slug for the newsletter (auto-generated from title)
   createdAt: timestamp("created_at").defaultNow(),
@@ -1792,6 +1793,7 @@ export const createNewsletterSchema = z.object({
   requiresReviewerApproval: z.boolean().optional(),
   reviewerId: z.string().optional(),
   reactionsEnabled: z.boolean().optional().default(true),
+  publishToBlog: z.boolean().optional().default(true),
 });
 
 export const updateNewsletterSchema = z.object({
@@ -1814,6 +1816,7 @@ export const updateNewsletterSchema = z.object({
   reviewStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
   reviewNotes: z.string().optional(),
   reactionsEnabled: z.boolean().optional(),
+  publishToBlog: z.boolean().optional(),
   publishedAt: z.union([z.string(), z.date()]).optional().nullable(),
   webSlug: z.string().optional().nullable(),
 });

@@ -26,7 +26,9 @@ import {
   Archive,
   ArchiveRestore,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Undo2,
+  XCircle
 } from "lucide-react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
@@ -256,6 +258,28 @@ export default function NewsletterPage() {
         title: t("newsletter.toast.submissionFailed"),
         description: error.message || t("newsletter.toast.submissionFailedDesc"),
         variant: "destructive"
+      });
+    },
+  });
+
+  // Recall to draft mutation
+  const recallToDraftMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/recall-review`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: t("newsletter.toast.recalledToDraft", "Recalled to Draft"),
+        description: t("newsletter.toast.recalledToDraftDesc", "Newsletter has been recalled from review and returned to draft."),
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("newsletter.toast.recallFailed", "Recall Failed"),
+        description: error.message || t("newsletter.toast.recallFailedDesc", "Failed to recall newsletter from review."),
+        variant: "destructive",
       });
     },
   });
@@ -710,6 +734,21 @@ export default function NewsletterPage() {
                                         {t("newsletter.actions.reviewNewsletter")}
                                       </DropdownMenuItem>
                                     )}
+                                    {isPendingReview && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          recallToDraftMutation.mutate(newsletter.id);
+                                        }}
+                                        disabled={recallToDraftMutation.isPending && recallToDraftMutation.variables === newsletter.id}
+                                        className="text-orange-600 focus:text-orange-600 focus:bg-orange-50 dark:focus:bg-orange-950/50"
+                                      >
+                                        <Undo2 className="h-4 w-4 mr-2" />
+                                        {recallToDraftMutation.isPending && recallToDraftMutation.variables === newsletter.id
+                                          ? t("newsletter.actions.recalling", "Recalling...")
+                                          : t("newsletter.actions.recallToDraft", "Recall to Draft")}
+                                      </DropdownMenuItem>
+                                    )}
                                     {isSent && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
@@ -748,6 +787,17 @@ export default function NewsletterPage() {
                                   {newsletter.subject}
                                 </p>
                               </div>
+
+                              {/* Rejection notice */}
+                              {newsletter.reviewStatus === 'rejected' && newsletter.reviewNotes && (
+                                <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40 px-3 py-2">
+                                  <XCircle className="h-3.5 w-3.5 text-red-500 dark:text-red-400 mt-0.5 shrink-0" />
+                                  <div className="min-w-0">
+                                    <p className="text-[11px] font-semibold text-red-700 dark:text-red-300">{t("newsletter.card.rejected", "Rejected by reviewer")}</p>
+                                    <p className="text-[11px] text-red-600/80 dark:text-red-400/70 line-clamp-2 mt-0.5">{newsletter.reviewNotes}</p>
+                                  </div>
+                                </div>
+                              )}
 
                               {/* Row 4: Author + Date (with top divider) */}
                               <div className="pt-3 border-t border-gray-100 dark:border-gray-700/50">

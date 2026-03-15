@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticateToken, requireRole, requirePlanFeature } from '../middleware/auth-middleware';
 import { storage } from '../storage';
 import { db } from '../db';
-import { betterAuthUser, subscriptionPlans, createUserSchema } from '@shared/schema';
+import { betterAuthUser, betterAuthSession, subscriptionPlans, createUserSchema } from '@shared/schema';
 import { sql, eq, and, count } from 'drizzle-orm';
 
 export const userRoutes = Router();
@@ -271,7 +271,7 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
       return res.status(400).json({ message: 'First name, last name, email, and role are required' });
     }
 
-    if (!['Owner', 'Administrator', 'Manager', 'Employee'].includes(role)) {
+    if (!['Administrator', 'Manager', 'Employee'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
@@ -292,9 +292,9 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
       return res.status(403).json({ message: 'Owner account is view-only and cannot be edited' });
     }
 
-    // Only Owners can assign the Owner role
-    if (role === 'Owner' && req.user.role !== 'Owner') {
-      return res.status(403).json({ message: 'Only owners can promote users to the Owner role' });
+    // Owner role cannot be assigned — each tenant has exactly one Owner, created at signup
+    if (role === 'Owner') {
+      return res.status(403).json({ message: 'There can only be one Owner per account. The Owner is assigned at signup and cannot be changed.' });
     }
 
     // Administrators cannot edit other Administrators (prevent horizontal privilege abuse)
@@ -473,5 +473,82 @@ userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administ
   } catch (error) {
     console.error('Delete user error:', error);
     res.status(500).json({ message: 'Failed to delete user' });
+  }
+});
+
+// Set password for a user (Manager+)
+// Owner accounts can only have their password set by the same owner
+userRoutes.post("/:userId/set-password", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
+  try {
+    const { userId } = req.params;
+    const { password, confirmPassword } = req.body;
+    const tenantId = req.user.tenantId;
+    const currentUserRole = req.user.role;
+    const currentUserId = req.user.id;
+
+    if (!password || !confirmPassword) {
+      return res.status(400).json({ message: 'Password and confirmation are required' });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match' });
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+    }
+    if (!/[a-z]/.test(password)) {
+      return res.status(400).json({ message: 'Password must contain at least one lowercase letter' });
+    }
+    if (!/[A-Z]/.test(password)) {
+      return res.status(400).json({ message: 'Password must contain at least one uppercase letter' });
+    }
+    if (!/[0-9]/.test(password)) {
+      return res.status(400).json({ message: 'Password must contain at least one number' });
+    }
+
+    // Find the target user
+    const targetUser = await db.query.betterAuthUser.findFirst({
+      where: and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, tenantId)
+      ),
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Owner accounts can only have their password set by the same owner
+    if (targetUser.role === 'Owner' && currentUserId !== targetUser.id) {
+      return res.status(403).json({ message: 'Owner account password can only be reset by the owner themselves' });
+    }
+
+    // Managers cannot set passwords for Administrators or Owners
+    if (currentUserRole === 'Manager' && (targetUser.role === 'Administrator' || targetUser.role === 'Owner')) {
+      return res.status(403).json({ message: 'Managers cannot set passwords for Administrators or Owners' });
+    }
+
+    // Hash new password using Better Auth's native hashing (scrypt)
+    const { hashPassword } = await import('better-auth/crypto');
+    const hashedPassword = await hashPassword(password);
+
+    // Update password in the credential account
+    await db.execute(
+      sql`UPDATE better_auth_account SET password = ${hashedPassword}, updated_at = NOW() WHERE user_id = ${userId} AND provider_id = 'credential'`
+    );
+
+    // Invalidate all existing sessions for the target user (except current user's session if setting own password)
+    if (currentUserId !== userId) {
+      await db.delete(betterAuthSession)
+        .where(eq(betterAuthSession.userId, userId));
+    }
+
+    console.log(`✅ [Set Password] Password set for user ${targetUser.email} by ${req.user.email}`);
+    res.json({ message: 'Password has been set successfully' });
+  } catch (error) {
+    console.error('Set password error:', error);
+    res.status(500).json({ message: 'Failed to set password' });
   }
 });
