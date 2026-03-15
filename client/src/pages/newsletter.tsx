@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -28,7 +28,8 @@ import {
   ChevronDown,
   ChevronRight,
   Undo2,
-  XCircle
+  XCircle,
+  RefreshCw
 } from "lucide-react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
@@ -102,6 +103,9 @@ export default function NewsletterPage() {
   const [editRecipientsNewsletter, setEditRecipientsNewsletter] = useState<NewsletterListItem | null>(null);
   const [showEditorPicker, setShowEditorPicker] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [refreshCooldown, setRefreshCooldown] = useState(false);
+  const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
@@ -128,6 +132,14 @@ export default function NewsletterPage() {
     retry: 2,
   });
 
+  const handleRefresh = useCallback(() => {
+    if (refreshCooldown || isLoading) return;
+    refetch();
+    setLastRefreshed(new Date());
+    setRefreshCooldown(true);
+    cooldownTimer.current = setTimeout(() => setRefreshCooldown(false), 5000);
+  }, [refreshCooldown, isLoading, refetch]);
+
   // Fetch reviewer settings to know if reviewer workflow is enabled
   const { data: reviewerSettings } = useQuery<{ enabled: boolean; reviewerId: string | null; reviewer: any }>({
     queryKey: ['/api/newsletters/reviewer-settings'],
@@ -138,6 +150,7 @@ export default function NewsletterPage() {
   });
 
   const reviewerEnabled = reviewerSettings?.enabled ?? false;
+  const isCurrentUserDesignatedReviewer = reviewerSettings?.reviewerId === currentUserId;
 
   const { data: emailDesign } = useQuery<{
     companyName?: string;
@@ -512,16 +525,35 @@ export default function NewsletterPage() {
         </div>
 
 
-        {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder={t("newsletter.searchPlaceholder", "Search newsletters...")}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-          />
+        {/* Search and Refresh */}
+        <div className="flex items-center justify-between">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder={t("newsletter.searchPlaceholder", "Search newsletters...")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            {lastRefreshed && (
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {t("newsletter.lastUpdated", "Updated")} {format(lastRefreshed, currentLanguage === 'es' ? 'h:mm:ss a' : 'h:mm:ss a', { locale: currentLanguage === 'es' ? esLocale : undefined })}
+              </span>
+            )}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isLoading || refreshCooldown}
+              title={t("newsletter.refresh", "Refresh newsletters")}
+              className="rounded-xl h-[42px] w-[42px] border-gray-200 dark:border-gray-700"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
 
         {/* Kanban Board */}
@@ -663,7 +695,7 @@ export default function NewsletterPage() {
                                         Preview article on blog
                                       </DropdownMenuItem>
                                     )}
-                                    {(isDraft || isReadyToSend) && (
+                                    {(isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -674,7 +706,7 @@ export default function NewsletterPage() {
                                         {t("newsletter.actions.edit")}
                                       </DropdownMenuItem>
                                     )}
-                                    {(isDraft || isReadyToSend) && (
+                                    {(isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -711,7 +743,7 @@ export default function NewsletterPage() {
                                         {isCancellingSchedule ? t("newsletter.actions.cancelling") : t("newsletter.actions.cancelSchedule")}
                                       </DropdownMenuItem>
                                     )}
-                                    {reviewerEnabled && (isDraft || isReadyToSend) && !isPendingReview && newsletter.reviewStatus !== 'approved' && (
+                                    {reviewerEnabled && isReadyToSend && !isPendingReview && !isCurrentUserDesignatedReviewer && newsletter.reviewStatus !== 'approved' && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();

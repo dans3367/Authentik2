@@ -288,6 +288,7 @@ export default function NewsletterViewPage() {
   });
 
   const reviewerEnabled = reviewerSettings?.enabled ?? false;
+  const isCurrentUserDesignatedReviewer = reviewerSettings?.reviewerId === currentUserId;
 
   const { data: recipientsData, isLoading: recipientsLoading } = useQuery<{ recipients: Array<{ id: string; email: string; firstName: string; lastName: string; status: string }>; total: number }>({
     queryKey: ['/api/newsletters', id, 'recipients'],
@@ -841,7 +842,7 @@ export default function NewsletterViewPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:justify-end shrink-0 pl-0 sm:pl-4">
-            {(newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && (
+            {(newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && newsletter.reviewStatus !== 'approved' && (
               <Button
                 onClick={() => navigate(`/newsletter/create/${newsletter.id}`)}
                 variant="outline"
@@ -852,7 +853,7 @@ export default function NewsletterViewPage() {
                 {t("newsletter.view.edit", "Edit")}
               </Button>
             )}
-            {reviewerEnabled && (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && newsletter.reviewStatus !== 'approved' && (
+            {reviewerEnabled && newsletter.status === 'ready_to_send' && !isCurrentUserDesignatedReviewer && newsletter.reviewStatus !== 'approved' && (
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -901,9 +902,8 @@ export default function NewsletterViewPage() {
                 </div>
               </div>
 
-              {/* Reviewer Actions - Only show to the assigned reviewer */}
-              {/* Recall to Draft - show to non-reviewer users who can edit/send newsletters */}
-              {newsletter.reviewerId !== currentUserId && (
+              {/* Recall to Draft - show to the submitter or admins/owners (not the reviewer) */}
+              {newsletter.reviewerId !== currentUserId && (newsletter.userId === currentUserId || ['Owner', 'Administrator'].includes((user as any)?.role)) && (
                 <div className="flex items-center gap-3">
                   <Button
                     onClick={() => recallReviewMutation.mutate(newsletter.id)}

@@ -93,6 +93,11 @@ export default function UsersPage() {
   const currentUser = user as ExtendedUser | null;
   const { toast } = useToast();
   const { t } = useLanguage();
+
+  // Check if the current user can set a password for a target user
+  const canSetPasswordFor = (targetRole: string) =>
+    currentUser?.role === 'Owner' || currentUser?.role === 'Administrator' ||
+    (currentUser?.role === 'Manager' && targetRole !== 'Administrator' && targetRole !== 'Owner');
   const queryClient = useQueryClient();
   const { canManageUsers, planName } = useTenantPlan();
   const [, setLocation] = useLocation();
@@ -791,10 +796,7 @@ export default function UsersPage() {
           );
         }
 
-        // Check if current user can set password for this user
-        // Managers cannot set passwords for Admins/Owners
-        const canSetPassword = currentUser.role === 'Owner' || currentUser.role === 'Administrator' ||
-          (currentUser.role === 'Manager' && user.role !== 'Administrator' && user.role !== 'Owner');
+        const canSetPassword = canSetPasswordFor(user.role);
 
         return (
           <div className="flex items-center space-x-2">
@@ -1301,8 +1303,7 @@ export default function UsersPage() {
                                   >
                                     <Edit className="h-4 w-4" />
                                   </Button>
-                                  {(currentUser.role === 'Owner' || currentUser.role === 'Administrator' ||
-                                    (currentUser.role === 'Manager' && user.role !== 'Administrator' && user.role !== 'Owner')) && (
+                                  {canSetPasswordFor(user.role) && (
                                     <Button
                                       variant="ghost"
                                       size="icon"

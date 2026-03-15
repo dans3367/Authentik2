@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, ne, and, like, desc, inArray } from 'drizzle-orm';
 import { authenticateToken, requireTenant, requireRole, requirePermission } from '../middleware/auth-middleware';
+import { createRateLimiter } from '../middleware/security';
 import { authenticateInternalService } from '../middleware/internal-service-auth';
 import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, newsletterTaskStatus, newsletterReviewerSettings, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
@@ -15,6 +16,12 @@ import { buildReactionButtonsHtml } from '../utils/newsletterReactionHtml';
 import crypto from 'crypto';
 
 export const newsletterRoutes = Router();
+
+// Rate limiter for newsletter list endpoint (refresh button)
+const newsletterListRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute per IP
+});
 
 /**
  * Replace {{variable}} placeholders in newsletter HTML with contact field values.
@@ -451,7 +458,7 @@ newsletterRoutes.get('/internal/suppression-list', authenticateInternalService, 
 });
 
 // Get all newsletters
-newsletterRoutes.get("/", authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
+newsletterRoutes.get("/", newsletterListRateLimiter, authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
     const { page = 1, limit = 50, search, status, emailType, archived } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
@@ -956,6 +963,11 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
       return res.status(404).json({ message: 'Newsletter not found' });
     }
 
+    // Prevent edits on approved newsletters — they must be sent as-is
+    if (newsletter.reviewStatus === 'approved') {
+      return res.status(403).json({ message: 'This newsletter has been approved and cannot be edited. Send it as-is or contact the reviewer.' });
+    }
+
     const updateData: any = {
       updatedAt: new Date(),
     };
@@ -982,6 +994,15 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
 
     if (status !== undefined) {
       updateData.status = status;
+      // When moving to ready_to_send, clear stale review state so a new review cycle can start
+      if (status === 'ready_to_send' && newsletter.reviewStatus) {
+        updateData.reviewStatus = 'pending';
+        updateData.requiresReviewerApproval = false;
+        updateData.reviewedAt = null;
+        updateData.reviewNotes = null;
+        updateData.reviewerApprovalCode = null;
+        updateData.reviewerId = null;
+      }
     }
 
     if (recipientType !== undefined) {
@@ -2520,13 +2541,8 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
       return res.status(400).json({ message: 'Newsletter is already pending review. It cannot be re-submitted until the current review is resolved.' });
     }
 
-    // Prevent re-submission of an already-approved newsletter (would void the approval)
-    if (newsletter.reviewStatus === 'approved') {
-      return res.status(400).json({ message: 'This newsletter has already been approved. Submit for review is not allowed.' });
-    }
-
-    if (newsletter.status !== 'draft' && newsletter.status !== 'ready_to_send') {
-      return res.status(400).json({ message: 'Newsletter must be in draft or ready_to_send status to submit for review' });
+    if (newsletter.status !== 'ready_to_send') {
+      return res.status(400).json({ message: 'Newsletter must be in "Ready to Send" status with recipients selected before submitting for review' });
     }
 
     // Get reviewer settings
@@ -2952,6 +2968,12 @@ newsletterRoutes.post("/:id/recall-review", authenticateToken, requireTenant, re
       return res.status(400).json({ message: 'Newsletter is not pending review' });
     }
 
+    // Only the original submitter (newsletter creator) or an Owner/Administrator can recall
+    const isAdminOrOwner = ['Owner', 'Administrator'].includes(req.user.role);
+    if (newsletter.userId !== req.user.id && !isAdminOrOwner) {
+      return res.status(403).json({ message: 'Only the person who submitted this newsletter or an administrator can recall it from review' });
+    }
+
     const [updated] = await db.update(newsletters)
       .set({
         status: 'draft',
@@ -2960,10 +2982,9 @@ newsletterRoutes.post("/:id/recall-review", authenticateToken, requireTenant, re
         reviewNotes: null,
         reviewerApprovalCode: null, // Invalidate any existing approval code/link
         reviewerId: null,
-        requiresReviewerApproval: false,
         updatedAt: new Date(),
       })
-      .where(eq(newsletters.id, id))
+      .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)))
       .returning();
 
     // Log activity
@@ -3013,6 +3034,7 @@ async function finalizeStuckNewsletters(): Promise<number> {
 
     for (const nl of stuckNewsletters) {
       try {
+        // TODO: Remove this try/catch after migration 0064 is deployed to all environments
         // Read the full row to check publishToBlog safely (column may not exist in DB yet)
         let shouldPublishToBlog = true;
         try {

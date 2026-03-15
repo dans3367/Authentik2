@@ -209,26 +209,49 @@ export function SendNewsletterWizardModal({
     setIsSending(true);
     try {
       const segmentData = getSegmentData();
-      await apiRequest('PUT', `/api/newsletters/${newsletterId}`, {
-        recipientType: segmentData.recipientType,
-        selectedContactIds: segmentData.selectedContactIds,
-        selectedTagIds: segmentData.selectedTagIds,
-        reactionsEnabled,
-      });
-      await apiRequest('POST', `/api/newsletters/${newsletterId}/send`, {});
-      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
-      toast({
-        title: `${itemLabel} Sending`,
-        description: `Your ${itemLabel.toLowerCase()} is being sent to all selected recipients.`,
-      });
-      onClose();
-      onSuccess?.();
-      setLocation(`/newsletters/${newsletterId}`);
+      if (requiresReview) {
+        // Save recipients and set status to ready_to_send, then submit for review
+        await apiRequest('PUT', `/api/newsletters/${newsletterId}`, {
+          recipientType: segmentData.recipientType,
+          selectedContactIds: segmentData.selectedContactIds,
+          selectedTagIds: segmentData.selectedTagIds,
+          status: 'ready_to_send',
+          reactionsEnabled,
+        });
+        await apiRequest('POST', `/api/newsletters/${newsletterId}/submit-for-review`, {});
+        queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+        toast({
+          title: `${itemLabel} Submitted for Review`,
+          description: `Your ${itemLabel.toLowerCase()} has been submitted for reviewer approval. You'll be notified once it's approved.`,
+        });
+        onClose();
+        onSuccess?.();
+        setLocation(returnPath);
+      } else {
+        await apiRequest('PUT', `/api/newsletters/${newsletterId}`, {
+          recipientType: segmentData.recipientType,
+          selectedContactIds: segmentData.selectedContactIds,
+          selectedTagIds: segmentData.selectedTagIds,
+          reactionsEnabled,
+        });
+        await apiRequest('POST', `/api/newsletters/${newsletterId}/send`, {});
+        queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
+        toast({
+          title: `${itemLabel} Sending`,
+          description: `Your ${itemLabel.toLowerCase()} is being sent to all selected recipients.`,
+        });
+        onClose();
+        onSuccess?.();
+        setLocation(`/newsletters/${newsletterId}`);
+      }
     } catch (error: any) {
       toast({
-        title: t("newsletter.sendWizard.toastSendFailed", "Send Failed"),
-        description: error.message || `Failed to send ${itemLabel.toLowerCase()}`,
+        title: requiresReview
+          ? t("newsletter.sendWizard.toastReviewFailed", "Review Submission Failed")
+          : t("newsletter.sendWizard.toastSendFailed", "Send Failed"),
+        description: error.message || `Failed to ${requiresReview ? 'submit for review' : 'send'} ${itemLabel.toLowerCase()}`,
         variant: "destructive",
       });
     } finally {

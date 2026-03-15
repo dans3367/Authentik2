@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken, requireRole, requirePlanFeature } from '../middleware/auth-middleware';
+import { validatePasswordStrength } from '../middleware/security-enhanced';
 import { storage } from '../storage';
 import { db } from '../db';
 import { betterAuthUser, betterAuthSession, subscriptionPlans, createUserSchema } from '@shared/schema';
@@ -494,18 +495,10 @@ userRoutes.post("/:userId/set-password", authenticateToken, requireRole(['Owner'
       return res.status(400).json({ message: 'Passwords do not match' });
     }
 
-    // Validate password strength
-    if (password.length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters' });
-    }
-    if (!/[a-z]/.test(password)) {
-      return res.status(400).json({ message: 'Password must contain at least one lowercase letter' });
-    }
-    if (!/[A-Z]/.test(password)) {
-      return res.status(400).json({ message: 'Password must contain at least one uppercase letter' });
-    }
-    if (!/[0-9]/.test(password)) {
-      return res.status(400).json({ message: 'Password must contain at least one number' });
+    // Validate password strength using shared validator
+    const strengthCheck = validatePasswordStrength(password);
+    if (!strengthCheck.valid) {
+      return res.status(400).json({ message: 'Password does not meet security requirements', errors: strengthCheck.errors });
     }
 
     // Find the target user
