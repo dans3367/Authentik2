@@ -49,6 +49,35 @@ export default defineSchema({
     .index("by_provider_event", ["providerMessageId", "eventType"])
     .index("by_recipient_newsletter_event", ["recipientEmail", "newsletterId", "eventType"]),
 
+  // Lightweight mirror of PostgreSQL newsletters for real-time kanban updates.
+  // Only stores fields the kanban card displays — no content/puckData.
+  newsletterListItems: defineTable({
+    tenantId: v.string(),
+    newsletterId: v.string(), // PostgreSQL newsletter.id
+    title: v.string(),
+    subject: v.string(),
+    status: v.string(), // draft, ready_to_send, pending_review, scheduled, sending, sent
+    emailType: v.string(), // newsletter, advertise
+    recipientCount: v.number(),
+    openCount: v.number(),
+    uniqueOpenCount: v.number(),
+    clickCount: v.number(),
+    reviewStatus: v.optional(v.string()), // pending, approved, rejected
+    reviewerId: v.optional(v.string()),
+    reviewNotes: v.optional(v.string()),
+    scheduledAt: v.optional(v.number()), // timestamp ms
+    sentAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    archivedAt: v.optional(v.number()),
+    deletedAt: v.optional(v.number()),
+    authorFirstName: v.optional(v.string()),
+    authorLastName: v.optional(v.string()),
+    recipientType: v.optional(v.string()), // all, selected, tags
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_newsletter", ["newsletterId"]),
+
   // Aggregated real-time stats per newsletter (updated on each event)
   newsletterStats: defineTable({
     tenantId: v.string(),

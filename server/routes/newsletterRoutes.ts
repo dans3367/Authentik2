@@ -11,6 +11,7 @@ import { emailService, enhancedEmailService } from '../emailService';
 import { wrapNewsletterContent, extractPuckColorOverrides } from '../utils/newsletterEmailWrapper';
 import { initNewsletterTracking, trackNewsletterEmailSend, getNewsletterStats, getNewsletterSends, getNewsletterEvents } from '../utils/convexNewsletterTracker';
 import { logActivity, computeChanges, NEWSLETTER_TRACKED_FIELDS } from '../utils/activityLogger';
+import { syncNewsletterToConvex, removeNewsletterFromConvex } from '../utils/convexNewsletterListSync';
 import { buildReactionButtonsHtml } from '../utils/newsletterReactionHtml';
 // Temporal service removed - now using server-node proxy
 import crypto from 'crypto';
@@ -795,6 +796,9 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, requirePermission('
       req,
     });
 
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex({ ...newNewsletter[0], user: { firstName: userRecord.firstName, lastName: userRecord.lastName } });
+
     res.status(201).json(newNewsletter[0]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
@@ -853,6 +857,9 @@ newsletterRoutes.post("/:id/clone", authenticateToken, requireTenant, requirePer
       req,
     });
 
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex({ ...cloned[0], user: { firstName: userRecord.firstName, lastName: userRecord.lastName } });
+
     res.status(201).json(cloned[0]);
   } catch (error) {
     console.error("Clone newsletter error:", error);
@@ -899,6 +906,9 @@ newsletterRoutes.post("/:id/archive", authenticateToken, requireTenant, requireP
       req,
     });
 
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex(updated);
+
     res.json({ message: 'Newsletter archived successfully', newsletter: updated });
   } catch (error) {
     console.error('Archive newsletter error:', error);
@@ -940,6 +950,9 @@ newsletterRoutes.post("/:id/unarchive", authenticateToken, requireTenant, requir
       metadata: {},
       req,
     });
+
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex(updated);
 
     res.json({ message: 'Newsletter unarchived successfully', newsletter: updated });
   } catch (error) {
@@ -1053,6 +1066,9 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
       req,
     });
 
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex({ ...updatedNewsletter[0], user: newsletter.user });
+
     res.json(updatedNewsletter[0]);
   } catch (error) {
     console.error('Update newsletter error:', error);
@@ -1098,11 +1114,15 @@ newsletterRoutes.delete("/:id", authenticateToken, requireTenant, requirePermiss
       // Hard delete: drafts have no analytics or send history to preserve
       await db.delete(newsletters)
         .where(sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`);
+      // Remove from Convex (fire-and-forget)
+      removeNewsletterFromConvex(id);
     } else {
       // Soft delete: preserve the row for analytics and task data
       await db.update(newsletters)
         .set({ deletedAt: new Date(), updatedAt: new Date() })
         .where(sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`);
+      // Sync soft-delete to Convex (fire-and-forget)
+      syncNewsletterToConvex({ ...newsletter, deletedAt: new Date(), updatedAt: new Date() });
     }
 
     res.json({ message: 'Newsletter deleted successfully' });
@@ -1337,6 +1357,9 @@ newsletterRoutes.put("/:id/status", authenticateInternalService, async (req: any
       description: `Newsletter "${updatedNewsletter[0].title}" status changed to ${status} (internal)`,
       metadata: { status, source: 'internal_service', ...(metadata || {}) },
     });
+
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex(updatedNewsletter[0]);
 
     res.json({
       message: 'Newsletter status updated successfully',
@@ -1815,6 +1838,9 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
           })
           .where(eq(newsletters.id, id));
 
+        // Sync to Convex for real-time kanban updates (fire-and-forget)
+        syncNewsletterToConvex({ ...newsletter, status: 'sending', recipientCount: allowedRecipients.length, updatedAt: new Date() });
+
         // Return success response
         res.json({
           message: 'Newsletter send started successfully',
@@ -2185,6 +2211,9 @@ newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, require
       })
       .where(eq(newsletters.id, id));
 
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex({ ...newsletter, status: 'scheduled', scheduledAt: scheduledDate, recipientCount: allowedRecipients.length, updatedAt: new Date() });
+
     // Log activity
     await logActivity({
       tenantId: req.user.tenantId,
@@ -2272,6 +2301,9 @@ newsletterRoutes.post("/:id/cancel-schedule", authenticateToken, requireTenant, 
       },
       req,
     });
+
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex({ ...newsletter, status: 'draft', scheduledAt: null, updatedAt: new Date() });
 
     res.json({
       message: 'Scheduled send cancelled successfully',
@@ -2372,6 +2404,15 @@ newsletterRoutes.put('/internal/:id/status', authenticateInternalService, async 
     await db.update(newsletters)
       .set(updateData)
       .where(eq(newsletters.id, id));
+
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    const updatedForConvex = await db.query.newsletters.findFirst({
+      where: eq(newsletters.id, id),
+      with: { user: true },
+    });
+    if (updatedForConvex) {
+      syncNewsletterToConvex(updatedForConvex);
+    }
 
     console.log(`[Newsletter Internal] Newsletter ${id} status updated to: ${status}`);
     res.json({ success: true, newsletterId: id, status });
@@ -2595,6 +2636,9 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
       req,
     });
 
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex(updated);
+
     // Trigger review notification email to the reviewer
     try {
       // Fetch reviewer details
@@ -2737,6 +2781,9 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
       req,
     });
 
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex(updated);
+
     res.json({ message: 'Newsletter approved', newsletter: updated });
   } catch (error) {
     console.error('Approve newsletter error:', error);
@@ -2847,6 +2894,9 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
       req,
     });
 
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex(updated);
+
     // Immediately trigger the send server-side so the client doesn't need to fire a second request.
     // This prevents a race condition where a network failure would leave the newsletter stuck at ready_to_send.
     try {
@@ -2946,6 +2996,9 @@ newsletterRoutes.post("/:id/reject", authenticateToken, requireTenant, async (re
       req,
     });
 
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex(updated);
+
     res.json({ message: 'Newsletter rejected', newsletter: updated });
   } catch (error) {
     console.error('Reject newsletter error:', error);
@@ -3002,6 +3055,9 @@ newsletterRoutes.post("/:id/recall-review", authenticateToken, requireTenant, re
       metadata: { previousReviewerId: newsletter.reviewerId },
       req,
     });
+
+    // Sync to Convex for real-time kanban updates (fire-and-forget)
+    syncNewsletterToConvex(updated);
 
     res.json({ message: 'Newsletter recalled to draft', newsletter: updated });
   } catch (error) {

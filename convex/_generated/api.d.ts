@@ -10,6 +10,7 @@
 
 import type * as convexExport from "../convexExport.js";
 import type * as http from "../http.js";
+import type * as newsletterListItems from "../newsletterListItems.js";
 import type * as newsletterTracking from "../newsletterTracking.js";
 import type * as webhookHandlers from "../webhookHandlers.js";
 
@@ -22,6 +23,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   convexExport: typeof convexExport;
   http: typeof http;
+  newsletterListItems: typeof newsletterListItems;
   newsletterTracking: typeof newsletterTracking;
   webhookHandlers: typeof webhookHandlers;
 }>;

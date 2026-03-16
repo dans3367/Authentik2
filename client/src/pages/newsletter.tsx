@@ -32,6 +32,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { useRealtimeNewsletters } from "@/hooks/useRealtimeNewsletters";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
 import { Button } from "@/components/ui/button";
@@ -112,6 +113,7 @@ export default function NewsletterPage() {
   const queryClient = useQueryClient();
   const { user } = useReduxAuth();
   const currentUserId = (user as any)?.id;
+  const tenantId = (user as any)?.tenantId as string | undefined;
   const dateFnsLocale = currentLanguage === 'es' ? { locale: esLocale } : {};
 
   useSetBreadcrumbs([
@@ -328,7 +330,9 @@ export default function NewsletterPage() {
     refetchOnMount: 'always',
   });
 
-  const archivedNewsletters: NewsletterListItem[] = archivedNewslettersData || [];
+  // Layer Convex real-time data on top of archived TanStack Query data
+  const { newsletters: realtimeArchivedNewsletters } = useRealtimeNewsletters(archivedNewslettersData, tenantId, true);
+  const archivedNewsletters: NewsletterListItem[] = realtimeArchivedNewsletters || [];
 
   const handleEditRecipientsSegmentSelected = async (segmentData: {
     segmentListId: string | null;
@@ -355,7 +359,9 @@ export default function NewsletterPage() {
     }
   };
 
-  const newsletters: NewsletterListItem[] = newslettersData || [];
+  // Layer Convex real-time data on top of TanStack Query data for instant kanban updates
+  const { newsletters: realtimeNewsletters } = useRealtimeNewsletters(newslettersData, tenantId, false);
+  const newsletters: NewsletterListItem[] = realtimeNewsletters || [];
 
   const filteredNewsletters = useMemo(() => {
     return newsletters.filter((newsletter) => {
