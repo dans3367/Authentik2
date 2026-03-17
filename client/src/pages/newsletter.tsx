@@ -331,7 +331,7 @@ export default function NewsletterPage() {
   });
 
   // Layer Convex real-time data on top of archived TanStack Query data
-  const { newsletters: realtimeArchivedNewsletters } = useRealtimeNewsletters(archivedNewslettersData, tenantId, true);
+  const { newsletters: realtimeArchivedNewsletters } = useRealtimeNewsletters(archivedNewslettersData, tenantId, true, "newsletter");
   const archivedNewsletters: NewsletterListItem[] = realtimeArchivedNewsletters || [];
 
   const handleEditRecipientsSegmentSelected = async (segmentData: {
@@ -360,7 +360,7 @@ export default function NewsletterPage() {
   };
 
   // Layer Convex real-time data on top of TanStack Query data for instant kanban updates
-  const { newsletters: realtimeNewsletters } = useRealtimeNewsletters(newslettersData, tenantId, false);
+  const { newsletters: realtimeNewsletters } = useRealtimeNewsletters(newslettersData, tenantId, false, "newsletter");
   const newsletters: NewsletterListItem[] = realtimeNewsletters || [];
 
   const filteredNewsletters = useMemo(() => {

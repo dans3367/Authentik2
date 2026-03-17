@@ -100,6 +100,7 @@ export const listByTenant = query({
   args: {
     tenantId: v.string(),
     archived: v.optional(v.boolean()),
+    emailType: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const items = await ctx.db
@@ -108,9 +109,12 @@ export const listByTenant = query({
       .collect();
 
     const showArchived = args.archived ?? false;
+    const emailTypeFilter = args.emailType ?? "newsletter";
 
     return items
       .filter((item) => {
+        // Filter by emailType
+        if (item.emailType !== emailTypeFilter) return false;
         // Always filter out deleted items
         if (item.deletedAt) return false;
         // Filter out archived items unless archived=true

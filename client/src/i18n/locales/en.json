@@ -2966,6 +2966,129 @@
       "segmentListSummary": "{{name}} ({{count}} recipients)"
     }
   },
+  "advertise": {
+    "title": "Advertise",
+    "subtitle": "Create and send promotional email campaigns to your contacts.",
+    "createNew": "New Promotional Email",
+    "createFirst": "Create First Campaign",
+    "searchPlaceholder": "Search promotional emails...",
+    "noItemsYet": "No promotional emails yet",
+    "noItemsDesc": "Create your first promotional email campaign to reach your audience.",
+    "noResultsFound": "No results found",
+    "noResultsDesc": "Try adjusting your search.",
+    "clearSearch": "Clear Search",
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbAdvertise": "Advertise",
+    "refresh": "Refresh promotional emails",
+    "lastUpdated": "Updated",
+    "kanban": {
+      "drafts": "Drafts",
+      "readyToSend": "Ready to Send",
+      "scheduled": "Scheduled",
+      "sent": "Sent",
+      "empty": "Nothing here yet"
+    },
+    "archived": {
+      "title": "Archived Promotional Emails",
+      "subtitle": "Sent promotional emails that have been archived",
+      "empty": "No archived promotional emails",
+      "emptyDesc": "Promotional emails you archive from the Sent column will appear here.",
+      "showArchived": "Show Archived",
+      "hideArchived": "Hide Archived",
+      "name": "Name",
+      "subject": "Subject",
+      "sentDate": "Sent Date",
+      "recipients": "Recipients",
+      "archivedDate": "Archived Date",
+      "actions": "Actions"
+    },
+    "status": {
+      "draft": "Draft",
+      "readyToSend": "Ready to Send",
+      "pendingReview": "Pending Review",
+      "scheduled": "Scheduled",
+      "sending": "Sending",
+      "sent": "Sent"
+    },
+    "actions": {
+      "preview": "Preview",
+      "edit": "Edit",
+      "editRecipients": "Edit Recipients",
+      "sendNow": "Send Now",
+      "sending": "Sending...",
+      "cancelSchedule": "Cancel Schedule",
+      "cancelling": "Cancelling...",
+      "submitForReview": "Submit for Review",
+      "submitting": "Submitting...",
+      "review": "Review",
+      "recallToDraft": "Recall to Draft",
+      "recalling": "Recalling...",
+      "archive": "Archive",
+      "archiving": "Archiving...",
+      "delete": "Delete"
+    },
+    "metrics": {
+      "sent": "Sent",
+      "opened": "Opens ({{rate}}%)",
+      "clicks": "Clicks"
+    },
+    "card": {
+      "scheduledFor": "Scheduled for {{date}}",
+      "lastEdited": "Last edited {{time}}",
+      "lastEditedRecently": "Recently edited",
+      "deleting": "Deleting...",
+      "rejectedByReviewer": "Rejected by reviewer"
+    },
+    "deleteDialog": {
+      "title": "Delete Promotional Email",
+      "description": "This action cannot be undone. The promotional email will be permanently deleted.",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    },
+    "previewDialog": {
+      "title": "Preview",
+      "description": "Email preview as it will appear to recipients.",
+      "subject": "Subject",
+      "status": "Status",
+      "noSubject": "No Subject"
+    },
+    "toast": {
+      "deleted": "Deleted",
+      "deletedDesc": "Promotional email deleted successfully.",
+      "deleteError": "Failed to delete promotional email",
+      "deployed": "Sent",
+      "deployedDesc": "Promotional email is being sent.",
+      "deployFailed": "Send Failed",
+      "deployFailedDesc": "Failed to send promotional email.",
+      "scheduleCancelled": "Schedule Cancelled",
+      "scheduleCancelledDesc": "The scheduled send has been cancelled.",
+      "cancelFailed": "Cancel Failed",
+      "cancelFailedDesc": "Failed to cancel schedule.",
+      "submittedForReview": "Submitted",
+      "submittedForReviewDesc": "Submitted for reviewer approval.",
+      "submissionFailed": "Submission Failed",
+      "submissionFailedDesc": "Failed to submit for review.",
+      "recalledToDraft": "Recalled to Draft",
+      "recalledToDraftDesc": "Promotional email has been recalled from review and returned to draft.",
+      "recallFailed": "Recall Failed",
+      "recallFailedDesc": "Failed to recall from review.",
+      "recipientsUpdated": "Recipients Updated",
+      "recipientsUpdatedDesc": "Recipients updated successfully.",
+      "recipientsError": "Failed to update recipients",
+      "error": "Error",
+      "archived": "Archived",
+      "archivedDesc": "Promotional email has been archived.",
+      "archiveError": "Failed to archive",
+      "unarchived": "Unarchived",
+      "unarchivedDesc": "Promotional email has been restored from the archive.",
+      "unarchiveError": "Failed to unarchive"
+    },
+    "error": {
+      "title": "Error",
+      "loadFailed": "Failed to load promotional emails.",
+      "tryAgain": "Try Again"
+    }
+  },
   "puckEditor": {
     "categories": {
       "layout": "Layout",

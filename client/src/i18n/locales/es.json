@@ -2860,6 +2860,129 @@
       "segmentListSummary": "{{name}} ({{count}} destinatarios)"
     }
   },
+  "advertise": {
+    "title": "Publicidad",
+    "subtitle": "Crea y envía campañas de correo electrónico promocional a tus contactos.",
+    "createNew": "Nuevo Correo Promocional",
+    "createFirst": "Crear Primera Campaña",
+    "searchPlaceholder": "Buscar correos promocionales...",
+    "noItemsYet": "No hay correos promocionales aún",
+    "noItemsDesc": "Crea tu primera campaña de correo electrónico promocional para llegar a tu audiencia.",
+    "noResultsFound": "No se encontraron resultados",
+    "noResultsDesc": "Intenta ajustar tu búsqueda.",
+    "clearSearch": "Limpiar Búsqueda",
+    "breadcrumbDashboard": "Panel",
+    "breadcrumbAdvertise": "Publicidad",
+    "refresh": "Actualizar correos promocionales",
+    "lastUpdated": "Actualizado",
+    "kanban": {
+      "drafts": "Borradores",
+      "readyToSend": "Listos para Enviar",
+      "scheduled": "Programados",
+      "sent": "Enviados",
+      "empty": "Nada aquí aún"
+    },
+    "archived": {
+      "title": "Correos Promocionales Archivados",
+      "subtitle": "Correos promocionales enviados que han sido archivados",
+      "empty": "No hay correos promocionales archivados",
+      "emptyDesc": "Los correos promocionales que archives de la columna Enviados aparecerán aquí.",
+      "showArchived": "Mostrar Archivados",
+      "hideArchived": "Ocultar Archivados",
+      "name": "Nombre",
+      "subject": "Asunto",
+      "sentDate": "Fecha de Envío",
+      "recipients": "Destinatarios",
+      "archivedDate": "Fecha de Archivo",
+      "actions": "Acciones"
+    },
+    "status": {
+      "draft": "Borrador",
+      "readyToSend": "Listo para Enviar",
+      "pendingReview": "Pendiente de Revisión",
+      "scheduled": "Programado",
+      "sending": "Enviando",
+      "sent": "Enviado"
+    },
+    "actions": {
+      "preview": "Vista Previa",
+      "edit": "Editar",
+      "editRecipients": "Editar Destinatarios",
+      "sendNow": "Enviar Ahora",
+      "sending": "Enviando...",
+      "cancelSchedule": "Cancelar Programación",
+      "cancelling": "Cancelando...",
+      "submitForReview": "Enviar a Revisión",
+      "submitting": "Enviando...",
+      "review": "Revisar",
+      "recallToDraft": "Regresar a Borrador",
+      "recalling": "Regresando...",
+      "archive": "Archivar",
+      "archiving": "Archivando...",
+      "delete": "Eliminar"
+    },
+    "metrics": {
+      "sent": "Enviados",
+      "opened": "Aperturas ({{rate}}%)",
+      "clicks": "Clics"
+    },
+    "card": {
+      "scheduledFor": "Programado para {{date}}",
+      "lastEdited": "Editado {{time}}",
+      "lastEditedRecently": "Editado recientemente",
+      "deleting": "Eliminando...",
+      "rejectedByReviewer": "Rechazado por el revisor"
+    },
+    "deleteDialog": {
+      "title": "Eliminar Correo Promocional",
+      "description": "Esta acción no se puede deshacer. El correo promocional será eliminado permanentemente.",
+      "cancel": "Cancelar",
+      "confirm": "Eliminar"
+    },
+    "previewDialog": {
+      "title": "Vista Previa",
+      "description": "Vista previa del correo tal como aparecerá para los destinatarios.",
+      "subject": "Asunto",
+      "status": "Estado",
+      "noSubject": "Sin Asunto"
+    },
+    "toast": {
+      "deleted": "Eliminado",
+      "deletedDesc": "Correo promocional eliminado exitosamente.",
+      "deleteError": "Error al eliminar correo promocional",
+      "deployed": "Enviado",
+      "deployedDesc": "El correo promocional se está enviando.",
+      "deployFailed": "Envío Fallido",
+      "deployFailedDesc": "Error al enviar correo promocional.",
+      "scheduleCancelled": "Programación Cancelada",
+      "scheduleCancelledDesc": "El envío programado ha sido cancelado.",
+      "cancelFailed": "Error al Cancelar",
+      "cancelFailedDesc": "Error al cancelar la programación.",
+      "submittedForReview": "Enviado a Revisión",
+      "submittedForReviewDesc": "Enviado para aprobación del revisor.",
+      "submissionFailed": "Error de Envío",
+      "submissionFailedDesc": "Error al enviar a revisión.",
+      "recalledToDraft": "Regresado a Borrador",
+      "recalledToDraftDesc": "El correo promocional ha sido retirado de revisión y regresado a borrador.",
+      "recallFailed": "Error al Regresar",
+      "recallFailedDesc": "Error al retirar de revisión.",
+      "recipientsUpdated": "Destinatarios Actualizados",
+      "recipientsUpdatedDesc": "Destinatarios actualizados exitosamente.",
+      "recipientsError": "Error al actualizar destinatarios",
+      "error": "Error",
+      "archived": "Archivado",
+      "archivedDesc": "Correo promocional archivado.",
+      "archiveError": "Error al archivar",
+      "unarchived": "Desarchivado",
+      "unarchivedDesc": "Correo promocional restaurado del archivo.",
+      "unarchiveError": "Error al desarchivar"
+    },
+    "error": {
+      "title": "Error",
+      "loadFailed": "Error al cargar correos promocionales.",
+      "tryAgain": "Intentar de Nuevo"
+    }
+  },
   "puckEditor": {
     "categories": {
       "layout": "Diseño",
