@@ -6,7 +6,7 @@
  */
 
 import { db } from '../db';
-import { birthdaySettings, companies, emailContacts, unsubscribeTokens } from '@shared/schema';
+import { birthdaySettings, companies, emailActivity, emailContacts, unsubscribeTokens } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import { tasks } from '@trigger.dev/sdk/v3';
@@ -42,7 +42,7 @@ export interface BirthdayTestResult {
 async function getOrCreateUnsubscribeToken(
     tenantId: string,
     contactEmail: string
-): Promise<{ token?: string; isOptedOut: boolean }> {
+): Promise<{ token?: string; isOptedOut: boolean; contactId?: string }> {
     try {
         const contact = await db.query.emailContacts.findFirst({
             where: and(eq(emailContacts.email, contactEmail), eq(emailContacts.tenantId, tenantId)),
@@ -50,7 +50,7 @@ async function getOrCreateUnsubscribeToken(
         });
 
         if (contact && contact.prefCustomerEngagement === false) {
-            return { isOptedOut: true };
+            return { isOptedOut: true, contactId: contact.id };
         }
 
         if (!contact) {
@@ -78,7 +78,7 @@ async function getOrCreateUnsubscribeToken(
         }
 
         console.log(`🔗 [Birthday Test] Generated unsubscribe token for ${contactEmail}`);
-        return { token: existingToken?.token, isOptedOut: false };
+        return { token: existingToken?.token, isOptedOut: false, contactId: contact.id };
     } catch (error) {
         console.warn(`⚠️ [Birthday Test] Error generating unsubscribe token:`, error);
         return { isOptedOut: false };
@@ -124,7 +124,7 @@ export async function sendBirthdayTestEmail(
         : userEmail.split('@')[0];
 
     // Get or create unsubscribe token
-    const { token: unsubscribeToken, isOptedOut } = await getOrCreateUnsubscribeToken(tenantId, userEmail);
+    const { token: unsubscribeToken, isOptedOut, contactId } = await getOrCreateUnsubscribeToken(tenantId, userEmail);
 
     if (isOptedOut) {
         console.log(`🚫 [Birthday Test] Contact ${userEmail} has opted out of Customer Engagement emails`);
@@ -157,6 +157,7 @@ export async function sendBirthdayTestEmail(
             companyName,
             unsubscribeToken,
             unsubscribeUrl,
+            contactId,
             promotion: settings.promotion,
         });
     } else {
@@ -170,6 +171,7 @@ export async function sendBirthdayTestEmail(
             companyName,
             unsubscribeToken,
             unsubscribeUrl,
+            contactId,
             promotion: settings?.promotion,
         });
     }
@@ -185,6 +187,7 @@ interface EmailSendParams {
     companyName: string;
     unsubscribeToken?: string;
     unsubscribeUrl?: string;
+    contactId?: string;
     promotion?: {
         id?: string;
         title?: string;
@@ -201,7 +204,7 @@ async function sendSplitBirthdayEmails(
     userId: string,
     params: EmailSendParams
 ): Promise<BirthdayTestResult> {
-    const { userEmail, recipientName, resolvedTemplate, resolvedMessage, resolvedCustomThemeData, resolvedSenderName, companyName, unsubscribeToken, unsubscribeUrl, promotion } = params;
+    const { userEmail, recipientName, resolvedTemplate, resolvedMessage, resolvedCustomThemeData, resolvedSenderName, companyName, unsubscribeToken, unsubscribeUrl, contactId, promotion } = params;
 
     console.log(`✅ [Birthday Test SPLIT FLOW] Sending birthday and promo as SEPARATE emails to ${userEmail}`);
 
@@ -270,6 +273,22 @@ async function sendSplitBirthdayEmails(
 
     console.log(`✅ [Birthday Test SPLIT FLOW] Email 2/2: Promotional email queued (20s delay), runId: ${promoHandle.id}`);
 
+    // Log birthday card test to activity timeline
+    if (contactId) {
+        try {
+            await db.insert(emailActivity).values({
+                tenantId,
+                contactId,
+                activityType: 'sent',
+                activityData: JSON.stringify({ type: 'birthday-card', test: true, split: true, subject: birthdaySubject, recipient: userEmail, from: process.env.EMAIL_FROM || 'admin@zendwise.com' }),
+                occurredAt: new Date(),
+            });
+            console.log(`📝 [Birthday Test SPLIT FLOW] Logged birthday card activity for ${userEmail}`);
+        } catch (logError) {
+            console.error(`⚠️ [Birthday Test SPLIT FLOW] Failed to log birthday card activity:`, logError);
+        }
+    }
+
     return {
         success: true,
         message: 'Test birthday card sent (split flow: birthday card sent, promotion queued with 20s delay)',
@@ -288,7 +307,7 @@ async function sendCombinedBirthdayEmail(
     userId: string,
     params: EmailSendParams
 ): Promise<BirthdayTestResult> {
-    const { userEmail, recipientName, resolvedTemplate, resolvedMessage, resolvedCustomThemeData, resolvedSenderName, companyName, unsubscribeToken, unsubscribeUrl, promotion } = params;
+    const { userEmail, recipientName, resolvedTemplate, resolvedMessage, resolvedCustomThemeData, resolvedSenderName, companyName, unsubscribeToken, unsubscribeUrl, contactId, promotion } = params;
 
     const htmlContent = renderBirthdayTemplate(resolvedTemplate as any, {
         recipientName,
@@ -322,6 +341,22 @@ async function sendCombinedBirthdayEmail(
     });
 
     console.log(`✅ [Birthday Test] Triggered send-email task, runId: ${handle.id}`);
+
+    // Log birthday card test to activity timeline
+    if (contactId) {
+        try {
+            await db.insert(emailActivity).values({
+                tenantId,
+                contactId,
+                activityType: 'sent',
+                activityData: JSON.stringify({ type: 'birthday-card', test: true, subject, recipient: userEmail, from: process.env.EMAIL_FROM || 'admin@zendwise.com' }),
+                occurredAt: new Date(),
+            });
+            console.log(`📝 [Birthday Test] Logged birthday card activity for ${userEmail}`);
+        } catch (logError) {
+            console.error(`⚠️ [Birthday Test] Failed to log birthday card activity:`, logError);
+        }
+    }
 
     return {
         success: true,

@@ -22,6 +22,7 @@ export function Toaster() {
       <ClickToDismiss />
       <SonnerToaster
         position="top-center"
+        style={{ zIndex: 2147483647 }}
         toastOptions={{
           duration: 4000,
           className: "font-sans border border-border bg-background text-foreground shadow-lg rounded-lg cursor-pointer",

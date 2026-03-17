@@ -1836,3 +1836,39 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
     });
   }
 });
+
+// Recalculate emailsOpened for all contacts based on unique opens per email send
+contactRoutes.post("/email-contacts/recalculate-opens", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
+  try {
+    const tenantId = req.tenantId;
+
+    // Get all contacts for this tenant
+    const contacts = await db.select({ id: emailContacts.id })
+      .from(emailContacts)
+      .where(eq(emailContacts.tenantId, tenantId));
+
+    let updated = 0;
+    for (const contact of contacts) {
+      // Count unique opens: one per emailSendId (first open or click per email)
+      const [result] = await db.select({
+        uniqueOpens: sql<number>`cast(count(distinct ${emailEvents.emailSendId}) as int)`,
+      })
+        .from(emailEvents)
+        .innerJoin(emailSends, eq(emailEvents.emailSendId, emailSends.id))
+        .where(sql`${emailSends.contactId} = ${contact.id} AND ${emailEvents.eventType} IN ('opened', 'clicked')`);
+
+      const uniqueOpens = result?.uniqueOpens ?? 0;
+
+      await db.update(emailContacts)
+        .set({ emailsOpened: uniqueOpens, updatedAt: new Date() })
+        .where(eq(emailContacts.id, contact.id));
+
+      updated++;
+    }
+
+    res.json({ success: true, message: `Recalculated open counts for ${updated} contacts` });
+  } catch (error: any) {
+    console.error('Error recalculating open counts:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to recalculate' });
+  }
+});

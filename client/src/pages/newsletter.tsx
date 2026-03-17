@@ -78,7 +78,7 @@ type NewsletterListItem = NewsletterWithUser & {
   webSlug?: string | null;
 };
 
-const getStatusBadge = (status: string, t: (key: string, fallback?: string) => string) => {
+const getStatusBadge = (status: string, t: any) => {
   switch (status) {
     case 'draft':
       return <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800"><FileText className="h-3 w-3 mr-1" />{t('newsletter.status.draft')}</Badge>;

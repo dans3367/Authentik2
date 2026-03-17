@@ -407,7 +407,7 @@ router.get(
           accentColor: emailDesign?.accentColor || '#10B981',
           fontFamily: emailDesign?.fontFamily || 'Arial, sans-serif',
           headerMode: emailDesign?.headerMode || 'logo',
-          logoUrl: emailDesign?.logoUrl || company?.logoUrl || null,
+          logoUrl: emailDesign?.logoUrl || null,
           logoSize: emailDesign?.logoSize || 'medium',
           logoAlignment: emailDesign?.logoAlignment || 'center',
           bannerUrl: emailDesign?.bannerUrl || null,

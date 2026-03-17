@@ -10,6 +10,7 @@ import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 import { replaceEmailPlaceholders } from '../utils/emailPlaceholders';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
+import { verifyTurnstileToken } from '../utils/turnstile';
 
 export const formsRoutes = Router();
 
@@ -271,6 +272,7 @@ const publicSubmitSchema = z.object({
   ),
   _hp_email: z.string().optional(), // Honeypot field — must be empty
   _ft: z.number().optional(), // Form load timestamp for timing check
+  _turnstile_token: z.string().optional(), // Cloudflare Turnstile CAPTCHA token
 });
 
 // ─── Middleware: validate :id is a UUID ───────────────────────────────────────
@@ -821,6 +823,7 @@ formsRoutes.get("/public/:id", validateUuidParam, async (req: any, res) => {
       theme: form.theme || 'modern',
       logoUrl,
       companyName,
+      turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || null,
     });
   } catch (error) {
     console.error('Get public form error:', error);
@@ -839,7 +842,7 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
       return res.status(400).json({ message: 'Invalid submission data', details: parsed.error.errors });
     }
 
-    const { data, _hp_email, _ft } = parsed.data;
+    const { data, _hp_email, _ft, _turnstile_token } = parsed.data;
 
     // ─── Bot Protection ────────────────────────────────────────────────
     // 1. Honeypot check: if the hidden field has a value, it's a bot
@@ -860,6 +863,51 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
           message: 'Form submitted successfully',
           responseId: 'blocked',
         });
+      }
+    }
+
+    // 3. Server-side suspicion scoring — require Turnstile if suspicious
+    if (process.env.TURNSTILE_SECRET_KEY) {
+      let suspicionScore = 0;
+      const signals: string[] = [];
+
+      // Near-threshold timing (passed 2s check but still fast)
+      if (_ft) {
+        const elapsed = Date.now() - _ft;
+        if (elapsed < 4000) { suspicionScore += 30; signals.push(`fast-timing:${elapsed}ms`); }
+      }
+
+      // Missing or bot-like User-Agent
+      const ua = req.get('User-Agent') || '';
+      if (!ua || /bot|crawl|spider|curl|wget|python|httpx|axios|node-fetch|go-http/i.test(ua)) {
+        suspicionScore += 40; signals.push('suspicious-ua');
+      }
+
+      // Missing typical browser headers
+      if (!req.get('Accept-Language')) { suspicionScore += 10; signals.push('no-accept-language'); }
+      if (!req.get('Referer') && !req.get('Origin')) { suspicionScore += 10; signals.push('no-referer-origin'); }
+
+      // No form load timestamp at all (bots often skip this)
+      if (!_ft) { suspicionScore += 20; signals.push('no-timestamp'); }
+
+      if (suspicionScore >= 50) {
+        if (!_turnstile_token) {
+          console.warn(`[Bot Protection] Suspicion score ${suspicionScore} for form ${id} from IP ${req.ip} — requiring CAPTCHA [${signals.join(', ')}]`);
+          return res.status(449).json({
+            requireCaptcha: true,
+            message: 'Additional verification required',
+          });
+        }
+
+        // Verify the provided Turnstile token
+        const verification = await verifyTurnstileToken(_turnstile_token, req.ip);
+        if (!verification.success) {
+          console.warn(`[Bot Protection] Turnstile verification failed for form ${id} from IP ${req.ip}`);
+          return res.status(201).json({
+            message: 'Form submitted successfully',
+            responseId: 'blocked',
+          });
+        }
       }
     }
 

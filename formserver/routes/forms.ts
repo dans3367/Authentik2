@@ -5,6 +5,7 @@ import { eq, and, sql, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
+import { verifyTurnstileToken } from '../utils/turnstile.js';
 
 const router = express.Router();
 
@@ -277,6 +278,7 @@ const formResponseSchema = z.object({
   ),
   _hp_email: z.string().optional(), // Honeypot field — must be empty
   _ft: z.number().optional(), // Form load timestamp for timing check
+  _turnstile_token: z.string().optional(), // Cloudflare Turnstile CAPTCHA token
 });
 
 // GET /api/forms/:id - Get a specific form by UUID
@@ -317,7 +319,8 @@ router.get('/:id', validateUuidParam, async (req, res) => {
       description: formRecord.description,
       category: formRecord.category || 'intake',
       formData: parsedFormData,
-      theme: formRecord.theme || 'modern'
+      theme: formRecord.theme || 'modern',
+      turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || null
     });
 
   } catch (error) {
@@ -340,7 +343,7 @@ router.post('/:id/submit', submitLimiter, validateUuidParam, async (req, res) =>
       });
     }
 
-    const { responseData, _hp_email, _ft } = validation.data;
+    const { responseData, _hp_email, _ft, _turnstile_token } = validation.data;
 
     // ─── Bot Protection ────────────────────────────────────────────────
     // 1. Honeypot check: if the hidden field has a value, it's a bot
@@ -364,6 +367,46 @@ router.post('/:id/submit', submitLimiter, validateUuidParam, async (req, res) =>
           responseId: 'blocked',
           message: 'Form response submitted successfully'
         });
+      }
+    }
+
+    // 3. Server-side suspicion scoring — require Turnstile if suspicious
+    if (process.env.TURNSTILE_SECRET_KEY) {
+      let suspicionScore = 0;
+      const signals: string[] = [];
+
+      if (_ft) {
+        const elapsed = Date.now() - _ft;
+        if (elapsed < 4000) { suspicionScore += 30; signals.push(`fast-timing:${elapsed}ms`); }
+      }
+
+      const ua = req.get('User-Agent') || '';
+      if (!ua || /bot|crawl|spider|curl|wget|python|httpx|axios|node-fetch|go-http/i.test(ua)) {
+        suspicionScore += 40; signals.push('suspicious-ua');
+      }
+
+      if (!req.get('Accept-Language')) { suspicionScore += 10; signals.push('no-accept-language'); }
+      if (!req.get('Referer') && !req.get('Origin')) { suspicionScore += 10; signals.push('no-referer-origin'); }
+      if (!_ft) { suspicionScore += 20; signals.push('no-timestamp'); }
+
+      if (suspicionScore >= 50) {
+        if (!_turnstile_token) {
+          console.warn(`[Bot Protection] Suspicion score ${suspicionScore} for form ${formId} from IP ${req.ip} — requiring CAPTCHA [${signals.join(', ')}]`);
+          return res.status(449).json({
+            requireCaptcha: true,
+            message: 'Additional verification required',
+          });
+        }
+
+        const verification = await verifyTurnstileToken(_turnstile_token, req.ip);
+        if (!verification.success) {
+          console.warn(`[Bot Protection] Turnstile verification failed for form ${formId} from IP ${req.ip}`);
+          return res.status(201).json({
+            success: true,
+            responseId: 'blocked',
+            message: 'Form response submitted successfully',
+          });
+        }
       }
     }
 

@@ -4,6 +4,8 @@ import { parseTheme, ThemeStyles } from '../themes';
 import { FullName } from './ui/FullName';
 import PrivacyStatement from './PrivacyStatement';
 import GoogleSignInButton from './GoogleSignInButton';
+import { useBotDetection } from '../hooks/useBotDetection';
+import TurnstileWidget from './TurnstileWidget';
 
 interface FormElement {
   id: string;
@@ -58,6 +60,10 @@ const FormView: React.FC<FormViewProps> = ({ formId }) => {
   const [theme, setTheme] = useState<ThemeStyles | null>(null);
   const [formLoadTime] = useState<number>(Date.now());
   const [honeypot, setHoneypot] = useState('');
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [showTurnstile, setShowTurnstile] = useState(false);
+  const botDetection = useBotDetection();
   const [googleSignInSuccess, setGoogleSignInSuccess] = useState<{ email: string; firstName?: string; lastName?: string } | null>(null);
   const [googleSignInError, setGoogleSignInError] = useState<string | null>(null);
 
@@ -78,7 +84,10 @@ const FormView: React.FC<FormViewProps> = ({ formId }) => {
 
         const formData = await response.json();
         setForm(formData);
-        
+        if (formData.turnstileSiteKey) {
+          setTurnstileSiteKey(formData.turnstileSiteKey);
+        }
+
         // Parse and set theme
         const parsedTheme = parseTheme(formData.theme);
         setTheme(parsedTheme);
@@ -109,10 +118,17 @@ const FormView: React.FC<FormViewProps> = ({ formId }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!form) return;
 
+    // Client-side bot detection: if suspicious and Turnstile is available, require challenge
+    if (turnstileSiteKey && botDetection.isSuspicious && !turnstileToken) {
+      setShowTurnstile(true);
+      return;
+    }
+
     setSubmitting(true);
+    setError(null);
     try {
       const response = await fetch(`/api/forms/${formId}/submit`, {
         method: 'POST',
@@ -123,8 +139,16 @@ const FormView: React.FC<FormViewProps> = ({ formId }) => {
           responseData: formValues,
           _hp_email: honeypot,
           _ft: formLoadTime,
+          ...(turnstileToken ? { _turnstile_token: turnstileToken } : {}),
         })
       });
+
+      // Server requested CAPTCHA challenge
+      if (response.status === 449 && turnstileSiteKey) {
+        setShowTurnstile(true);
+        setSubmitting(false);
+        return;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to submit form');
@@ -383,9 +407,16 @@ const FormView: React.FC<FormViewProps> = ({ formId }) => {
                 </div>
               )}
 
-              <button 
-                type="submit" 
-                disabled={submitting}
+              {showTurnstile && turnstileSiteKey && (
+                <TurnstileWidget
+                  siteKey={turnstileSiteKey}
+                  onVerify={(token) => setTurnstileToken(token)}
+                />
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting || (showTurnstile && !turnstileToken)}
                 className={theme?.button || 'w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed'}
               >
                 {(() => {

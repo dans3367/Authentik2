@@ -855,15 +855,29 @@ async function handleEmailOpened(data: any) {
       return;
     }
 
-    // Create email_events record
-    await createEmailEvent(emailSend.id, data, 'opened');
-
-    // Update contact metrics if contact is linked
+    // Check if this email was already opened/clicked before (to avoid counting subsequent opens)
+    let isFirstOpen = false;
     if (emailSend.contactId) {
-      await updateContactMetrics(emailSend.contactId, 'opened');
+      const existingOpens = await db.select({ count: sql<number>`cast(count(*) as int)` })
+        .from(emailEvents)
+        .where(sql`${emailEvents.emailSendId} = ${emailSend.id} AND ${emailEvents.eventType} IN ('opened', 'clicked')`);
+      isFirstOpen = (existingOpens[0]?.count ?? 0) === 0;
     }
 
+    // Create email_events record (always record the event for audit trail)
+    await createEmailEvent(emailSend.id, data, 'opened');
 
+    // Update contact metrics if contact is linked - only increment open count on first open
+    if (emailSend.contactId) {
+      if (isFirstOpen) {
+        await updateContactMetrics(emailSend.contactId, 'opened');
+      } else {
+        // Still update lastActivity for subsequent opens, but don't increment counter
+        await db.update(emailContacts)
+          .set({ lastActivity: new Date(), updatedAt: new Date() })
+          .where(sql`${emailContacts.id} = ${emailSend.contactId}`);
+      }
+    }
 
     console.log(`Successfully processed opened event for email_send: ${emailSend.id}`);
   } catch (error) {
@@ -892,15 +906,29 @@ async function handleEmailClicked(data: any) {
       return;
     }
 
-    // Create email_events record
-    await createEmailEvent(emailSend.id, data, 'clicked');
-
-    // Update contact metrics if contact is linked
+    // Check if this email was already opened/clicked before (clicks count as opens)
+    let isFirstOpen = false;
     if (emailSend.contactId) {
-      await updateContactMetrics(emailSend.contactId, 'clicked');
+      const existingOpens = await db.select({ count: sql<number>`cast(count(*) as int)` })
+        .from(emailEvents)
+        .where(sql`${emailEvents.emailSendId} = ${emailSend.id} AND ${emailEvents.eventType} IN ('opened', 'clicked')`);
+      isFirstOpen = (existingOpens[0]?.count ?? 0) === 0;
     }
 
+    // Create email_events record (always record the event for audit trail)
+    await createEmailEvent(emailSend.id, data, 'clicked');
 
+    // Update contact metrics if contact is linked - only increment open count on first interaction
+    if (emailSend.contactId) {
+      if (isFirstOpen) {
+        await updateContactMetrics(emailSend.contactId, 'clicked');
+      } else {
+        // Still update lastActivity for subsequent clicks, but don't increment open counter
+        await db.update(emailContacts)
+          .set({ lastActivity: new Date(), updatedAt: new Date() })
+          .where(sql`${emailContacts.id} = ${emailSend.contactId}`);
+      }
+    }
 
     console.log(`Successfully processed clicked event for email_send: ${emailSend.id}`);
   } catch (error) {

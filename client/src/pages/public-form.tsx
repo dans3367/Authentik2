@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useRoute } from 'wouter';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useBotDetection } from '@/hooks/useBotDetection';
+import TurnstileWidget from '@/components/TurnstileWidget';
 
 // ─── Theme System ────────────────────────────────────────────────────────────
 
@@ -446,6 +448,10 @@ const PublicFormPage: React.FC = () => {
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [formLoadTime] = useState<number>(Date.now());
   const [honeypot, setHoneypot] = useState('');
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [showTurnstile, setShowTurnstile] = useState(false);
+  const botDetection = useBotDetection();
   const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   const [googleSignInLoading, setGoogleSignInLoading] = useState(false);
   const [googleSignInSuccess, setGoogleSignInSuccess] = useState<{ email: string } | null>(null);
@@ -566,6 +572,9 @@ const PublicFormPage: React.FC = () => {
         if (data.companyName) {
           setCompanyName(data.companyName);
         }
+        if (data.turnstileSiteKey) {
+          setTurnstileSiteKey(data.turnstileSiteKey);
+        }
 
         const parsedTheme = parseTheme(data.theme);
         setTheme(parsedTheme);
@@ -594,13 +603,32 @@ const PublicFormPage: React.FC = () => {
     e.preventDefault();
     if (!form) return;
 
+    // Client-side bot detection: if suspicious and Turnstile is available, require challenge
+    if (turnstileSiteKey && botDetection.isSuspicious && !turnstileToken) {
+      setShowTurnstile(true);
+      return;
+    }
+
     setSubmitting(true);
+    setError(null);
     try {
       const response = await fetch(`/api/forms/public/${formId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: formValues, _hp_email: honeypot, _ft: formLoadTime })
+        body: JSON.stringify({
+          data: formValues,
+          _hp_email: honeypot,
+          _ft: formLoadTime,
+          ...(turnstileToken ? { _turnstile_token: turnstileToken } : {}),
+        })
       });
+
+      // Server requested CAPTCHA challenge
+      if (response.status === 449 && turnstileSiteKey) {
+        setShowTurnstile(true);
+        setSubmitting(false);
+        return;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to submit form');
@@ -870,9 +898,16 @@ const PublicFormPage: React.FC = () => {
                 </div>
               )}
 
+              {showTurnstile && turnstileSiteKey && (
+                <TurnstileWidget
+                  siteKey={turnstileSiteKey}
+                  onVerify={(token) => setTurnstileToken(token)}
+                />
+              )}
+
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || (showTurnstile && !turnstileToken)}
                 className={theme?.button || 'w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed'}
               >
                 {(() => {

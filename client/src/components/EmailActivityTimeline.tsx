@@ -23,7 +23,7 @@ import {
   Settings
 } from "lucide-react";
 import ActivityIcon from "@assets/28_new.svg";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { addDays, format } from "date-fns";
 
 interface EmailActivity {
@@ -115,6 +115,7 @@ const formatDateTime = (dateString: string) => {
 
 export default function EmailActivityTimeline({ contactId, pageSize = 20, initialPage = 1 }: EmailActivityTimelineProps) {
   const queryClient = useQueryClient();
+  const timelineRef = useRef<HTMLDivElement>(null);
   const [dateRange, setDateRange] = useState<{from?: Date; to?: Date}>({});
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(initialPage);
@@ -206,11 +207,10 @@ export default function EmailActivityTimeline({ contactId, pageSize = 20, initia
   const goToPage = (page: number) => {
     if (page < 1 || page > totalPages) return;
     setCurrentPage(page);
-    // Scroll to top of timeline
-    const timelineElement = document.querySelector('[data-component="email-activity-timeline"]');
-    if (timelineElement) {
-      timelineElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    // Scroll to top of timeline after React re-renders the new page
+    requestAnimationFrame(() => {
+      timelineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   };
 
   const handleNextPage = () => goToPage(currentPage + 1);
@@ -548,7 +548,7 @@ export default function EmailActivityTimeline({ contactId, pageSize = 20, initia
   }
 
   return (
-    <Card>
+    <Card ref={timelineRef}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -798,6 +798,21 @@ export default function EmailActivityTimeline({ contactId, pageSize = 20, initia
                         <Badge className={colorClass}>
                           {activity.activityType}
                         </Badge>
+                        {(parsedActivityData?.type === 'birthday-card' || parsedActivityData?.type === 'birthday-card-test') && (
+                          <Badge variant="outline" className="bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-900/20 dark:text-pink-400 dark:border-pink-800">
+                            Birthday Card
+                          </Badge>
+                        )}
+                        {parsedActivityData?.type === 'birthday-promotion-test' && (
+                          <Badge variant="outline" className="bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-900/20 dark:text-pink-400 dark:border-pink-800">
+                            Birthday Promo (Test)
+                          </Badge>
+                        )}
+                        {parsedActivityData?.source === 'manual_birthday_invitation' && (
+                          <Badge variant="outline" className="bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-900/20 dark:text-pink-400 dark:border-pink-800">
+                            Birthday Invitation
+                          </Badge>
+                        )}
                         {parsedActivityData?.subject ? (
                           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                             {parsedActivityData.subject}
