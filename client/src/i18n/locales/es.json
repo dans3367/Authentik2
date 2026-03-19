@@ -65,6 +65,7 @@
       "evening": "Buenas Noches"
     },
     "welcomeMessage": "Esto es lo que está pasando con tu negocio hoy. Hagamos que sea un gran día.",
+    "quickActionsTitle": "Acciones Rápidas",
     "quickActions": {
       "newNewsletter": "Nuevo Boletín",
       "sendEmail": "Enviar Correo",

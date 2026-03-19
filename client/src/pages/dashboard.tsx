@@ -6,6 +6,13 @@ import { HighlightsCard } from "@/components/ui/highlights-card";
 import { UpcomingBirthdaysCard } from "@/components/ui/upcoming-birthdays-card";
 import { UpcomingAppointmentsCard } from "@/components/ui/upcoming-appointments-card";
 import { UpcomingScheduledEmailsCard } from "@/components/ui/upcoming-scheduled-emails-card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import {
   LayoutDashboard,
@@ -18,6 +25,8 @@ import {
   TrendingUp,
   TrendingDown,
   CalendarCheck,
+  ChevronDown,
+  Plus,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDashboardHighlights } from "@/hooks/useStats";
@@ -165,21 +174,32 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-            {quickActions.map((action) => (
-              <button
-                key={action.label}
-                onClick={() => action.onClick ? action.onClick() : setLocation(action.path)}
-                className={`group flex items-center gap-2 px-3 py-2 rounded-lg ${action.lightBg} border border-transparent hover:border-border/50 hover:shadow-sm active:scale-[0.97] transition-all duration-200 cursor-pointer`}
-                data-testid={`button-quick-${action.path.replace(/\//g, '-').substring(1)}`}
-              >
-                <div className={`w-7 h-7 rounded-md bg-gradient-to-br ${action.gradient} flex items-center justify-center shadow-sm`}>
-                  <action.icon className="w-3.5 h-3.5 text-white" />
-                </div>
-                <span className="text-xs font-semibold text-foreground/80 group-hover:text-foreground transition-colors hidden sm:inline">
-                  {action.label}
-                </span>
-              </button>
-            ))}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="gap-2 rounded-lg shadow-sm">
+                  <Plus className="w-4 h-4" />
+                  {t("dashboard.quickActionsTitle", "Quick Actions")}
+                  <ChevronDown className="w-4 h-4 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 p-2 rounded-xl">
+                {quickActions.map((action) => (
+                  <DropdownMenuItem
+                    key={action.label}
+                    onClick={() => action.onClick ? action.onClick() : setLocation(action.path)}
+                    className="gap-3 p-2.5 cursor-pointer rounded-lg"
+                    data-testid={`menu-quick-${action.path.replace(/\//g, '-').substring(1)}`}
+                  >
+                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${action.gradient} flex items-center justify-center shadow-sm`}>
+                      <action.icon className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="font-medium text-sm text-foreground/90 group-hover:text-foreground">
+                      {action.label}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

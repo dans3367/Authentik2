@@ -234,7 +234,7 @@ export function AppSidebar() {
                           asChild
                           isActive={isActive}
                           className={cn(
-                            "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0 hover:!bg-[#e1fce9] data-[active=true]:!bg-[#e1fce9] hover:!text-gray-800 data-[active=true]:!text-gray-800",
+                            "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0",
                             isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
                           )}
                           tooltip={item.name}
@@ -255,7 +255,7 @@ export function AppSidebar() {
                           asChild
                           isActive={isActive}
                           className={cn(
-                            "w-full justify-start hover:!bg-[#e1fce9] data-[active=true]:!bg-[#e1fce9] hover:!text-gray-800 data-[active=true]:!text-gray-800",
+                            "w-full justify-start",
                             isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
                           )}
                           tooltip={item.name}
@@ -299,7 +299,7 @@ export function AppSidebar() {
                       asChild
                       isActive={isActive}
                       className={cn(
-                        "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0 hover:!bg-[#e1fce9] data-[active=true]:!bg-[#e1fce9] hover:!text-gray-800 data-[active=true]:!text-gray-800",
+                        "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0",
                         isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
                       )}
                       tooltip={item.name}
@@ -325,7 +325,7 @@ export function AppSidebar() {
                   asChild
                   isActive={location === '/legal-agreements' || location === '/privacy-security' || location === '/terms-of-service' || location === '/acceptable-use' || location === '/data-processing' || location === '/cookie-policy'}
                   className={cn(
-                    "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0 hover:!bg-[#e1fce9] data-[active=true]:!bg-[#e1fce9] hover:!text-gray-800 data-[active=true]:!text-gray-800",
+                    "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0",
                     isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
                   )}
                   tooltip="Legal Agreements"
@@ -341,14 +341,14 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="pb-4">
         <SidebarMenu>
           <SidebarMenuItem className="flex justify-center group-data-[collapsible=icon]:justify-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="data-[state=open]:!bg-[#e1fce9] data-[state=open]:!text-gray-800 hover:!bg-[#e1fce9] hover:!text-gray-800 group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
                   tooltip="User Menu"
                 >
                   <CustomAvatar
@@ -396,9 +396,9 @@ export function AppSidebar() {
                       setLocation('/profile');
                       handleMobileNavClick();
                     }}
-                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
+                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
                   >
-                    <User className="h-4 w-4" style={{ color: "#3396D3" }} />
+                    <User className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
                     <span className="text-sm">Profile</span>
                   </DropdownMenuItem>
 
@@ -407,9 +407,9 @@ export function AppSidebar() {
                       setLocation('/company');
                       handleMobileNavClick();
                     }}
-                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
+                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
                   >
-                    <Building2 className="h-4 w-4" style={{ color: "#3396D3" }} />
+                    <Building2 className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
                     <span className="text-sm">Company</span>
                   </DropdownMenuItem>
 
@@ -418,9 +418,9 @@ export function AppSidebar() {
                       setLocation('/sessions');
                       handleMobileNavClick();
                     }}
-                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
+                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
                   >
-                    <Activity className="h-4 w-4" style={{ color: "#3396D3" }} />
+                    <Activity className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
                     <span className="text-sm">Sessions</span>
                   </DropdownMenuItem>
 
@@ -493,9 +493,9 @@ export function AppSidebar() {
                 <div className="py-2">
                   <DropdownMenuItem
                     onClick={handleLogout}
-                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 rounded-none"
+                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
                   >
-                    <LogOut className="h-4 w-4" style={{ color: "#3396D3" }} />
+                    <LogOut className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
                     <span className="text-sm">Logout</span>
                   </DropdownMenuItem>
                 </div>

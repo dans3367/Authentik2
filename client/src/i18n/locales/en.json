@@ -66,6 +66,7 @@
       "evening": "Good Evening"
     },
     "welcomeMessage": "Here's what's happening with your business today. Let's make it a great one.",
+    "quickActionsTitle": "Quick Actions",
     "quickActions": {
       "newNewsletter": "New Newsletter",
       "sendEmail": "Send Email",
