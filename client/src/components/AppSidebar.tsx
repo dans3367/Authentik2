@@ -398,7 +398,7 @@ export function AppSidebar() {
                 <SidebarMenuButton
                   size="lg"
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
-                  tooltip="User Menu"
+                  tooltip={t('userMenu.tooltip') || "User Menu"}
                 >
                   <CustomAvatar
                     user={extendedUser}
@@ -448,7 +448,7 @@ export function AppSidebar() {
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
                   >
                     <User className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
-                    <span className="text-sm">Profile</span>
+                    <span className="text-sm">{t('userMenu.profile') || "Profile"}</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuItem
@@ -459,7 +459,7 @@ export function AppSidebar() {
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
                   >
                     <Building2 className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
-                    <span className="text-sm">Company</span>
+                    <span className="text-sm">{t('userMenu.company') || "Company"}</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuItem
@@ -470,7 +470,7 @@ export function AppSidebar() {
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
                   >
                     <Activity className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
-                    <span className="text-sm">Sessions</span>
+                    <span className="text-sm">{t('userMenu.sessions') || "Sessions"}</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-700" />
@@ -524,12 +524,12 @@ export function AppSidebar() {
                         >
                           <span className="relative z-10 flex items-center justify-center gap-1.5">
                             <Sparkles className="h-3.5 w-3.5 text-indigo-600 group-hover/btn:animate-spin" />
-                            <span>Upgrade to Pro</span>
+                            <span>{t('userMenu.upgradeToPro') || "Upgrade to Pro"}</span>
                           </span>
                         </Button>
 
                         <p className="text-[10px] text-center text-white/50">
-                          Unlock unlimited views & premium features
+                          {t('userMenu.unlockPremium') || "Unlock unlimited views & premium features"}
                         </p>
                       </div>
                     </div>
@@ -545,7 +545,7 @@ export function AppSidebar() {
                     className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
                   >
                     <LogOut className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
-                    <span className="text-sm">Logout</span>
+                    <span className="text-sm">{t('userMenu.logout') || "Logout"}</span>
                   </DropdownMenuItem>
                 </div>
               </DropdownMenuContent>

@@ -116,16 +116,16 @@ export default function ManagementNewsletterReviewer() {
             queryClient.setQueryData(["/api/newsletters/reviewer-settings"], data);
             setHasChanges(false);
             toast({
-                title: "Settings saved",
+                title: t("newsletterReviewer.settingsSaved", "Settings saved"),
                 description: data.enabled
-                    ? `Newsletter reviewer approval enabled${data.reviewer ? ` with ${data.reviewer.email}` : ""}`
-                    : "Newsletter reviewer approval disabled",
+                    ? data.reviewer ? t("newsletterReviewer.enabledWithReviewer", "Newsletter reviewer approval enabled with {{email}}", { email: data.reviewer.email }) : t("newsletterReviewer.enabledNoReviewer", "Newsletter reviewer approval enabled")
+                    : t("newsletterReviewer.disabled", "Newsletter reviewer approval disabled"),
             });
         },
         onError: (error: Error) => {
             toast({
-                title: "Error",
-                description: error.message || "Failed to save reviewer settings",
+                title: t("common.error", "Error"),
+                description: error.message || t("newsletterReviewer.errorDesc", "Failed to save reviewer settings"),
                 variant: "destructive",
             });
         },
@@ -134,8 +134,8 @@ export default function ManagementNewsletterReviewer() {
     const handleSave = () => {
         if (enabled && !selectedReviewerId) {
             toast({
-                title: "Reviewer required",
-                description: "Please select a reviewer before enabling the approval workflow",
+                title: t("newsletterReviewer.reviewerRequired", "Reviewer required"),
+                description: t("newsletterReviewer.reviewerRequiredDesc", "Please select a reviewer before enabling the approval workflow"),
                 variant: "destructive",
             });
             return;
@@ -149,8 +149,8 @@ export default function ManagementNewsletterReviewer() {
             setSelectedReviewerId(settings.reviewerId);
             setHasChanges(false);
             toast({
-                title: "Changes discarded",
-                description: "Reverted to the last saved settings.",
+                title: t("newsletterReviewer.changesDiscarded", "Changes discarded"),
+                description: t("newsletterReviewer.changesDiscardedDesc", "Reverted to the last saved settings."),
             });
         }
     };
@@ -176,7 +176,7 @@ export default function ManagementNewsletterReviewer() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[400px]">
                 <FileCheck2 className="w-10 h-10 animate-bounce text-primary mb-4" />
-                <p className="text-muted-foreground animate-pulse">Loading reviewer settings...</p>
+                <p className="text-muted-foreground animate-pulse">{t("newsletterReviewer.loading", "Loading reviewer settings...")}</p>
             </div>
         );
     }
@@ -187,9 +187,9 @@ export default function ManagementNewsletterReviewer() {
                 <CardContent className="py-8">
                     <div className="flex flex-col items-center gap-2 py-4 text-center">
                         <ShieldAlert className="h-8 w-8 text-orange-500" />
-                        <p className="font-medium text-sm">Permission Denied</p>
+                        <p className="font-medium text-sm">{t("newsletterReviewer.permissionDenied", "Permission Denied")}</p>
                         <p className="text-xs text-muted-foreground max-w-xs">
-                            You need Owner or Administrator access to manage newsletter reviewer settings.
+                            {t("newsletterReviewer.permissionDeniedDesc", "You need Owner or Administrator access to manage newsletter reviewer settings.")}
                         </p>
                     </div>
                 </CardContent>
@@ -204,10 +204,10 @@ export default function ManagementNewsletterReviewer() {
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
                         <UserCheck className="w-6 h-6 text-primary" />
-                        Newsletter Reviewer
+                        {t("newsletterReviewer.title", "Newsletter Reviewer")}
                     </h2>
                     <p className="text-muted-foreground mt-1">
-                        Configure a reviewer who must approve newsletters before they can be sent.
+                        {t("newsletterReviewer.description", "Configure a reviewer who must approve newsletters before they can be sent.")}
                     </p>
                 </div>
 
@@ -219,7 +219,7 @@ export default function ManagementNewsletterReviewer() {
                         className="flex-1 sm:flex-none"
                     >
                         <RotateCcw className="w-4 h-4 mr-2" />
-                        Discard
+                        {t("newsletterReviewer.discard", "Discard")}
                     </Button>
                     <Button
                         onClick={handleSave}
@@ -229,12 +229,12 @@ export default function ManagementNewsletterReviewer() {
                         {saveMutation.isPending ? (
                             <span className="flex items-center gap-2">
                                 <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                                Saving...
+                                {t("newsletterReviewer.saving", "Saving...")}
                             </span>
                         ) : (
                             <span className="flex items-center gap-2">
                                 <Save className="w-4 h-4" />
-                                Save Changes
+                                {t("newsletterReviewer.saveChanges", "Save Changes")}
                             </span>
                         )}
                     </Button>
@@ -249,20 +249,20 @@ export default function ManagementNewsletterReviewer() {
                         <CardHeader className="pb-4">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                                Approval Workflow
+                                {t("newsletterReviewer.workflowTitle", "Approval Workflow")}
                             </CardTitle>
                             <CardDescription>
-                                When enabled, newsletters must be approved by the designated reviewer before they can be sent.
+                                {t("newsletterReviewer.workflowDesc", "When enabled, newsletters must be approved by the designated reviewer before they can be sent.")}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30 border">
                                 <div className="space-y-1">
                                     <Label htmlFor="reviewer-enabled" className="text-sm font-medium cursor-pointer">
-                                        Require reviewer approval
+                                        {t("newsletterReviewer.requireApproval", "Require reviewer approval")}
                                     </Label>
                                     <p className="text-xs text-muted-foreground">
-                                        Newsletters will need approval before sending
+                                        {t("newsletterReviewer.requireApprovalDesc", "Newsletters will need approval before sending")}
                                     </p>
                                 </div>
                                 <Switch
@@ -277,10 +277,10 @@ export default function ManagementNewsletterReviewer() {
                             {/* Reviewer Selection */}
                             <div className="space-y-3">
                                 <Label className="text-sm font-medium">
-                                    Designated Reviewer
+                                    {t("newsletterReviewer.designatedReviewer", "Designated Reviewer")}
                                 </Label>
                                 <p className="text-xs text-muted-foreground">
-                                    Select the team member who will review and approve newsletters. Only Owners, Administrators, and Managers are eligible.
+                                    {t("newsletterReviewer.designatedReviewerDesc", "Select the team member who will review and approve newsletters. Only Owners, Administrators, and Managers are eligible.")}
                                 </p>
                                 <Select
                                     value={selectedReviewerId || "none"}
@@ -288,11 +288,11 @@ export default function ManagementNewsletterReviewer() {
                                     disabled={!enabled}
                                 >
                                     <SelectTrigger className="h-12">
-                                        <SelectValue placeholder="Select a reviewer..." />
+                                        <SelectValue placeholder={t("newsletterReviewer.selectReviewer", "Select a reviewer...")} />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="none" className="text-muted-foreground">
-                                            No reviewer selected
+                                            {t("newsletterReviewer.noReviewerSelected", "No reviewer selected")}
                                         </SelectItem>
                                         {availableReviewers.map((u: ReviewerUser) => (
                                             <SelectItem key={u.id} value={u.id} className="py-3">
@@ -341,7 +341,7 @@ export default function ManagementNewsletterReviewer() {
                                         <div className="flex items-start gap-2">
                                             <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                                             <p className="text-xs text-amber-700 dark:text-amber-300">
-                                                You must select a reviewer before saving. The reviewer will be notified when a newsletter is submitted for approval.
+                                                {t("newsletterReviewer.mustSelectReviewer", "You must select a reviewer before saving. The reviewer will be notified when a newsletter is submitted for approval.")}
                                             </p>
                                         </div>
                                     </div>
@@ -354,8 +354,8 @@ export default function ManagementNewsletterReviewer() {
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                         <div className={`w-2 h-2 rounded-full ${settings.enabled ? "bg-emerald-500" : "bg-gray-400"}`} />
                                         <span>
-                                            Currently {settings.enabled ? "enabled" : "disabled"}
-                                            {settings.reviewer ? ` — Reviewer: ${settings.reviewer.email}` : ""}
+                                            {settings.enabled ? t("newsletterReviewer.currentlyEnabled", "Currently enabled") : t("newsletterReviewer.currentlyDisabled", "Currently disabled")}
+                                            {settings.reviewer ? ` — ${t("newsletterReviewer.reviewerLbl", "Reviewer")}: ${settings.reviewer.email}` : ""}
                                         </span>
                                     </div>
                                 </div>
@@ -370,10 +370,10 @@ export default function ManagementNewsletterReviewer() {
                         <CardHeader className="pb-4">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <Eye className="w-5 h-5 text-blue-600" />
-                                How It Works
+                                {t("newsletterReviewer.howItWorksTitle", "How It Works")}
                             </CardTitle>
                             <CardDescription>
-                                The reviewer approval workflow adds a quality control step before newsletters are sent to your contacts.
+                                {t("newsletterReviewer.howItWorksDesc", "The reviewer approval workflow adds a quality control step before newsletters are sent to your contacts.")}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -390,10 +390,10 @@ export default function ManagementNewsletterReviewer() {
                                     <div className="pb-6">
                                         <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
                                             <FileCheck2 className="w-4 h-4 text-blue-500" />
-                                            Create Newsletter
+                                            {t("newsletterReviewer.step1Title", "Create Newsletter")}
                                         </h4>
                                         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                                            Team members create and design their newsletter as usual using the editor. The newsletter stays in <Badge variant="outline" className="text-[10px] py-0 px-1.5">Draft</Badge> status.
+                                            {t("newsletterReviewer.step1Desc1", "Team members create and design their newsletter as usual using the editor. The newsletter stays in ")}<Badge variant="outline" className="text-[10px] py-0 px-1.5">{t("newsletterReviewer.draft", "Draft")}</Badge>{t("newsletterReviewer.step1Desc2", " status.")}
                                         </p>
                                     </div>
                                 </div>
@@ -409,10 +409,10 @@ export default function ManagementNewsletterReviewer() {
                                     <div className="pb-6">
                                         <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
                                             <Clock className="w-4 h-4 text-amber-500" />
-                                            Submit for Review
+                                            {t("newsletterReviewer.step2Title", "Submit for Review")}
                                         </h4>
                                         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                                            Instead of sending immediately, the creator submits the newsletter for review. The status changes to <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-amber-300 text-amber-700">Pending Review</Badge>.
+                                            {t("newsletterReviewer.step2Desc1", "Instead of sending immediately, the creator submits the newsletter for review. The status changes to ")}<Badge variant="outline" className="text-[10px] py-0 px-1.5 border-amber-300 text-amber-700">{t("newsletterReviewer.pendingReview", "Pending Review")}</Badge>{t("newsletterReviewer.step2Desc2", ".")}
                                         </p>
                                     </div>
                                 </div>
@@ -428,10 +428,10 @@ export default function ManagementNewsletterReviewer() {
                                     <div className="pb-6">
                                         <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
                                             <UserCheck className="w-4 h-4 text-emerald-500" />
-                                            Reviewer Approves or Rejects
+                                            {t("newsletterReviewer.step3Title", "Reviewer Approves or Rejects")}
                                         </h4>
                                         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                                            The designated reviewer reviews the content and either approves it (moving to <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-emerald-300 text-emerald-700">Ready to Send</Badge>) or rejects it with notes (returning to <Badge variant="outline" className="text-[10px] py-0 px-1.5">Draft</Badge>).
+                                            {t("newsletterReviewer.step3Desc1", "The designated reviewer reviews the content and either approves it (moving to ")}<Badge variant="outline" className="text-[10px] py-0 px-1.5 border-emerald-300 text-emerald-700">{t("newsletterReviewer.readyToSend", "Ready to Send")}</Badge>{t("newsletterReviewer.step3Desc2", ") or rejects it with notes (returning to ")}<Badge variant="outline" className="text-[10px] py-0 px-1.5">{t("newsletterReviewer.draft", "Draft")}</Badge>{t("newsletterReviewer.step3Desc3", ").")}
                                         </p>
                                     </div>
                                 </div>
@@ -446,10 +446,10 @@ export default function ManagementNewsletterReviewer() {
                                     <div className="pb-2">
                                         <h4 className="font-semibold text-sm text-foreground flex items-center gap-2">
                                             <Send className="w-4 h-4 text-violet-500" />
-                                            Send Newsletter
+                                            {t("newsletterReviewer.step4Title", "Send Newsletter")}
                                         </h4>
                                         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                                            Once approved, the newsletter can be sent to recipients following the normal sending process.
+                                            {t("newsletterReviewer.step4Desc", "Once approved, the newsletter can be sent to recipients following the normal sending process.")}
                                         </p>
                                     </div>
                                 </div>
@@ -462,20 +462,20 @@ export default function ManagementNewsletterReviewer() {
                                 <div className="p-4 rounded-lg border border-emerald-200 bg-emerald-50/30 dark:border-emerald-800/30 dark:bg-emerald-900/10">
                                     <div className="flex items-center gap-2 mb-2">
                                         <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                                        <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Approved</span>
+                                        <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{t("newsletterReviewer.approvedTitle", "Approved")}</span>
                                     </div>
                                     <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-relaxed">
-                                        Newsletter moves to "Ready to Send" and can be deployed to recipients.
+                                        {t("newsletterReviewer.approvedDesc", "Newsletter moves to \"Ready to Send\" and can be deployed to recipients.")}
                                     </p>
                                 </div>
 
                                 <div className="p-4 rounded-lg border border-red-200 bg-red-50/30 dark:border-red-800/30 dark:bg-red-900/10">
                                     <div className="flex items-center gap-2 mb-2">
                                         <XCircle className="w-5 h-5 text-red-600" />
-                                        <span className="text-sm font-semibold text-red-800 dark:text-red-200">Rejected</span>
+                                        <span className="text-sm font-semibold text-red-800 dark:text-red-200">{t("newsletterReviewer.rejectedTitle", "Rejected")}</span>
                                     </div>
                                     <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
-                                        Newsletter returns to "Draft" with reviewer feedback for the creator to address.
+                                        {t("newsletterReviewer.rejectedDesc", "Newsletter returns to \"Draft\" with reviewer feedback for the creator to address.")}
                                     </p>
                                 </div>
                             </div>
