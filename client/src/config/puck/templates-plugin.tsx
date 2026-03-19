@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { usePuck, Render } from "@puckeditor/core";
 import type { Plugin } from "@puckeditor/core";
 import { newsletterTemplates, type NewsletterTemplate } from "./templates";
+import { useLanguage } from "@/hooks/useLanguage";
 
 /**
  * Full-screen preview overlay for a template.
@@ -18,6 +19,7 @@ function TemplatePreviewModal({
   onApply: () => void;
 }) {
   const { config } = usePuck();
+  const { t } = useLanguage();
 
   // Close on Escape & prevent body scroll while open
   useEffect(() => {
@@ -77,7 +79,7 @@ function TemplatePreviewModal({
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{ fontWeight: 600, fontSize: "16px", color: "#111827" }}>
-              {template.name}
+              {t(`puckEditor.templates.items.${template.id}.name`, template.name)}
             </span>
             <span
               style={{
@@ -90,7 +92,7 @@ function TemplatePreviewModal({
                 textTransform: "capitalize",
               }}
             >
-              {template.category}
+              {t(`puckEditor.templates.categories.${template.category}`, template.category)}
             </span>
           </div>
           {/* X close button */}
@@ -128,7 +130,7 @@ function TemplatePreviewModal({
             flexShrink: 0,
           }}
         >
-          {template.description}
+          {t(`puckEditor.templates.items.${template.id}.description`, template.description)}
         </p>
 
         {/* Scrollable preview */}
@@ -181,7 +183,7 @@ function TemplatePreviewModal({
               cursor: "pointer",
             }}
           >
-            Close
+            {t("puckEditor.templates.close", "Close")}
           </button>
           <button
             onClick={onApply}
@@ -196,7 +198,7 @@ function TemplatePreviewModal({
               cursor: "pointer",
             }}
           >
-            Use this template
+            {t("puckEditor.templates.useThis", "Use this template")}
           </button>
         </div>
       </div>
@@ -210,9 +212,16 @@ function TemplatePreviewModal({
  */
 function TemplatesPanel() {
   const { dispatch } = usePuck();
+  const { t } = useLanguage();
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<NewsletterTemplate | null>(null);
   const [filter, setFilter] = useState<"all" | "newsletter" | "product">("all");
+
+  const filterLabels: Record<string, string> = {
+    all: t("puckEditor.templates.filters.all", "All"),
+    newsletter: t("puckEditor.templates.filters.newsletter", "Newsletter"),
+    product: t("puckEditor.templates.filters.product", "Product"),
+  };
 
   const filtered =
     filter === "all"
@@ -257,10 +266,9 @@ function TemplatesPanel() {
               border: "none",
               borderRadius: "4px",
               cursor: "pointer",
-              textTransform: "capitalize",
             }}
           >
-            {f}
+            {filterLabels[f]}
           </button>
         ))}
       </div>
@@ -297,7 +305,7 @@ function TemplatesPanel() {
                 }}
               >
                 <span style={{ fontWeight: 600, fontSize: "13px", color: "#111827" }}>
-                  {template.name}
+                  {t(`puckEditor.templates.items.${template.id}.name`, template.name)}
                 </span>
                 <span
                   style={{
@@ -309,10 +317,9 @@ function TemplatesPanel() {
                       template.category === "product" ? "#fef3c7" : "#dbeafe",
                     color:
                       template.category === "product" ? "#92400e" : "#1e40af",
-                    textTransform: "capitalize",
                   }}
                 >
-                  {template.category}
+                  {t(`puckEditor.templates.categories.${template.category}`, template.category)}
                 </span>
               </div>
               <p
@@ -323,7 +330,7 @@ function TemplatesPanel() {
                   color: "#6b7280",
                 }}
               >
-                {template.description}
+                {t(`puckEditor.templates.items.${template.id}.description`, template.description)}
               </p>
 
               {confirmId === template.id ? (
@@ -342,7 +349,7 @@ function TemplatesPanel() {
                       cursor: "pointer",
                     }}
                   >
-                    Replace content
+                    {t("puckEditor.templates.replaceContent", "Replace content")}
                   </button>
                   <button
                     onClick={() => setConfirmId(null)}
@@ -358,7 +365,7 @@ function TemplatesPanel() {
                       cursor: "pointer",
                     }}
                   >
-                    Cancel
+                    {t("common.cancel", "Cancel")}
                   </button>
                 </div>
               ) : (
@@ -377,7 +384,7 @@ function TemplatesPanel() {
                       cursor: "pointer",
                     }}
                   >
-                    Preview
+                    {t("puckEditor.templates.preview", "Preview")}
                   </button>
                   <button
                     onClick={() => setConfirmId(template.id)}
@@ -393,7 +400,7 @@ function TemplatesPanel() {
                       cursor: "pointer",
                     }}
                   >
-                    Use template
+                    {t("puckEditor.templates.useTemplate", "Use template")}
                   </button>
                 </div>
               )}
@@ -417,10 +424,10 @@ function TemplatesPanel() {
 /**
  * Puck plugin that adds a "Templates" tab to the left sidebar.
  */
-export function templatesPlugin(): Plugin {
+export function templatesPlugin(t?: (key: string, fallback?: string) => any): Plugin {
   return {
     name: "templates",
-    label: "Templates",
+    label: t?.("puckEditor.templates.label", "Templates") || "Templates",
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"

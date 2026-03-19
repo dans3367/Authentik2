@@ -18,7 +18,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { 
+import {
   UserPlus,
   Mail,
   User,
@@ -26,7 +26,13 @@ import {
   List,
   Loader2,
   Settings2,
+  CalendarIcon,
+  Cake,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import {
   Form,
   FormControl,
@@ -48,6 +54,7 @@ const addContactSchema = z.object({
   email: z.string().email(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
+  dateOfBirth: z.date().nullable().optional(),
   status: z.enum(['active', 'unsubscribed', 'bounced', 'pending']).default('active'),
   tags: z.array(z.string()).optional(),
   lists: z.array(z.string()).optional(),
@@ -94,6 +101,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
       email: "",
       firstName: "",
       lastName: "",
+      dateOfBirth: null,
       status: "active",
       tags: [],
       lists: [],
@@ -145,6 +153,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
     mutationFn: async (data: AddContactForm) => {
       const payload = {
         ...data,
+        dateOfBirth: data.dateOfBirth ? format(data.dateOfBirth, 'yyyy-MM-dd') : undefined,
         tags: selectedTags,
         lists: selectedLists,
         consentIpAddress: window.location.hostname,
@@ -293,6 +302,52 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
                 )}
               />
             </div>
+
+            {/* Date of Birth */}
+            <FormField
+              control={form.control}
+              name="dateOfBirth"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <Cake className="w-4 h-4" />
+                    Date of Birth
+                  </FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          type="button"
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>Select date of birth</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        selected={field.value ?? undefined}
+                        onSelect={field.onChange}
+                        disabled={{ after: new Date(), before: new Date("1900-01-01") }}
+                        fromYear={1920}
+                        toYear={new Date().getFullYear()}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormDescription>Optional - used for birthday cards and promotions</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Address Fields */}
             <div className="space-y-4 border-t pt-4">

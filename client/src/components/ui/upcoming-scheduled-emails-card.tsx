@@ -277,7 +277,7 @@ export function UpcomingScheduledEmailsCard() {
                     {/* Details */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">
-                        {email.subject || "No subject"}
+                        {email.subject || t("dashboard.scheduledEmails.noSubject", "No subject")}
                       </p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         <span className="flex items-center gap-1">

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { emailSends, bouncedEmails, emailContacts, emailEvents } from '@shared/schema';
+import { emailSends, bouncedEmails, emailContacts, emailEvents, emailActivity } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { createHmac } from 'crypto';
 import { getConvexClient, api } from '../utils/convexClient';
@@ -856,8 +856,16 @@ async function handleEmailOpened(data: any) {
     }
 
     // Check if this email was already opened/clicked before (to avoid counting subsequent opens)
+    // Use emailActivity table (where open tracking data lives) with the provider email_id
+    const providerEmailId = data.email_id || data.id || data.MessageID;
     let isFirstOpen = false;
-    if (emailSend.contactId) {
+    if (emailSend.contactId && providerEmailId) {
+      const existingOpens = await db.select({ count: sql<number>`cast(count(*) as int)` })
+        .from(emailActivity)
+        .where(sql`${emailActivity.contactId} = ${emailSend.contactId} AND ${emailActivity.activityType} IN ('opened', 'clicked') AND ${emailActivity.activityData}::text LIKE ${'%' + providerEmailId + '%'}`);
+      isFirstOpen = (existingOpens[0]?.count ?? 0) === 0;
+    } else if (emailSend.contactId) {
+      // Fallback: check emailEvents if no provider email ID available
       const existingOpens = await db.select({ count: sql<number>`cast(count(*) as int)` })
         .from(emailEvents)
         .where(sql`${emailEvents.emailSendId} = ${emailSend.id} AND ${emailEvents.eventType} IN ('opened', 'clicked')`);
@@ -907,8 +915,16 @@ async function handleEmailClicked(data: any) {
     }
 
     // Check if this email was already opened/clicked before (clicks count as opens)
+    // Use emailActivity table (where open tracking data lives) with the provider email_id
+    const providerEmailId = data.email_id || data.id || data.MessageID;
     let isFirstOpen = false;
-    if (emailSend.contactId) {
+    if (emailSend.contactId && providerEmailId) {
+      const existingOpens = await db.select({ count: sql<number>`cast(count(*) as int)` })
+        .from(emailActivity)
+        .where(sql`${emailActivity.contactId} = ${emailSend.contactId} AND ${emailActivity.activityType} IN ('opened', 'clicked') AND ${emailActivity.activityData}::text LIKE ${'%' + providerEmailId + '%'}`);
+      isFirstOpen = (existingOpens[0]?.count ?? 0) === 0;
+    } else if (emailSend.contactId) {
+      // Fallback: check emailEvents if no provider email ID available
       const existingOpens = await db.select({ count: sql<number>`cast(count(*) as int)` })
         .from(emailEvents)
         .where(sql`${emailEvents.emailSendId} = ${emailSend.id} AND ${emailEvents.eventType} IN ('opened', 'clicked')`);

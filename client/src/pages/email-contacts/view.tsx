@@ -434,7 +434,7 @@ export default function ViewContact() {
               onClick={() => setLocation(`/email-contacts/view/${contact.id}/schedule`)}
             >
               <Clock className="w-4 h-4 mr-2" />
-              Schedule Send
+              Schedule Email
             </Button>
             <Button
               variant="outline"
@@ -882,7 +882,7 @@ export default function ViewContact() {
                 onClick={() => setLocation(`/email-contacts/view/${contact.id}/schedule`)}
               >
                 <Clock className="w-4 h-4 mr-2" />
-                Schedule Send
+                Schedule Email
               </Button>
               <Button
                 variant="outline"

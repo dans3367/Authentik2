@@ -131,6 +131,21 @@
       "status_cancelled": "Cancelada",
       "status_completed": "Completada",
       "status_no_show": "No Se Presentó"
+    },
+    "scheduledEmails": {
+      "title": "Correos Programados",
+      "viewAll": "Ver Todos",
+      "noEmailsTitle": "No hay correos programados",
+      "noEmailsDesc": "No hay correos programados próximamente",
+      "scheduleNew": "Programar Nuevo Correo",
+      "upcoming": "{{count}} próximos",
+      "today": "Hoy",
+      "tomorrow": "Mañana",
+      "inDays": "en {{count}} días",
+      "pending": "Pendiente",
+      "triggered": "Activado",
+      "running": "Enviando",
+      "noSubject": "Sin asunto"
     }
   },
   "cards": {
@@ -2059,11 +2074,39 @@
     "title": "Gestión",
     "subtitle": "Administra usuarios, tiendas, etiquetas y diseños de correo para organizar las operaciones de tu negocio",
     "tabs": {
+      "accountUsage": "Uso de Cuenta",
       "users": "Usuarios",
       "shops": "Tiendas",
       "tags": "Etiquetas",
       "rolesPermissions": "Roles y Permisos",
-      "emailDesign": "Diseño de Correo"
+      "emailDesign": "Diseño de Correo",
+      "blogDesign": "Diseño de Blog",
+      "newsletterReviewer": "Revisor",
+      "customFields": "Campos Personalizados"
+    },
+    "accountUsage": {
+      "title": "Uso de Cuenta",
+      "subtitle": "Tu uso actual de recursos y límites",
+      "billingPeriod": "Período de facturación",
+      "limitedResources": "RECURSOS LIMITADOS",
+      "emailsSent": "Correos Enviados",
+      "shops": "Tiendas",
+      "teamMembers": "Miembros del Equipo",
+      "contacts": "Contactos",
+      "lists": "Listas",
+      "forms": "Formularios",
+      "newsletters": "Boletines",
+      "campaigns": "Campañas",
+      "appointments": "Citas",
+      "tags": "Etiquetas",
+      "needMore": "¿Necesitas más recursos?",
+      "checkPlans": "Conoce nuestros planes con límites mayores",
+      "error": "Error al cargar los datos de uso"
+    },
+    "resourceUsage": {
+      "title": "Uso de Recursos",
+      "subtitle": "Tu conteo actual de recursos y límites",
+      "error": "Error al cargar los datos de uso"
     },
     "rolesPermissions": {
       "title": "Roles y Permisos",
@@ -2858,6 +2901,18 @@
       "selectedCustomersSummary": "{{count}} clientes seleccionados",
       "tagsSelectedSummary": "{{count}} etiquetas seleccionadas",
       "segmentListSummary": "{{name}} ({{count}} destinatarios)"
+    },
+    "editorPicker": {
+      "title": "Elige Tu Editor",
+      "description": "Selecciona qué editor te gustaría usar para este boletín. Puedes cambiar el predeterminado en Administración > Diseño de Blog.",
+      "classic": "Editor Clásico",
+      "classicDesc": "Editor de bloques con arrastrar y soltar con componentes visuales. Ideal para diseños estructurados con columnas, botones e imágenes.",
+      "notion": "Editor Tipo Notion",
+      "notionDesc": "Experiencia de escritura limpia con comandos de barra y formato en línea. Perfecto para boletines centrados en contenido.",
+      "default": "Predeterminado",
+      "new": "Nuevo",
+      "continue": "Continuar",
+      "cancel": "Cancelar"
     }
   },
   "advertise": {
@@ -2984,6 +3039,10 @@
     }
   },
   "puckEditor": {
+    "sidebar": {
+      "blocks": "Bloques",
+      "outline": "Esquema"
+    },
     "categories": {
       "layout": "Diseño",
       "typography": "Tipografía",
@@ -3061,6 +3120,9 @@
       "productTitle": "Título del producto",
       "price": "Precio",
       "pageTitle": "Título de la página",
+      "contentBackgroundColor": "Color de Fondo del Contenido",
+      "bodyBackgroundColor": "Color de Fondo de Página",
+      "footerTextColor": "Color del Texto del Pie de Página",
       "products": "Productos",
       "logos": "Logotipos"
     },
@@ -3097,6 +3159,41 @@
       "gridRows": "Filas de cuadrícula",
       "flexGrow": "Crecimiento flexible",
       "verticalPadding": "Relleno vertical"
+    },
+    "templates": {
+      "label": "Plantillas",
+      "preview": "Vista previa",
+      "useTemplate": "Usar plantilla",
+      "useThis": "Usar esta plantilla",
+      "replaceContent": "Reemplazar contenido",
+      "close": "Cerrar",
+      "filters": {
+        "all": "Todas",
+        "newsletter": "Boletín",
+        "product": "Producto"
+      },
+      "categories": {
+        "newsletter": "Boletín",
+        "product": "Producto"
+      },
+      "items": {
+        "company-update": {
+          "name": "Actualización de Empresa",
+          "description": "Noticias mensuales de la empresa con artículo destacado, actualizaciones y próximos eventos."
+        },
+        "weekly-digest": {
+          "name": "Resumen Semanal",
+          "description": "Resumen curado con historia destacada, tarjetas de artículos y testimonio de lectores."
+        },
+        "product-marketing": {
+          "name": "Vitrina de Producto",
+          "description": "Boletín con vitrina de producto destacado, cuadrícula de productos y contenido de blog."
+        },
+        "blog-post": {
+          "name": "Artículo de Blog",
+          "description": "Diseño limpio de artículo con título, metadatos, texto, imágenes y citas."
+        }
+      }
     }
   }
 }

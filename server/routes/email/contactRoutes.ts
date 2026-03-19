@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactListMemberships, contactTagAssignments, betterAuthUser, emailActivity, tenants, emailSends, emailContent, companies, masterEmailDesign, triggerTasks } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactListMemberships, contactTagAssignments, betterAuthUser, emailActivity, tenants, emailSends, emailContent, companies, masterEmailDesign, triggerTasks, birthdaySettings, unsubscribeTokens } from '@shared/schema';
 import { authenticateToken, requireTenant, requirePermission } from '../../middleware/auth-middleware';
 import { sanitizeString, sanitizeEmail, escapeLikePattern } from '../../utils/sanitization';
 import { storage } from '../../storage';
@@ -11,7 +11,7 @@ import { emailAttachmentUpload, validateAttachmentSize, filesToBase64Attachments
 import { fromZonedTime } from 'date-fns-tz';
 import { wrapNewsletterContent } from '../../utils/newsletterEmailWrapper';
 import { replaceEmailPlaceholders } from '../../utils/emailPlaceholders';
-import { sanitizeEmailHtml, sanitizeFontFamily, escapeHtml, isValidHttpUrl, maskEmail } from './emailUtils';
+import { sanitizeEmailHtml, sanitizeFontFamily, escapeHtml, isValidHttpUrl, maskEmail, renderBirthdayTemplate, enqueuePromotionalEmailJob } from './emailUtils';
 
 export const contactRoutes = Router();
 
@@ -808,11 +808,238 @@ contactRoutes.post("/email-contacts", authenticateToken, requireTenant, requireP
     });
 
     res.status(201).json(result);
+
+    // Auto-send birthday card if DOB matches today or yesterday
+    if (validatedDateOfBirth && result.status === 'active') {
+      autoSendBirthdayCard(result, req.user.tenantId).catch(err => {
+        console.error(`[AutoBirthday] Error auto-sending birthday card:`, err);
+      });
+    }
   } catch (error) {
     console.error('Create email contact error:', error);
     res.status(500).json({ message: 'Failed to create email contact' });
   }
 });
+
+/**
+ * Auto-send birthday card when a new contact is added with a DOB matching today or 1 day prior.
+ * Uses the tenant's birthday settings from /cards?tab=themes&type=birthday including
+ * promo, split promo config, theme, custom message, etc.
+ * Fire-and-forget — does not block the contact creation response.
+ */
+async function autoSendBirthdayCard(contact: any, tenantId: string) {
+  try {
+    const dob = contact.dateOfBirth;
+    if (!dob) return;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Parse DOB month/day (ignore year)
+    const [, dobMonth, dobDay] = dob.split('-').map(Number);
+    const todayMonth = today.getMonth() + 1;
+    const todayDay = today.getDate();
+    const yesterdayMonth = yesterday.getMonth() + 1;
+    const yesterdayDay = yesterday.getDate();
+
+    const isToday = dobMonth === todayMonth && dobDay === todayDay;
+    const isYesterday = dobMonth === yesterdayMonth && dobDay === yesterdayDay;
+
+    if (!isToday && !isYesterday) return;
+
+    console.log(`[AutoBirthday] DOB match for ${contact.email} (${isToday ? 'today' : 'yesterday'}) — sending birthday card`);
+
+    // Get birthday settings for this tenant
+    const settings = await db.query.birthdaySettings.findFirst({
+      where: eq(birthdaySettings.tenantId, tenantId),
+      with: { promotion: true },
+    });
+
+    if (!settings || !settings.enabled) {
+      console.log(`[AutoBirthday] Birthday settings not found or disabled for tenant ${tenantId}`);
+      return;
+    }
+
+    // Fetch company info for branding
+    const company = await db.query.companies.findFirst({
+      where: and(eq(companies.tenantId, tenantId), eq(companies.isActive, true)),
+    });
+
+    const companyName = company?.name || settings.senderName || 'Your Company';
+    const resolvedSenderName = settings.senderName || companyName || 'Your Team';
+
+    // Skip if contact is suppressed/bounced/unsubscribed or opted out
+    if (['suppressed', 'bounced', 'unsubscribed'].includes(contact.status)) {
+      console.log(`[AutoBirthday] Skipping ${contact.email} — status: ${contact.status}`);
+      return;
+    }
+    if (contact.prefCustomerEngagement === false) {
+      console.log(`[AutoBirthday] Skipping ${contact.email} — opted out of Customer Engagement`);
+      return;
+    }
+
+    const recipientName = contact.firstName || contact.lastName
+      ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim()
+      : contact.email.split('@')[0];
+
+    // Generate unsubscribe token
+    let unsubscribeToken: string | undefined;
+    try {
+      const token = crypto.randomBytes(24).toString('base64url');
+      const created = await db.insert(unsubscribeTokens).values({
+        tenantId,
+        contactId: contact.id,
+        token,
+      }).returning();
+      unsubscribeToken = created[0]?.token;
+    } catch (error) {
+      console.warn(`[AutoBirthday] Error generating unsubscribe token:`, error);
+    }
+
+    const { enhancedEmailService } = await import('../../emailService');
+    const shouldSplitEmail = settings.splitPromotionalEmail && settings.promotion;
+
+    const unsubUrl = unsubscribeToken
+      ? `${process.env.APP_URL || 'http://localhost:5002'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
+      : undefined;
+
+    const emailHeaders = unsubUrl ? {
+      'List-Unsubscribe': `<${unsubUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    } : undefined;
+
+    const emailMetadata = {
+      type: 'birthday-card',
+      contactId: contact.id,
+      tenantId,
+      auto: true,
+      tags: ['birthday', 'auto', `tenant-${tenantId}`],
+      unsubscribeToken: unsubscribeToken || 'none',
+    };
+
+    if (shouldSplitEmail) {
+      // SPLIT FLOW: birthday card without promo, then promo email after 20s delay
+      const htmlBirthday = renderBirthdayTemplate(settings.emailTemplate as any, {
+        recipientName,
+        message: settings.customMessage || 'Wishing you a wonderful birthday!',
+        brandName: companyName,
+        customThemeData: settings.customThemeData ? JSON.parse(settings.customThemeData) : null,
+        senderName: resolvedSenderName,
+        unsubscribeToken,
+      });
+
+      const birthdayResult = await enhancedEmailService.sendCustomEmail(
+        contact.email,
+        `🎉 Happy Birthday ${recipientName}!`,
+        htmlBirthday,
+        { text: htmlBirthday.replace(/<[^>]*>/g, ''), from: 'admin@zendwise.com', headers: emailHeaders, metadata: emailMetadata }
+      );
+
+      // Log birthday card
+      try {
+        const emailSendId = crypto.randomUUID();
+        await db.insert(emailActivity).values({
+          tenantId, contactId: contact.id, activityType: 'sent',
+          activityData: JSON.stringify({ type: 'birthday-card', auto: true, split: true, subject: `🎉 Happy Birthday ${recipientName}!`, recipient: contact.email, from: 'admin@zendwise.com' }),
+          occurredAt: new Date(),
+        });
+        await db.insert(emailSends).values({
+          id: emailSendId, tenantId, recipientEmail: contact.email, recipientName, senderEmail: 'admin@zendwise.com', senderName: resolvedSenderName,
+          subject: `🎉 Happy Birthday ${recipientName}!`, emailType: 'birthday_card', provider: 'resend',
+          providerMessageId: typeof birthdayResult === 'string' ? birthdayResult : birthdayResult?.messageId,
+          status: 'sent', contactId: contact.id, sentAt: new Date(),
+        });
+        await db.insert(emailContent).values({
+          emailSendId, htmlContent: htmlBirthday, textContent: htmlBirthday.replace(/<[^>]*>/g, ''),
+          metadata: JSON.stringify({ split: true, auto: true, birthdayCard: true, promotional: false }),
+        });
+      } catch (logError) {
+        console.error(`[AutoBirthday] Failed to log birthday card:`, logError);
+      }
+
+      // Queue promotional email with 20s delay
+      const safePromoTitle = sanitizeEmailHtml(settings.promotion?.title || 'Special Birthday Offer!');
+      const safePromoDescription = settings.promotion?.description ? sanitizeEmailHtml(settings.promotion.description) : '';
+      const safePromoContent = sanitizeEmailHtml(settings.promotion?.content || '');
+
+      const htmlPromo = `
+        <html><body style="margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+          <div style="max-width:600px;margin:20px auto;padding:32px 24px;background:linear-gradient(135deg,#f7fafc 0%,#edf2f7 100%);border-radius:8px;">
+            <h2 style="font-size:1.5rem;font-weight:bold;margin:0 0 16px;color:#2d3748;">${safePromoTitle}</h2>
+            ${safePromoDescription ? `<p style="margin:0 0 20px;color:#4a5568;font-size:1rem;line-height:1.5;">${safePromoDescription}</p>` : ''}
+            <div style="color:#2d3748;font-size:1rem;line-height:1.6;">${safePromoContent}</div>
+            <hr style="margin:32px 0 16px;border:none;border-top:1px solid #e2e8f0;">
+            <p style="margin:0;font-size:0.85rem;color:#a0aec0;text-align:center;">This is a special birthday promotion for valued subscribers.</p>
+          </div>
+        </body></html>`;
+
+      await enqueuePromotionalEmailJob({
+        tenantId, contactId: contact.id, recipientEmail: contact.email, recipientName,
+        senderName: resolvedSenderName, promoSubject: safePromoTitle, htmlPromo,
+        unsubscribeToken, promotionId: settings.promotion?.id || null, manual: false,
+      }, 20000);
+
+      console.log(`[AutoBirthday] Split flow complete for ${contact.email} — birthday card sent, promo queued`);
+    } else {
+      // COMBINED FLOW: birthday card with promo embedded
+      const htmlContent = renderBirthdayTemplate(settings.emailTemplate as any, {
+        recipientName,
+        message: settings.customMessage || 'Wishing you a wonderful birthday!',
+        brandName: companyName,
+        customThemeData: settings.customThemeData ? JSON.parse(settings.customThemeData) : null,
+        senderName: resolvedSenderName,
+        promotionContent: settings.promotion?.content,
+        promotionTitle: settings.promotion?.title,
+        promotionDescription: settings.promotion?.description || undefined,
+        unsubscribeToken,
+      });
+
+      const result = await enhancedEmailService.sendCustomEmail(
+        contact.email,
+        `🎉 Happy Birthday ${recipientName}!`,
+        htmlContent,
+        { text: htmlContent.replace(/<[^>]*>/g, ''), from: 'admin@zendwise.com', headers: emailHeaders, metadata: emailMetadata }
+      );
+
+      // Log combined card
+      try {
+        const emailSendId = crypto.randomUUID();
+        await db.insert(emailActivity).values({
+          tenantId, contactId: contact.id, activityType: 'sent',
+          activityData: JSON.stringify({ type: 'birthday-card', auto: true, subject: `🎉 Happy Birthday ${recipientName}!`, recipient: contact.email, from: 'admin@zendwise.com' }),
+          occurredAt: new Date(),
+        });
+        await db.insert(emailSends).values({
+          id: emailSendId, tenantId, recipientEmail: contact.email, recipientName, senderEmail: 'admin@zendwise.com', senderName: resolvedSenderName,
+          subject: `🎉 Happy Birthday ${recipientName}!`, emailType: 'birthday_card', provider: 'resend',
+          providerMessageId: typeof result === 'string' ? result : result?.messageId,
+          status: 'sent', contactId: contact.id, promotionId: settings.promotion?.id || null, sentAt: new Date(),
+        });
+        await db.insert(emailContent).values({
+          emailSendId, htmlContent: htmlContent, textContent: htmlContent.replace(/<[^>]*>/g, ''),
+          metadata: JSON.stringify({ split: false, auto: true, birthdayCard: true, promotional: !!settings.promotion }),
+        });
+      } catch (logError) {
+        console.error(`[AutoBirthday] Failed to log birthday card:`, logError);
+      }
+
+      console.log(`[AutoBirthday] Combined flow complete for ${contact.email} — birthday card sent`);
+    }
+
+    // Update contact metrics
+    try {
+      await db.update(emailContacts)
+        .set({ emailsSent: sql`${emailContacts.emailsSent} + 1`, lastActivity: new Date(), updatedAt: new Date() })
+        .where(eq(emailContacts.id, contact.id));
+    } catch (err) {
+      console.error(`[AutoBirthday] Failed to update contact metrics:`, err);
+    }
+  } catch (error) {
+    console.error(`[AutoBirthday] Failed to auto-send birthday card:`, error);
+  }
+}
 
 // Update email contact
 contactRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
@@ -1837,38 +2064,3 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
   }
 });
 
-// Recalculate emailsOpened for all contacts based on unique opens per email send
-contactRoutes.post("/email-contacts/recalculate-opens", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
-  try {
-    const tenantId = req.tenantId;
-
-    // Get all contacts for this tenant
-    const contacts = await db.select({ id: emailContacts.id })
-      .from(emailContacts)
-      .where(eq(emailContacts.tenantId, tenantId));
-
-    let updated = 0;
-    for (const contact of contacts) {
-      // Count unique opens: one per emailSendId (first open or click per email)
-      const [result] = await db.select({
-        uniqueOpens: sql<number>`cast(count(distinct ${emailEvents.emailSendId}) as int)`,
-      })
-        .from(emailEvents)
-        .innerJoin(emailSends, eq(emailEvents.emailSendId, emailSends.id))
-        .where(sql`${emailSends.contactId} = ${contact.id} AND ${emailEvents.eventType} IN ('opened', 'clicked')`);
-
-      const uniqueOpens = result?.uniqueOpens ?? 0;
-
-      await db.update(emailContacts)
-        .set({ emailsOpened: uniqueOpens, updatedAt: new Date() })
-        .where(eq(emailContacts.id, contact.id));
-
-      updated++;
-    }
-
-    res.json({ success: true, message: `Recalculated open counts for ${updated} contacts` });
-  } catch (error: any) {
-    console.error('Error recalculating open counts:', error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to recalculate' });
-  }
-});

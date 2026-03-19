@@ -31,8 +31,8 @@ function getGreeting(t: (key: string) => string): { text: string; emoji: string 
   return { text: t("dashboard.greeting.evening"), emoji: "🌙" };
 }
 
-function getFormattedDate(): string {
-  return new Date().toLocaleDateString("en-US", {
+function getFormattedDate(locale: string = "en-US"): string {
+  return new Date().toLocaleDateString(locale, {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -43,11 +43,11 @@ function getFormattedDate(): string {
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading } = useReduxAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const greeting = getGreeting(t);
   const { data: highlights, isLoading: highlightsLoading } = useDashboardHighlights();
 
-  useSetBreadcrumbs([{ label: "Dashboard", icon: LayoutDashboard }]);
+  useSetBreadcrumbs([{ label: t("sidebar.dashboard", "Dashboard"), icon: LayoutDashboard }]);
 
   if (isLoading) {
     return (
@@ -147,7 +147,7 @@ export default function Dashboard() {
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
-              {getFormattedDate()}
+              {getFormattedDate(i18n.language === 'es' ? 'es-ES' : 'en-US')}
             </p>
             <h1
               className="text-2xl sm:text-3xl font-bold tracking-tight"

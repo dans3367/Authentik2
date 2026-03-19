@@ -1552,6 +1552,7 @@ async function handleSubscriptionUpdated(stripeSubscription: any) {
       return;
     }
 
+    const previousStatus = dbSubscription.status;
     const now = new Date();
     const updateData: any = {
       status: stripeSubscription.status,
@@ -1605,6 +1606,33 @@ async function handleSubscriptionUpdated(stripeSubscription: any) {
       .where(eq(subscriptions.id, dbSubscription.id));
 
     console.log('Subscription updated:', stripeSubscription.id, updateData.planId ? `(new plan: ${updateData.planId})` : '');
+
+    // Send subscription updated notification (only for meaningful status changes)
+    if (previousStatus !== stripeSubscription.status || updateData.cancelAtPeriodEnd !== dbSubscription.cancelAtPeriodEnd) {
+      try {
+        const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, updateData.planId || dbSubscription.planId) });
+        const owner = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, dbSubscription.userId) });
+        if (owner?.email && plan) {
+          const { sendSubscriptionEventNotificationTask } = await import('../../src/trigger/subscriptionEventNotification');
+          await sendSubscriptionEventNotificationTask.trigger({
+            eventType: 'subscription_updated',
+            ownerEmail: owner.email,
+            ownerName: owner.firstName ? `${owner.firstName} ${owner.lastName || ''}`.trim() : null,
+            planName: plan.displayName,
+            planPrice: dbSubscription.isYearly && plan.yearlyPrice ? plan.yearlyPrice : plan.price,
+            billingCycle: dbSubscription.isYearly ? 'yearly' : 'monthly',
+            previousStatus,
+            newStatus: stripeSubscription.status,
+            cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end || false,
+            periodEnd: stripeSubscription.current_period_end
+              ? new Date(stripeSubscription.current_period_end * 1000).toISOString() : undefined,
+          });
+          console.log('📧 [Webhook] Subscription updated notification triggered for', owner.email);
+        }
+      } catch (notifyError) {
+        console.error('Failed to trigger subscription updated notification:', notifyError);
+      }
+    }
   } catch (error) {
     console.error('Error handling subscription updated:', error);
   }
@@ -1629,6 +1657,28 @@ async function handleSubscriptionDeleted(stripeSubscription: any) {
       .where(eq(subscriptions.id, dbSubscription.id));
 
     console.log('Subscription cancelled:', stripeSubscription.id);
+
+    // Send cancellation notification
+    try {
+      const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, dbSubscription.planId) });
+      const owner = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, dbSubscription.userId) });
+      if (owner?.email && plan) {
+        const { sendSubscriptionEventNotificationTask } = await import('../../src/trigger/subscriptionEventNotification');
+        await sendSubscriptionEventNotificationTask.trigger({
+          eventType: 'subscription_cancelled',
+          ownerEmail: owner.email,
+          ownerName: owner.firstName ? `${owner.firstName} ${owner.lastName || ''}`.trim() : null,
+          planName: plan.displayName,
+          planPrice: dbSubscription.isYearly && plan.yearlyPrice ? plan.yearlyPrice : plan.price,
+          billingCycle: dbSubscription.isYearly ? 'yearly' : 'monthly',
+          cancelAtPeriodEnd: dbSubscription.cancelAtPeriodEnd || false,
+          periodEnd: dbSubscription.currentPeriodEnd ? dbSubscription.currentPeriodEnd.toISOString() : undefined,
+        });
+        console.log('📧 [Webhook] Subscription cancelled notification triggered for', owner.email);
+      }
+    } catch (notifyError) {
+      console.error('Failed to trigger subscription cancelled notification:', notifyError);
+    }
   } catch (error) {
     console.error('Error handling subscription deleted:', error);
   }
@@ -1659,6 +1709,30 @@ async function handlePaymentSucceeded(invoice: any) {
       .where(eq(subscriptions.id, dbSubscription.id));
 
     console.log('Payment succeeded for subscription:', stripeSub.id);
+
+    // Send payment success notification
+    try {
+      const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, dbSubscription.planId) });
+      const owner = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, dbSubscription.userId) });
+      if (owner?.email && plan) {
+        const { sendSubscriptionEventNotificationTask } = await import('../../src/trigger/subscriptionEventNotification');
+        await sendSubscriptionEventNotificationTask.trigger({
+          eventType: 'payment_succeeded',
+          ownerEmail: owner.email,
+          ownerName: owner.firstName ? `${owner.firstName} ${owner.lastName || ''}`.trim() : null,
+          planName: plan.displayName,
+          planPrice: dbSubscription.isYearly && plan.yearlyPrice ? plan.yearlyPrice : plan.price,
+          billingCycle: dbSubscription.isYearly ? 'yearly' : 'monthly',
+          invoiceAmount: invoice.amount_paid ? (invoice.amount_paid / 100).toFixed(2) : undefined,
+          invoiceUrl: invoice.hosted_invoice_url || undefined,
+          periodEnd: stripeSub.current_period_end
+            ? new Date(stripeSub.current_period_end * 1000).toISOString() : undefined,
+        });
+        console.log('📧 [Webhook] Payment success notification triggered for', owner.email);
+      }
+    } catch (notifyError) {
+      console.error('Failed to trigger payment success notification:', notifyError);
+    }
   } catch (error) {
     console.error('Error handling payment succeeded:', error);
   }
@@ -1689,6 +1763,29 @@ async function handlePaymentFailed(invoice: any) {
       .where(eq(subscriptions.id, dbSubscription.id));
 
     console.log('Payment failed for subscription:', stripeSub.id);
+
+    // Send payment failed notification
+    try {
+      const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, dbSubscription.planId) });
+      const owner = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, dbSubscription.userId) });
+      if (owner?.email && plan) {
+        const { sendSubscriptionEventNotificationTask } = await import('../../src/trigger/subscriptionEventNotification');
+        await sendSubscriptionEventNotificationTask.trigger({
+          eventType: 'payment_failed',
+          ownerEmail: owner.email,
+          ownerName: owner.firstName ? `${owner.firstName} ${owner.lastName || ''}`.trim() : null,
+          planName: plan.displayName,
+          planPrice: dbSubscription.isYearly && plan.yearlyPrice ? plan.yearlyPrice : plan.price,
+          billingCycle: dbSubscription.isYearly ? 'yearly' : 'monthly',
+          invoiceAmount: invoice.amount_due ? (invoice.amount_due / 100).toFixed(2) : undefined,
+          periodEnd: stripeSub.current_period_end
+            ? new Date(stripeSub.current_period_end * 1000).toISOString() : undefined,
+        });
+        console.log('📧 [Webhook] Payment failed notification triggered for', owner.email);
+      }
+    } catch (notifyError) {
+      console.error('Failed to trigger payment failed notification:', notifyError);
+    }
   } catch (error) {
     console.error('Error handling payment failed:', error);
   }

@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 // Lazy load editors to avoid loading both bundles
 const LazyPuck = lazy(() => import("@puckeditor/core").then(m => ({ default: m.Puck })));
+let _blocksPlugin: any = null;
+let _outlinePlugin: any = null;
+import("@puckeditor/core").then(m => { _blocksPlugin = m.blocksPlugin; _outlinePlugin = m.outlinePlugin; });
 const LazyNotionEditor = lazy(() => import("@/components/NotionLikeEditor"));
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createConfig, initialData } from "@/config/puck";
@@ -1377,7 +1380,11 @@ export default function NewsletterCreatePage() {
                     onPublish={handlePublish}
                     iframe={iframeConfig}
                     overrides={puckOverrides}
-                    plugins={[templatesPlugin()]}
+                    plugins={[
+                      ...(_blocksPlugin ? [{ ..._blocksPlugin(), label: t("puckEditor.sidebar.blocks", { defaultValue: "Blocks" }) }] : []),
+                      ...(_outlinePlugin ? [{ ..._outlinePlugin(), label: t("puckEditor.sidebar.outline", { defaultValue: "Outline" }) }] : []),
+                      templatesPlugin((key, fallback) => t(key, { defaultValue: fallback })),
+                    ]}
                   />
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
