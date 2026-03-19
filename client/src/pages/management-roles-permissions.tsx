@@ -280,18 +280,30 @@ export default function ManagementRolesPermissions() {
     if (!searchTerm.trim()) return permissionCategories || [];
     const lower = searchTerm.toLowerCase();
     return (permissionCategories || [])
-      .map((cat) => ({
-        ...cat,
-        permissions: cat.permissions.filter(
-          (p) =>
-            p.label.toLowerCase().includes(lower) ||
-            p.description.toLowerCase().includes(lower) ||
-            p.key.toLowerCase().includes(lower) ||
-            cat.label.toLowerCase().includes(lower)
-        ),
-      }))
+      .map((cat) => {
+        const translatedCatLabel = t(`management.rolesPermissions.categories.${cat.key}.label`, cat.label).toLowerCase();
+        const translatedCatDesc = t(`management.rolesPermissions.categories.${cat.key}.description`, cat.description).toLowerCase();
+        const catMatches = translatedCatLabel.includes(lower) || translatedCatDesc.includes(lower) || cat.label.toLowerCase().includes(lower);
+        return {
+          ...cat,
+          permissions: cat.permissions.filter(
+            (p) => {
+              const translatedLabel = t(`management.rolesPermissions.permissions.${p.key}.label`, p.label).toLowerCase();
+              const translatedDesc = t(`management.rolesPermissions.permissions.${p.key}.description`, p.description).toLowerCase();
+              return (
+                translatedLabel.includes(lower) ||
+                translatedDesc.includes(lower) ||
+                p.label.toLowerCase().includes(lower) ||
+                p.description.toLowerCase().includes(lower) ||
+                p.key.toLowerCase().includes(lower) ||
+                catMatches
+              );
+            }
+          ),
+        };
+      })
       .filter((cat) => cat.permissions.length > 0);
-  }, [permissionCategories, searchTerm]);
+  }, [permissionCategories, searchTerm, t]);
 
   // Count pending changes — only compare keys that exist in the role's permission set
   const pendingChangeCount = useMemo(() => {
@@ -391,7 +403,7 @@ export default function ManagementRolesPermissions() {
 
   const startEditing = (roleName: string) => {
     if (isEditing && pendingChangeCount > 0) {
-      if (!window.confirm('You have unsaved changes. Discard and edit a different role?')) return;
+      if (!window.confirm(t('management.rolesPermissions.unsavedChanges'))) return;
     }
     const role = roles.find((r) => r.name === roleName);
     if (!role) return;
@@ -531,14 +543,14 @@ export default function ManagementRolesPermissions() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {getRoleIcon(role.name)}
-                  <CardTitle className="text-base">{role.name}</CardTitle>
+                  <CardTitle className="text-base">{t(`management.rolesPermissions.roles.${role.name}`, role.name)}</CardTitle>
                 </div>
                 <Badge variant="secondary" className={getRoleColor(role.name)}>
                   {t("management.rolesPermissions.level", "Level")} {role.level}
                 </Badge>
               </div>
               <CardDescription className="text-xs mt-1">
-                {role.description}
+                {t(`management.rolesPermissions.roleDescriptions.${role.name}`, role.description)}
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0 space-y-2">
@@ -693,7 +705,7 @@ export default function ManagementRolesPermissions() {
                             <div className="flex flex-col items-center gap-1">
                               <div className="flex items-center gap-1.5">
                                 {getRoleIcon(role.name, "sm")}
-                                <span className="text-xs">{role.name}</span>
+                                <span className="text-xs">{t(`management.rolesPermissions.roles.${role.name}`, role.name)}</span>
                               </div>
                               {isOwner && !isEditing && role.name !== "Owner" && (
                                 <Button
@@ -741,9 +753,9 @@ export default function ManagementRolesPermissions() {
                                       <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                                     )}
                                     <div>
-                                      <div>{category.label}</div>
+                                      <div>{t(`management.rolesPermissions.categories.${category.key}.label`, category.label)}</div>
                                       <div className="text-[10px] font-normal text-muted-foreground">
-                                        {category.description}
+                                        {t(`management.rolesPermissions.categories.${category.key}.description`, category.description)}
                                       </div>
                                     </div>
                                   </div>
@@ -796,11 +808,11 @@ export default function ManagementRolesPermissions() {
                                         <Tooltip>
                                           <TooltipTrigger asChild>
                                             <div className="text-sm text-muted-foreground cursor-help">
-                                              {perm.label}
+                                              {t(`management.rolesPermissions.permissions.${perm.key}.label`, perm.label)}
                                             </div>
                                           </TooltipTrigger>
                                           <TooltipContent side="right">
-                                            <p className="text-xs max-w-[200px]">{perm.description}</p>
+                                            <p className="text-xs max-w-[200px]">{t(`management.rolesPermissions.permissions.${perm.key}.description`, perm.description)}</p>
                                           </TooltipContent>
                                         </Tooltip>
                                       </TooltipProvider>
@@ -869,7 +881,7 @@ export default function ManagementRolesPermissions() {
                     <div key={roleName}>
                       <div className="flex items-center gap-2 mb-3">
                         {getRoleIcon(roleName)}
-                        <h3 className="font-semibold text-sm">{roleName}</h3>
+                        <h3 className="font-semibold text-sm">{t(`management.rolesPermissions.roles.${roleName}`, roleName)}</h3>
                         <Badge variant="outline" className="text-xs">
                           {roleUsers.length}
                         </Badge>
@@ -966,7 +978,7 @@ export default function ManagementRolesPermissions() {
                                               <SelectItem key={r} value={r}>
                                                 <div className="flex items-center gap-2">
                                                   {getRoleIcon(r, "sm")}
-                                                  <span>{r}</span>
+                                                  <span>{t(`management.rolesPermissions.roles.${r}`, r)}</span>
                                                 </div>
                                               </SelectItem>
                                             ))}
@@ -1082,11 +1094,11 @@ export default function ManagementRolesPermissions() {
               </div>
               <div className="flex items-center justify-center gap-3 py-2">
                 <Badge className={getRoleColor(changeRoleDialog.user.role)}>
-                  {changeRoleDialog.user.role}
+                  {t(`management.rolesPermissions.roles.${changeRoleDialog.user.role}`, changeRoleDialog.user.role)}
                 </Badge>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 <Badge className={getRoleColor(changeRoleDialog.newRole)}>
-                  {changeRoleDialog.newRole}
+                  {t(`management.rolesPermissions.roles.${changeRoleDialog.newRole}`, changeRoleDialog.newRole)}
                 </Badge>
               </div>
             </div>

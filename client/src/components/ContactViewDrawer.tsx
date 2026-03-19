@@ -38,6 +38,7 @@ import {
   Cake
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 
 interface Contact {
   id: string;
@@ -90,6 +91,7 @@ interface ContactViewDrawerProps {
 }
 
 export default function ContactViewDrawer({ contactId, open, onOpenChange }: ContactViewDrawerProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
@@ -162,15 +164,15 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
       queryClient.invalidateQueries({ queryKey: ['/api/email-contacts-stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', contactId, 'stats'] });
       toast({
-        title: "Success",
-        description: "Contact deleted successfully",
+        title: t('contactDrawer.toasts.success'),
+        description: t('contactDrawer.toasts.deleteSuccess'),
       });
       onOpenChange(false);
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete contact",
+        title: t('contactDrawer.toasts.error'),
+        description: error.message || t('contactDrawer.toasts.deleteError'),
         variant: "destructive",
       });
     },
@@ -179,7 +181,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
   const handleDeleteContact = () => {
     if (!contact) return;
 
-    if (window.confirm('Are you sure you want to delete this contact? This action cannot be undone.')) {
+    if (window.confirm(t('contactDrawer.toasts.deleteConfirm'))) {
       deleteContactMutation.mutate(contact.id);
     }
   };
@@ -187,28 +189,28 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
   const getStatusBadge = (status: any) => {
     let color = "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400";
     let Icon = AlertCircle;
-    let label = status ? String(status) : "Unknown";
+    let label = status ? String(status) : t('contactDrawer.status.unknown');
 
     if (status === "active") {
       color = "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
       Icon = CheckCircle2;
-      label = "Active";
+      label = t('contactDrawer.status.active');
     } else if (status === "unsubscribed") {
       color = "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400";
       Icon = XCircle;
-      label = "Unsubscribed";
+      label = t('contactDrawer.status.unsubscribed');
     } else if (status === "bounced") {
       color = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
       Icon = AlertCircle;
-      label = "Bounced";
+      label = t('contactDrawer.status.bounced');
     } else if (status === "suppressed") {
       color = "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300";
       Icon = AlertCircle;
-      label = "Suppressed";
+      label = t('contactDrawer.status.suppressed');
     } else if (status === "pending") {
       color = "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
       Icon = AlertCircle;
-      label = "Pending";
+      label = t('contactDrawer.status.pending');
     }
 
     if (!Icon) {
@@ -230,7 +232,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
   };
 
   const formatDateShort = (date: Date | string | null) => {
-    if (!date) return 'Not set';
+    if (!date) return t('contactDrawer.timeline.notSet');
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     return dateObj.toLocaleDateString("en-US", {
       month: "short",
@@ -248,7 +250,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
     if (contact.firstName || contact.lastName) {
       return `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
     }
-    return contact.email?.split('@')[0] || 'Unknown Contact';
+    return contact.email?.split('@')[0] || t('contactDrawer.status.unknown');
   };
 
   const handleEmailSent = () => {
@@ -267,10 +269,10 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
 
   const sendEmailDisabledReason = isSendEmailDisabled
     ? (isEmailSuppressed
-      ? `This email has been suppressed${suppressedSinceFormatted ? ` since ${suppressedSinceFormatted}` : ''}${bouncedCheck?.suppressionReason ? ` due to: ${bouncedCheck.suppressionReason}` : ''}. No outgoing communication can be sent to this address.`
+      ? `${t('contactDrawer.alerts.suppressedDesc')} ${suppressedSinceFormatted ? t('contactDrawer.alerts.suppressedSince', { date: suppressedSinceFormatted }) : ''}${bouncedCheck?.suppressionReason ? ` ${t('contactDrawer.alerts.suppressedDueTo', { reason: bouncedCheck.suppressionReason })}` : ''}.`
       : contact?.status === 'bounced' || !!bouncedCheck?.isBounced
-        ? "Cannot send email to a bounced contact."
-        : "Cannot send email to an unsubscribed contact.")
+        ? t('contactDrawer.alerts.cannotSendBounced')
+        : t('contactDrawer.alerts.cannotSendUnsubscribed'))
     : undefined;
 
   return (
@@ -280,21 +282,21 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="flex flex-col items-center gap-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-4 text-gray-600 dark:text-gray-400">Loading contact...</span>
+              <span className="ml-4 text-gray-600 dark:text-gray-400">{t('contactDrawer.loading')}</span>
             </div>
           </div>
         ) : error ? (
           <div className="text-center py-12">
-            <h2 className="text-xl font-bold mb-4">Error Loading Contact</h2>
+            <h2 className="text-xl font-bold mb-4">{t('contactDrawer.errorTitle')}</h2>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               {error instanceof Error ? error.message : 'Unknown error'}
             </p>
           </div>
         ) : !contact ? (
           <div className="text-center py-12">
-            <h2 className="text-xl font-bold mb-4">Contact Not Found</h2>
+            <h2 className="text-xl font-bold mb-4">{t('contactDrawer.notFoundTitle')}</h2>
             <p className="text-gray-600 dark:text-gray-400">
-              The contact you're looking for doesn't exist or you don't have permission to view it.
+              {t('contactDrawer.notFoundDesc')}
             </p>
           </div>
         ) : (
@@ -333,7 +335,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                   trigger={
                     <Button variant="outline" size="sm">
                       <Send className="w-4 h-4 mr-2" />
-                      Send Email
+                      {t('contactDrawer.actions.sendEmail')}
                     </Button>
                   }
                 />
@@ -347,7 +349,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                   }}
                 >
                   <Clock className="w-4 h-4 mr-2" />
-                  Schedule Send
+                  {t('contactDrawer.actions.scheduleSend')}
                 </Button>
                 <Button
                   variant="outline"
@@ -358,7 +360,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                   }}
                 >
                   <Edit className="w-4 h-4 mr-2" />
-                  Edit
+                  {t('contactDrawer.actions.edit')}
                 </Button>
               </div>
 
@@ -366,12 +368,12 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
               {isEmailSuppressed && (
                 <Alert className="border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200 [&>svg]:text-red-600 dark:[&>svg]:text-red-400">
                   <AlertTriangleIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <AlertTitle className="text-sm font-semibold">Suppressed Email Address</AlertTitle>
+                  <AlertTitle className="text-sm font-semibold">{t('contactDrawer.alerts.suppressedTitle')}</AlertTitle>
                   <AlertDescription className="text-red-700 dark:text-red-300 text-sm leading-relaxed">
-                    This email address has been marked as <strong>suppressed{suppressedSinceFormatted ? ` since ${suppressedSinceFormatted}` : ''}</strong>
-                    {bouncedCheck?.suppressionReason ? <> due to: <em>{bouncedCheck.suppressionReason}</em></> : null}.
+                    {t('contactDrawer.alerts.suppressedDesc')} <strong>{suppressedSinceFormatted ? t('contactDrawer.alerts.suppressedSince', { date: suppressedSinceFormatted }) : ''}</strong>
+                    {bouncedCheck?.suppressionReason ? <> {t('contactDrawer.alerts.suppressedDueTo', { reason: bouncedCheck.suppressionReason })}</> : null}.
                     <br className="my-1" />
-                    No outgoing communication of any kind (individual emails, scheduled emails, birthday letters, or newsletters) can be sent to this address. The email provider has flagged this address and further sending attempts may harm your sender reputation.
+                    {t('contactDrawer.alerts.suppressedWarning')}
                   </AlertDescription>
                 </Alert>
               )}
@@ -383,9 +385,9 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                 return (
                   <Alert className="border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200 [&>svg]:text-yellow-600 dark:[&>svg]:text-yellow-400">
                     <AlertTriangleIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <AlertTitle className="text-sm font-medium">Unsubscribed Contact</AlertTitle>
+                    <AlertTitle className="text-sm font-medium">{t('contactDrawer.alerts.unsubscribedTitle')}</AlertTitle>
                     <AlertDescription className="text-yellow-700 dark:text-yellow-300 text-sm leading-relaxed">
-                      This customer has unsubscribed from the mailing list. Please do not send marketing or promotional emails to this contact. You may still send direct or scheduled messages if needed.
+                      {t('contactDrawer.alerts.unsubscribedDesc')}
                     </AlertDescription>
                   </Alert>
                 );
@@ -394,8 +396,8 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
               {/* Tabs for Profile and Appointments */}
               <Tabs defaultValue="profile" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="profile">Profile</TabsTrigger>
-                  <TabsTrigger value="appointments">Appointments</TabsTrigger>
+                  <TabsTrigger value="profile">{t('contactDrawer.tabs.profile')}</TabsTrigger>
+                  <TabsTrigger value="appointments">{t('contactDrawer.tabs.appointments')}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="profile" className="space-y-6 mt-4">
@@ -404,22 +406,22 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-lg">
                         <UserCheck className="w-5 h-5" />
-                        Contact Information
+                        {t('contactDrawer.contactInfo.title')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">First Name</label>
-                          <p className="text-gray-900 dark:text-white">{contact.firstName || 'Not provided'}</p>
+                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.firstName')}</label>
+                          <p className="text-gray-900 dark:text-white">{contact.firstName || t('contactDrawer.contactInfo.notProvided')}</p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Name</label>
-                          <p className="text-gray-900 dark:text-white">{contact.lastName || 'Not provided'}</p>
+                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.lastName')}</label>
+                          <p className="text-gray-900 dark:text-white">{contact.lastName || t('contactDrawer.contactInfo.notProvided')}</p>
                         </div>
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Email Address</label>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.emailAddress')}</label>
                         <p className="text-gray-900 dark:text-white font-mono text-sm break-all">{contact.email}</p>
                       </div>
 
@@ -428,11 +430,11 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                         <>
                           <Separator />
                           <div className="space-y-3">
-                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Address & Contact</h4>
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{t('contactDrawer.contactInfo.addressContact')}</h4>
 
                             {contact.address && (
                               <div>
-                                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Street Address</label>
+                                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.streetAddress')}</label>
                                 <p className="text-gray-900 dark:text-white">{contact.address}</p>
                               </div>
                             )}
@@ -440,14 +442,14 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                             <div className="grid grid-cols-2 gap-4">
                               {contact.city && (
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">City</label>
+                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.city')}</label>
                                   <p className="text-gray-900 dark:text-white">{contact.city}</p>
                                 </div>
                               )}
 
                               {contact.state && (
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">State/Province</label>
+                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.stateProvince')}</label>
                                   <p className="text-gray-900 dark:text-white">{contact.state}</p>
                                 </div>
                               )}
@@ -456,14 +458,14 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                             <div className="grid grid-cols-2 gap-4">
                               {contact.zipCode && (
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Zip/Postal Code</label>
+                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.zipPostalCode')}</label>
                                   <p className="text-gray-900 dark:text-white">{contact.zipCode}</p>
                                 </div>
                               )}
 
                               {contact.country && (
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Country</label>
+                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.country')}</label>
                                   <p className="text-gray-900 dark:text-white">{contact.country}</p>
                                 </div>
                               )}
@@ -472,7 +474,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                             <div className="grid grid-cols-2 gap-4">
                               {contact.phoneNumber && (
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Phone Number</label>
+                                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.phoneNumber')}</label>
                                   <p className="text-gray-900 dark:text-white font-mono text-sm">{contact.phoneNumber}</p>
                                 </div>
                               )}
@@ -481,7 +483,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                                 <div>
                                   <label className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
                                     <Cake className="w-3.5 h-3.5" />
-                                    Customer's Date of Birth
+                                    {t('contactDrawer.contactInfo.dateOfBirth')}
                                   </label>
                                   <p className="text-gray-900 dark:text-white">
                                     {new Date(contact.dateOfBirth).toLocaleDateString("en-US", {
@@ -502,12 +504,12 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                         <>
                           <Separator />
                           <div className="space-y-3">
-                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Custom Fields</h4>
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{t('contactDrawer.contactInfo.customFields')}</h4>
                             <div className="grid grid-cols-2 gap-4">
                               {customFields.filter((f: any) => f.value !== null && f.value !== undefined && f.value !== '').map((field: any) => {
                                 let displayValue = field.value;
                                 if (field.fieldType === 'boolean') {
-                                  displayValue = field.value === 'true' ? 'Yes' : 'No';
+                                  displayValue = field.value === 'true' ? t('contactDrawer.contactInfo.yes') : t('contactDrawer.contactInfo.no');
                                 } else if (field.fieldType === 'date') {
                                   displayValue = new Date(field.value).toLocaleDateString('en-US', {
                                     month: 'short',
@@ -546,7 +548,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-lg">
                         <BarChart3 className="w-5 h-5" />
-                        Engagement Statistics
+                        {t('contactDrawer.engagement.title')}
                         {statsLoading && (
                           <div className="ml-2 animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                         )}
@@ -556,7 +558,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                       {statsLoading ? (
                         <div className="flex items-center justify-center py-6">
                           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                          <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Loading stats...</span>
+                          <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">{t('contactDrawer.engagement.loadingStats')}</span>
                         </div>
                       ) : engagementStats ? (
                         <div className="space-y-4">
@@ -566,7 +568,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                                 <Send className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                               </div>
                               <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{engagementStats.emailsSent}</p>
-                              <span className="text-xs text-gray-600 dark:text-gray-400">Sent</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">{t('contactDrawer.engagement.sent')}</span>
                             </div>
 
                             <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
@@ -574,7 +576,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                                 <Eye className="w-4 h-4 text-green-600 dark:text-green-400" />
                               </div>
                               <p className="text-xl font-bold text-green-600 dark:text-green-400">{engagementStats.emailsOpened}</p>
-                              <span className="text-xs text-gray-600 dark:text-gray-400">Opened</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">{t('contactDrawer.engagement.opened')}</span>
                             </div>
 
                             <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
@@ -582,7 +584,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                                 <TrendingUp className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                               </div>
                               <p className="text-xl font-bold text-purple-600 dark:text-purple-400">{engagementStats.openRate}%</p>
-                              <span className="text-xs text-gray-600 dark:text-gray-400">Rate</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">{t('contactDrawer.engagement.rate')}</span>
                             </div>
                           </div>
 
@@ -591,14 +593,14 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                               {engagementStats.emailsClicked > 0 && (
                                 <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                                   <p className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{engagementStats.emailsClicked}</p>
-                                  <p className="text-xs text-gray-600 dark:text-gray-400">Clicked ({engagementStats.clickRate}%)</p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">{t('contactDrawer.engagement.clicked')} ({engagementStats.clickRate}%)</p>
                                 </div>
                               )}
 
                               {engagementStats.emailsBounced > 0 && (
                                 <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                                   <p className="text-lg font-bold text-red-600 dark:text-red-400">{engagementStats.emailsBounced}</p>
-                                  <p className="text-xs text-gray-600 dark:text-gray-400">Bounced ({engagementStats.bounceRate}%)</p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">{t('contactDrawer.engagement.bounced')} ({engagementStats.bounceRate}%)</p>
                                 </div>
                               )}
                             </div>
@@ -608,19 +610,19 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                         <div className="grid grid-cols-3 gap-3">
                           <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                             <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{contact.emailsSent || 0}</p>
-                            <span className="text-xs text-gray-600 dark:text-gray-400">Sent</span>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">{t('contactDrawer.engagement.sent')}</span>
                           </div>
 
                           <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                             <p className="text-xl font-bold text-green-600 dark:text-green-400">{contact.emailsOpened || 0}</p>
-                            <span className="text-xs text-gray-600 dark:text-gray-400">Opened</span>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">{t('contactDrawer.engagement.opened')}</span>
                           </div>
 
                           <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                             <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
                               {getEngagementRate(contact.emailsSent || 0, contact.emailsOpened || 0)}%
                             </p>
-                            <span className="text-xs text-gray-600 dark:text-gray-400">Rate</span>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">{t('contactDrawer.engagement.rate')}</span>
                           </div>
                         </div>
                       )}
@@ -632,7 +634,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base">
                         <Tag className="w-4 h-4" />
-                        Tags
+                        {t('contactDrawer.tags.title')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -654,7 +656,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">No tags assigned</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{t('contactDrawer.tags.noTags')}</p>
                       )}
                     </CardContent>
                   </Card>
@@ -664,26 +666,26 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base">
                         <Calendar className="w-4 h-4" />
-                        Activity Timeline
+                        {t('contactDrawer.timeline.title')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div>
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Added Date</label>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.timeline.addedDate')}</label>
                         <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.addedDate)}</p>
                       </div>
 
                       <Separator />
 
                       <div>
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Activity</label>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.timeline.lastActivity')}</label>
                         <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.lastActivity || null)}</p>
                       </div>
 
                       <Separator />
 
                       <div>
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Updated</label>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.timeline.lastUpdated')}</label>
                         <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.updatedAt)}</p>
                       </div>
                     </CardContent>
@@ -694,22 +696,22 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base">
                         <CheckCircle2 className="w-4 h-4" />
-                        Consent Information
+                        {t('contactDrawer.consent.title')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div>
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Consent Given</label>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.consent.consentGiven')}</label>
                         <div className="flex items-center gap-2 mt-1">
                           {contact.consentGiven ? (
                             <>
                               <CheckCircle2 className="w-4 h-4 text-green-600" />
-                              <span className="text-sm text-green-600 font-medium">Yes</span>
+                              <span className="text-sm text-green-600 font-medium">{t('contactDrawer.consent.yes')}</span>
                             </>
                           ) : (
                             <>
                               <XCircle className="w-4 h-4 text-red-600" />
-                              <span className="text-sm text-red-600 font-medium">No</span>
+                              <span className="text-sm text-red-600 font-medium">{t('contactDrawer.consent.no')}</span>
                             </>
                           )}
                         </div>
@@ -720,13 +722,13 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                           <Separator />
 
                           <div>
-                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Consent Date</label>
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.consent.consentDate')}</label>
                             <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.consentDate || null)}</p>
                           </div>
 
                           {contact.consentMethod && (
                             <div>
-                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Consent Method</label>
+                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.consent.consentMethod')}</label>
                               <p className="text-sm text-gray-900 dark:text-white capitalize">
                                 {contact.consentMethod.replace(/_/g, ' ')}
                               </p>
@@ -742,25 +744,25 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base">
                         <Mail className="w-4 h-4" />
-                        Email Preferences
+                        {t('contactDrawer.preferences.title')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {[
-                        { label: 'Marketing', value: contact.prefMarketing, desc: 'Promotions & offers' },
-                        { label: 'Customer Engagement', value: contact.prefCustomerEngagement, desc: 'Birthday & loyalty' },
-                        { label: 'Newsletters', value: contact.prefNewsletters, desc: 'Updates & digests' },
-                        { label: 'Surveys & Forms', value: contact.prefSurveysForms, desc: 'Feedback requests' },
+                        { label: t('contactDrawer.preferences.marketing'), value: contact.prefMarketing, desc: t('contactDrawer.preferences.marketingDesc') },
+                        { label: t('contactDrawer.preferences.customerEngagement'), value: contact.prefCustomerEngagement, desc: t('contactDrawer.preferences.customerEngagementDesc') },
+                        { label: t('contactDrawer.preferences.newsletters'), value: contact.prefNewsletters, desc: t('contactDrawer.preferences.newslettersDesc') },
+                        { label: t('contactDrawer.preferences.surveysForms'), value: contact.prefSurveysForms, desc: t('contactDrawer.preferences.surveysFormsDesc') },
                       ].map((pref) => {
                         let badgeClass = 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
-                        let badgeText = 'Not Set';
+                        let badgeText = t('contactDrawer.preferences.notSet');
 
                         if (pref.value === true) {
                           badgeClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-                          badgeText = 'Opted In';
+                          badgeText = t('contactDrawer.preferences.optedIn');
                         } else if (pref.value === false) {
                           badgeClass = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
-                          badgeText = 'Opted Out';
+                          badgeText = t('contactDrawer.preferences.optedOut');
                         }
 
                         return (
@@ -786,12 +788,12 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                   {/* Quick Actions */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base">Quick Actions</CardTitle>
+                      <CardTitle className="text-base">{t('contactDrawer.quickActions.title')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <ManageContactTagsModal
                         contactId={contact.id}
-                        currentTagIds={Array.isArray(contact.tags) ? contact.tags.map((t) => t.id) : []}
+                        currentTagIds={Array.isArray(contact.tags) ? contact.tags.map((tag) => tag.id) : []}
                         contactName={getFullName(contact)}
                         onUpdated={() => {
                           queryClient.invalidateQueries({ queryKey: ['/api/email-contacts', contactId] });
@@ -799,7 +801,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                         trigger={
                           <Button variant="outline" size="sm" className="w-full justify-start">
                             <Tag className="w-4 h-4 mr-2" />
-                            Manage Tags
+                            {t('contactDrawer.actions.manageTags')}
                           </Button>
                         }
                       />
@@ -811,7 +813,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                         disabled={deleteContactMutation.isPending}
                       >
                         <Trash2 className="w-4 h-4 mr-2" />
-                        {deleteContactMutation.isPending ? 'Deleting...' : 'Delete Contact'}
+                        {deleteContactMutation.isPending ? t('contactDrawer.actions.deleting') : t('contactDrawer.actions.deleteContact')}
                       </Button>
                     </CardContent>
                   </Card>
