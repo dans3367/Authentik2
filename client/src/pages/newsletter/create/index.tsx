@@ -1325,7 +1325,7 @@ export default function NewsletterCreatePage() {
                                   setNotionHtmlContent(html);
                                   setHasUnsavedChanges(true);
                                 }}
-                                placeholder="Type '/' for commands, or start writing your newsletter..."
+                                placeholder={undefined}
                                 className="notion-editor-embedded"
                               />
                             </div>

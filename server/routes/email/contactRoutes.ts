@@ -18,7 +18,7 @@ export const contactRoutes = Router();
 // Get email contacts
 contactRoutes.get("/email-contacts", authenticateToken, requireTenant, requirePermission('contacts.view'), async (req: any, res) => {
   try {
-    const { page = 1, limit = 50, search, tags, lists, status, statsOnly } = req.query;
+    const { page = 1, limit = 10, search, tags, lists, status, statsOnly } = req.query;
 
     // If statsOnly is requested, return only statistics
     if (statsOnly === 'true') {
@@ -27,7 +27,7 @@ contactRoutes.get("/email-contacts", authenticateToken, requireTenant, requirePe
     }
 
     const parsedPage = Math.max(1, Math.floor(Number(page)) || 1);
-    const parsedLimit = Math.min(200, Math.max(1, Math.floor(Number(limit)) || 50));
+    const parsedLimit = Math.min(200, Math.max(1, Math.floor(Number(limit)) || 10));
     const offset = (parsedPage - 1) * parsedLimit;
 
     let whereClause = sql`${emailContacts.tenantId} = ${req.user.tenantId}`;

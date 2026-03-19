@@ -34,7 +34,9 @@ import {
   Trash2,
   UserCheck,
   LayoutDashboard,
-  ShieldAlert
+  ShieldAlert,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -105,6 +107,8 @@ export default function EmailContacts() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -121,12 +125,15 @@ export default function EmailContacts() {
   const searchParamsRef = useRef({
     search: "",
     status: "all",
-    listId: undefined as string | undefined
+    listId: undefined as string | undefined,
+    page: 1,
+    limit: 10
   });
 
   // Handle search changes from ContactSearch component
   const handleSearchChange = useCallback((search: string) => {
     setSearchQuery(search);
+    setCurrentPage(1);
   }, []);
 
 
@@ -151,7 +158,9 @@ export default function EmailContacts() {
     searchParamsRef.current = {
       search: "",
       status: "all",
-      listId: undefined
+      listId: undefined,
+      page: 1,
+      limit: 10
     };
   }, []);
 
@@ -165,6 +174,8 @@ export default function EmailContacts() {
       if (currentParams.search) params.append('search', currentParams.search);
       if (currentParams.status !== 'all') params.append('status', currentParams.status);
       if (currentParams.listId) params.append('listId', currentParams.listId);
+      params.append('page', String(currentParams.page));
+      params.append('limit', String(currentParams.limit));
 
       const response = await apiRequest('GET', `/api/email-contacts?${params.toString()}`);
       return response.json();
@@ -183,15 +194,19 @@ export default function EmailContacts() {
       searchParamsRef.current = {
         search: searchQuery,
         status: statusFilter,
-        listId: undefined
+        listId: undefined,
+        page: currentPage,
+        limit: pageSize
       };
       refetch();
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, statusFilter, refetch]);
+  }, [searchQuery, statusFilter, currentPage, refetch]);
 
   const contacts: Contact[] = (contactsData as any)?.contacts || [];
+  const pagination = (contactsData as any)?.pagination || { page: 1, limit: pageSize, total: 0, pages: 1 };
+  const totalPages = pagination.pages || 1;
   const stats: ContactStats = (statsData as any)?.stats || {
     totalContacts: 0,
     activeContacts: 0,
@@ -472,7 +487,7 @@ export default function EmailContacts() {
               onSearchChange={handleSearchChange}
               placeholder={t('emailContacts.filters.searchPlaceholder')}
             />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setCurrentPage(1); }}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder={t('emailContacts.filters.filterByStatus')} />
@@ -929,6 +944,71 @@ export default function EmailContacts() {
               </div>
             </div>
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200 dark:border-gray-800 mt-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {t('emailContacts.pagination.showing', {
+                  from: ((currentPage - 1) * pageSize) + 1,
+                  to: Math.min(currentPage * pageSize, pagination.total),
+                  total: pagination.total
+                }) || `Showing ${((currentPage - 1) * pageSize) + 1}–${Math.min(currentPage * pageSize, pagination.total)} of ${pagination.total}`}
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    if (totalPages <= 7) return true;
+                    if (page === 1 || page === totalPages) return true;
+                    if (Math.abs(page - currentPage) <= 1) return true;
+                    return false;
+                  })
+                  .reduce<(number | string)[]>((acc, page, idx, arr) => {
+                    if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
+                      acc.push('...' + idx);
+                    }
+                    acc.push(page);
+                    return acc;
+                  }, [])
+                  .map((item) => {
+                    if (typeof item === 'string') {
+                      return (
+                        <span key={item} className="px-1 text-sm text-gray-400">
+                          &hellip;
+                        </span>
+                      );
+                    }
+                    return (
+                      <Button
+                        key={item}
+                        variant={currentPage === item ? "default" : "outline"}
+                        size="sm"
+                        className="min-w-[32px]"
+                        onClick={() => setCurrentPage(item)}
+                      >
+                        {item}
+                      </Button>
+                    );
+                  })}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

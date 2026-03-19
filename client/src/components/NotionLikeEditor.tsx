@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { StarterKit } from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extension-placeholder";
@@ -100,135 +101,137 @@ interface SlashCommand {
     category?: string;
 }
 
-const SLASH_COMMANDS: SlashCommand[] = [
+function getSlashCommands(t: (key: string) => string): SlashCommand[] {
+    return [
     {
-        title: "Generate with AI",
-        description: "Create a full newsletter with AI",
+        title: t('notionEditor.slash.generateWithAi'),
+        description: t('notionEditor.slash.generateWithAiDesc'),
         icon: <Sparkles className="w-4 h-4" style={{ color: '#a78bfa' }} />,
         command: () => {},
         isAiGenerate: true,
     },
     {
-        title: "Text",
-        description: "Plain text block",
+        title: t('notionEditor.slash.text'),
+        description: t('notionEditor.slash.textDesc'),
         icon: <Type className="w-4 h-4" />,
         command: (editor) => editor.chain().focus().setParagraph().run(),
     },
     {
-        title: "Heading 1",
-        description: "Large heading",
+        title: t('notionEditor.slash.heading1'),
+        description: t('notionEditor.slash.heading1Desc'),
         icon: <Heading1 className="w-4 h-4" />,
         command: (editor) => editor.chain().focus().setHeading({ level: 1 }).run(),
     },
     {
-        title: "Heading 2",
-        description: "Medium heading",
+        title: t('notionEditor.slash.heading2'),
+        description: t('notionEditor.slash.heading2Desc'),
         icon: <Heading2 className="w-4 h-4" />,
         command: (editor) => editor.chain().focus().setHeading({ level: 2 }).run(),
     },
     {
-        title: "Heading 3",
-        description: "Small heading",
+        title: t('notionEditor.slash.heading3'),
+        description: t('notionEditor.slash.heading3Desc'),
         icon: <Heading3 className="w-4 h-4" />,
         command: (editor) => editor.chain().focus().setHeading({ level: 3 }).run(),
     },
     {
-        title: "Bullet List",
-        description: "Unordered list",
+        title: t('notionEditor.slash.bulletList'),
+        description: t('notionEditor.slash.bulletListDesc'),
         icon: <List className="w-4 h-4" />,
         command: (editor) => editor.chain().focus().toggleBulletList().run(),
     },
     {
-        title: "Numbered List",
-        description: "Ordered list",
+        title: t('notionEditor.slash.numberedList'),
+        description: t('notionEditor.slash.numberedListDesc'),
         icon: <ListOrdered className="w-4 h-4" />,
         command: (editor) => editor.chain().focus().toggleOrderedList().run(),
     },
     {
-        title: "Quote",
-        description: "Block quote",
+        title: t('notionEditor.slash.quote'),
+        description: t('notionEditor.slash.quoteDesc'),
         icon: <Quote className="w-4 h-4" />,
         command: (editor) => editor.chain().focus().setBlockquote().run(),
     },
     {
-        title: "Code Block",
-        description: "Fenced code block",
+        title: t('notionEditor.slash.codeBlock'),
+        description: t('notionEditor.slash.codeBlockDesc'),
         icon: <Code className="w-4 h-4" />,
         command: (editor) => editor.chain().focus().setCodeBlock().run(),
     },
     {
-        title: "Divider",
-        description: "Horizontal rule",
+        title: t('notionEditor.slash.divider'),
+        description: t('notionEditor.slash.dividerDesc'),
         icon: <Minus className="w-4 h-4" />,
         command: (editor) => editor.chain().focus().setHorizontalRule().run(),
     },
     {
-        title: "Table",
-        description: "Insert a table",
+        title: t('notionEditor.slash.table'),
+        description: t('notionEditor.slash.tableDesc'),
         icon: <TableIcon className="w-4 h-4" />,
         command: (editor) => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
     },
     {
-        title: "Image",
-        description: "Embed an image from URL",
+        title: t('notionEditor.slash.image'),
+        description: t('notionEditor.slash.imageDesc'),
         icon: <ImageIcon className="w-4 h-4" />,
         command: (editor) => {
-            const url = window.prompt("Enter image URL");
+            const url = window.prompt(t('notionEditor.slash.imagePrompt'));
             if (url) {
                 editor.chain().focus().setImage({ src: url }).run();
             }
         },
     },
     {
-        title: "First Name",
-        description: "Insert {{first_name}} variable",
+        title: t('notionEditor.slash.firstName'),
+        description: t('notionEditor.slash.firstNameDesc'),
         icon: <User className="w-4 h-4" style={{ color: '#3b82f6' }} />,
         command: (editor) => editor.chain().focus().insertContent({ type: 'handlebarVariable', attrs: { variable: 'first_name' } }).run(),
         category: "variables",
     },
     {
-        title: "Last Name",
-        description: "Insert {{last_name}} variable",
+        title: t('notionEditor.slash.lastName'),
+        description: t('notionEditor.slash.lastNameDesc'),
         icon: <User className="w-4 h-4" style={{ color: '#3b82f6' }} />,
         command: (editor) => editor.chain().focus().insertContent({ type: 'handlebarVariable', attrs: { variable: 'last_name' } }).run(),
         category: "variables",
     },
     {
-        title: "Email",
-        description: "Insert {{email}} variable",
+        title: t('notionEditor.slash.email'),
+        description: t('notionEditor.slash.emailDesc'),
         icon: <Mail className="w-4 h-4" style={{ color: '#3b82f6' }} />,
         command: (editor) => editor.chain().focus().insertContent({ type: 'handlebarVariable', attrs: { variable: 'email' } }).run(),
         category: "variables",
     },
     {
-        title: "Phone",
-        description: "Insert {{phone}} variable",
+        title: t('notionEditor.slash.phone'),
+        description: t('notionEditor.slash.phoneDesc'),
         icon: <Phone className="w-4 h-4" style={{ color: '#3b82f6' }} />,
         command: (editor) => editor.chain().focus().insertContent({ type: 'handlebarVariable', attrs: { variable: 'phone' } }).run(),
         category: "variables",
     },
     {
-        title: "Address",
-        description: "Insert {{address}} variable",
+        title: t('notionEditor.slash.address'),
+        description: t('notionEditor.slash.addressDesc'),
         icon: <MapPin className="w-4 h-4" style={{ color: '#3b82f6' }} />,
         command: (editor) => editor.chain().focus().insertContent({ type: 'handlebarVariable', attrs: { variable: 'address' } }).run(),
         category: "variables",
     },
     {
-        title: "Office Hours",
-        description: "Insert {{office_hours}} variable",
+        title: t('notionEditor.slash.officeHours'),
+        description: t('notionEditor.slash.officeHoursDesc'),
         icon: <Clock className="w-4 h-4" style={{ color: '#3b82f6' }} />,
         command: (editor) => editor.chain().focus().insertContent({ type: 'handlebarVariable', attrs: { variable: 'office_hours' } }).run(),
         category: "variables",
     },
     {
-        title: "Contact Card",
-        description: "Insert formatted contact card block",
+        title: t('notionEditor.slash.contactCard'),
+        description: t('notionEditor.slash.contactCardDesc'),
         icon: <CreditCard className="w-4 h-4" style={{ color: '#10b981' }} />,
         command: (editor) => editor.chain().focus().insertContent(CONTACT_CARD_TEMPLATE).run(),
         category: "variables",
     },
-];
+    ];
+}
 
 // ── Handlebar Suggestion Menu ────────────────────────────────────────────────
 
@@ -243,6 +246,7 @@ function HandlebarMenu({
     selectedIndex: number;
     position: { top: number; left: number };
 }) {
+    const { t } = useTranslation();
     const menuRef = useRef<HTMLDivElement>(null);
     const filtered = DEFAULT_HANDLEBAR_VARIABLES.filter(
         (v) =>
@@ -275,7 +279,7 @@ function HandlebarMenu({
         >
             <div className="notion-slash-menu-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontFamily: 'monospace', fontSize: '10px', background: '#eef2ff', color: '#6366f1', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>{'{ }'}</span>
-                Insert Variable
+                {t('notionEditor.insertVariable')}
             </div>
             {Array.from(categories.entries()).map(([category, items]) => (
                 <div key={category}>
@@ -318,9 +322,11 @@ function SlashCommandMenu({
     selectedIndex: number;
     position: { top: number; left: number };
 }) {
+    const { t } = useTranslation();
     const menuRef = useRef<HTMLDivElement>(null);
-    const filtered = SLASH_COMMANDS.filter(
-        (cmd) =>
+    const slashCommands = getSlashCommands(t);
+    const filtered = slashCommands.filter(
+        (cmd: SlashCommand) =>
             cmd.title.toLowerCase().includes(query.toLowerCase()) ||
             cmd.description.toLowerCase().includes(query.toLowerCase())
     );
@@ -332,8 +338,8 @@ function SlashCommandMenu({
 
     if (filtered.length === 0) return null;
 
-    const blockItems = filtered.filter((cmd) => cmd.category !== "variables");
-    const variableItems = filtered.filter((cmd) => cmd.category === "variables");
+    const blockItems = filtered.filter((cmd: SlashCommand) => cmd.category !== "variables");
+    const variableItems = filtered.filter((cmd: SlashCommand) => cmd.category === "variables");
 
     let globalIndex = 0;
 
@@ -345,8 +351,8 @@ function SlashCommandMenu({
         >
             {blockItems.length > 0 && (
                 <>
-                    <div className="notion-slash-menu-label">Blocks</div>
-                    {blockItems.map((cmd) => {
+                    <div className="notion-slash-menu-label">{t('notionEditor.slash.blocks')}</div>
+                    {blockItems.map((cmd: SlashCommand) => {
                         const idx = globalIndex++;
                         return (
                             <button
@@ -367,8 +373,8 @@ function SlashCommandMenu({
             )}
             {variableItems.length > 0 && (
                 <>
-                    <div className="notion-slash-menu-label" style={{ marginTop: blockItems.length > 0 ? '6px' : undefined }}>Variables</div>
-                    {variableItems.map((cmd) => {
+                    <div className="notion-slash-menu-label" style={{ marginTop: blockItems.length > 0 ? '6px' : undefined }}>{t('notionEditor.slash.variables')}</div>
+                    {variableItems.map((cmd: SlashCommand) => {
                         const idx = globalIndex++;
                         return (
                             <button
@@ -419,13 +425,15 @@ const HIGHLIGHT_COLORS = [
     { label: "Red", value: "#b91c1c" },
 ];
 
-const TRANSLATE_LANGUAGES = [
-    { key: 'english', label: 'English' },
-    { key: 'spanish', label: 'Spanish' },
-    { key: 'mandarin', label: 'Chinese' },
-    { key: 'hindi', label: 'Hindi' },
-    { key: 'bengali', label: 'Bengali' },
-];
+function getTranslateLanguages(t: (key: string) => string) {
+    return [
+        { key: 'english', label: t('notionEditor.languages.english') },
+        { key: 'spanish', label: t('notionEditor.languages.spanish') },
+        { key: 'mandarin', label: t('notionEditor.languages.chinese') },
+        { key: 'hindi', label: t('notionEditor.languages.hindi') },
+        { key: 'bengali', label: t('notionEditor.languages.bengali') },
+    ];
+}
 
 function FloatingToolbar({
     editor,
@@ -434,6 +442,7 @@ function FloatingToolbar({
     editor: any;
     onLinkClick: () => void;
 }) {
+    const { t } = useTranslation();
     const toolbarRef = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
     const [visible, setVisible] = useState(false);
@@ -588,32 +597,32 @@ function FloatingToolbar({
                     onClick={() => { setTurnIntoOpen((v) => !v); setColorPickerOpen(false); }}
                     className="notion-bubble-btn"
                     style={{ gap: '3px', width: 'auto', padding: '0 8px', fontSize: '12px', fontWeight: 600 }}
-                    title="Turn into"
+                    title={t('notionEditor.toolbar.turnInto')}
                 >
                     <span style={{ color: '#d1d5db', whiteSpace: 'nowrap' }}>
-                        {editor.isActive('heading', { level: 1 }) ? 'Heading 1'
-                            : editor.isActive('heading', { level: 2 }) ? 'Heading 2'
-                            : editor.isActive('heading', { level: 3 }) ? 'Heading 3'
-                            : editor.isActive('bulletList') ? 'Bulleted list'
-                            : editor.isActive('orderedList') ? 'Numbered list'
-                            : editor.isActive('blockquote') ? 'Quote'
-                            : editor.isActive('codeBlock') ? 'Code block'
-                            : 'Text'}
+                        {editor.isActive('heading', { level: 1 }) ? t('notionEditor.slash.heading1')
+                            : editor.isActive('heading', { level: 2 }) ? t('notionEditor.slash.heading2')
+                            : editor.isActive('heading', { level: 3 }) ? t('notionEditor.slash.heading3')
+                            : editor.isActive('bulletList') ? t('notionEditor.toolbar.bulletedList')
+                            : editor.isActive('orderedList') ? t('notionEditor.toolbar.numberedList')
+                            : editor.isActive('blockquote') ? t('notionEditor.slash.quote')
+                            : editor.isActive('codeBlock') ? t('notionEditor.toolbar.codeBlock')
+                            : t('notionEditor.slash.text')}
                     </span>
                     <ChevronDown className="w-3 h-3" style={{ opacity: 0.6 }} />
                 </button>
                 {turnIntoOpen && (
                     <div className="notion-turninto-menu" onMouseDown={(e) => e.preventDefault()}>
-                        <div className="notion-turninto-label">Turn Into</div>
+                        <div className="notion-turninto-label">{t('notionEditor.toolbar.turnInto')}</div>
                         {[
-                            { label: 'Text', icon: <Type className="w-4 h-4" />, active: editor.isActive('paragraph') && !editor.isActive('bulletList') && !editor.isActive('orderedList') && !editor.isActive('blockquote') && !editor.isActive('codeBlock'), action: () => editor.chain().focus().setParagraph().run() },
-                            { label: 'Heading 1', icon: <Heading1 className="w-4 h-4" />, active: editor.isActive('heading', { level: 1 }), action: () => editor.chain().focus().setHeading({ level: 1 }).run() },
-                            { label: 'Heading 2', icon: <Heading2 className="w-4 h-4" />, active: editor.isActive('heading', { level: 2 }), action: () => editor.chain().focus().setHeading({ level: 2 }).run() },
-                            { label: 'Heading 3', icon: <Heading3 className="w-4 h-4" />, active: editor.isActive('heading', { level: 3 }), action: () => editor.chain().focus().setHeading({ level: 3 }).run() },
-                            { label: 'Bulleted list', icon: <List className="w-4 h-4" />, active: editor.isActive('bulletList'), action: () => editor.chain().focus().toggleBulletList().run() },
-                            { label: 'Numbered list', icon: <ListOrdered className="w-4 h-4" />, active: editor.isActive('orderedList'), action: () => editor.chain().focus().toggleOrderedList().run() },
-                            { label: 'Blockquote', icon: <Quote className="w-4 h-4" />, active: editor.isActive('blockquote'), action: () => editor.chain().focus().toggleBlockquote().run() },
-                            { label: 'Code block', icon: <Code className="w-4 h-4" />, active: editor.isActive('codeBlock'), action: () => editor.chain().focus().toggleCodeBlock().run() },
+                            { label: t('notionEditor.slash.text'), icon: <Type className="w-4 h-4" />, active: editor.isActive('paragraph') && !editor.isActive('bulletList') && !editor.isActive('orderedList') && !editor.isActive('blockquote') && !editor.isActive('codeBlock'), action: () => editor.chain().focus().setParagraph().run() },
+                            { label: t('notionEditor.slash.heading1'), icon: <Heading1 className="w-4 h-4" />, active: editor.isActive('heading', { level: 1 }), action: () => editor.chain().focus().setHeading({ level: 1 }).run() },
+                            { label: t('notionEditor.slash.heading2'), icon: <Heading2 className="w-4 h-4" />, active: editor.isActive('heading', { level: 2 }), action: () => editor.chain().focus().setHeading({ level: 2 }).run() },
+                            { label: t('notionEditor.slash.heading3'), icon: <Heading3 className="w-4 h-4" />, active: editor.isActive('heading', { level: 3 }), action: () => editor.chain().focus().setHeading({ level: 3 }).run() },
+                            { label: t('notionEditor.toolbar.bulletedList'), icon: <List className="w-4 h-4" />, active: editor.isActive('bulletList'), action: () => editor.chain().focus().toggleBulletList().run() },
+                            { label: t('notionEditor.toolbar.numberedList'), icon: <ListOrdered className="w-4 h-4" />, active: editor.isActive('orderedList'), action: () => editor.chain().focus().toggleOrderedList().run() },
+                            { label: t('notionEditor.toolbar.blockquote'), icon: <Quote className="w-4 h-4" />, active: editor.isActive('blockquote'), action: () => editor.chain().focus().toggleBlockquote().run() },
+                            { label: t('notionEditor.toolbar.codeBlock'), icon: <Code className="w-4 h-4" />, active: editor.isActive('codeBlock'), action: () => editor.chain().focus().toggleCodeBlock().run() },
                         ].map((item) => (
                             <button
                                 key={item.label}
@@ -631,35 +640,35 @@ function FloatingToolbar({
             <button
                 onClick={() => editor.chain().focus().toggleBold().run()}
                 className={`notion-bubble-btn ${editor.isActive("bold") ? "active" : ""}`}
-                title="Bold"
+                title={t('notionEditor.toolbar.bold')}
             >
                 <Bold className="w-4 h-4" />
             </button>
             <button
                 onClick={() => editor.chain().focus().toggleItalic().run()}
                 className={`notion-bubble-btn ${editor.isActive("italic") ? "active" : ""}`}
-                title="Italic"
+                title={t('notionEditor.toolbar.italic')}
             >
                 <Italic className="w-4 h-4" />
             </button>
             <button
                 onClick={() => editor.chain().focus().toggleUnderline().run()}
                 className={`notion-bubble-btn ${editor.isActive("underline") ? "active" : ""}`}
-                title="Underline"
+                title={t('notionEditor.toolbar.underline')}
             >
                 <UnderlineIcon className="w-4 h-4" />
             </button>
             <button
                 onClick={() => editor.chain().focus().toggleStrike().run()}
                 className={`notion-bubble-btn ${editor.isActive("strike") ? "active" : ""}`}
-                title="Strikethrough"
+                title={t('notionEditor.toolbar.strikethrough')}
             >
                 <Strikethrough className="w-4 h-4" />
             </button>
             <button
                 onClick={() => editor.chain().focus().toggleCode().run()}
                 className={`notion-bubble-btn ${editor.isActive("code") ? "active" : ""}`}
-                title="Inline code"
+                title={t('notionEditor.toolbar.inlineCode')}
             >
                 <Code className="w-4 h-4" />
             </button>
@@ -673,7 +682,7 @@ function FloatingToolbar({
                     }
                 }}
                 className={`notion-bubble-btn ${editor.isActive("link") ? "active" : ""}`}
-                title="Link"
+                title={t('notionEditor.toolbar.link')}
             >
                 <LinkIcon className="w-4 h-4" />
             </button>
@@ -683,7 +692,7 @@ function FloatingToolbar({
                     ref={colorBtnRef}
                     onClick={() => setColorPickerOpen((v) => !v)}
                     className={`notion-bubble-btn ${editor.getAttributes("textStyle").color ? "active" : ""}`}
-                    title="Text color"
+                    title={t('notionEditor.toolbar.textColor')}
                     style={{ gap: '4px', width: 'auto', padding: '0 8px' }}
                 >
                     <span style={{
@@ -706,7 +715,7 @@ function FloatingToolbar({
                         {/* Recently Used */}
                         {recentColors.length > 0 && (
                             <div style={{ marginBottom: '10px' }}>
-                                <div className="notion-color-picker-label">Recently Used</div>
+                                <div className="notion-color-picker-label">{t('notionEditor.toolbar.recentlyUsed')}</div>
                                 <div className="notion-color-picker-grid">
                                     {recentColors.slice(0, 5).map((color, i) => (
                                         <button
@@ -727,7 +736,7 @@ function FloatingToolbar({
 
                         {/* Text Color */}
                         <div style={{ marginBottom: '10px' }}>
-                            <div className="notion-color-picker-label">Text Color</div>
+                            <div className="notion-color-picker-label">{t('notionEditor.toolbar.textColorLabel')}</div>
                             <div className="notion-color-picker-grid">
                                 {TEXT_COLORS.map((c) => (
                                     <button
@@ -758,7 +767,7 @@ function FloatingToolbar({
 
                         {/* Highlight Color */}
                         <div>
-                            <div className="notion-color-picker-label">Highlight Color</div>
+                            <div className="notion-color-picker-label">{t('notionEditor.toolbar.highlightColor')}</div>
                             <div className="notion-color-picker-grid">
                                 {HIGHLIGHT_COLORS.map((c) => (
                                     <button
@@ -786,21 +795,21 @@ function FloatingToolbar({
             <button
                 onClick={() => editor.chain().focus().setTextAlign("left").run()}
                 className={`notion-bubble-btn ${editor.isActive({ textAlign: "left" }) ? "active" : ""}`}
-                title="Align left"
+                title={t('notionEditor.toolbar.alignLeft')}
             >
                 <AlignLeft className="w-4 h-4" />
             </button>
             <button
                 onClick={() => editor.chain().focus().setTextAlign("center").run()}
                 className={`notion-bubble-btn ${editor.isActive({ textAlign: "center" }) ? "active" : ""}`}
-                title="Align center"
+                title={t('notionEditor.toolbar.alignCenter')}
             >
                 <AlignCenter className="w-4 h-4" />
             </button>
             <button
                 onClick={() => editor.chain().focus().setTextAlign("right").run()}
                 className={`notion-bubble-btn ${editor.isActive({ textAlign: "right" }) ? "active" : ""}`}
-                title="Align right"
+                title={t('notionEditor.toolbar.alignRight')}
             >
                 <AlignRight className="w-4 h-4" />
             </button>
@@ -810,7 +819,7 @@ function FloatingToolbar({
                 <button
                     onClick={() => { setAiMenuOpen((v) => !v); setColorPickerOpen(false); setTurnIntoOpen(false); setTranslateSubOpen(false); }}
                     className={`notion-bubble-btn ${aiProcessing ? 'active' : ''}`}
-                    title="AI tools"
+                    title={t('notionEditor.toolbar.aiTools')}
                     style={{ gap: '4px', width: 'auto', padding: '0 8px' }}
                     disabled={!!aiProcessing}
                 >
@@ -823,14 +832,14 @@ function FloatingToolbar({
                 </button>
                 {aiMenuOpen && (
                     <div className="notion-ai-menu" onMouseDown={(e) => e.preventDefault()}>
-                        <div className="notion-ai-menu-label">AI Tools</div>
+                        <div className="notion-ai-menu-label">{t('notionEditor.ai.label')}</div>
                         <button
                             className="notion-ai-menu-item"
                             onClick={() => handleAiAction('improve')}
                             disabled={!!aiProcessing}
                         >
                             <Wand2 className="w-4 h-4" />
-                            <span>Improve with AI</span>
+                            <span>{t('notionEditor.ai.improve')}</span>
                         </button>
                         <button
                             className="notion-ai-menu-item"
@@ -838,7 +847,7 @@ function FloatingToolbar({
                             disabled={!!aiProcessing}
                         >
                             <Sparkles className="w-4 h-4" />
-                            <span>More casual</span>
+                            <span>{t('notionEditor.ai.casual')}</span>
                         </button>
                         <button
                             className="notion-ai-menu-item"
@@ -846,7 +855,7 @@ function FloatingToolbar({
                             disabled={!!aiProcessing}
                         >
                             <Sparkles className="w-4 h-4" />
-                            <span>More formal</span>
+                            <span>{t('notionEditor.ai.formal')}</span>
                         </button>
                         <button
                             className="notion-ai-menu-item"
@@ -854,7 +863,7 @@ function FloatingToolbar({
                             disabled={!!aiProcessing}
                         >
                             <PartyPopper className="w-4 h-4" />
-                            <span>Emojify</span>
+                            <span>{t('notionEditor.ai.emojify')}</span>
                         </button>
                         <button
                             className="notion-ai-menu-item"
@@ -862,7 +871,7 @@ function FloatingToolbar({
                             disabled={!!aiProcessing}
                         >
                             <ArrowRightFromLine className="w-4 h-4" />
-                            <span>Make longer</span>
+                            <span>{t('notionEditor.ai.expand')}</span>
                         </button>
                         <button
                             className="notion-ai-menu-item"
@@ -870,7 +879,7 @@ function FloatingToolbar({
                             disabled={!!aiProcessing}
                         >
                             <ArrowLeftToLine className="w-4 h-4" />
-                            <span>Make shorter</span>
+                            <span>{t('notionEditor.ai.shorten')}</span>
                         </button>
                         <div className="notion-ai-menu-divider" />
                         <div style={{ position: 'relative' }}>
@@ -880,7 +889,7 @@ function FloatingToolbar({
                                 disabled={!!aiProcessing}
                             >
                                 <Languages className="w-4 h-4" />
-                                <span>Translate</span>
+                                <span>{t('notionEditor.ai.translate')}</span>
                                 <ChevronRight className="w-3 h-3" style={{ marginLeft: 'auto', opacity: 0.5 }} />
                             </button>
                             {translateSubOpen && (
@@ -889,7 +898,7 @@ function FloatingToolbar({
                                     onMouseLeave={() => setTranslateSubOpen(false)}
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
-                                    {TRANSLATE_LANGUAGES.map((lang) => (
+                                    {getTranslateLanguages(t).map((lang) => (
                                         <button
                                             key={lang.key}
                                             className="notion-ai-menu-item"
@@ -1398,6 +1407,7 @@ interface RowInfo {
 }
 
 function TableFloatingControls({ editor }: { editor: any }) {
+    const { t } = useTranslation();
     const [isInTable, setIsInTable] = useState(false);
     const [columns, setColumns] = useState<ColInfo[]>([]);
     const [rows, setRows] = useState<RowInfo[]>([]);
@@ -1814,7 +1824,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                             className={`table-col-drag-bar ${
                                 openColMenu === col.index ? 'table-col-drag-bar-active' : ''
                             } ${dragColFrom === col.index ? 'table-col-drag-bar-dragging' : ''}`}
-                            title="Drag to reorder, click for options"
+                            title={t('notionEditor.table.dragReorder')}
                         >
                             <GripHorizontal className="w-3 h-3" />
                         </button>
@@ -1822,14 +1832,14 @@ function TableFloatingControls({ editor }: { editor: any }) {
                         {/* Column dropdown menu */}
                         {openColMenu === col.index && (
                             <div className="table-col-dropdown">
-                                <div className="table-dropdown-section-label">Insert</div>
+                                <div className="table-dropdown-section-label">{t('notionEditor.table.insert')}</div>
                                 <button
                                     className="table-dropdown-item"
                                     onClick={() => handleColAction('insertLeft', col.index)}
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
                                     <PanelLeftOpen className="w-4 h-4" />
-                                    <span>Insert column left</span>
+                                    <span>{t('notionEditor.table.insertColLeft')}</span>
                                 </button>
                                 <button
                                     className="table-dropdown-item"
@@ -1837,10 +1847,10 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
                                     <PanelRightOpen className="w-4 h-4" />
-                                    <span>Insert column right</span>
+                                    <span>{t('notionEditor.table.insertColRight')}</span>
                                 </button>
                                 <div className="table-dropdown-divider" />
-                                <div className="table-dropdown-section-label">Move</div>
+                                <div className="table-dropdown-section-label">{t('notionEditor.table.move')}</div>
                                 <button
                                     className="table-dropdown-item"
                                     onClick={() => handleColAction('moveLeft', col.index)}
@@ -1848,7 +1858,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     disabled={col.index === 0}
                                 >
                                     <ArrowLeft className="w-4 h-4" />
-                                    <span>Move column left</span>
+                                    <span>{t('notionEditor.table.moveColLeft')}</span>
                                 </button>
                                 <button
                                     className="table-dropdown-item"
@@ -1857,7 +1867,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     disabled={col.index >= totalCols - 1}
                                 >
                                     <ArrowRight className="w-4 h-4" />
-                                    <span>Move column right</span>
+                                    <span>{t('notionEditor.table.moveColRight')}</span>
                                 </button>
                                 <div className="table-dropdown-divider" />
                                 <button
@@ -1866,7 +1876,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
                                     <Copy className="w-4 h-4" />
-                                    <span>Duplicate column</span>
+                                    <span>{t('notionEditor.table.duplicateCol')}</span>
                                 </button>
                                 <button
                                     className="table-dropdown-item"
@@ -1874,7 +1884,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
                                     <ArrowDownAZ className="w-4 h-4" />
-                                    <span>Sort A → Z</span>
+                                    <span>{t('notionEditor.table.sortAZ')}</span>
                                 </button>
                                 <button
                                     className="table-dropdown-item"
@@ -1882,10 +1892,10 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
                                     <ArrowUpAZ className="w-4 h-4" />
-                                    <span>Sort Z → A</span>
+                                    <span>{t('notionEditor.table.sortZA')}</span>
                                 </button>
                                 <div className="table-dropdown-divider" />
-                                <div className="table-dropdown-section-label">Format</div>
+                                <div className="table-dropdown-section-label">{t('notionEditor.table.format')}</div>
                                 {/* Color submenu */}
                                 <div className="relative">
                                     <button
@@ -1894,7 +1904,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <Paintbrush className="w-4 h-4" />
-                                        <span>Color</span>
+                                        <span>{t('notionEditor.table.color')}</span>
                                         <ChevronRight className="w-3 h-3 ml-auto opacity-50" />
                                     </button>
                                     {colSubmenu === 'color' && (
@@ -1924,19 +1934,19 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <AlignLeft className="w-4 h-4" />
-                                        <span>Alignment</span>
+                                        <span>{t('notionEditor.table.alignment')}</span>
                                         <ChevronRight className="w-3 h-3 ml-auto opacity-50" />
                                     </button>
                                     {colSubmenu === 'align' && (
                                         <div className="table-submenu">
                                             <button className="table-dropdown-item" onClick={() => handleColAlign(col.index, 'left')} onMouseDown={(e) => e.preventDefault()}>
-                                                <AlignLeft className="w-4 h-4" /> <span>Align left</span>
+                                                <AlignLeft className="w-4 h-4" /> <span>{t('notionEditor.toolbar.alignLeft')}</span>
                                             </button>
                                             <button className="table-dropdown-item" onClick={() => handleColAlign(col.index, 'center')} onMouseDown={(e) => e.preventDefault()}>
-                                                <AlignCenter className="w-4 h-4" /> <span>Align center</span>
+                                                <AlignCenter className="w-4 h-4" /> <span>{t('notionEditor.toolbar.alignCenter')}</span>
                                             </button>
                                             <button className="table-dropdown-item" onClick={() => handleColAlign(col.index, 'right')} onMouseDown={(e) => e.preventDefault()}>
-                                                <AlignRight className="w-4 h-4" /> <span>Align right</span>
+                                                <AlignRight className="w-4 h-4" /> <span>{t('notionEditor.toolbar.alignRight')}</span>
                                             </button>
                                         </div>
                                     )}
@@ -1947,7 +1957,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
                                     <Eraser className="w-4 h-4" />
-                                    <span>Clear contents</span>
+                                    <span>{t('notionEditor.table.clearContents')}</span>
                                 </button>
                                 <div className="table-dropdown-divider" />
                                 <button
@@ -1956,7 +1966,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
                                     <Bold className="w-4 h-4" />
-                                    <span>Toggle header</span>
+                                    <span>{t('notionEditor.table.toggleHeader')}</span>
                                 </button>
                                 {canMerge && (
                                     <button
@@ -1965,7 +1975,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <TableCellsMerge className="w-4 h-4" />
-                                        <span>Merge cells</span>
+                                        <span>{t('notionEditor.table.mergeCells')}</span>
                                     </button>
                                 )}
                                 {canSplit && (
@@ -1975,7 +1985,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
                                         <TableCellsSplit className="w-4 h-4" />
-                                        <span>Split cell</span>
+                                        <span>{t('notionEditor.table.splitCell')}</span>
                                     </button>
                                 )}
                                 <div className="table-dropdown-divider" />
@@ -1985,7 +1995,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
                                     <Trash2 className="w-4 h-4" />
-                                    <span>Delete column</span>
+                                    <span>{t('notionEditor.table.deleteCol')}</span>
                                 </button>
                             </div>
                         )}
@@ -2004,7 +2014,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                             openRowMenu === row.index ? 'table-row-drag-bar-active' : ''
                         } ${dragRowFrom === row.index ? 'table-row-drag-bar-dragging' : ''}`}
                         style={{ height: Math.max(row.height - 4, 18) }}
-                        title="Drag to reorder, click for options"
+                        title={t('notionEditor.table.dragReorder')}
                     >
                         <GripVertical className="w-3 h-3" />
                     </button>
@@ -2012,14 +2022,14 @@ function TableFloatingControls({ editor }: { editor: any }) {
                     {/* Row dropdown menu */}
                     {openRowMenu === row.index && (
                         <div className="table-row-dropdown" style={{ position: 'absolute', top: 0, right: '100%', marginRight: 4 }}>
-                            <div className="table-dropdown-section-label">Insert</div>
+                            <div className="table-dropdown-section-label">{t('notionEditor.table.insert')}</div>
                             <button
                                 className="table-dropdown-item"
                                 onClick={() => handleRowAction('insertAbove', row.index)}
                                 onMouseDown={(e) => e.preventDefault()}
                             >
                                 <ArrowUp className="w-4 h-4" />
-                                <span>Insert row above</span>
+                                <span>{t('notionEditor.table.insertRowAbove')}</span>
                             </button>
                             <button
                                 className="table-dropdown-item"
@@ -2027,10 +2037,10 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                 onMouseDown={(e) => e.preventDefault()}
                             >
                                 <ArrowDown className="w-4 h-4" />
-                                <span>Insert row below</span>
+                                <span>{t('notionEditor.table.insertRowBelow')}</span>
                             </button>
                             <div className="table-dropdown-divider" />
-                            <div className="table-dropdown-section-label">Move</div>
+                            <div className="table-dropdown-section-label">{t('notionEditor.table.move')}</div>
                             <button
                                 className="table-dropdown-item"
                                 onClick={() => handleRowAction('moveUp', row.index)}
@@ -2038,7 +2048,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                 disabled={row.index === 0}
                             >
                                 <ArrowUp className="w-4 h-4" />
-                                <span>Move row up</span>
+                                <span>{t('notionEditor.table.moveRowUp')}</span>
                             </button>
                             <button
                                 className="table-dropdown-item"
@@ -2047,7 +2057,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                 disabled={row.index >= totalRows - 1}
                             >
                                 <ArrowDown className="w-4 h-4" />
-                                <span>Move row down</span>
+                                <span>{t('notionEditor.table.moveRowDown')}</span>
                             </button>
                             <div className="table-dropdown-divider" />
                             <button
@@ -2056,10 +2066,10 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                 onMouseDown={(e) => e.preventDefault()}
                             >
                                 <Copy className="w-4 h-4" />
-                                <span>Duplicate row</span>
+                                <span>{t('notionEditor.table.duplicateRow')}</span>
                             </button>
                             <div className="table-dropdown-divider" />
-                            <div className="table-dropdown-section-label">Format</div>
+                            <div className="table-dropdown-section-label">{t('notionEditor.table.format')}</div>
                             {/* Row color submenu */}
                             <div className="relative">
                                 <button
@@ -2068,7 +2078,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
                                     <Paintbrush className="w-4 h-4" />
-                                    <span>Color</span>
+                                    <span>{t('notionEditor.table.color')}</span>
                                     <ChevronRight className="w-3 h-3 ml-auto opacity-50" />
                                 </button>
                                 {rowSubmenu === 'color' && (
@@ -2098,19 +2108,19 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     onMouseDown={(e) => e.preventDefault()}
                                 >
                                     <AlignLeft className="w-4 h-4" />
-                                    <span>Alignment</span>
+                                    <span>{t('notionEditor.table.alignment')}</span>
                                     <ChevronRight className="w-3 h-3 ml-auto opacity-50" />
                                 </button>
                                 {rowSubmenu === 'align' && (
                                     <div className="table-submenu">
                                         <button className="table-dropdown-item" onClick={() => handleRowAlign(row.index, 'left')} onMouseDown={(e) => e.preventDefault()}>
-                                            <AlignLeft className="w-4 h-4" /> <span>Align left</span>
+                                            <AlignLeft className="w-4 h-4" /> <span>{t('notionEditor.toolbar.alignLeft')}</span>
                                         </button>
                                         <button className="table-dropdown-item" onClick={() => handleRowAlign(row.index, 'center')} onMouseDown={(e) => e.preventDefault()}>
-                                            <AlignCenter className="w-4 h-4" /> <span>Align center</span>
+                                            <AlignCenter className="w-4 h-4" /> <span>{t('notionEditor.toolbar.alignCenter')}</span>
                                         </button>
                                         <button className="table-dropdown-item" onClick={() => handleRowAlign(row.index, 'right')} onMouseDown={(e) => e.preventDefault()}>
-                                            <AlignRight className="w-4 h-4" /> <span>Align right</span>
+                                            <AlignRight className="w-4 h-4" /> <span>{t('notionEditor.toolbar.alignRight')}</span>
                                         </button>
                                     </div>
                                 )}
@@ -2121,7 +2131,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                 onMouseDown={(e) => e.preventDefault()}
                             >
                                 <Eraser className="w-4 h-4" />
-                                <span>Clear contents</span>
+                                <span>{t('notionEditor.table.clearContents')}</span>
                             </button>
                             <div className="table-dropdown-divider" />
                             <button
@@ -2130,7 +2140,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                 onMouseDown={(e) => e.preventDefault()}
                             >
                                 <Bold className="w-4 h-4" />
-                                <span>Toggle header row</span>
+                                <span>{t('notionEditor.table.toggleHeaderRow')}</span>
                             </button>
                             <div className="table-dropdown-divider" />
                             <button
@@ -2139,7 +2149,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                 onMouseDown={(e) => e.preventDefault()}
                             >
                                 <Trash2 className="w-4 h-4" />
-                                <span>Delete row</span>
+                                <span>{t('notionEditor.table.deleteRow')}</span>
                             </button>
                         </div>
                     )}
@@ -2219,7 +2229,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 }}
                 onClick={() => editor.chain().focus().addColumnAfter().run()}
                 onMouseDown={(e) => e.preventDefault()}
-                title="Add column"
+                title={t('notionEditor.table.addColumn')}
             >
                 <Plus className="w-3.5 h-3.5" />
             </button>
@@ -2235,7 +2245,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 }}
                 onClick={() => editor.chain().focus().addRowAfter().run()}
                 onMouseDown={(e) => e.preventDefault()}
-                title="Add row"
+                title={t('notionEditor.table.addRow')}
             >
                 <Plus className="w-3.5 h-3.5" />
             </button>
@@ -2256,10 +2266,10 @@ function TableFloatingControls({ editor }: { editor: any }) {
                     className="table-delete-btn"
                     onClick={() => editor.chain().focus().deleteTable().run()}
                     onMouseDown={(e) => e.preventDefault()}
-                    title="Delete table"
+                    title={t('notionEditor.table.deleteTable')}
                 >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete table</span>
+                    <span>{t('notionEditor.table.deleteTable')}</span>
                 </button>
             </div>
         </div>,
@@ -2279,9 +2289,11 @@ export interface NotionLikeEditorProps {
 export default function NotionLikeEditor({
     content,
     onChange,
-    placeholder = 'Type \'/\' for commands, or start writing...',
+    placeholder,
     className = "",
 }: NotionLikeEditorProps) {
+    const { t } = useTranslation();
+    const resolvedPlaceholder = placeholder || t('notionEditor.placeholder');
     const [slashMenuOpen, setSlashMenuOpen] = useState(false);
     const [slashQuery, setSlashQuery] = useState("");
     const [slashPosition, setSlashPosition] = useState({ top: 0, left: 0 });
@@ -2306,8 +2318,9 @@ export default function NotionLikeEditor({
     const [aiGeneratePrompt, setAiGeneratePrompt] = useState("");
     const [aiGenerating, setAiGenerating] = useState(false);
 
-    const filteredCommands = SLASH_COMMANDS.filter(
-        (cmd) =>
+    const slashCommands = getSlashCommands(t);
+    const filteredCommands = slashCommands.filter(
+        (cmd: SlashCommand) =>
             cmd.title.toLowerCase().includes(slashQuery.toLowerCase()) ||
             cmd.description.toLowerCase().includes(slashQuery.toLowerCase())
     );
@@ -2326,7 +2339,7 @@ export default function NotionLikeEditor({
                 },
             }),
             Placeholder.configure({
-                placeholder,
+                placeholder: resolvedPlaceholder,
                 showOnlyWhenEditable: true,
                 showOnlyCurrent: true,
             }),
@@ -2550,11 +2563,11 @@ export default function NotionLikeEditor({
                 onChange(editor.getHTML());
             } else {
                 console.error("Failed to generate newsletter:", result.error);
-                alert(result.error || "Failed to generate newsletter. Please try again.");
+                alert(result.error || t('notionEditor.ai.generateError'));
             }
         } catch (error: any) {
             console.error("Error generating newsletter:", error);
-            alert("An error occurred while generating the newsletter. Please try again.");
+            alert(t('notionEditor.ai.generateError'));
         } finally {
             setAiGenerating(false);
             setAiGenerateModalOpen(false);
@@ -2587,7 +2600,7 @@ export default function NotionLikeEditor({
                             type="url"
                             value={linkUrl}
                             onChange={(e) => setLinkUrl(e.target.value)}
-                            placeholder="Paste or type a URL..."
+                            placeholder={t('notionEditor.link.placeholder')}
                             className="notion-link-input"
                             autoFocus
                             onKeyDown={(e) => {
@@ -2601,7 +2614,7 @@ export default function NotionLikeEditor({
                             }}
                         />
                         <button onClick={handleAddLink} className="notion-link-apply-btn">
-                            Apply
+                            {t('notionEditor.link.apply')}
                         </button>
                     </div>
                 </div>
@@ -2613,15 +2626,15 @@ export default function NotionLikeEditor({
                     <div className="notion-ai-generate-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="notion-ai-generate-header">
                             <Sparkles className="w-5 h-5" style={{ color: '#a78bfa' }} />
-                            <span>Generate Newsletter with AI</span>
+                            <span>{t('notionEditor.ai.generateTitle')}</span>
                         </div>
                         <p className="notion-ai-generate-desc">
-                            What kind of newsletter would you like to create?
+                            {t('notionEditor.ai.generateDesc')}
                         </p>
                         <textarea
                             value={aiGeneratePrompt}
                             onChange={(e) => setAiGeneratePrompt(e.target.value)}
-                            placeholder="e.g. A monthly update about our new product launches, upcoming events, and a tip of the month for our customers..."
+                            placeholder={t('notionEditor.ai.generatePlaceholder')}
                             className="notion-ai-generate-input"
                             autoFocus
                             rows={4}
@@ -2643,7 +2656,7 @@ export default function NotionLikeEditor({
                                 className="notion-ai-generate-cancel"
                                 disabled={aiGenerating}
                             >
-                                Cancel
+                                {t('notionEditor.ai.cancel')}
                             </button>
                             <button
                                 onClick={handleAiGenerate}
@@ -2653,12 +2666,12 @@ export default function NotionLikeEditor({
                                 {aiGenerating ? (
                                     <>
                                         <Loader2 className="w-4 h-4 animate-spin" />
-                                        Generating...
+                                        {t('notionEditor.ai.generating')}
                                     </>
                                 ) : (
                                     <>
                                         <Sparkles className="w-4 h-4" />
-                                        Generate
+                                        {t('notionEditor.ai.generate')}
                                     </>
                                 )}
                             </button>
