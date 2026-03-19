@@ -54,7 +54,9 @@
     "shops": "Tiendas",
     "users": "Usuarios",
     "segmentation": "Segmentación",
-    "management": "Gestión"
+    "management": "Gestión",
+    "help": "Ayuda",
+    "legalAgreements": "Acuerdos Legales"
   },
   "dashboard": {
     "welcomeBack": "Bienvenido de nuevo, {{name}}",

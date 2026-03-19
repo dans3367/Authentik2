@@ -27,6 +27,7 @@ import {
   Scale,
   ChevronRight,
   Tv2,
+  HelpCircle,
 } from "lucide-react";
 import logoUrl from "@assets/logo.png";
 import { cn } from "@/lib/utils";
@@ -132,7 +133,7 @@ export function AppSidebar() {
   const { planName, canManageUsers, maxShops } = useTenantPlan();
 
   const navigation = getNavigation(extendedUser?.role, t, canManageUsers, maxShops);
-  const { state, isMobile, setOpenMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile, setOpen } = useSidebar();
 
   const handleLogout = async () => {
     await logout();
@@ -316,26 +317,74 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Legal Agreements - Bottom of navigation */}
+        {/* Help & Resources - Bottom of navigation */}
         <SidebarGroup className="mt-auto pt-2 border-t border-sidebar-border">
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
-                <SidebarMenuButton
-                  asChild
-                  isActive={location === '/legal-agreements' || location === '/privacy-security' || location === '/terms-of-service' || location === '/acceptable-use' || location === '/data-processing' || location === '/cookie-policy'}
-                  className={cn(
-                    "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0",
-                    isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
-                  )}
-                  tooltip="Legal Agreements"
+              {isCollapsed ? (
+                <SidebarMenuItem className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <SidebarMenuButton
+                        className={cn(
+                          "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0",
+                          isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
+                        )}
+                        tooltip={t('navigation.help') || "Help"}
+                      >
+                        <HelpCircle className="h-5 w-5 flex-shrink-0" />
+                        <span className="group-data-[collapsible=icon]:hidden font-medium text-xs text-muted-foreground">{t('navigation.help') || "Help"}</span>
+                      </SidebarMenuButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="right" align="start" sideOffset={8} className="w-48 rounded-lg">
+                      <DropdownMenuItem asChild>
+                        <Link href="/legal-agreements" className="flex items-center gap-2 cursor-pointer w-full" onClick={handleMobileNavClick}>
+                          <Scale className="h-4 w-4" />
+                          <span>{t('navigation.legalAgreements') || "Legal Agreements"}</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </SidebarMenuItem>
+              ) : (
+                <Collapsible 
+                  asChild 
+                  defaultOpen={location === '/legal-agreements' || location === '/privacy-security' || location === '/terms-of-service' || location === '/acceptable-use' || location === '/data-processing' || location === '/cookie-policy'} 
+                  className="group/collapsible"
                 >
-                  <Link href="/legal-agreements" className="flex items-center gap-3 w-full group-data-[collapsible=icon]:justify-center" onClick={handleMobileNavClick}>
-                    <Scale className="h-5 w-5 flex-shrink-0" />
-                    <span className="group-data-[collapsible=icon]:hidden font-medium text-xs text-muted-foreground">Legal Agreements</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+                  <SidebarMenuItem className="w-full flex flex-col">
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        isActive={location === '/legal-agreements' || location === '/privacy-security' || location === '/terms-of-service' || location === '/acceptable-use' || location === '/data-processing' || location === '/cookie-policy'}
+                        className={cn(
+                          "w-full justify-start",
+                          isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
+                        )}
+                      >
+                        <div className="flex items-center w-full gap-3 cursor-pointer">
+                          <HelpCircle className="h-5 w-5 flex-shrink-0" />
+                          <span className="font-medium text-xs flex-1 text-left">{t('navigation.help') || "Help"}</span>
+                          <span className="ml-auto p-0.5 rounded hover:bg-black/10">
+                            <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                          </span>
+                        </div>
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={location === '/legal-agreements' || location === '/privacy-security' || location === '/terms-of-service' || location === '/acceptable-use' || location === '/data-processing' || location === '/cookie-policy'}>
+                            <Link href="/legal-agreements" className="flex items-center gap-2" onClick={handleMobileNavClick}>
+                              <Scale className="h-4 w-4" />
+                              <span className="text-xs">{t('navigation.legalAgreements') || "Legal Agreements"}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
