@@ -283,7 +283,37 @@ const recipientSchema = z.object({
   phoneNumber: z.string().optional(),
   address: z.string().optional(),
   unsubscribeToken: z.string().optional(),
+  preferredLanguage: z.string().optional(),
 });
+
+/**
+ * Resolve the correct subject and content for a recipient based on their preferredLanguage.
+ * Falls back to the source content if no translation is available.
+ */
+function resolveRecipientContent(
+  recipient: NewsletterRecipient,
+  defaultSubject: string,
+  defaultContent: string,
+  translatedContents?: Record<string, { subject: string; content: string }>,
+  sourceLanguage?: string
+): { subject: string; content: string } {
+  const lang = recipient.preferredLanguage || sourceLanguage || 'en';
+  const src = sourceLanguage || 'en';
+
+  // If recipient speaks the source language or no translations provided, use defaults
+  if (lang === src || !translatedContents) {
+    return { subject: defaultSubject, content: defaultContent };
+  }
+
+  // Look up translation for the recipient's language
+  const translation = translatedContents[lang];
+  if (translation) {
+    return { subject: translation.subject, content: translation.content };
+  }
+
+  // Fallback to source content
+  return { subject: defaultSubject, content: defaultContent };
+}
 
 /**
  * Replace {{variable}} placeholders in newsletter HTML with per-recipient values.
@@ -299,6 +329,12 @@ function substituteVariables(html: string, recipient: NewsletterRecipient): stri
 }
 
 // Schema for newsletter job payload
+// Schema for translated content per language
+const translatedContentSchema = z.object({
+  subject: z.string(),
+  content: z.string(),
+});
+
 const newsletterJobSchema = z.object({
   jobId: z.string(),
   newsletterId: z.string(),
@@ -315,6 +351,10 @@ const newsletterJobSchema = z.object({
   scheduledFor: z.string().optional(),
   reactionsEnabled: z.boolean().default(true),
   baseUrl: z.string().optional(),
+  // Translation support: map of language code → { subject, content }
+  // If provided, recipients with a preferredLanguage get translated content
+  translatedContents: z.record(z.string(), translatedContentSchema).optional(),
+  sourceLanguage: z.string().optional(),
 });
 
 export type NewsletterJobPayload = z.infer<typeof newsletterJobSchema>;
@@ -821,70 +861,90 @@ export const sendNewsletterTask = task({
 
       if (batch.length >= BULK_THRESHOLD) {
         // ── BULK SEND: use Resend batch API (or AhaSend fallback) ──
-        // Resend batch API supports up to 100 per call; split if needed
-        const bulkChunks: NewsletterRecipient[][] = [];
-        for (let c = 0; c < batch.length; c += 100) {
-          bulkChunks.push(batch.slice(c, c + 100));
+        // Group recipients by language so each group gets the correct translated content
+        const langGroups = new Map<string, NewsletterRecipient[]>();
+        for (const r of batch) {
+          const lang = r.preferredLanguage || data.sourceLanguage || 'en';
+          const group = langGroups.get(lang) || [];
+          group.push(r);
+          langGroups.set(lang, group);
         }
 
-        for (const chunk of bulkChunks) {
-          const bulkResults = await sendBulkEmails({
-            recipients: chunk,
-            subject: data.subject,
-            content: data.content,
-            from: fromEmail,
-            replyTo: data.replyTo,
-            newsletterId: data.newsletterId,
-            groupUUID: data.groupUUID,
-            tenantId: data.tenantId,
-            reactionsEnabled: data.reactionsEnabled,
-            baseUrl: data.baseUrl,
-          });
+        for (const [lang, langRecipients] of Array.from(langGroups.entries())) {
+          // Resolve content for this language group
+          const resolved = resolveRecipientContent(
+            { preferredLanguage: lang } as NewsletterRecipient,
+            data.subject,
+            data.content,
+            data.translatedContents,
+            data.sourceLanguage,
+          );
 
-          // Track each result individually in Convex
-          for (const result of bulkResults) {
-            if (result.success) {
-              totalSent++;
-              try {
-                const convex = getConvex();
-                if (convex) {
-                  await convex.mutation("newsletterTracking:trackEmailSend" as any, {
-                    tenantId: data.tenantId,
-                    newsletterId: data.newsletterId,
-                    groupUUID: data.groupUUID,
-                    recipientEmail: result.recipientEmail,
-                    recipientId: result.recipientId,
-                    providerMessageId: result.providerMessageId,
-                    status: "queued",
-                  });
-                }
-              } catch (_) { }
-            } else {
-              totalFailed++;
-              errors.push({ email: result.recipientEmail, error: result.error || "Unknown error" });
-              try {
-                const convex = getConvex();
-                if (convex) {
-                  await convex.mutation("newsletterTracking:trackEmailSend" as any, {
-                    tenantId: data.tenantId,
-                    newsletterId: data.newsletterId,
-                    groupUUID: data.groupUUID,
-                    recipientEmail: result.recipientEmail,
-                    recipientId: result.recipientId,
-                    status: "failed",
-                    error: result.error || "Unknown error",
-                  });
-                }
-              } catch (_) { }
-            }
+          // Resend batch API supports up to 100 per call; split if needed
+          const bulkChunks: NewsletterRecipient[][] = [];
+          for (let c = 0; c < langRecipients.length; c += 100) {
+            bulkChunks.push(langRecipients.slice(c, c + 100));
           }
 
-          // Update progress after each bulk chunk
-          const processed = totalSent + totalFailed;
-          const progress = Math.round((processed / validRecipients.length) * 100);
-          metadata.set("sentCount", totalSent);
-          metadata.set("failedCount", totalFailed);
-          metadata.set("progress", progress);
+          for (const chunk of bulkChunks) {
+            const bulkResults = await sendBulkEmails({
+              recipients: chunk,
+              subject: resolved.subject,
+              content: resolved.content,
+              from: fromEmail,
+              replyTo: data.replyTo,
+              newsletterId: data.newsletterId,
+              groupUUID: data.groupUUID,
+              tenantId: data.tenantId,
+              reactionsEnabled: data.reactionsEnabled,
+              baseUrl: data.baseUrl,
+            });
+
+            // Track each result individually in Convex
+            for (const result of bulkResults) {
+              if (result.success) {
+                totalSent++;
+                try {
+                  const convex = getConvex();
+                  if (convex) {
+                    await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                      tenantId: data.tenantId,
+                      newsletterId: data.newsletterId,
+                      groupUUID: data.groupUUID,
+                      recipientEmail: result.recipientEmail,
+                      recipientId: result.recipientId,
+                      providerMessageId: result.providerMessageId,
+                      status: "queued",
+                    });
+                  }
+                } catch (_) { }
+              } else {
+                totalFailed++;
+                errors.push({ email: result.recipientEmail, error: result.error || "Unknown error" });
+                try {
+                  const convex = getConvex();
+                  if (convex) {
+                    await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                      tenantId: data.tenantId,
+                      newsletterId: data.newsletterId,
+                      groupUUID: data.groupUUID,
+                      recipientEmail: result.recipientEmail,
+                      recipientId: result.recipientId,
+                      status: "failed",
+                      error: result.error || "Unknown error",
+                    });
+                  }
+                } catch (_) { }
+              }
+            }
+
+            // Update progress after each bulk chunk
+            const processed = totalSent + totalFailed;
+            const progress = Math.round((processed / validRecipients.length) * 100);
+            metadata.set("sentCount", totalSent);
+            metadata.set("failedCount", totalFailed);
+            metadata.set("progress", progress);
+          }
         }
       } else {
         // ── INDIVIDUAL SEND: fewer than BULK_THRESHOLD recipients ──
@@ -896,8 +956,17 @@ export const sendNewsletterTask = task({
             let emailData: any = null;
             let sendError: any = null;
 
+            // Resolve translated content for this recipient's preferred language
+            const resolved = resolveRecipientContent(
+              recipient,
+              data.subject,
+              data.content,
+              data.translatedContents,
+              data.sourceLanguage,
+            );
+
             // Substitute variables and inject per-recipient reaction bar if enabled
-            let recipientHtml = substituteVariables(data.content, recipient);
+            let recipientHtml = substituteVariables(resolved.content, recipient);
             if (data.reactionsEnabled && data.baseUrl) {
               recipientHtml = injectReactionBar(recipientHtml, data.baseUrl, data.newsletterId, recipient.id);
             }
@@ -905,9 +974,9 @@ export const sendNewsletterTask = task({
             const { data: resendData, error: resendError } = await resend.emails.send({
               from: fromEmail,
               to: recipient.email,
-              subject: data.subject,
+              subject: resolved.subject,
               html: recipientHtml,
-              text: data.content.replace(/<[^>]*>/g, ""),
+              text: resolved.content.replace(/<[^>]*>/g, ""),
               replyTo: data.replyTo,
               tags: [
                 { name: "type", value: "newsletter" },
@@ -928,9 +997,9 @@ export const sendNewsletterTask = task({
                 const sesResult = await sendSESEmail({
                   from: { email: fromEmail },
                   recipients: [{ email: recipient.email }],
-                  subject: data.subject,
+                  subject: resolved.subject,
                   html_content: recipientHtml,
-                  text_content: data.content.replace(/<[^>]*>/g, ""),
+                  text_content: resolved.content.replace(/<[^>]*>/g, ""),
                   reply_to: data.replyTo,
                   tags: { type: "newsletter", newsletterId: data.newsletterId, groupUUID: data.groupUUID, tenantId: data.tenantId, recipientId: recipient.id },
                 });
@@ -944,9 +1013,9 @@ export const sendNewsletterTask = task({
                   const ahaResult = await sendAhaEmail({
                     from: { email: fromEmail },
                     recipients: [{ email: recipient.email }],
-                    subject: data.subject,
+                    subject: resolved.subject,
                     html_content: recipientHtml,
-                    text_content: data.content.replace(/<[^>]*>/g, ""),
+                    text_content: resolved.content.replace(/<[^>]*>/g, ""),
                     reply_to: data.replyTo,
                   });
                   const ahaMessages: any[] = ahaResult?.data || [];

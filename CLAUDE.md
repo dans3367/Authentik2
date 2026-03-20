@@ -1,4 +1,6 @@
-# Authentik - SaaS Authentication & Marketing Platform
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -13,89 +15,133 @@ Full-stack multi-tenant SaaS platform for authentication, email marketing, newsl
 | State | Redux + Redux Persist + TanStack Query + Convex |
 | Backend | Express.js + TypeScript (port 5002) |
 | Database | PostgreSQL + Drizzle ORM |
-| Auth | Better Auth v1.4.20 (JWT + sessions + 2FA TOTP) |
-| Email | Resend (primary) + AWS SES (failover) |
+| Auth | Better Auth v1.4.20 (sessions + 2FA TOTP) |
+| Email | Resend (primary) → AWS SES (secondary) → AhaSend (tertiary) |
 | Task Queue | Trigger.dev v4.4.3 |
-| Workflows | Temporal (Go microservice, port 5004) |
-| Real-time | Convex (newsletter tracking webhooks) |
+| Real-time | Convex (newsletter tracking via WebSocket subscriptions) |
 | Billing | Stripe subscriptions |
 | AI | Google Gemini 2.5 Flash via Vercel AI SDK |
 | File Storage | AWS S3 / CloudFlare R2 |
 | Visual Editor | Puck v0.21 (newsletters) + Tiptap v3.6 (rich text) |
 | Validation | Zod + Drizzle Zod |
 | Logging | Pino + Axiom |
-| Testing | Playwright |
-
-## Architecture
-
-```
-client/          - React SPA (70+ pages, Wouter routing)
-server/          - Express API (40+ route files, Drizzle schema)
-shared/          - Shared types and schemas
-src/trigger/     - Trigger.dev tasks (17 task files)
-convex/          - Convex real-time backend (newsletter tracking)
-formserver/      - Independent public form hosting app
-cardprocessor-go/ - Go microservice (birthday cards, Temporal)
-migrations/      - Drizzle database migrations
-seeders/         - Database seeders
-scripts/         - Dev/build utility scripts
-tests/           - Playwright tests
-```
-
-## Key Directories
-
-- `server/routes/` - Express route handlers (auth, newsletters, emails, forms, etc.)
-- `server/db/schema.ts` - Drizzle schema (30+ tables, ~3000 lines)
-- `server/auth.ts` - Better Auth configuration
-- `client/src/pages/` - React page components
-- `client/src/components/` - Reusable UI components
-- `client/src/config/puck/` - Puck editor configuration and blocks
 
 ## Build & Dev
 
 ```bash
-npm run dev              # Start Express + Vite dev server
+npm run dev              # Start Express + Vite dev server (single port 5002)
 npm run dev:trigger      # Start Trigger.dev local dev
 npm run build            # Production build (Vite + esbuild)
 npm run db:push          # Push Drizzle schema to PostgreSQL
-npm run db:init          # Initialize database
+npm run db:init          # Initialize database (idempotent: creates default tenant + subscription plans)
 npm run check            # TypeScript type check
+npm run seed:owner-company # Create owner account with default tenant for local dev
+npm run build:email-css  # Build Tailwind CSS for email templates
 ```
+
+## TypeScript Path Aliases
+
+```
+@/*       → ./client/src/*
+@shared/* → ./shared/*
+```
+
+## Architecture
+
+```
+client/            - React SPA (70+ pages, Wouter routing)
+server/            - Express API (40+ route files)
+  routes/          - Express route handlers
+  db/              - Database connection (server/db.ts)
+  auth.ts          - Better Auth configuration + signup hooks
+  middleware/       - Auth, tenant, role, security middleware
+shared/            - Shared Drizzle schema + types (shared/schema.ts, ~3000 lines)
+src/trigger/       - Trigger.dev tasks (17 task files)
+convex/            - Convex real-time backend (newsletter tracking)
+formserver/        - Retained but unused public form hosting app
+cardprocessor-go/  - Go microservice (birthday cards, Temporal) — largely superseded by Trigger.dev
+migrations/        - Drizzle SQL migration files
+seeders/           - Database seeders
+```
+
+### Single-Port Unified Server
+
+Express on port 5002 serves both the API and the React SPA. In development, Vite middleware provides HMR. In production, Express static-serves the built SPA from `dist/public/`. All `/api/*` requests go to Express routes; everything else falls through to `index.html` for client-side routing.
+
+### Dual-Database Pattern (PostgreSQL + Convex)
+
+PostgreSQL is the source of truth for all business data. Convex mirrors a subset of newsletter data for real-time WebSocket subscriptions (send status, tracking events, aggregated stats). This avoids Convex vendor lock-in for business logic while enabling live dashboards.
+
+- `convex/schema.ts` — `newsletterSends`, `newsletterEvents`, `newsletterListItems`, `newsletterStats`
+- Client subscribes via `useQuery(api.newsletterListItems.getList)` for live kanban updates
+- Convex is optional — if `CONVEX_URL` is not set, the app degrades gracefully
+
+### Three-Layer Client State
+
+- **Redux** (persisted): Auth state (user, role, tenantId) + UI prefs (menuExpanded, theme)
+- **TanStack Query**: Server state from Express API with caching + invalidation
+- **Convex**: Real-time newsletter tracking via WebSocket subscriptions
+
+### Better Auth Signup Flow
+
+Signup automatically creates a tenant + company via Better Auth hooks in `server/auth.ts`:
+1. Creates `tenants` record (slug auto-generated from email)
+2. Creates `companies` record (for onboarding modal)
+3. Updates user with `tenantId` + `role: 'Owner'`
+
+Session verification: `authenticateToken` middleware calls `auth.api.getSession()` then cross-checks user in DB for tenant info and active status.
 
 ## Multi-Tenant Model
 
-- All data is tenant-scoped via `tenantId` column
+- All data tenant-scoped via `tenantId` column
 - Roles: Owner, Administrator, Manager, Employee
-- `authenticateToken` middleware validates Better Auth sessions
-- `requireTenant` middleware enforces tenant context
-- `requireRole` middleware enforces RBAC
+- `authenticateToken` → `requireTenant` → `requireRole` middleware chain enforces RBAC
+- Tenant isolation enforced at both middleware and query level (explicit WHERE clauses)
 
 ## Email System
 
-- **Resend** as primary provider with **AWS SES** as failover
-- Rate limiting and retry logic per provider
-- Real-time tracking: sent, delivered, opened, clicked, bounced, complained
-- Bounce/suppression list management
-- Unsubscribe tokens per contact
+- **Provider failover**: Resend → SES → AhaSend
+- Resend batch API for 5+ recipients, individual sends for 1-4
+- Per-recipient tracking via unique `emailTrackingId` (UUID) correlated in Convex
+- Webhook processing: Resend/Postmark webhooks → Convex updates send status + inserts event records
+- All newsletter HTML sanitized with XSS library (CSS-preserving config) before storage
+- Unsubscribe tokens per contact; reactions injected before footer marker
+
+## Internal Service Auth (Trigger.dev → Express)
+
+Trigger.dev tasks authenticate to Express endpoints using HMAC-SHA256 signatures instead of storing auth tokens:
+- Headers: `x-internal-service`, `x-internal-timestamp`, `x-internal-signature`
+- 5-minute timestamp window prevents replay attacks
+- Timing-safe comparison for signature verification
+- Middleware: `server/middleware/internal-service-auth.ts`
 
 ## Key Conventions
 
 - Use `@trigger.dev/sdk` v4 (NEVER `client.defineJob` from v2)
 - Check `result.ok` before accessing `result.output` on `triggerAndWait()`
 - Never wrap `triggerAndWait` or `wait` calls in `Promise.all`
-- All email HTML is sanitized with XSS library (CSS-preserving config)
 - Input validation at API boundaries with Zod + express-validator
 - i18n via i18next (client-side)
+- Shared schema in `shared/schema.ts` — imported by both server and client for type generation via `createInsertSchema` (Drizzle Zod)
 
 ## Security
 
-- Helmet security headers
+- Helmet security headers + custom CSP
 - Rate limiting (token bucket for auth, sliding window for API)
-- XSS sanitization on all public endpoints
-- Tenant isolation at middleware + query level
+- XSS sanitization on all public endpoints — **skipped for `/api/webhooks/*`** to preserve external payloads
+- CORS allowlist from `CORS_ORIGIN` env var (no wildcards in production)
 - GDPR consent tracking (IP, user agent, timestamp)
 - Drizzle ORM parameterized queries (SQL injection prevention)
 - NEVER hardcode API keys or commit .env files
+
+## Express Middleware Order (Critical)
+
+1. Helmet security headers
+2. CORS (dynamic allowlist + localhost in dev)
+3. Better Auth handler for `/api/auth/*`
+4. Raw body parser for Stripe webhooks (must come before `express.json()`)
+5. JSON/URL body parsers
+6. Request logging middleware
 
 <!-- TRIGGER.DEV basic START -->
 ## Trigger.dev Tasks (v4)

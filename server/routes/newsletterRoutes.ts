@@ -195,6 +195,7 @@ async function getNewsletterRecipientsBase(newsletter: any, tenantId: string, op
       lastName: true,
       phoneNumber: true,
       address: true,
+      preferredLanguage: true,
       ...(filterActiveOnly ? { prefNewsletters: true } : { status: true }),
     };
 
@@ -1782,9 +1783,9 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
         // Wrap newsletter content in the tenant's global email design template
         const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
 
-        // Generate unsubscribe tokens for all recipients
+        // Generate unsubscribe tokens for all recipients (include preferredLanguage)
         const recipientsWithTokens = await Promise.all(
-          allowedRecipients.map(async (contact: { id: string; email: string; firstName?: string; lastName?: string; phoneNumber?: string; address?: string }) => {
+          allowedRecipients.map(async (contact: { id: string; email: string; firstName?: string; lastName?: string; phoneNumber?: string; address?: string; preferredLanguage?: string | null }) => {
             let unsub = await db.query.unsubscribeTokens.findFirst({
               where: and(eq(unsubscribeTokens.tenantId, req.user.tenantId), eq(unsubscribeTokens.contactId, contact.id), sql`${unsubscribeTokens.usedAt} IS NULL`),
             });
@@ -1801,9 +1802,41 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
               phoneNumber: contact.phoneNumber || '',
               address: contact.address || '',
               unsubscribeToken: unsub.token,
+              preferredLanguage: contact.preferredLanguage || 'en',
             };
           })
         );
+
+        // Pre-translate newsletter content for recipients with non-source languages
+        const sourceLanguage = req.user.language || 'en'; // Use the sender's profile language preference
+        const recipientLanguages = recipientsWithTokens.map(r => r.preferredLanguage);
+        let translatedContents: Record<string, { subject: string; content: string }> | undefined;
+
+        try {
+          const { translateNewsletterForRecipients } = await import('../utils/translationService');
+          const translationMap = await translateNewsletterForRecipients({
+            tenantId: req.user.tenantId,
+            newsletterId: newsletter.id,
+            sourceLanguage,
+            subject: newsletter.subject,
+            content: wrappedContent,
+            recipientLanguages,
+          });
+
+          // Convert Map to plain object for JSON serialization (only non-source languages)
+          if (translationMap.size > 1) {
+            translatedContents = {};
+            for (const [lang, content] of Array.from(translationMap.entries())) {
+              if (lang !== sourceLanguage) {
+                translatedContents[lang] = content;
+              }
+            }
+            console.log(`[Newsletter] Pre-translated content into ${Object.keys(translatedContents).length} language(s): ${Object.keys(translatedContents).join(', ')}`);
+          }
+        } catch (translationError) {
+          console.error('[Newsletter] Translation failed, will send in source language:', translationError);
+          // Continue without translations — all recipients get source language content
+        }
 
         // Import and trigger the Trigger.dev task
         const { sendNewsletterTask } = await import('../../src/trigger/newsletter');
@@ -1821,6 +1854,8 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
           priority: 'normal' as const,
           reactionsEnabled: newsletter.reactionsEnabled ?? true,
           baseUrl: `${req.protocol}://${req.get('host')}`,
+          translatedContents,
+          sourceLanguage,
         });
 
         console.log(`[Newsletter] Trigger.dev task triggered:`, {
@@ -1873,6 +1908,24 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
         // Wrap newsletter content in the branded email design template
         const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
 
+        // Pre-translate content for the fallback path
+        const fallbackSourceLang = req.user.language || 'en';
+        const fallbackRecipientLangs = allowedRecipients.map((r: any) => r.preferredLanguage || fallbackSourceLang);
+        let fallbackTranslationMap: Map<string, { subject: string; content: string }> | undefined;
+        try {
+          const { translateNewsletterForRecipients } = await import('../utils/translationService');
+          fallbackTranslationMap = await translateNewsletterForRecipients({
+            tenantId: req.user.tenantId,
+            newsletterId: newsletter.id,
+            sourceLanguage: fallbackSourceLang,
+            subject: newsletter.subject,
+            content: wrappedContent,
+            recipientLanguages: fallbackRecipientLangs,
+          });
+        } catch (translationErr) {
+          console.error('[Newsletter] Fallback translation failed, sending in source language:', translationErr);
+        }
+
         // Helper to inject content before the footer marker (inside the document body)
         const injectBeforeFooter = (content: string, injection: string): string => {
           const footerMarker = '<!-- Footer -->';
@@ -1889,10 +1942,16 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
         };
 
         // Prepare emails for batch sending (inject reaction buttons + unsubscribe link inside body)
-        const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string; phoneNumber?: string; address?: string }) => {
+        const emails = allowedRecipients.map((contact: { id: string; email: string; firstName?: string; lastName?: string; phoneNumber?: string; address?: string; preferredLanguage?: string | null }) => {
           const token = tokenMap.get(contact.id)!;
           const unsubscribeUrl = `${req.protocol}://${req.get('host')}/api/email/unsubscribe?token=${encodeURIComponent(token)}&type=newsletters`;
           const emailTrackingId = crypto.randomUUID();
+
+          // Resolve translated content for this recipient's preferred language
+          const recipientLang = contact.preferredLanguage || fallbackSourceLang;
+          const translated = fallbackTranslationMap?.get(recipientLang);
+          const resolvedSubject = translated ? translated.subject : newsletter.subject;
+          const resolvedContent = translated ? translated.content : wrappedContent;
 
           // Build reaction buttons HTML if reactions are enabled
           const reactionHtml = newsletter.reactionsEnabled
@@ -1907,15 +1966,15 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
             </div>`;
 
           // Substitute template variables for this recipient
-          let html = substituteNewsletterVariables(wrappedContent, contact);
+          let html = substituteNewsletterVariables(resolvedContent, contact);
           if (reactionHtml) {
             html = injectBeforeFooter(html, reactionHtml);
           }
           html = injectBeforeFooter(html, unsubscribeBlock);
-          const text = `${newsletter.content.replace(/<[^>]*>/g, '')}\n\nUnsubscribe: ${unsubscribeUrl}`;
+          const text = `${resolvedContent.replace(/<[^>]*>/g, '')}\n\nUnsubscribe: ${unsubscribeUrl}`;
           return {
             to: contact.email,
-            subject: newsletter.subject,
+            subject: resolvedSubject,
             html,
             text,
             headers: {

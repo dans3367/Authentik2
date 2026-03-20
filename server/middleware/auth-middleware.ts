@@ -14,6 +14,7 @@ export interface AuthUser {
   lastName?: string;
   role: string;
   tenantId: string;
+  language?: string;
 }
 
 export interface AuthRequest extends Request {
@@ -77,7 +78,8 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       firstName,
       lastName,
       role: userRecord.role || 'Employee',
-      tenantId: finalTenantId
+      tenantId: finalTenantId,
+      language: userRecord.language || 'en',
     };
 
     req.user = authUser;

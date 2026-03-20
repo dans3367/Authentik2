@@ -49,6 +49,7 @@ import { statsRoutes } from "./routes/statsRoutes";
 import { newsletterReactionRoutes } from "./routes/newsletterReactionRoutes";
 import { publicNewsletterRoutes } from "./routes/publicNewsletterRoutes";
 import { analyticsRoutes } from "./routes/analyticsRoutes";
+import { translationRoutes } from "./routes/translationRoutes";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
@@ -85,6 +86,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/company", companyRoutes);
   app.use("/api/shops", shopsRoutes);
   app.use("/api", emailManagementRoutes);
+  app.use("/api/newsletters", translationRoutes);  // Must be before newsletterRoutes so /translation-languages isn't caught by /:id
   app.use("/api/newsletters", newsletterRoutes);
   app.use("/api/card-images", cardImageRoutes);
   app.use("/api/newsletter-images", newsletterImageRoutes);

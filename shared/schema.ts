@@ -549,6 +549,22 @@ export const newsletterTaskStatus = pgTable("newsletter_task_status", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Newsletter translations cache - stores AI-translated newsletter content per language
+export const newsletterTranslations = pgTable("newsletter_translations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  newsletterId: varchar("newsletter_id").notNull().references(() => newsletters.id, { onDelete: 'cascade' }),
+  sourceLanguage: text("source_language").notNull().default('en'), // ISO 639-1 code of the original content
+  targetLanguage: text("target_language").notNull(), // ISO 639-1 code of the translated content
+  translatedSubject: text("translated_subject").notNull(), // Translated email subject line
+  translatedContent: text("translated_content").notNull(), // Translated HTML content (pre-wrapped)
+  contentHash: text("content_hash").notNull(), // SHA-256 hash of source content — used for cache invalidation
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  uniqueNewsletterLanguage: uniqueIndex("newsletter_translations_unique_idx").on(table.newsletterId, table.targetLanguage),
+}));
+
 // Newsletter reviewer settings for tenant-wide reviewer configuration
 export const newsletterReviewerSettings = pgTable("newsletter_reviewer_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1747,6 +1763,18 @@ export const newsletterRelations = relations(newsletters, ({ one, many }) => ({
   }),
   taskStatuses: many(newsletterTaskStatus),
   reactions: many(newsletterReactions),
+  translations: many(newsletterTranslations),
+}));
+
+export const newsletterTranslationsRelations = relations(newsletterTranslations, ({ one }) => ({
+  newsletter: one(newsletters, {
+    fields: [newsletterTranslations.newsletterId],
+    references: [newsletters.id],
+  }),
+  tenant: one(tenants, {
+    fields: [newsletterTranslations.tenantId],
+    references: [tenants.id],
+  }),
 }));
 
 export const newsletterTaskStatusRelations = relations(newsletterTaskStatus, ({ one }) => ({
