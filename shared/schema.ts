@@ -378,6 +378,7 @@ export const emailContacts = pgTable("email_contacts", {
   // Contact fields
   phoneNumber: text("phone_number"),
   dateOfBirth: text("date_of_birth"), // Date of birth in YYYY-MM-DD format
+  preferredLanguage: text("preferred_language").default('en'), // ISO 639-1 language code for communications
   // Email preference fields (segmented unsubscribe)
   prefTransactional: boolean("pref_transactional").notNull().default(true),
   prefMarketing: boolean("pref_marketing").notNull().default(true),
@@ -1538,6 +1539,7 @@ export const createEmailContactSchema = z.object({
   country: z.string().optional(),
   // Contact fields
   phoneNumber: z.string().optional(),
+  preferredLanguage: z.string().min(2).max(10).optional(),
 });
 
 export const updateEmailContactSchema = z.object({
@@ -1558,6 +1560,7 @@ export const updateEmailContactSchema = z.object({
   country: z.string().optional(),
   // Contact fields
   phoneNumber: z.string().optional(),
+  preferredLanguage: z.string().min(2).max(10).optional(),
 });
 
 export const createEmailListSchema = z.object({

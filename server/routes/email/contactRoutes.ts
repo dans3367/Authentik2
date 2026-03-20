@@ -64,6 +64,7 @@ contactRoutes.get("/email-contacts", authenticateToken, requireTenant, requirePe
         zipCode: true,
         country: true,
         phoneNumber: true,
+        preferredLanguage: true,
         addedDate: true,
         lastActivity: true,
         emailsSent: true,
@@ -522,6 +523,7 @@ contactRoutes.get("/email-contacts/:id", authenticateToken, requireTenant, requi
         zipCode: true,
         country: true,
         phoneNumber: true,
+        preferredLanguage: true,
         addedDate: true,
         lastActivity: true,
         emailsSent: true,
@@ -650,7 +652,7 @@ contactRoutes.get("/email-contacts/:id/stats", authenticateToken, requireTenant,
 // Create email contact with batch operations
 contactRoutes.post("/email-contacts", authenticateToken, requireTenant, requirePermission('contacts.create'), async (req: any, res) => {
   try {
-    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent, address, city, state, zipCode, country, phoneNumber, dateOfBirth } = req.body;
+    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent, address, city, state, zipCode, country, phoneNumber, dateOfBirth, preferredLanguage } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
@@ -756,6 +758,7 @@ contactRoutes.post("/email-contacts", authenticateToken, requireTenant, requireP
         country: sanitizedCountry,
         phoneNumber: sanitizedPhoneNumber,
         dateOfBirth: validatedDateOfBirth,
+        preferredLanguage: preferredLanguage ? sanitizeString(preferredLanguage) : 'en',
         createdAt: now,
         updatedAt: now,
       }).returning();
@@ -1045,7 +1048,7 @@ async function autoSendBirthdayCard(contact: any, tenantId: string) {
 contactRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { email, firstName, lastName, status, birthday, address, city, state, zipCode, country, phoneNumber, dateOfBirth } = req.body;
+    const { email, firstName, lastName, status, birthday, address, city, state, zipCode, country, phoneNumber, dateOfBirth, preferredLanguage } = req.body;
 
     const contact = await db.query.emailContacts.findFirst({
       where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
@@ -1126,6 +1129,11 @@ contactRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, requi
       updateData.phoneNumber = phoneNumber ? sanitizeString(phoneNumber) : null;
     }
 
+    // Optional preferred language (ISO 639-1 code)
+    if (preferredLanguage !== undefined) {
+      updateData.preferredLanguage = preferredLanguage ? sanitizeString(preferredLanguage) : 'en';
+    }
+
     // Optional date of birth in YYYY-MM-DD format
     if (dateOfBirth !== undefined) {
       if (dateOfBirth) {
@@ -1163,6 +1171,7 @@ contactRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, requi
       'country',
       'phoneNumber',
       'dateOfBirth',
+      'preferredLanguage',
     ]);
 
     if (changes) {

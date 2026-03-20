@@ -1162,6 +1162,9 @@
         "countryPlaceholder": "United States",
         "phoneNumberLabel": "Phone Number",
         "phoneNumberPlaceholder": "+1 (555) 123-4567",
+        "preferredLanguageLabel": "Preferred Language",
+        "preferredLanguageDescription": "Language used for sending communications to this contact",
+        "preferredLanguagePlaceholder": "Select language",
         "addressSectionTitle": "Address Information (Optional)",
         "consentLabel": "Consent Acknowledgment",
         "consentDescription": "I acknowledge that I have express consent from this contact to add their email address to our mailing lists. I understand that I am legally liable for ensuring proper consent has been obtained before adding any email address to our email marketing lists. This includes having explicit permission to send marketing communications to this email address in compliance with applicable laws (CAN-SPAM, GDPR, etc.).",
@@ -3582,6 +3585,8 @@
       "country": "Country",
       "phoneNumber": "Phone Number",
       "dateOfBirth": "Customer's Date of Birth",
+      "preferredLanguage": "Preferred Language",
+      "preferredLanguageDescription": "Language used for sending communications to this contact",
       "customFields": "Custom Fields",
       "yes": "Yes",
       "no": "No"

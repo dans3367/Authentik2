@@ -947,6 +947,9 @@
         "countryPlaceholder": "México",
         "phoneNumberLabel": "Número de Teléfono",
         "phoneNumberPlaceholder": "+52 (55) 1234-5678",
+        "preferredLanguageLabel": "Idioma Preferido",
+        "preferredLanguageDescription": "Idioma utilizado para enviar comunicaciones a este contacto",
+        "preferredLanguagePlaceholder": "Seleccionar idioma",
         "addressSectionTitle": "Información de Dirección (Opcional)",
         "consentLabel": "Reconocimiento de Consentimiento",
         "consentDescription": "Reconozco que tengo el consentimiento expreso de este contacto para agregar su dirección de correo electrónico a nuestras listas de correo. Entiendo que soy legalmente responsable de asegurar que se haya obtenido el consentimiento adecuado antes de agregar cualquier dirección de correo electrónico a nuestras listas de marketing por correo electrónico. Esto incluye tener permiso explícito para enviar comunicaciones de marketing a esta dirección de correo electrónico en cumplimiento con las leyes aplicables (CAN-SPAM, GDPR, etc.).",
@@ -3570,6 +3573,8 @@
       "country": "País",
       "phoneNumber": "Número de Teléfono",
       "dateOfBirth": "Fecha de Nacimiento del Cliente",
+      "preferredLanguage": "Idioma Preferido",
+      "preferredLanguageDescription": "Idioma utilizado para enviar comunicaciones a este contacto",
       "customFields": "Campos Personalizados",
       "yes": "Sí",
       "no": "No"

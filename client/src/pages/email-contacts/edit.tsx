@@ -52,6 +52,7 @@ const editContactSchema = z.object({
   country: z.string().optional(),
   phoneNumber: z.string().optional(),
   dateOfBirth: z.date().optional().nullable(),
+  preferredLanguage: z.string().optional(),
 });
 
 type EditContactForm = z.infer<typeof editContactSchema>;
@@ -75,6 +76,7 @@ interface UpdateContactRequest {
   country?: string | null;
   phoneNumber?: string | null;
   dateOfBirth?: string | null;
+  preferredLanguage?: string | null;
 }
 
 export default function EditEmailContact() {
@@ -154,6 +156,7 @@ export default function EditEmailContact() {
       country: "",
       phoneNumber: "",
       dateOfBirth: undefined,
+      preferredLanguage: "en",
     },
   });
 
@@ -179,6 +182,7 @@ export default function EditEmailContact() {
         country: contact.country || "",
         phoneNumber: contact.phoneNumber || "",
         dateOfBirth: contact.dateOfBirth ? new Date(contact.dateOfBirth) : undefined,
+        preferredLanguage: contact.preferredLanguage || "en",
       });
       setSelectedTags(contact.tags?.map((tag: any) => tag.id) || []);
       setSelectedLists(contact.lists?.map((list: any) => list.id) || []);
@@ -244,6 +248,7 @@ export default function EditEmailContact() {
       country: data.country || null,
       phoneNumber: data.phoneNumber || null,
       dateOfBirth: data.dateOfBirth ? format(data.dateOfBirth, 'yyyy-MM-dd') : null,
+      preferredLanguage: data.preferredLanguage || 'en',
     };
 
     // Save custom field values in parallel with contact update
@@ -550,6 +555,42 @@ export default function EditEmailContact() {
                         )}
                       />
                     </div>
+
+                    {/* Preferred Language */}
+                    <FormField
+                      control={form.control}
+                      name="preferredLanguage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Preferred Language</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || 'en'}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select language" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="en">English</SelectItem>
+                              <SelectItem value="es">Español</SelectItem>
+                              <SelectItem value="fr">Français</SelectItem>
+                              <SelectItem value="de">Deutsch</SelectItem>
+                              <SelectItem value="pt">Português</SelectItem>
+                              <SelectItem value="it">Italiano</SelectItem>
+                              <SelectItem value="ja">日本語</SelectItem>
+                              <SelectItem value="ko">한국어</SelectItem>
+                              <SelectItem value="zh">中文</SelectItem>
+                              <SelectItem value="ar">العربية</SelectItem>
+                              <SelectItem value="hi">हिन्दी</SelectItem>
+                              <SelectItem value="ru">Русский</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription className="text-xs">
+                            Language used for sending communications to this contact
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
                   {/* Custom Fields */}

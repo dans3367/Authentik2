@@ -66,6 +66,7 @@ const addContactSchema = z.object({
   zipCode: z.string().optional(),
   country: z.string().optional(),
   phoneNumber: z.string().optional(),
+  preferredLanguage: z.string().optional(),
 });
 
 type AddContactForm = z.infer<typeof addContactSchema>;
@@ -113,6 +114,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
       zipCode: "",
       country: "",
       phoneNumber: "",
+      preferredLanguage: "en",
     },
   });
 
@@ -436,6 +438,42 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
                     <FormControl>
                       <Input placeholder="+1 (555) 123-4567" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Preferred Language */}
+              <FormField
+                control={form.control}
+                name="preferredLanguage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Preferred Language</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || 'en'}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select language" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="en">English</SelectItem>
+                        <SelectItem value="es">Español</SelectItem>
+                        <SelectItem value="fr">Français</SelectItem>
+                        <SelectItem value="de">Deutsch</SelectItem>
+                        <SelectItem value="pt">Português</SelectItem>
+                        <SelectItem value="it">Italiano</SelectItem>
+                        <SelectItem value="ja">日本語</SelectItem>
+                        <SelectItem value="ko">한국어</SelectItem>
+                        <SelectItem value="zh">中文</SelectItem>
+                        <SelectItem value="ar">العربية</SelectItem>
+                        <SelectItem value="hi">हिन्दी</SelectItem>
+                        <SelectItem value="ru">Русский</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs">
+                      Language used for sending communications to this contact
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

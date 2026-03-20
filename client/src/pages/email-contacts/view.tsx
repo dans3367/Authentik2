@@ -51,6 +51,7 @@ interface Contact {
   consentDate?: Date | null;
   consentMethod?: string | null;
   consentIpAddress?: string | null;
+  preferredLanguage?: string | null;
   // Email preferences (segmented unsubscribe)
   prefMarketing?: boolean;
   prefCustomerEngagement?: boolean;
@@ -510,6 +511,18 @@ export default function ViewContact() {
                   <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Email Address</label>
                   <p className="text-gray-900 dark:text-white font-mono">{contact.email}</p>
                 </div>
+                {contact.preferredLanguage && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Preferred Language</label>
+                    <p className="text-gray-900 dark:text-white">
+                      {{
+                        en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch',
+                        pt: 'Português', it: 'Italiano', ja: '日本語', ko: '한국어',
+                        zh: '中文', ar: 'العربية', hi: 'हिन्दी', ru: 'Русский',
+                      }[contact.preferredLanguage] || contact.preferredLanguage}
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

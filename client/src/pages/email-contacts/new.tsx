@@ -62,6 +62,7 @@ const addContactSchema = z.object({
   country: z.string().optional(),
   phoneNumber: z.string().optional(),
   dateOfBirth: z.date().optional().nullable(),
+  preferredLanguage: z.string().optional(),
 });
 
 type AddContactForm = z.infer<typeof addContactSchema>;
@@ -104,6 +105,7 @@ export default function NewEmailContact() {
       country: "",
       phoneNumber: "",
       dateOfBirth: undefined,
+      preferredLanguage: "en",
     },
   });
 
@@ -501,6 +503,42 @@ export default function NewEmailContact() {
                       )}
                     />
                   </div>
+
+                  {/* Preferred Language */}
+                  <FormField
+                    control={form.control}
+                    name="preferredLanguage"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Preferred Language</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || 'en'}>
+                          <FormControl>
+                            <SelectTrigger className="bg-white dark:bg-gray-800">
+                              <SelectValue placeholder="Select language" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="en">English</SelectItem>
+                            <SelectItem value="es">Español</SelectItem>
+                            <SelectItem value="fr">Français</SelectItem>
+                            <SelectItem value="de">Deutsch</SelectItem>
+                            <SelectItem value="pt">Português</SelectItem>
+                            <SelectItem value="it">Italiano</SelectItem>
+                            <SelectItem value="ja">日本語</SelectItem>
+                            <SelectItem value="ko">한국어</SelectItem>
+                            <SelectItem value="zh">中文</SelectItem>
+                            <SelectItem value="ar">العربية</SelectItem>
+                            <SelectItem value="hi">हिन्दी</SelectItem>
+                            <SelectItem value="ru">Русский</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription className="text-xs">
+                          Language used for sending communications to this contact
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 {/* Status Field */}
