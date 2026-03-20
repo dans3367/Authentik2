@@ -1614,7 +1614,17 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
     // If test email is provided, send test email
     if (testEmail) {
       try {
-        const wrappedTestHtml = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
+        let wrappedTestHtml = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
+
+        // Rehost external images for test send too
+        try {
+          const { rehostNewsletterImages } = await import('../utils/newsletterImageRehost');
+          const rehostResult = await rehostNewsletterImages(wrappedTestHtml, req.user.tenantId, newsletter.id);
+          wrappedTestHtml = rehostResult.html;
+        } catch (rehostErr) {
+          console.warn('[Newsletter] Test send image rehosting failed (non-fatal):', rehostErr);
+        }
+
         const testTrackingId = crypto.randomUUID();
         await emailService.sendCustomEmail(testEmail, newsletter.subject, wrappedTestHtml, {
           tags: [
@@ -1781,7 +1791,19 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
         console.log(`[Newsletter] Triggering Trigger.dev sendNewsletterTask`);
 
         // Wrap newsletter content in the tenant's global email design template
-        const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
+        let wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
+
+        // Rehost external images to Cloudflare R2 for reliable delivery
+        try {
+          const { rehostNewsletterImages } = await import('../utils/newsletterImageRehost');
+          const rehostResult = await rehostNewsletterImages(wrappedContent, req.user.tenantId, newsletter.id);
+          wrappedContent = rehostResult.html;
+          if (rehostResult.rehosted > 0) {
+            console.log(`[Newsletter] Rehosted ${rehostResult.rehosted} image(s) to R2 (${rehostResult.skipped} skipped, ${rehostResult.failed} failed)`);
+          }
+        } catch (rehostErr) {
+          console.warn('[Newsletter] Image rehosting failed (non-fatal, using original URLs):', rehostErr);
+        }
 
         // Generate unsubscribe tokens for all recipients (include preferredLanguage)
         const recipientsWithTokens = await Promise.all(
@@ -1906,7 +1928,16 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
         }
 
         // Wrap newsletter content in the branded email design template
-        const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
+        let wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
+
+        // Rehost external images to R2 (fallback path)
+        try {
+          const { rehostNewsletterImages } = await import('../utils/newsletterImageRehost');
+          const rehostResult = await rehostNewsletterImages(wrappedContent, req.user.tenantId, newsletter.id);
+          wrappedContent = rehostResult.html;
+        } catch (rehostErr) {
+          console.warn('[Newsletter] Fallback image rehosting failed (non-fatal):', rehostErr);
+        }
 
         // Pre-translate content for the fallback path
         const fallbackSourceLang = req.user.language || 'en';
@@ -2224,7 +2255,19 @@ newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, require
     }
 
     // Wrap newsletter content
-    const wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
+    let wrappedContent = await wrapNewsletterContent(req.user.tenantId, newsletter.content, extractPuckColorOverrides(newsletter.puckData));
+
+    // Rehost external images to R2 before scheduling
+    try {
+      const { rehostNewsletterImages } = await import('../utils/newsletterImageRehost');
+      const rehostResult = await rehostNewsletterImages(wrappedContent, req.user.tenantId, newsletter.id);
+      wrappedContent = rehostResult.html;
+      if (rehostResult.rehosted > 0) {
+        console.log(`[Newsletter] Rehosted ${rehostResult.rehosted} image(s) to R2 for scheduled send`);
+      }
+    } catch (rehostErr) {
+      console.warn('[Newsletter] Scheduled send image rehosting failed (non-fatal):', rehostErr);
+    }
 
     // Trigger the schedule task via Trigger.dev
     const { scheduleNewsletterTask } = await import('../../src/trigger/newsletter');

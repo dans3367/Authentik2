@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Calendar, ArrowRight, Globe, ExternalLink } from "lucide-react";
+import { Loader2, Calendar, ArrowRight, Globe, ExternalLink, Sun, Moon } from "lucide-react";
 
 interface Branding {
   companyName: string;
@@ -53,11 +53,26 @@ const logoSizeMap: Record<string, string> = {
   xlarge: "96px",
 };
 
+function useBlogTheme() {
+  const [dark, setDark] = useState(() => {
+    try { return localStorage.getItem('blog-theme') === 'dark'; } catch { return false; }
+  });
+  const toggle = useCallback(() => {
+    setDark(prev => {
+      const next = !prev;
+      try { localStorage.setItem('blog-theme', next ? 'dark' : 'light'); } catch {}
+      return next;
+    });
+  }, []);
+  return { dark, toggle };
+}
+
 export default function PublicNewsletterHub() {
   const params = useParams<{ tenantSlug: string }>();
   const tenantSlug = params.tenantSlug;
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
+  const { dark, toggle: toggleTheme } = useBlogTheme();
 
   const { data, isLoading, isError } = useQuery<PublicNewsletterListResponse>({
     queryKey: ["public-newsletters", tenantSlug, page],
@@ -78,7 +93,7 @@ export default function PublicNewsletterHub() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className={`min-h-screen flex items-center justify-center ${dark ? 'dark bg-gray-950' : 'bg-gray-50'}`}>
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     );
@@ -86,10 +101,10 @@ export default function PublicNewsletterHub() {
 
   if (isError || !data) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
-        <Globe className="h-16 w-16 text-gray-300 mb-4" />
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Publication Not Found</h1>
-        <p className="text-gray-500 text-center max-w-md">
+      <div className={`min-h-screen flex flex-col items-center justify-center px-4 ${dark ? 'dark bg-gray-950' : 'bg-gray-50'}`}>
+        <Globe className="h-16 w-16 text-gray-300 dark:text-gray-600 mb-4" />
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">Publication Not Found</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-center max-w-md">
           The newsletter publication you're looking for doesn't exist or is no longer available.
         </p>
       </div>
@@ -100,10 +115,11 @@ export default function PublicNewsletterHub() {
   const logoHeight = logoSizeMap[branding.logoSize] || "56px";
 
   return (
-    <div className="min-h-screen" style={{ fontFamily: branding.fontFamily, backgroundColor: branding.pageBackgroundColor || '#F3F4F6' }}>
+    <div className={`min-h-screen ${dark ? 'dark' : ''}`} style={{ fontFamily: branding.fontFamily }}>
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
       {/* Boxed layout container */}
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden transition-colors duration-300">
 
           {/* Header */}
           {(branding.headerMode || 'logo') === 'banner' && branding.bannerUrl ? (
@@ -114,7 +130,15 @@ export default function PublicNewsletterHub() {
                 className="w-full h-auto object-cover"
                 style={{ maxHeight: '220px' }}
               />
-              <div className="px-6 py-8 text-center" style={{ backgroundColor: branding.primaryColor }}>
+              <div className="px-6 py-8 text-center relative" style={{ backgroundColor: branding.primaryColor }}>
+                {/* Theme toggle */}
+                <button
+                  onClick={toggleTheme}
+                  className="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+                  aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </button>
                 {(branding.showCompanyName || 'true') === 'true' && (
                   <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight mb-2">
                     {branding.companyName || tenant.name}
@@ -131,7 +155,15 @@ export default function PublicNewsletterHub() {
               </div>
             </>
           ) : (
-            <div className="px-6 py-10" style={{ backgroundColor: branding.primaryColor }}>
+            <div className="px-6 py-10 relative" style={{ backgroundColor: branding.primaryColor }}>
+              {/* Theme toggle */}
+              <button
+                onClick={toggleTheme}
+                className="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+                aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
               <div className={`${branding.logoAlignment === 'left' ? 'text-left' : branding.logoAlignment === 'right' ? 'text-right' : 'text-center'}`}>
                 {branding.logoUrl && (
                   <img
@@ -173,9 +205,9 @@ export default function PublicNewsletterHub() {
           <div className="px-6 py-10">
             {newsletters.length === 0 ? (
               <div className="text-center py-20">
-                <Globe className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-gray-700 mb-2">No newsletters published yet</h2>
-                <p className="text-gray-500">Check back soon for updates.</p>
+                <Globe className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-200 mb-2">No newsletters published yet</h2>
+                <p className="text-gray-500 dark:text-gray-400">Check back soon for updates.</p>
               </div>
             ) : (
               <>
@@ -184,19 +216,19 @@ export default function PublicNewsletterHub() {
                     <article
                       key={nl.id}
                       onClick={() => navigate(`/n/${tenant.slug}/${nl.webSlug}`)}
-                      className="group bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
+                      className="group bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md dark:hover:shadow-lg dark:hover:shadow-black/20 transition-all duration-200 cursor-pointer"
                     >
                       {/* Color bar */}
                       <div className="h-1.5" style={{ backgroundColor: branding.primaryColor }} />
                       <div className="p-5">
-                        <div className="flex items-center text-xs text-gray-400 mb-3">
+                        <div className="flex items-center text-xs text-gray-400 dark:text-gray-500 mb-3">
                           <Calendar className="h-3.5 w-3.5 mr-1.5" />
                           {formatDate(nl.publishedAt)}
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 mb-2">
                           {nl.title}
                         </h3>
-                        <p className="text-sm text-gray-500 line-clamp-2 mb-4">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-4">
                           {nl.subject}
                         </p>
                         <div className="flex items-center text-sm font-medium transition-colors"
@@ -216,17 +248,17 @@ export default function PublicNewsletterHub() {
                     <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page <= 1}
-                      className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       Previous
                     </button>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
                       Page {page} of {pagination.totalPages}
                     </span>
                     <button
                       onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
                       disabled={page >= pagination.totalPages}
-                      className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       Next
                     </button>
@@ -237,20 +269,20 @@ export default function PublicNewsletterHub() {
           </div>
 
           {/* Footer */}
-          <footer className="border-t border-gray-200 px-6 py-8 text-center">
+          <footer className="border-t border-gray-200 dark:border-gray-800 px-6 py-8 text-center">
             {branding.socialLinks && (
               <div className="flex items-center justify-center gap-4 mb-4">
                 {branding.socialLinks.facebook && (
-                  <a href={branding.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 text-sm font-medium transition-colors">Facebook</a>
+                  <a href={branding.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm font-medium transition-colors">Facebook</a>
                 )}
                 {branding.socialLinks.twitter && (
-                  <a href={branding.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 text-sm font-medium transition-colors">Twitter</a>
+                  <a href={branding.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm font-medium transition-colors">Twitter</a>
                 )}
                 {branding.socialLinks.instagram && (
-                  <a href={branding.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 text-sm font-medium transition-colors">Instagram</a>
+                  <a href={branding.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm font-medium transition-colors">Instagram</a>
                 )}
                 {branding.socialLinks.linkedin && (
-                  <a href={branding.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 text-sm font-medium transition-colors">LinkedIn</a>
+                  <a href={branding.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm font-medium transition-colors">LinkedIn</a>
                 )}
               </div>
             )}
@@ -259,22 +291,23 @@ export default function PublicNewsletterHub() {
                 href={branding.website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-3"
+                className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors mb-3"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 {branding.website.replace(/^https?:\/\//, '')}
               </a>
             )}
             {branding.footerText && (
-              <p className="text-xs text-gray-400 mt-2">{branding.footerText}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{branding.footerText}</p>
             )}
             {!branding.footerText && branding.companyName && (
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                 &copy; {new Date().getFullYear()} {branding.companyName}. All rights reserved.
               </p>
             )}
           </footer>
         </div>
+      </div>
       </div>
     </div>
   );

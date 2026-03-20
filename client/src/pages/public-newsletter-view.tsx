@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Calendar, ArrowLeft, Globe, ExternalLink } from "lucide-react";
+import { Loader2, Calendar, ArrowLeft, Globe, ExternalLink, Sun, Moon } from "lucide-react";
 
 interface Branding {
   companyName: string;
@@ -57,12 +57,27 @@ const logoSizeMap: Record<string, string> = {
   xlarge: "72px",
 };
 
+function useBlogTheme() {
+  const [dark, setDark] = useState(() => {
+    try { return localStorage.getItem('blog-theme') === 'dark'; } catch { return false; }
+  });
+  const toggle = useCallback(() => {
+    setDark(prev => {
+      const next = !prev;
+      try { localStorage.setItem('blog-theme', next ? 'dark' : 'light'); } catch {}
+      return next;
+    });
+  }, []);
+  return { dark, toggle };
+}
+
 export default function PublicNewsletterView() {
   const params = useParams<{ tenantSlug: string; newsletterSlug?: string; newsletterId?: string }>();
   const { tenantSlug, newsletterSlug, newsletterId } = params;
   const [, navigate] = useLocation();
   const contentRef = useRef<HTMLDivElement>(null);
   const isPreviewRoute = Boolean(newsletterId);
+  const { dark, toggle: toggleTheme } = useBlogTheme();
 
   const { data, isLoading, isError } = useQuery<PublicNewsletterViewResponse>({
     queryKey: ["public-newsletter", tenantSlug, newsletterSlug, newsletterId],
@@ -99,7 +114,7 @@ export default function PublicNewsletterView() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className={`min-h-screen flex items-center justify-center ${dark ? 'dark bg-gray-950' : 'bg-gray-50'}`}>
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     );
@@ -107,10 +122,10 @@ export default function PublicNewsletterView() {
 
   if (isError || !data) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
-        <Globe className="h-16 w-16 text-gray-300 mb-4" />
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Newsletter Not Found</h1>
-        <p className="text-gray-500 text-center max-w-md">
+      <div className={`min-h-screen flex flex-col items-center justify-center px-4 ${dark ? 'dark bg-gray-950' : 'bg-gray-50'}`}>
+        <Globe className="h-16 w-16 text-gray-300 dark:text-gray-600 mb-4" />
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">Newsletter Not Found</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-center max-w-md">
           This newsletter doesn't exist or is no longer available.
         </p>
       </div>
@@ -122,10 +137,11 @@ export default function PublicNewsletterView() {
   const displayDate = newsletter.publishedAt || newsletter.createdAt;
 
   return (
-    <div className="min-h-screen bg-gray-100" style={{ fontFamily: branding.fontFamily }}>
+    <div className={`min-h-screen ${dark ? 'dark' : ''}`} style={{ fontFamily: branding.fontFamily }}>
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
       {/* Boxed layout container */}
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden transition-colors duration-300">
 
           {/* Header */}
           {(branding.headerMode || 'logo') === 'banner' && branding.bannerUrl ? (
@@ -147,11 +163,20 @@ export default function PublicNewsletterView() {
                   <ArrowLeft className="h-4 w-4" />
                   All Newsletters
                 </button>
-                {(branding.showCompanyName || 'true') === 'true' && branding.companyName && (
-                  <span className="text-white font-semibold text-sm">
-                    {branding.companyName}
-                  </span>
-                )}
+                <div className="flex items-center gap-3">
+                  {(branding.showCompanyName || 'true') === 'true' && branding.companyName && (
+                    <span className="text-white font-semibold text-sm">
+                      {branding.companyName}
+                    </span>
+                  )}
+                  <button
+                    onClick={toggleTheme}
+                    className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+                    aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+                  >
+                    {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
             </>
           ) : (
@@ -180,6 +205,13 @@ export default function PublicNewsletterView() {
                     {branding.companyName}
                   </span>
                 )}
+                <button
+                  onClick={toggleTheme}
+                  className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+                  aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </button>
               </div>
             </div>
           )}
@@ -188,15 +220,15 @@ export default function PublicNewsletterView() {
           <div className="px-6 md:px-10 py-10">
             {/* Title section */}
             <div className="mb-8">
-              <div className="flex items-center text-sm text-gray-400 mb-4">
+              <div className="flex items-center text-sm text-gray-400 dark:text-gray-500 mb-4">
                 <Calendar className="h-4 w-4 mr-2" />
                 {formatDate(displayDate)}
               </div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight leading-tight mb-3">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100 tracking-tight leading-tight mb-3">
                 {newsletter.title}
               </h1>
               {newsletter.subject !== newsletter.title && (
-                <p className="text-lg text-gray-500 leading-relaxed">
+                <p className="text-lg text-gray-500 dark:text-gray-400 leading-relaxed">
                   {newsletter.subject}
                 </p>
               )}
@@ -209,12 +241,12 @@ export default function PublicNewsletterView() {
             {/* Newsletter content */}
             <div
               ref={contentRef}
-              className="newsletter-web-content prose prose-gray max-w-none"
+              className={`newsletter-web-content prose max-w-none ${dark ? 'prose-invert' : 'prose-gray'}`}
               style={{
                 fontFamily: branding.fontFamily,
                 fontSize: "16px",
                 lineHeight: "1.75",
-                color: "#334155",
+                color: dark ? "#cbd5e1" : "#334155",
               }}
             />
 
@@ -222,7 +254,7 @@ export default function PublicNewsletterView() {
             <div className="mt-10 text-center">
               <button
                 onClick={() => navigate(`/n/${tenant.slug}`)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to all newsletters
@@ -231,20 +263,20 @@ export default function PublicNewsletterView() {
           </div>
 
           {/* Footer */}
-          <footer className="border-t border-gray-200 px-6 py-8 text-center">
+          <footer className="border-t border-gray-200 dark:border-gray-800 px-6 py-8 text-center">
             {branding.socialLinks && (
               <div className="flex items-center justify-center gap-4 mb-4">
                 {branding.socialLinks.facebook && (
-                  <a href={branding.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 text-sm font-medium transition-colors">Facebook</a>
+                  <a href={branding.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm font-medium transition-colors">Facebook</a>
                 )}
                 {branding.socialLinks.twitter && (
-                  <a href={branding.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 text-sm font-medium transition-colors">Twitter</a>
+                  <a href={branding.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm font-medium transition-colors">Twitter</a>
                 )}
                 {branding.socialLinks.instagram && (
-                  <a href={branding.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 text-sm font-medium transition-colors">Instagram</a>
+                  <a href={branding.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm font-medium transition-colors">Instagram</a>
                 )}
                 {branding.socialLinks.linkedin && (
-                  <a href={branding.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 text-sm font-medium transition-colors">LinkedIn</a>
+                  <a href={branding.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm font-medium transition-colors">LinkedIn</a>
                 )}
               </div>
             )}
@@ -253,22 +285,23 @@ export default function PublicNewsletterView() {
                 href={branding.website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-3"
+                className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors mb-3"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 {branding.website.replace(/^https?:\/\//, "")}
               </a>
             )}
             {branding.footerText && (
-              <p className="text-xs text-gray-400 mt-2">{branding.footerText}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{branding.footerText}</p>
             )}
             {!branding.footerText && branding.companyName && (
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                 &copy; {new Date().getFullYear()} {branding.companyName}. All rights reserved.
               </p>
             )}
           </footer>
         </div>
+      </div>
       </div>
 
       {/* Scoped styles for newsletter content */}
@@ -294,7 +327,7 @@ export default function PublicNewsletterView() {
           vertical-align: top;
         }
         .newsletter-web-content h1, .newsletter-web-content h2, .newsletter-web-content h3 {
-          color: #1e293b;
+          color: ${dark ? '#f1f5f9' : '#1e293b'} !important;
           font-weight: 700;
           margin-top: 1.5em;
           margin-bottom: 0.5em;
@@ -306,9 +339,50 @@ export default function PublicNewsletterView() {
           border-left: 3px solid ${branding.primaryColor};
           padding-left: 1em;
           margin-left: 0;
-          color: #64748b;
+          color: ${dark ? '#94a3b8' : '#64748b'} !important;
           font-style: italic;
         }
+        ${dark ? `
+        /* Dark mode: override inline styles from email HTML */
+        .newsletter-web-content,
+        .newsletter-web-content div,
+        .newsletter-web-content td,
+        .newsletter-web-content th,
+        .newsletter-web-content section,
+        .newsletter-web-content article {
+          background-color: transparent !important;
+          background: transparent !important;
+        }
+        .newsletter-web-content,
+        .newsletter-web-content p,
+        .newsletter-web-content span,
+        .newsletter-web-content li,
+        .newsletter-web-content td,
+        .newsletter-web-content th,
+        .newsletter-web-content div {
+          color: #cbd5e1 !important;
+        }
+        .newsletter-web-content h1,
+        .newsletter-web-content h2,
+        .newsletter-web-content h3,
+        .newsletter-web-content h4,
+        .newsletter-web-content h5,
+        .newsletter-web-content h6 {
+          color: #f1f5f9 !important;
+        }
+        .newsletter-web-content a {
+          color: ${branding.primaryColor} !important;
+        }
+        .newsletter-web-content hr {
+          border-color: #374151 !important;
+        }
+        .newsletter-web-content table {
+          border-color: #374151 !important;
+        }
+        .newsletter-web-content img {
+          opacity: 0.92;
+        }
+        ` : ''}
       `}</style>
     </div>
   );
