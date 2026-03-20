@@ -2477,6 +2477,100 @@
         "deleteError": "Failed to delete tag"
       }
     },
+    "customFields": {
+      "title": "Custom Contact Fields",
+      "subtitle": "Define custom fields that appear on every contact's profile. Examples: age, employment, income, social media channels.",
+      "addField": "Add Field",
+      "searchPlaceholder": "Search fields...",
+      "noFieldsTitle": "No custom fields yet",
+      "noFieldsDescription": "Custom fields let you track additional information about your contacts like age, employment, income, social media channels, and more.",
+      "noSearchResults": "No fields match your search",
+      "noSearchResultsHint": "Try a different search term.",
+      "createFirstField": "Create Your First Field",
+      "placeholder": "Placeholder",
+      "required": "Required",
+      "option": "option",
+      "options": "options",
+      "summary": "{{count}} custom field(s) defined. These fields will appear on all contact profiles.",
+      "createDialog": {
+        "title": "Create Custom Field",
+        "description": "Define a new custom field that will be available on all contact profiles.",
+        "creating": "Creating...",
+        "create": "Create Field"
+      },
+      "editDialog": {
+        "title": "Edit Custom Field",
+        "description": "Update the field definition. Changes apply to all contacts.",
+        "saving": "Saving...",
+        "save": "Save Changes"
+      },
+      "deleteDialog": {
+        "title": "Delete Custom Field",
+        "description": "Are you sure you want to delete the field <strong>\"{{fieldLabel}}\"</strong>? This will permanently remove all values stored for this field across all contacts. This action cannot be undone.",
+        "deleting": "Deleting...",
+        "delete": "Delete Field"
+      },
+      "form": {
+        "displayLabel": "Display Label",
+        "displayLabelPlaceholder": "e.g. Annual Income, YouTube Channel",
+        "fieldName": "Field Name (internal)",
+        "fieldNamePlaceholder": "e.g. annual_income",
+        "fieldNameHint": "Used internally. Lowercase, underscores only.",
+        "fieldType": "Field Type",
+        "format": "Format",
+        "dropdownOptions": "Dropdown Options",
+        "addOptionPlaceholder": "Add option...",
+        "addOptionHint": "Add at least one option for the dropdown.",
+        "placeholderText": "Placeholder Text",
+        "placeholderTextPlaceholder": "e.g. Enter their income...",
+        "requiredField": "Required field"
+      },
+      "fieldTypes": {
+        "text": "Text",
+        "textDesc": "Free-form text input",
+        "number": "Number",
+        "numberDesc": "Numeric values",
+        "date": "Date",
+        "dateDesc": "Date picker",
+        "select": "Dropdown",
+        "selectDesc": "Choose from predefined options",
+        "url": "URL",
+        "urlDesc": "Web links",
+        "boolean": "Yes/No",
+        "booleanDesc": "Toggle on or off"
+      },
+      "masks": {
+        "single_line": "Single line",
+        "single_lineDesc": "Standard text input",
+        "multi_line": "Multi-line",
+        "multi_lineDesc": "Textarea for longer text",
+        "plain": "Plain number",
+        "plainDesc": "Standard numeric value",
+        "phone_with_area": "Phone (with area code)",
+        "phone_with_areaDesc": "(555) 123-4567",
+        "phone_no_area": "Phone (no area code)",
+        "phone_no_areaDesc": "123-4567",
+        "currency": "Currency",
+        "currencyDesc": "$1,234.56",
+        "percentage": "Percentage",
+        "percentageDesc": "85%",
+        "date_only": "Date only",
+        "date_onlyDesc": "MM/DD/YYYY",
+        "date_time": "Date & time",
+        "date_timeDesc": "MM/DD/YYYY HH:MM",
+        "time_only": "Time only",
+        "time_onlyDesc": "HH:MM AM/PM"
+      },
+      "toasts": {
+        "created": "Custom field created",
+        "createdDesc": "The field is now available for all contacts.",
+        "updated": "Custom field updated",
+        "deleted": "Custom field deleted",
+        "deletedDesc": "The field and all its values have been removed.",
+        "error": "Error"
+      },
+      "cancel": "Cancel"
+    },
     "emailDesign": {
       "title": "Master Email Design",
       "subtitle": "Configure your universal email look and feel that will be applied to all emails",

@@ -24,7 +24,6 @@ import {
   Sparkles,
   Zap,
   Crown,
-  Scale,
   ChevronRight,
   Tv2,
   HelpCircle,
@@ -43,7 +42,6 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -317,104 +315,33 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Help & Resources - Bottom of navigation */}
+        {/* User menu - Bottom of navigation */}
         <SidebarGroup className="mt-auto pt-2 border-t border-sidebar-border">
           <SidebarGroupContent>
             <SidebarMenu>
-              {isCollapsed ? (
-                <SidebarMenuItem className="w-full flex justify-center group-data-[collapsible=icon]:justify-center">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <SidebarMenuButton
-                        className={cn(
-                          "w-full justify-start group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0",
-                          isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
-                        )}
-                        tooltip={t('navigation.help') || "Help"}
-                      >
-                        <HelpCircle className="h-5 w-5 flex-shrink-0" />
-                        <span className="group-data-[collapsible=icon]:hidden font-medium text-xs text-muted-foreground">{t('navigation.help') || "Help"}</span>
-                      </SidebarMenuButton>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent side="right" align="start" sideOffset={8} className="w-48 rounded-lg">
-                      <DropdownMenuItem asChild>
-                        <Link href="/legal-agreements" className="flex items-center gap-2 cursor-pointer w-full" onClick={handleMobileNavClick}>
-                          <Scale className="h-4 w-4" />
-                          <span>{t('navigation.legalAgreements') || "Legal Agreements"}</span>
-                        </Link>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </SidebarMenuItem>
-              ) : (
-                <Collapsible 
-                  asChild 
-                  defaultOpen={location === '/legal-agreements' || location === '/privacy-security' || location === '/terms-of-service' || location === '/acceptable-use' || location === '/data-processing' || location === '/cookie-policy'} 
-                  className="group/collapsible"
-                >
-                  <SidebarMenuItem className="w-full flex flex-col">
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        isActive={location === '/legal-agreements' || location === '/privacy-security' || location === '/terms-of-service' || location === '/acceptable-use' || location === '/data-processing' || location === '/cookie-policy'}
-                        className={cn(
-                          "w-full justify-start",
-                          isMobile ? "px-4 py-3 mx-2 rounded-lg" : "px-3 py-2.5"
-                        )}
-                      >
-                        <div className="flex items-center w-full gap-3 cursor-pointer">
-                          <HelpCircle className="h-5 w-5 flex-shrink-0" />
-                          <span className="font-medium text-xs flex-1 text-left">{t('navigation.help') || "Help"}</span>
-                          <span className="ml-auto p-0.5 rounded hover:bg-black/10">
-                            <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                          </span>
-                        </div>
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={location === '/legal-agreements' || location === '/privacy-security' || location === '/terms-of-service' || location === '/acceptable-use' || location === '/data-processing' || location === '/cookie-policy'}>
-                            <Link href="/legal-agreements" className="flex items-center gap-2" onClick={handleMobileNavClick}>
-                              <Scale className="h-4 w-4" />
-                              <span className="text-xs">{t('navigation.legalAgreements') || "Legal Agreements"}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-
-      <SidebarFooter className="pb-4">
-        <SidebarMenu>
-          <SidebarMenuItem className="flex justify-center group-data-[collapsible=icon]:justify-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
-                  tooltip={t('userMenu.tooltip') || "User Menu"}
-                >
-                  <CustomAvatar
-                    user={extendedUser}
-                    size="sm"
-                    className="w-8 h-8 flex-shrink-0"
-                  />
-                  <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                    <span className="truncate font-semibold">
-                      {extendedUser.firstName || extendedUser.name} {extendedUser.lastName || ''}
-                    </span>
-                    <span className="truncate text-xs">
-                      {extendedUser.email}
-                    </span>
-                  </div>
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
+              <SidebarMenuItem className="flex justify-center group-data-[collapsible=icon]:justify-center">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton
+                      size="lg"
+                      className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!px-0"
+                      tooltip={t('userMenu.tooltip') || "User Menu"}
+                    >
+                      <CustomAvatar
+                        user={extendedUser}
+                        size="sm"
+                        className="w-8 h-8 flex-shrink-0"
+                      />
+                      <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                        <span className="truncate font-semibold">
+                          {extendedUser.firstName || extendedUser.name} {extendedUser.lastName || ''}
+                        </span>
+                        <span className="truncate text-xs">
+                          {extendedUser.email}
+                        </span>
+                      </div>
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="right"
                 align="end"
@@ -471,6 +398,13 @@ export function AppSidebar() {
                   >
                     <Activity className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
                     <span className="text-sm">{t('userMenu.sessions') || "Sessions"}</span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem asChild>
+                    <Link href="/legal-agreements" className="flex items-center gap-3 px-4 py-2.5 cursor-pointer w-full" onClick={handleMobileNavClick}>
+                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{t('navigation.help') || "Help"}</span>
+                    </Link>
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-700" />
@@ -549,10 +483,13 @@ export function AppSidebar() {
                   </DropdownMenuItem>
                 </div>
               </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
+                </DropdownMenu>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
     </Sidebar>
   );
 }

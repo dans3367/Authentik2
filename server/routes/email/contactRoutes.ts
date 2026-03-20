@@ -4,6 +4,7 @@ import { sql, eq, and } from 'drizzle-orm';
 import { emailContacts, emailLists, bouncedEmails, contactListMemberships, contactTagAssignments, betterAuthUser, emailActivity, tenants, emailSends, emailContent, companies, masterEmailDesign, triggerTasks, birthdaySettings, unsubscribeTokens } from '@shared/schema';
 import { authenticateToken, requireTenant, requirePermission } from '../../middleware/auth-middleware';
 import { sanitizeString, sanitizeEmail, escapeLikePattern } from '../../utils/sanitization';
+import { LANGUAGE_NAMES } from '../../utils/translationService';
 import { storage } from '../../storage';
 import crypto from 'crypto';
 import { logActivity, computeChanges } from '../../utils/activityLogger';
@@ -758,7 +759,7 @@ contactRoutes.post("/email-contacts", authenticateToken, requireTenant, requireP
         country: sanitizedCountry,
         phoneNumber: sanitizedPhoneNumber,
         dateOfBirth: validatedDateOfBirth,
-        preferredLanguage: preferredLanguage ? sanitizeString(preferredLanguage) : 'en',
+        preferredLanguage: (preferredLanguage && preferredLanguage in LANGUAGE_NAMES) ? preferredLanguage : 'en',
         createdAt: now,
         updatedAt: now,
       }).returning();
@@ -1129,9 +1130,9 @@ contactRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, requi
       updateData.phoneNumber = phoneNumber ? sanitizeString(phoneNumber) : null;
     }
 
-    // Optional preferred language (ISO 639-1 code)
+    // Optional preferred language (must be a supported ISO 639-1 code)
     if (preferredLanguage !== undefined) {
-      updateData.preferredLanguage = preferredLanguage ? sanitizeString(preferredLanguage) : 'en';
+      updateData.preferredLanguage = (preferredLanguage && preferredLanguage in LANGUAGE_NAMES) ? preferredLanguage : 'en';
     }
 
     // Optional date of birth in YYYY-MM-DD format

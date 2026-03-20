@@ -2446,6 +2446,100 @@
         "deleteError": "Error al eliminar etiqueta"
       }
     },
+    "customFields": {
+      "title": "Campos Personalizados de Contacto",
+      "subtitle": "Define campos personalizados que aparecen en el perfil de cada contacto. Ejemplos: edad, empleo, ingresos, redes sociales.",
+      "addField": "Agregar Campo",
+      "searchPlaceholder": "Buscar campos...",
+      "noFieldsTitle": "Aún no hay campos personalizados",
+      "noFieldsDescription": "Los campos personalizados te permiten registrar información adicional sobre tus contactos como edad, empleo, ingresos, redes sociales y más.",
+      "noSearchResults": "Ningún campo coincide con tu búsqueda",
+      "noSearchResultsHint": "Intenta con otro término de búsqueda.",
+      "createFirstField": "Crea Tu Primer Campo",
+      "placeholder": "Marcador de posición",
+      "required": "Obligatorio",
+      "option": "opción",
+      "options": "opciones",
+      "summary": "{{count}} campo(s) personalizado(s) definido(s). Estos campos aparecerán en todos los perfiles de contacto.",
+      "createDialog": {
+        "title": "Crear Campo Personalizado",
+        "description": "Define un nuevo campo personalizado que estará disponible en todos los perfiles de contacto.",
+        "creating": "Creando...",
+        "create": "Crear Campo"
+      },
+      "editDialog": {
+        "title": "Editar Campo Personalizado",
+        "description": "Actualiza la definición del campo. Los cambios se aplican a todos los contactos.",
+        "saving": "Guardando...",
+        "save": "Guardar Cambios"
+      },
+      "deleteDialog": {
+        "title": "Eliminar Campo Personalizado",
+        "description": "¿Estás seguro de que deseas eliminar el campo <strong>\"{{fieldLabel}}\"</strong>? Esto eliminará permanentemente todos los valores almacenados para este campo en todos los contactos. Esta acción no se puede deshacer.",
+        "deleting": "Eliminando...",
+        "delete": "Eliminar Campo"
+      },
+      "form": {
+        "displayLabel": "Etiqueta Visible",
+        "displayLabelPlaceholder": "ej. Ingreso Anual, Canal de YouTube",
+        "fieldName": "Nombre del Campo (interno)",
+        "fieldNamePlaceholder": "ej. ingreso_anual",
+        "fieldNameHint": "Uso interno. Solo minúsculas y guiones bajos.",
+        "fieldType": "Tipo de Campo",
+        "format": "Formato",
+        "dropdownOptions": "Opciones del Menú",
+        "addOptionPlaceholder": "Agregar opción...",
+        "addOptionHint": "Agrega al menos una opción para el menú desplegable.",
+        "placeholderText": "Texto de Marcador",
+        "placeholderTextPlaceholder": "ej. Ingresa su ingreso...",
+        "requiredField": "Campo obligatorio"
+      },
+      "fieldTypes": {
+        "text": "Texto",
+        "textDesc": "Entrada de texto libre",
+        "number": "Número",
+        "numberDesc": "Valores numéricos",
+        "date": "Fecha",
+        "dateDesc": "Selector de fecha",
+        "select": "Desplegable",
+        "selectDesc": "Elegir de opciones predefinidas",
+        "url": "URL",
+        "urlDesc": "Enlaces web",
+        "boolean": "Sí/No",
+        "booleanDesc": "Activar o desactivar"
+      },
+      "masks": {
+        "single_line": "Una línea",
+        "single_lineDesc": "Entrada de texto estándar",
+        "multi_line": "Multilínea",
+        "multi_lineDesc": "Área de texto para texto extenso",
+        "plain": "Número simple",
+        "plainDesc": "Valor numérico estándar",
+        "phone_with_area": "Teléfono (con código de área)",
+        "phone_with_areaDesc": "(555) 123-4567",
+        "phone_no_area": "Teléfono (sin código de área)",
+        "phone_no_areaDesc": "123-4567",
+        "currency": "Moneda",
+        "currencyDesc": "$1,234.56",
+        "percentage": "Porcentaje",
+        "percentageDesc": "85%",
+        "date_only": "Solo fecha",
+        "date_onlyDesc": "DD/MM/AAAA",
+        "date_time": "Fecha y hora",
+        "date_timeDesc": "DD/MM/AAAA HH:MM",
+        "time_only": "Solo hora",
+        "time_onlyDesc": "HH:MM AM/PM"
+      },
+      "toasts": {
+        "created": "Campo personalizado creado",
+        "createdDesc": "El campo ya está disponible para todos los contactos.",
+        "updated": "Campo personalizado actualizado",
+        "deleted": "Campo personalizado eliminado",
+        "deletedDesc": "El campo y todos sus valores han sido eliminados.",
+        "error": "Error"
+      },
+      "cancel": "Cancelar"
+    },
     "emailDesign": {
       "title": "Diseño Maestro de Correo",
       "subtitle": "Configura la apariencia universal de tus correos que se aplicará a todos los emails",

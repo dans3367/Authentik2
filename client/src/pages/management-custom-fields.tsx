@@ -40,6 +40,7 @@ interface CustomField {
   name: string;
   label: string;
   fieldType: string;
+  mask: string | null;
   options: string[];
   placeholder: string | null;
   isRequired: boolean;
@@ -48,23 +49,30 @@ interface CustomField {
   updatedAt: string;
 }
 
-const FIELD_TYPE_OPTIONS = [
-  { value: "text", label: "Text", icon: Type, description: "Free-form text input" },
-  { value: "number", label: "Number", icon: Hash, description: "Numeric values" },
-  { value: "date", label: "Date", icon: Calendar, description: "Date picker" },
-  { value: "select", label: "Dropdown", icon: List, description: "Choose from predefined options" },
-  { value: "url", label: "URL", icon: Link, description: "Web links" },
-  { value: "boolean", label: "Yes/No", icon: ToggleLeft, description: "Toggle on or off" },
+const FIELD_TYPE_KEYS = [
+  { value: "text", key: "text", icon: Type },
+  { value: "number", key: "number", icon: Hash },
+  { value: "date", key: "date", icon: Calendar },
+  { value: "select", key: "select", icon: List },
+  { value: "url", key: "url", icon: Link },
+  { value: "boolean", key: "boolean", icon: ToggleLeft },
 ];
 
-function getFieldTypeIcon(fieldType: string) {
-  const match = FIELD_TYPE_OPTIONS.find(f => f.value === fieldType);
-  return match?.icon || Type;
+// Mask (format) option keys per field type
+const MASK_KEYS: Record<string, string[]> = {
+  text: ["single_line", "multi_line"],
+  number: ["plain", "phone_with_area", "phone_no_area", "currency", "percentage"],
+  date: ["date_only", "date_time", "time_only"],
+};
+
+function getDefaultMask(fieldType: string): string | null {
+  const masks = MASK_KEYS[fieldType];
+  return masks ? masks[0] : null;
 }
 
-function getFieldTypeLabel(fieldType: string) {
-  const match = FIELD_TYPE_OPTIONS.find(f => f.value === fieldType);
-  return match?.label || fieldType;
+function getFieldTypeIcon(fieldType: string) {
+  const match = FIELD_TYPE_KEYS.find(f => f.value === fieldType);
+  return match?.icon || Type;
 }
 
 export default function ManagementCustomFields() {
@@ -82,6 +90,7 @@ export default function ManagementCustomFields() {
   const [formName, setFormName] = useState("");
   const [formLabel, setFormLabel] = useState("");
   const [formType, setFormType] = useState("text");
+  const [formMask, setFormMask] = useState<string | null>(null);
   const [formPlaceholder, setFormPlaceholder] = useState("");
   const [formRequired, setFormRequired] = useState(false);
   const [formOptions, setFormOptions] = useState<string[]>([]);
@@ -114,13 +123,13 @@ export default function ManagementCustomFields() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Custom field created", description: "The field is now available for all contacts." });
+      toast({ title: t('management.customFields.toasts.created'), description: t('management.customFields.toasts.createdDesc') });
       qc.invalidateQueries({ queryKey: ["/api/contact-custom-fields"] });
       resetForm();
       setCreateOpen(false);
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message || "Failed to create field", variant: "destructive" });
+      toast({ title: t('management.customFields.toasts.error'), description: err.message, variant: "destructive" });
     },
   });
 
@@ -135,13 +144,13 @@ export default function ManagementCustomFields() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Custom field updated" });
+      toast({ title: t('management.customFields.toasts.updated') });
       qc.invalidateQueries({ queryKey: ["/api/contact-custom-fields"] });
       resetForm();
       setEditOpen(false);
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message || "Failed to update field", variant: "destructive" });
+      toast({ title: t('management.customFields.toasts.error'), description: err.message, variant: "destructive" });
     },
   });
 
@@ -156,13 +165,13 @@ export default function ManagementCustomFields() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Custom field deleted", description: "The field and all its values have been removed." });
+      toast({ title: t('management.customFields.toasts.deleted'), description: t('management.customFields.toasts.deletedDesc') });
       qc.invalidateQueries({ queryKey: ["/api/contact-custom-fields"] });
       setDeleteOpen(false);
       setSelectedField(null);
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message || "Failed to delete field", variant: "destructive" });
+      toast({ title: t('management.customFields.toasts.error'), description: err.message, variant: "destructive" });
     },
   });
 
@@ -170,6 +179,7 @@ export default function ManagementCustomFields() {
     setFormName("");
     setFormLabel("");
     setFormType("text");
+    setFormMask(null);
     setFormPlaceholder("");
     setFormRequired(false);
     setFormOptions([]);
@@ -186,6 +196,7 @@ export default function ManagementCustomFields() {
     setFormName(field.name);
     setFormLabel(field.label);
     setFormType(field.fieldType);
+    setFormMask(field.mask || getDefaultMask(field.fieldType));
     setFormPlaceholder(field.placeholder || "");
     setFormRequired(field.isRequired);
     setFormOptions(field.options || []);
@@ -204,6 +215,7 @@ export default function ManagementCustomFields() {
       name: formName.trim(),
       label: formLabel.trim(),
       fieldType: formType,
+      mask: MASK_KEYS[formType] ? (formMask || getDefaultMask(formType)) : null,
       options: formType === "select" ? formOptions : undefined,
       placeholder: formPlaceholder.trim() || undefined,
       isRequired: formRequired,
@@ -219,6 +231,7 @@ export default function ManagementCustomFields() {
         name: formName.trim(),
         label: formLabel.trim(),
         fieldType: formType,
+        mask: MASK_KEYS[formType] ? (formMask || getDefaultMask(formType)) : null,
         options: formType === "select" ? formOptions : undefined,
         placeholder: formPlaceholder.trim() || undefined,
         isRequired: formRequired,
@@ -249,40 +262,40 @@ export default function ManagementCustomFields() {
   const fieldForm = (isCreate: boolean) => (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Display Label *</Label>
+        <Label>{t('management.customFields.form.displayLabel')} *</Label>
         <Input
-          placeholder="e.g. Annual Income, YouTube Channel"
+          placeholder={t('management.customFields.form.displayLabelPlaceholder')}
           value={formLabel}
           onChange={(e) => handleLabelChange(e.target.value, isCreate)}
         />
       </div>
 
       <div className="space-y-2">
-        <Label>Field Name (internal) *</Label>
+        <Label>{t('management.customFields.form.fieldName')} *</Label>
         <Input
-          placeholder="e.g. annual_income"
+          placeholder={t('management.customFields.form.fieldNamePlaceholder')}
           value={formName}
           onChange={(e) => setFormName(e.target.value)}
           className="font-mono text-sm"
         />
-        <p className="text-xs text-muted-foreground">Used internally. Lowercase, underscores only.</p>
+        <p className="text-xs text-muted-foreground">{t('management.customFields.form.fieldNameHint')}</p>
       </div>
 
       <div className="space-y-2">
-        <Label>Field Type</Label>
-        <Select value={formType} onValueChange={setFormType}>
+        <Label>{t('management.customFields.form.fieldType')}</Label>
+        <Select value={formType} onValueChange={(val) => { setFormType(val); setFormMask(getDefaultMask(val)); }}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {FIELD_TYPE_OPTIONS.map(opt => {
+            {FIELD_TYPE_KEYS.map(opt => {
               const Icon = opt.icon;
               return (
                 <SelectItem key={opt.value} value={opt.value}>
                   <div className="flex items-center gap-2">
                     <Icon className="h-4 w-4 text-muted-foreground" />
-                    <span>{opt.label}</span>
-                    <span className="text-xs text-muted-foreground">— {opt.description}</span>
+                    <span>{t(`management.customFields.fieldTypes.${opt.key}`)}</span>
+                    <span className="text-xs text-muted-foreground">— {t(`management.customFields.fieldTypes.${opt.key}Desc`)}</span>
                   </div>
                 </SelectItem>
               );
@@ -291,12 +304,33 @@ export default function ManagementCustomFields() {
         </Select>
       </div>
 
+      {MASK_KEYS[formType] && (
+        <div className="space-y-2">
+          <Label>{t('management.customFields.form.format')}</Label>
+          <Select value={formMask || getDefaultMask(formType) || ''} onValueChange={setFormMask}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MASK_KEYS[formType].map(maskKey => (
+                <SelectItem key={maskKey} value={maskKey}>
+                  <div className="flex items-center gap-2">
+                    <span>{t(`management.customFields.masks.${maskKey}`)}</span>
+                    <span className="text-xs text-muted-foreground">— {t(`management.customFields.masks.${maskKey}Desc`)}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {formType === "select" && (
         <div className="space-y-2">
-          <Label>Dropdown Options</Label>
+          <Label>{t('management.customFields.form.dropdownOptions')}</Label>
           <div className="flex gap-2">
             <Input
-              placeholder="Add option..."
+              placeholder={t('management.customFields.form.addOptionPlaceholder')}
               value={newOption}
               onChange={(e) => setNewOption(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addOption(); } }}
@@ -316,15 +350,15 @@ export default function ManagementCustomFields() {
             </div>
           )}
           {formOptions.length === 0 && (
-            <p className="text-xs text-muted-foreground">Add at least one option for the dropdown.</p>
+            <p className="text-xs text-muted-foreground">{t('management.customFields.form.addOptionHint')}</p>
           )}
         </div>
       )}
 
       <div className="space-y-2">
-        <Label>Placeholder Text</Label>
+        <Label>{t('management.customFields.form.placeholderText')}</Label>
         <Input
-          placeholder="e.g. Enter their income..."
+          placeholder={t('management.customFields.form.placeholderTextPlaceholder')}
           value={formPlaceholder}
           onChange={(e) => setFormPlaceholder(e.target.value)}
         />
@@ -337,7 +371,7 @@ export default function ManagementCustomFields() {
           onCheckedChange={(checked) => setFormRequired(checked === true)}
         />
         <Label htmlFor="field-required" className="text-sm cursor-pointer">
-          Required field
+          {t('management.customFields.form.requiredField')}
         </Label>
       </div>
     </div>
@@ -350,15 +384,15 @@ export default function ManagementCustomFields() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Settings2 className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            Custom Contact Fields
+            {t('management.customFields.title')}
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Define custom fields that appear on every contact's profile. Examples: age, employment, income, social media channels.
+            {t('management.customFields.subtitle')}
           </p>
         </div>
         <Button onClick={openCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white">
           <Plus className="h-4 w-4 mr-2" />
-          Add Field
+          {t('management.customFields.addField')}
         </Button>
       </div>
 
@@ -366,7 +400,7 @@ export default function ManagementCustomFields() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search fields..."
+          placeholder={t('management.customFields.searchPlaceholder')}
           className="pl-9"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -384,17 +418,17 @@ export default function ManagementCustomFields() {
             <div className="flex flex-col items-center gap-3 text-center">
               <Settings2 className="h-12 w-12 text-gray-300 dark:text-gray-600" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {searchTerm ? "No fields match your search" : "No custom fields yet"}
+                {searchTerm ? t('management.customFields.noSearchResults') : t('management.customFields.noFieldsTitle')}
               </h3>
               <p className="text-gray-600 dark:text-gray-400 text-sm max-w-md">
                 {searchTerm
-                  ? "Try a different search term."
-                  : "Custom fields let you track additional information about your contacts like age, employment, income, social media channels, and more."}
+                  ? t('management.customFields.noSearchResultsHint')
+                  : t('management.customFields.noFieldsDescription')}
               </p>
               {!searchTerm && (
                 <Button onClick={openCreate} variant="outline" className="mt-2">
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Your First Field
+                  {t('management.customFields.createFirstField')}
                 </Button>
               )}
             </div>
@@ -404,6 +438,7 @@ export default function ManagementCustomFields() {
         <div className="grid gap-3">
           {filteredFields.map((field) => {
             const Icon = getFieldTypeIcon(field.fieldType);
+            const maskLabel = field.mask ? t(`management.customFields.masks.${field.mask}`, { defaultValue: '' }) : null;
             return (
               <Card key={field.id} className="group hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
@@ -421,23 +456,28 @@ export default function ManagementCustomFields() {
                             {field.name}
                           </Badge>
                           <Badge variant="secondary" className="text-xs">
-                            {getFieldTypeLabel(field.fieldType)}
+                            {t(`management.customFields.fieldTypes.${field.fieldType}`, { defaultValue: field.fieldType })}
                           </Badge>
                           {field.isRequired && (
                             <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs">
-                              Required
+                              {t('management.customFields.required')}
+                            </Badge>
+                          )}
+                          {maskLabel && (
+                            <Badge variant="outline" className="text-xs">
+                              {maskLabel}
                             </Badge>
                           )}
                         </div>
                         <div className="flex items-center gap-3 mt-1">
                           {field.placeholder && (
                             <span className="text-xs text-muted-foreground">
-                              Placeholder: "{field.placeholder}"
+                              {t('management.customFields.placeholder')}: "{field.placeholder}"
                             </span>
                           )}
                           {field.fieldType === "select" && field.options.length > 0 && (
                             <span className="text-xs text-muted-foreground">
-                              {field.options.length} option{field.options.length !== 1 ? "s" : ""}
+                              {field.options.length} {field.options.length !== 1 ? t('management.customFields.options') : t('management.customFields.option')}
                             </span>
                           )}
                         </div>
@@ -473,7 +513,7 @@ export default function ManagementCustomFields() {
       {/* Summary */}
       {fields.length > 0 && (
         <p className="text-sm text-muted-foreground">
-          {fields.length} custom field{fields.length !== 1 ? "s" : ""} defined. These fields will appear on all contact profiles.
+          {t('management.customFields.summary', { count: fields.length })}
         </p>
       )}
 
@@ -481,20 +521,20 @@ export default function ManagementCustomFields() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Create Custom Field</DialogTitle>
+            <DialogTitle>{t('management.customFields.createDialog.title')}</DialogTitle>
             <DialogDescription>
-              Define a new custom field that will be available on all contact profiles.
+              {t('management.customFields.createDialog.description')}
             </DialogDescription>
           </DialogHeader>
           {fieldForm(true)}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>{t('management.customFields.cancel')}</Button>
             <Button
               onClick={handleCreate}
               disabled={!formName.trim() || !formLabel.trim() || createMutation.isPending || (formType === "select" && formOptions.length === 0)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white"
             >
-              {createMutation.isPending ? "Creating..." : "Create Field"}
+              {createMutation.isPending ? t('management.customFields.createDialog.creating') : t('management.customFields.createDialog.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -504,19 +544,19 @@ export default function ManagementCustomFields() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Edit Custom Field</DialogTitle>
+            <DialogTitle>{t('management.customFields.editDialog.title')}</DialogTitle>
             <DialogDescription>
-              Update the field definition. Changes apply to all contacts.
+              {t('management.customFields.editDialog.description')}
             </DialogDescription>
           </DialogHeader>
           {fieldForm(false)}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>{t('management.customFields.cancel')}</Button>
             <Button
               onClick={handleUpdate}
               disabled={!formName.trim() || !formLabel.trim() || updateMutation.isPending || (formType === "select" && formOptions.length === 0)}
             >
-              {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              {updateMutation.isPending ? t('management.customFields.editDialog.saving') : t('management.customFields.editDialog.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -528,20 +568,20 @@ export default function ManagementCustomFields() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="h-5 w-5" />
-              Delete Custom Field
+              {t('management.customFields.deleteDialog.title')}
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete the field <strong>"{selectedField?.label}"</strong>? This will permanently remove all values stored for this field across all contacts. This action cannot be undone.
+              <span dangerouslySetInnerHTML={{ __html: t('management.customFields.deleteDialog.description', { fieldLabel: selectedField?.label || '' }) }} />
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>{t('management.customFields.cancel')}</Button>
             <Button
               variant="destructive"
               onClick={() => selectedField && deleteMutation.mutate(selectedField.id)}
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete Field"}
+              {deleteMutation.isPending ? t('management.customFields.deleteDialog.deleting') : t('management.customFields.deleteDialog.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

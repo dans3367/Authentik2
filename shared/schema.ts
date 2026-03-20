@@ -2964,6 +2964,7 @@ export const contactCustomFields = pgTable("contact_custom_fields", {
   name: text("name").notNull(),
   label: text("label").notNull(), // Display label
   fieldType: text("field_type").notNull().default('text'), // text, number, date, select, url, boolean
+  mask: text("mask"), // Format subtype — text: single_line|multi_line; number: plain|phone_with_area|phone_no_area|currency|percentage; date: date_only|date_time|time_only
   options: text("options"), // JSON array of options for 'select' type, e.g. '["Option A","Option B"]'
   placeholder: text("placeholder"),
   isRequired: boolean("is_required").default(false),
@@ -3012,6 +3013,7 @@ export const createContactCustomFieldSchema = z.object({
   name: z.string().min(1, "Field name is required").max(100),
   label: z.string().min(1, "Display label is required").max(100),
   fieldType: z.enum(['text', 'number', 'date', 'select', 'url', 'boolean']).default('text'),
+  mask: z.string().max(50).optional().nullable(), // Format subtype per fieldType
   options: z.array(z.string()).optional(), // For select type
   placeholder: z.string().max(200).optional(),
   isRequired: z.boolean().default(false),

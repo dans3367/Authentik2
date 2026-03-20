@@ -779,7 +779,36 @@ export default function ViewContact() {
                 {customFields.filter((cf: any) => cf.value !== null && cf.value !== '').length > 0 ? (
                   customFields
                     .filter((cf: any) => cf.value !== null && cf.value !== '')
-                    .map((cf: any) => (
+                    .map((cf: any) => {
+                      const mask = cf.mask;
+                      let displayValue = cf.value;
+
+                      if (cf.fieldType === 'number') {
+                        if (mask === 'currency') {
+                          displayValue = `$${Number(cf.value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                        } else if (mask === 'percentage') {
+                          displayValue = `${Number(cf.value).toLocaleString()}%`;
+                        } else if (mask === 'phone_with_area' || mask === 'phone_no_area') {
+                          displayValue = cf.value; // Already stored as formatted string
+                        } else {
+                          displayValue = Number(cf.value).toLocaleString();
+                        }
+                      } else if (cf.fieldType === 'date') {
+                        if (mask === 'time_only') {
+                          // Format time value (HH:MM) to 12h display
+                          const [h, m] = cf.value.split(':');
+                          const hour = parseInt(h, 10);
+                          const ampm = hour >= 12 ? 'PM' : 'AM';
+                          const h12 = hour % 12 || 12;
+                          displayValue = `${h12}:${m} ${ampm}`;
+                        } else if (mask === 'date_time') {
+                          displayValue = new Date(cf.value).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                        } else {
+                          displayValue = new Date(cf.value).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                        }
+                      }
+
+                      return (
                       <div key={cf.id} className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-900 dark:text-white">{cf.label}</p>
@@ -797,20 +826,15 @@ export default function ViewContact() {
                             <p className="text-sm text-gray-600 dark:text-gray-400">
                               {cf.value === 'true' ? 'Yes' : 'No'}
                             </p>
-                          ) : cf.fieldType === 'date' ? (
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              {new Date(cf.value).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                            </p>
-                          ) : cf.fieldType === 'number' ? (
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              {Number(cf.value).toLocaleString()}
-                            </p>
+                          ) : cf.fieldType === 'text' && mask === 'multi_line' ? (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 break-words whitespace-pre-wrap">{cf.value}</p>
                           ) : (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 break-words">{cf.value}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 break-words">{displayValue}</p>
                           )}
                         </div>
                       </div>
-                    ))
+                      );
+                    })
                 ) : (
                   <p className="text-sm text-gray-500 dark:text-gray-400">No custom field values set</p>
                 )}

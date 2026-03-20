@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Loader2, X, Mail, CheckCircle2, UserCheck, Tag, Calendar, Shield, AlertTriangle, CalendarIcon, ShieldAlert, Settings2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -592,23 +593,42 @@ export default function EditEmailContact() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {customFieldDefs.map((cf: any) => (
-                          <div key={cf.id} className="space-y-1.5">
+                        {customFieldDefs.map((cf: any) => {
+                          const mask = cf.mask;
+                          return (
+                          <div key={cf.id} className={`space-y-1.5${mask === 'multi_line' ? ' md:col-span-2' : ''}`}>
                             <FormLabel>
                               {cf.label}
                               {cf.isRequired && <span className="text-red-500 ml-1">*</span>}
                             </FormLabel>
-                            {cf.fieldType === 'text' && (
+                            {cf.fieldType === 'text' && mask === 'multi_line' && (
+                              <Textarea
+                                placeholder={cf.placeholder || `Enter ${cf.label.toLowerCase()}...`}
+                                value={customFieldValues[cf.id] || ''}
+                                rows={3}
+                                onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                              />
+                            )}
+                            {cf.fieldType === 'text' && mask !== 'multi_line' && (
                               <Input
                                 placeholder={cf.placeholder || `Enter ${cf.label.toLowerCase()}...`}
                                 value={customFieldValues[cf.id] || ''}
                                 onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
                               />
                             )}
-                            {cf.fieldType === 'number' && (
+                            {cf.fieldType === 'number' && (mask === 'phone_with_area' || mask === 'phone_no_area') && (
+                              <Input
+                                type="tel"
+                                placeholder={cf.placeholder || (mask === 'phone_with_area' ? '(555) 123-4567' : '123-4567')}
+                                value={customFieldValues[cf.id] || ''}
+                                onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                              />
+                            )}
+                            {cf.fieldType === 'number' && mask !== 'phone_with_area' && mask !== 'phone_no_area' && (
                               <Input
                                 type="number"
-                                placeholder={cf.placeholder || '0'}
+                                step={mask === 'currency' ? '0.01' : mask === 'percentage' ? '1' : 'any'}
+                                placeholder={cf.placeholder || (mask === 'currency' ? '0.00' : mask === 'percentage' ? '0' : '0')}
                                 value={customFieldValues[cf.id] || ''}
                                 onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
                               />
@@ -621,7 +641,21 @@ export default function EditEmailContact() {
                                 onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
                               />
                             )}
-                            {cf.fieldType === 'date' && (
+                            {cf.fieldType === 'date' && mask === 'time_only' && (
+                              <Input
+                                type="time"
+                                value={customFieldValues[cf.id] || ''}
+                                onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                              />
+                            )}
+                            {cf.fieldType === 'date' && mask === 'date_time' && (
+                              <Input
+                                type="datetime-local"
+                                value={customFieldValues[cf.id] || ''}
+                                onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [cf.id]: e.target.value }))}
+                              />
+                            )}
+                            {cf.fieldType === 'date' && mask !== 'time_only' && mask !== 'date_time' && (
                               <Input
                                 type="date"
                                 value={customFieldValues[cf.id] || ''}
@@ -656,7 +690,8 @@ export default function EditEmailContact() {
                               </div>
                             )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

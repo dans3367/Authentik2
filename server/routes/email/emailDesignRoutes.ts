@@ -851,7 +851,7 @@ emailDesignRoutes.get("/contact-custom-fields", authenticateToken, requireTenant
 // Create a custom field definition
 emailDesignRoutes.post("/contact-custom-fields", authenticateToken, requireTenant, requirePermission('contacts.create'), async (req: any, res) => {
   try {
-    const { name, label, fieldType, options, placeholder, isRequired, sortOrder } = req.body;
+    const { name, label, fieldType, mask, options, placeholder, isRequired, sortOrder } = req.body;
 
     if (!name || !label) {
       return res.status(400).json({ message: 'Name and label are required' });
@@ -875,6 +875,7 @@ emailDesignRoutes.post("/contact-custom-fields", authenticateToken, requireTenan
       name: sanitizeString(name),
       label: sanitizeString(label),
       fieldType: fieldType || 'text',
+      mask: mask ? sanitizeString(mask) : null,
       options: options && Array.isArray(options) ? JSON.stringify(options) : null,
       placeholder: placeholder ? sanitizeString(placeholder) : null,
       isRequired: isRequired || false,
@@ -897,7 +898,7 @@ emailDesignRoutes.post("/contact-custom-fields", authenticateToken, requireTenan
 emailDesignRoutes.put("/contact-custom-fields/:id", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { name, label, fieldType, options, placeholder, isRequired, sortOrder } = req.body;
+    const { name, label, fieldType, mask, options, placeholder, isRequired, sortOrder } = req.body;
 
     const existing = await db.select().from(contactCustomFields)
       .where(sql`${contactCustomFields.id} = ${id} AND ${contactCustomFields.tenantId} = ${req.user.tenantId}`);
@@ -916,6 +917,7 @@ emailDesignRoutes.put("/contact-custom-fields/:id", authenticateToken, requireTe
       }
       updateData.fieldType = fieldType;
     }
+    if (mask !== undefined) updateData.mask = mask ? sanitizeString(mask) : null;
     if (options !== undefined) updateData.options = Array.isArray(options) ? JSON.stringify(options) : null;
     if (placeholder !== undefined) updateData.placeholder = placeholder ? sanitizeString(placeholder) : null;
     if (isRequired !== undefined) updateData.isRequired = isRequired;

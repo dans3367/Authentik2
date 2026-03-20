@@ -1,11 +1,21 @@
 import { Router } from "express";
 import { authenticateToken, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { getOrCreateTranslation, getTranslations, invalidateTranslationCache, LANGUAGE_NAMES } from '../utils/translationService';
+import { createRateLimiter } from '../middleware/security';
 import { db } from '../db';
 import { newsletters } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 
 export const translationRoutes = Router();
+
+// Supported language codes (keys of LANGUAGE_NAMES)
+const SUPPORTED_LANGUAGES = new Set(Object.keys(LANGUAGE_NAMES));
+
+// Rate limiter for AI translation endpoint (expensive operation)
+const translationRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 translation requests per minute per IP
+});
 
 // GET /api/newsletters/:id/translations
 // List all cached translations for a newsletter
@@ -13,11 +23,12 @@ translationRoutes.get("/:id/translations", authenticateToken, requireTenant, req
   try {
     const { id } = req.params;
 
-    // Verify newsletter belongs to tenant
+    // Verify newsletter belongs to tenant and is not soft-deleted
     const newsletter = await db.query.newsletters.findFirst({
       where: and(
         eq(newsletters.id, id),
         eq(newsletters.tenantId, req.user.tenantId),
+        isNull(newsletters.deletedAt),
       ),
     });
 
@@ -27,9 +38,12 @@ translationRoutes.get("/:id/translations", authenticateToken, requireTenant, req
 
     const translations = await getTranslations(id);
 
+    // Derive source language from the first translation record, or fall back to user's language
+    const sourceLanguage = translations[0]?.sourceLanguage || req.user.language || 'en';
+
     res.json({
       newsletterId: id,
-      sourceLanguage: 'en',
+      sourceLanguage,
       translations: translations.map(t => ({
         id: t.id,
         targetLanguage: t.targetLanguage,
@@ -48,7 +62,7 @@ translationRoutes.get("/:id/translations", authenticateToken, requireTenant, req
 
 // POST /api/newsletters/:id/translations/translate
 // Translate a newsletter into a specific language (or re-translate if stale)
-translationRoutes.post("/:id/translations/translate", authenticateToken, requireTenant, requirePermission('newsletters.send'), async (req: any, res) => {
+translationRoutes.post("/:id/translations/translate", authenticateToken, requireTenant, requirePermission('newsletters.send'), translationRateLimiter, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { targetLanguage, sourceLanguage } = req.body;
@@ -57,11 +71,28 @@ translationRoutes.post("/:id/translations/translate", authenticateToken, require
       return res.status(400).json({ message: 'targetLanguage is required' });
     }
 
-    // Verify newsletter belongs to tenant
+    // Validate targetLanguage against supported languages
+    if (!SUPPORTED_LANGUAGES.has(targetLanguage)) {
+      return res.status(400).json({
+        message: `Unsupported target language: ${targetLanguage}`,
+        supportedLanguages: Array.from(SUPPORTED_LANGUAGES),
+      });
+    }
+
+    // Validate sourceLanguage if provided
+    if (sourceLanguage && !SUPPORTED_LANGUAGES.has(sourceLanguage)) {
+      return res.status(400).json({
+        message: `Unsupported source language: ${sourceLanguage}`,
+        supportedLanguages: Array.from(SUPPORTED_LANGUAGES),
+      });
+    }
+
+    // Verify newsletter belongs to tenant and is not soft-deleted
     const newsletter = await db.query.newsletters.findFirst({
       where: and(
         eq(newsletters.id, id),
         eq(newsletters.tenantId, req.user.tenantId),
+        isNull(newsletters.deletedAt),
       ),
     });
 
@@ -72,7 +103,7 @@ translationRoutes.post("/:id/translations/translate", authenticateToken, require
     const result = await getOrCreateTranslation({
       tenantId: req.user.tenantId,
       newsletterId: id,
-      sourceLanguage: sourceLanguage || 'en',
+      sourceLanguage: sourceLanguage || req.user.language || 'en',
       targetLanguage,
       subject: newsletter.subject,
       content: newsletter.content,
@@ -97,11 +128,12 @@ translationRoutes.delete("/:id/translations", authenticateToken, requireTenant, 
   try {
     const { id } = req.params;
 
-    // Verify newsletter belongs to tenant
+    // Verify newsletter belongs to tenant and is not soft-deleted
     const newsletter = await db.query.newsletters.findFirst({
       where: and(
         eq(newsletters.id, id),
         eq(newsletters.tenantId, req.user.tenantId),
+        isNull(newsletters.deletedAt),
       ),
     });
 
