@@ -11,6 +11,7 @@ import ManagementBlogDesign from "@/pages/management-blog-design";
 import ManagementRolesPermissions from "@/pages/management-roles-permissions";
 import ManagementNewsletterReviewer from "@/pages/management-newsletter-reviewer";
 import ManagementCustomFields from "@/pages/management-custom-fields";
+import ManagementBulkImport from "@/pages/management-bulk-import";
 import { AccountUsageCard, ResourceUsageCard } from "@/components/ui/account-usage-card";
 
 export default function ManagementPage() {
@@ -45,6 +46,7 @@ export default function ManagementPage() {
             <TabsTrigger value="blog-design">{t('management.tabs.blogDesign', 'Blog Design')}</TabsTrigger>
             <TabsTrigger value="newsletter-reviewer">{t('management.tabs.newsletterReviewer', 'Reviewer')}</TabsTrigger>
             <TabsTrigger value="custom-fields">{t('management.tabs.customFields', 'Custom Fields')}</TabsTrigger>
+            <TabsTrigger value="bulk-import">{t('management.tabs.bulkImport', 'Bulk Import')}</TabsTrigger>
           </TabsList>
           <div className="mt-6">
             <TabsContent value="account-usage">
@@ -76,6 +78,9 @@ export default function ManagementPage() {
             </TabsContent>
             <TabsContent value="custom-fields">
               <ManagementCustomFields />
+            </TabsContent>
+            <TabsContent value="bulk-import">
+              <ManagementBulkImport />
             </TabsContent>
           </div>
         </Tabs>

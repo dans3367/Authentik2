@@ -13,6 +13,8 @@ import { fromZonedTime } from 'date-fns-tz';
 import { wrapNewsletterContent } from '../../utils/newsletterEmailWrapper';
 import { replaceEmailPlaceholders } from '../../utils/emailPlaceholders';
 import { sanitizeEmailHtml, sanitizeFontFamily, escapeHtml, isValidHttpUrl, maskEmail, renderBirthdayTemplate, enqueuePromotionalEmailJob } from './emailUtils';
+import multer from 'multer';
+import Papa from 'papaparse';
 
 export const contactRoutes = Router();
 
@@ -823,6 +825,229 @@ contactRoutes.post("/email-contacts", authenticateToken, requireTenant, requireP
     console.error('Create email contact error:', error);
     res.status(500).json({ message: 'Failed to create email contact' });
   }
+});
+
+// CSV file upload middleware for bulk import
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype !== 'text/csv' && !file.originalname.toLowerCase().endsWith('.csv')) {
+      cb(new Error('Only CSV files are allowed'));
+      return;
+    }
+    cb(null, true);
+  },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+}).single('file');
+
+// Bulk import contacts from CSV
+contactRoutes.post("/email-contacts/bulk-import", authenticateToken, requireTenant, requirePermission('contacts.create'), (req: any, res: any) => {
+  csvUpload(req, res, async (uploadErr: any) => {
+    if (uploadErr) {
+      if (uploadErr instanceof multer.MulterError && uploadErr.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ message: 'File too large. Maximum size is 10MB.' });
+      }
+      return res.status(400).json({ message: uploadErr.message || 'File upload failed' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No CSV file provided' });
+    }
+
+    try {
+      const csvText = req.file.buffer.toString('utf-8');
+      const parsed = Papa.parse<Record<string, string>>(csvText, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (h: string) => h.trim().toLowerCase().replace(/\s+/g, '_'),
+      });
+
+      if (parsed.errors.length > 0 && parsed.data.length === 0) {
+        return res.status(400).json({
+          message: 'Failed to parse CSV file',
+          errors: parsed.errors.slice(0, 5).map(e => e.message),
+        });
+      }
+
+      const rows = parsed.data;
+      if (rows.length === 0) {
+        return res.status(400).json({ message: 'CSV file contains no data rows' });
+      }
+
+      if (rows.length > 5000) {
+        return res.status(400).json({ message: 'Maximum 5,000 contacts per import. Please split your file.' });
+      }
+
+      // Column mapping: support common variations
+      const colMap = (row: Record<string, string>, keys: string[]): string | undefined => {
+        for (const k of keys) {
+          if (row[k] !== undefined && row[k] !== '') return row[k].trim();
+        }
+        return undefined;
+      };
+
+      const tenantId = req.user.tenantId;
+      const now = new Date();
+
+      // Fetch existing emails for this tenant to check duplicates
+      const existingEmails = new Set<string>();
+      const existingRows = await db.query.emailContacts.findMany({
+        where: sql`${emailContacts.tenantId} = ${tenantId}`,
+        columns: { email: true },
+      });
+      for (const r of existingRows) {
+        existingEmails.add(r.email.toLowerCase());
+      }
+
+      const results = {
+        total: rows.length,
+        created: 0,
+        skipped: 0,
+        errors: [] as Array<{ row: number; email?: string; reason: string }>,
+      };
+
+      // Process in batches of 100
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const batch = rows.slice(i, i + BATCH_SIZE);
+        const toInsert: any[] = [];
+
+        for (let j = 0; j < batch.length; j++) {
+          const row = batch[j];
+          const rowNum = i + j + 2; // +2 for 1-indexed + header row
+
+          const rawEmail = colMap(row, ['email', 'email_address', 'e-mail', 'e_mail']);
+          if (!rawEmail) {
+            results.errors.push({ row: rowNum, reason: 'Missing email address' });
+            results.skipped++;
+            continue;
+          }
+
+          const email = sanitizeEmail(rawEmail);
+          if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            results.errors.push({ row: rowNum, email: rawEmail, reason: 'Invalid email address' });
+            results.skipped++;
+            continue;
+          }
+
+          if (existingEmails.has(email.toLowerCase())) {
+            results.errors.push({ row: rowNum, email, reason: 'Duplicate — contact already exists' });
+            results.skipped++;
+            continue;
+          }
+
+          // Mark as seen to catch in-file duplicates
+          existingEmails.add(email.toLowerCase());
+
+          const firstName = colMap(row, ['first_name', 'firstname', 'first', 'given_name']);
+          const lastName = colMap(row, ['last_name', 'lastname', 'last', 'surname', 'family_name']);
+          const phone = colMap(row, ['phone', 'phone_number', 'phonenumber', 'telephone', 'mobile']);
+          const address = colMap(row, ['address', 'street', 'street_address']);
+          const city = colMap(row, ['city', 'town']);
+          const state = colMap(row, ['state', 'province', 'region']);
+          const zipCode = colMap(row, ['zip', 'zip_code', 'zipcode', 'postal_code', 'postalcode']);
+          const country = colMap(row, ['country']);
+          const dob = colMap(row, ['date_of_birth', 'dob', 'dateofbirth', 'birthday', 'birth_date', 'birthdate']);
+          const status = colMap(row, ['status']);
+
+          // Validate date of birth if provided
+          let validatedDob: string | null = null;
+          if (dob) {
+            // Try to parse various date formats
+            let parsed: Date | null = null;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+              parsed = new Date(dob);
+            } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dob)) {
+              const [m, d, y] = dob.split('/');
+              parsed = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+            } else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(dob)) {
+              const [m, d, y] = dob.split('-');
+              parsed = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+            }
+            if (parsed && !isNaN(parsed.getTime())) {
+              validatedDob = parsed.toISOString().split('T')[0];
+            }
+          }
+
+          // Validate status
+          const allowedStatuses = ['active', 'unsubscribed', 'bounced', 'pending', 'suppressed'];
+          const contactStatus = status && allowedStatuses.includes(status.toLowerCase()) ? status.toLowerCase() : 'active';
+
+          toInsert.push({
+            tenantId,
+            email,
+            firstName: firstName ? sanitizeString(firstName) : null,
+            lastName: lastName ? sanitizeString(lastName) : null,
+            phoneNumber: phone ? sanitizeString(phone) : null,
+            address: address ? sanitizeString(address) : null,
+            city: city ? sanitizeString(city) : null,
+            state: state ? sanitizeString(state) : null,
+            zipCode: zipCode ? sanitizeString(zipCode) : null,
+            country: country ? sanitizeString(country) : null,
+            dateOfBirth: validatedDob,
+            status: contactStatus,
+            consentGiven: true,
+            consentMethod: 'import',
+            consentDate: now,
+            addedByUserId: req.user.id,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+
+        // Bulk insert the batch
+        if (toInsert.length > 0) {
+          try {
+            await db.insert(emailContacts).values(toInsert);
+            results.created += toInsert.length;
+          } catch (dbErr: any) {
+            // If batch insert fails, fall back to individual inserts
+            for (const contact of toInsert) {
+              try {
+                await db.insert(emailContacts).values(contact);
+                results.created++;
+              } catch (individualErr: any) {
+                results.errors.push({
+                  row: 0,
+                  email: contact.email,
+                  reason: individualErr.message?.includes('unique') ? 'Duplicate — contact already exists' : 'Database insert failed',
+                });
+                results.skipped++;
+              }
+            }
+          }
+        }
+      }
+
+      // Log activity
+      await logActivity({
+        tenantId,
+        userId: req.user.id,
+        entityType: 'contact',
+        entityId: 'bulk-import',
+        entityName: 'Bulk Import',
+        activityType: 'created',
+        description: `Bulk imported ${results.created} contacts from CSV (${results.skipped} skipped, ${results.total} total)`,
+        metadata: {
+          total: results.total,
+          created: results.created,
+          skipped: results.skipped,
+          errorCount: results.errors.length,
+        },
+        req,
+      });
+
+      // Only return first 50 errors to avoid huge responses
+      res.json({
+        ...results,
+        errors: results.errors.slice(0, 50),
+        hasMoreErrors: results.errors.length > 50,
+      });
+    } catch (error) {
+      console.error('Bulk import error:', error);
+      res.status(500).json({ message: 'Failed to process bulk import' });
+    }
+  });
 });
 
 /**

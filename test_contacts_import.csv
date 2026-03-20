@@ -1,0 +1,6 @@
+email,first_name,last_name,phone_number,date_of_birth,address,city,state,zip_code,country
+maria.garcia@example.com,Maria,Garcia,(512) 555-0147,1988-03-22,456 Oak Avenue,Austin,TX,78701,US
+james.chen@example.com,James,Chen,(303) 555-0291,1995-11-08,789 Maple Drive,Denver,CO,80202,US
+sarah.johnson@example.com,Sarah,Johnson,(917) 555-0183,1992-07-14,321 Broadway,New York,NY,10013,US
+roberto.silva@example.com,Roberto,Silva,(305) 555-0462,1985-01-30,1010 Biscayne Blvd,Miami,FL,33132,US
+emily.watts@example.com,Emily,Watts,(206) 555-0374,1999-09-05,55 Pine Street,Seattle,WA,98101,US
