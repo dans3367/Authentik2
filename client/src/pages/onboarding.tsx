@@ -200,8 +200,8 @@ export default function OnboardingPage() {
                 description: 'Your account setup is complete. Let\'s get started!',
             });
 
-            // Small delay for the toast, then redirect
-            redirectToPlanSelection(800);
+            // Small delay for the toast, then redirect to dashboard
+            setTimeout(() => { window.location.href = '/dashboard'; }, 800);
         } catch (error) {
             console.error('Onboarding error:', error);
             toast({

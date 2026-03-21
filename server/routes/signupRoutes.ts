@@ -3,6 +3,7 @@ import { db } from '../db';
 import { betterAuthUser } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import rateLimit from 'express-rate-limit';
+import { sanitizeString } from '../utils/sanitization';
 
 // Extend global type for pendingCompanyNames
 declare global {
@@ -54,7 +55,8 @@ signupRoutes.post("/store-company-name", storeCompanyNameLimiter, async (req, re
     }
 
     const normalizedKey = email.toLowerCase();
-    global.pendingCompanyNames[normalizedKey] = companyName;
+    const sanitizedName = sanitizeString(companyName) || companyName.trim();
+    global.pendingCompanyNames[normalizedKey] = sanitizedName;
 
     // Clean up after 5 minutes to prevent memory leaks
     setTimeout(() => {

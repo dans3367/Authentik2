@@ -127,6 +127,14 @@ export const jwtTokenRateLimiter = createRateLimiter({
   skipSuccessfulRequests: false,
 });
 
+// Stricter rate limiter for credential-checking endpoints (login, 2FA check)
+export const loginRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: "Too many login attempts. Please try again later.",
+  skipSuccessfulRequests: false,
+});
+
 // Rate limiter for 2FA verification attempts
 export const twoFactorRateLimiter = createRateLimiter({
   windowMs: 10 * 60 * 1000, // 10 minutes (matches temp session TTL)

@@ -14,7 +14,7 @@ export const betterAuthUser = pgTable("better_auth_user", {
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
   role: text("role").default('Owner').notNull(), // New users default to Owner role
-  tenantId: varchar("tenant_id").default(sql`'2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff'`).notNull(), // Temporary default, will be updated by signup hook
+  tenantId: varchar("tenant_id").default(sql`'00000000-0000-0000-0000-000000000000'`).notNull(), // Placeholder — real tenant created after Stripe payment
   // Additional fields from users table
   firstName: text("first_name"),
   lastName: text("last_name"),

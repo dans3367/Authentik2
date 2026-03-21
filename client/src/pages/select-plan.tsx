@@ -100,13 +100,15 @@ export default function SelectPlanPage() {
         // Cache subscription status so ProtectedRoute won't re-check
         if (user?.id) {
           localStorage.setItem(`subscriptionActive:${user.id}`, 'true');
+          // Clear onboarding cache so it gets re-checked (company was just created)
+          localStorage.removeItem(`onboardingCompleted:${user.id}`);
         }
         toast({
           title: "Welcome!",
-          description: "Your subscription is active. Redirecting to dashboard...",
+          description: "Your subscription is active. Let's set up your account...",
         });
         setTimeout(() => {
-          window.location.href = "/dashboard";
+          window.location.href = "/onboarding";
         }, 1000);
       }
     },

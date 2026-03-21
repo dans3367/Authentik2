@@ -61,6 +61,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     // Check if user has a valid tenant ID
     const placeholderTenantIds = [
       '00000000-0000-0000-0000-000000000000',
+      '2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff', // Old schema default
     ];
 
     let finalTenantId = userRecord.tenantId;
@@ -313,8 +314,7 @@ export const requireTenant = (req: AuthRequest, res: Response, next: NextFunctio
       req.user.tenantId = extractedUuid;
     } else {
       return res.status(400).json({
-        message: 'Invalid tenant ID format - no valid UUID found',
-        tenantId: req.user.tenantId
+        message: 'Invalid tenant ID format'
       });
     }
   }
@@ -349,12 +349,11 @@ export const requireValidTenant = async (req: AuthRequest, res: Response, next: 
     if (uuidMatch) {
       // Extract the valid UUID and update the request
       const extractedUuid = uuidMatch[0];
-      console.log(`🔧 [Tenant Fix] Extracted valid UUID from malformed tenant ID: ${req.user.tenantId} -> ${extractedUuid}`);
+      console.log(`🔧 [Tenant Fix] Extracted valid UUID from malformed tenant ID`);
       req.user.tenantId = extractedUuid;
     } else {
       return res.status(400).json({
-        message: 'Invalid tenant ID format - no valid UUID found',
-        tenantId: req.user.tenantId
+        message: 'Invalid tenant ID format'
       });
     }
   }
@@ -368,15 +367,13 @@ export const requireValidTenant = async (req: AuthRequest, res: Response, next: 
 
     if (!tenant) {
       return res.status(404).json({
-        message: 'Tenant not found',
-        tenantId: req.user.tenantId
+        message: 'Tenant not found'
       });
     }
 
     if (!tenant.isActive) {
       return res.status(403).json({
-        message: 'Tenant is inactive',
-        tenantId: req.user.tenantId
+        message: 'Tenant is inactive'
       });
     }
   } catch (error) {

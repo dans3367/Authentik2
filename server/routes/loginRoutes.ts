@@ -6,11 +6,11 @@ import { authenticator } from 'otplib';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { auth, getAuthSecret } from '../auth';
-import bcrypt from 'bcryptjs';
+// bcrypt removed — Better Auth uses scrypt via hashPassword
 import jwt from 'jsonwebtoken';
 import { triggerTransactionalEmail } from '../lib/trigger';
 import { randomBytes } from 'crypto';
-import { twoFactorRateLimiter, passwordResetRateLimiter } from '../middleware/security';
+import { twoFactorRateLimiter, passwordResetRateLimiter, loginRateLimiter } from '../middleware/security';
 import { validatePasswordStrength } from '../middleware/security-enhanced';
 
 export const loginRoutes = Router();
@@ -161,7 +161,7 @@ loginRoutes.post('/resend-verification', async (req, res) => {
 });
 
 // New login verification endpoint that follows the flow in the image
-loginRoutes.post('/verify-login', async (req, res) => {
+loginRoutes.post('/verify-login', loginRateLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -342,7 +342,7 @@ setInterval(async () => {
 }, 5 * 60 * 1000);
 
 // Check if user requires 2FA verification before login
-loginRoutes.post('/check-2fa-requirement', async (req, res) => {
+loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -398,20 +398,21 @@ loginRoutes.post('/check-2fa-requirement', async (req, res) => {
     }
 
     // Check if user has 2FA enabled
+    // Always clean up the session that signInEmail created — for non-2FA users
+    // the client will call signIn.email() again creating its own session; for 2FA
+    // users we create a temp session instead.
+    if (loginResult.token) {
+      await db.delete(betterAuthSession)
+        .where(eq(betterAuthSession.token, loginResult.token))
+        .catch(err => console.warn('⚠️ [2FA Check] Could not clean up pre-check session:', err));
+    }
+
     if (!userRecord.twoFactorEnabled || !userRecord.twoFactorSecret) {
       console.log(`✅ [2FA Check] No 2FA required for user ${userRecord.email}`);
       return res.json({
         success: true,
         requires2FA: false
       });
-    }
-
-    // User has 2FA enabled - clean up the session that signInEmail created
-    // since the user must complete 2FA before getting a real session
-    if (loginResult.token) {
-      await db.delete(betterAuthSession)
-        .where(eq(betterAuthSession.token, loginResult.token))
-        .catch(err => console.warn('⚠️ [2FA Check] Could not clean up pre-2FA session:', err));
     }
 
     // Create temporary session for verification
@@ -1256,8 +1257,9 @@ loginRoutes.post('/reset-password', async (req, res) => {
       return res.status(400).json({ message: 'User not found' });
     }
 
-    // Hash new password using bcrypt (matching Better Auth's hashing)
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Hash new password using Better Auth's native scrypt hashing
+    const { hashPassword } = await import('better-auth/crypto');
+    const hashedPassword = await hashPassword(password);
 
     // Delete the used reset token (single-use enforcement)
     await db.delete(betterAuthVerification)

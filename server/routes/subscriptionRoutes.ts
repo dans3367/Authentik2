@@ -8,6 +8,145 @@ import Stripe from 'stripe';
 
 export const subscriptionRoutes = Router();
 
+const PLACEHOLDER_TENANT_ID = '00000000-0000-0000-0000-000000000000';
+const OLD_DEFAULT_TENANT_ID = '2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff';
+
+function isPlaceholderTenant(tenantId: string | null | undefined): boolean {
+  return !tenantId || tenantId === PLACEHOLDER_TENANT_ID || tenantId === OLD_DEFAULT_TENANT_ID;
+}
+
+/**
+ * Deterministic 32-bit hash of a string for use as a PostgreSQL advisory lock key.
+ */
+function hashStringToInt32(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return hash;
+}
+
+// Fixed namespace key for provisioning advisory locks (avoids collisions with other lock users)
+const PROVISION_LOCK_NS = 0x50524F56; // "PROV" as int32
+
+/**
+ * Mask an email for logging: "d***@example.com"
+ */
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!local || !domain) return '***';
+  return `${local[0]}***@${domain}`;
+}
+
+/**
+ * Truncate a UUID for logging: "a1b2c3d4..."
+ */
+function truncateId(id: string): string {
+  return id.length > 8 ? `${id.slice(0, 8)}...` : id;
+}
+
+/**
+ * Creates a tenant + company for a user after Stripe payment is confirmed.
+ * Returns the new tenantId, or the existing one if the user already has a real tenant.
+ *
+ * Uses a PostgreSQL advisory lock keyed on the userId to prevent a race condition
+ * where both confirm-checkout and the Stripe webhook call this simultaneously.
+ */
+async function provisionTenantForUser(userId: string): Promise<string> {
+  // Fast path — check before acquiring lock
+  const preCheck = await db.query.betterAuthUser.findFirst({
+    where: eq(betterAuthUser.id, userId),
+  });
+  if (!preCheck) throw new Error(`User not found: ${userId}`);
+  if (preCheck.tenantId && !isPlaceholderTenant(preCheck.tenantId)) {
+    console.log(`✅ [Provision] User ${maskEmail(preCheck.email)} already has tenant: ${truncateId(preCheck.tenantId)}`);
+    return preCheck.tenantId;
+  }
+
+  // Acquire two-key advisory lock: (namespace, userHash) — 64-bit key space eliminates collisions
+  const userHash = hashStringToInt32(userId);
+  await db.execute(sql`SELECT pg_advisory_lock(${PROVISION_LOCK_NS}, ${userHash})`);
+
+  try {
+    // Re-check after acquiring lock — the other caller may have already provisioned
+    const userRecord = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, userId),
+    });
+
+    if (!userRecord) throw new Error(`User not found: ${userId}`);
+
+    if (userRecord.tenantId && !isPlaceholderTenant(userRecord.tenantId)) {
+      console.log(`✅ [Provision] User ${maskEmail(userRecord.email)} already has tenant (after lock): ${truncateId(userRecord.tenantId)}`);
+      return userRecord.tenantId;
+    }
+
+    console.log(`🔧 [Provision] Creating tenant+company for user: ${maskEmail(userRecord.email)}`);
+
+    // Get company name from pending signups store
+    const pendingCompanyName = (global as any).pendingCompanyNames?.[userRecord.email.toLowerCase()];
+    const companyName = pendingCompanyName || (userRecord.name ? `${userRecord.name}'s Organization` : 'My Organization');
+
+    // Generate a unique slug
+    let baseSlug = userRecord.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '-');
+    let slug = baseSlug;
+    let attempts = 0;
+
+    while (attempts < 10) {
+      const existingTenant = await db.query.tenants.findFirst({
+        where: eq(tenants.slug, slug),
+      });
+      if (!existingTenant) break;
+      attempts++;
+      slug = `${baseSlug}-${attempts}`;
+    }
+
+    // Create tenant
+    const [newTenant] = await db.insert(tenants).values({
+      name: companyName,
+      slug,
+      isActive: true,
+      maxUsers: 10,
+    }).returning();
+
+    if (!newTenant?.id) {
+      throw new Error('Failed to create tenant');
+    }
+
+    // Update user with new tenant ID
+    await db.update(betterAuthUser)
+      .set({
+        tenantId: newTenant.id,
+        role: 'Owner',
+        updatedAt: new Date(),
+      })
+      .where(eq(betterAuthUser.id, userRecord.id));
+
+    // Create company record
+    const [newCompany] = await db.insert(companies).values({
+      tenantId: newTenant.id,
+      ownerId: userRecord.id,
+      name: companyName,
+      setupCompleted: false,
+      isActive: true,
+    }).returning();
+
+    if (!newCompany) {
+      throw new Error('Failed to create company');
+    }
+
+    // Clean up pending company name
+    if ((global as any).pendingCompanyNames?.[userRecord.email.toLowerCase()]) {
+      delete (global as any).pendingCompanyNames[userRecord.email.toLowerCase()];
+    }
+
+    console.log(`✅ [Provision] Tenant ${truncateId(newTenant.id)} + company ${truncateId(newCompany.id)} created for ${maskEmail(userRecord.email)}`);
+    return newTenant.id;
+  } finally {
+    // Always release the advisory lock
+    await db.execute(sql`SELECT pg_advisory_unlock(${PROVISION_LOCK_NS}, ${userHash})`);
+  }
+}
+
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
   console.warn("Warning: STRIPE_SECRET_KEY not found, Stripe features will be disabled");
@@ -936,12 +1075,22 @@ subscriptionRoutes.get("/usage", authenticateToken, requireRole(["Owner"]), asyn
 // Check if current tenant has an active subscription (used by frontend to gate plan selection)
 subscriptionRoutes.get("/check-subscription", authenticateToken, async (req: any, res) => {
   try {
-    if (!req.user || !req.user.tenantId) {
+    if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
+    const tenantId = req.user.tenantId;
+
+    // Users with placeholder or no tenant haven't paid yet — no subscription
+    if (isPlaceholderTenant(tenantId)) {
+      return res.json({
+        hasSubscription: false,
+        status: null,
+      });
+    }
+
     const subscription = await db.query.subscriptions.findFirst({
-      where: eq(subscriptions.tenantId, req.user.tenantId),
+      where: eq(subscriptions.tenantId, tenantId),
     });
 
     const activeStatuses = ['active', 'trialing'];
@@ -959,18 +1108,15 @@ subscriptionRoutes.get("/check-subscription", authenticateToken, async (req: any
 
 // Create Stripe Checkout Session for new signup plan selection
 // All plans (including Free) require going through Stripe to collect a payment method
+// NOTE: New signups may have a placeholder tenantId — tenant is created AFTER payment
 subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, res) => {
   try {
     if (!stripe) {
       return res.status(503).json({ message: 'Payment processing is not configured' });
     }
 
-    if (!req.user || !req.user.tenantId) {
+    if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    if (req.user.role !== 'Owner') {
-      return res.status(403).json({ message: 'Only account owners can manage billing' });
     }
 
     const { planId, billingCycle = 'monthly' } = req.body;
@@ -979,17 +1125,22 @@ subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, r
       return res.status(400).json({ message: 'Plan ID is required' });
     }
 
-    const tenantId = req.user.tenantId;
     const userId = req.user.id;
     const userEmail = req.user.email;
+    const tenantId = req.user.tenantId; // May be placeholder for new signups
 
-    // Check if tenant already has a subscription
-    const existingSub = await db.query.subscriptions.findFirst({
-      where: eq(subscriptions.tenantId, tenantId),
-    });
+    // Determine if this is a new signup (placeholder tenant) or existing user
+    const isNewSignup = isPlaceholderTenant(tenantId);
 
-    if (existingSub && existingSub.status === 'active') {
-      return res.status(400).json({ message: 'You already have an active subscription. Use the subscription management page to change plans.' });
+    // For existing users with a real tenant, check for active subscription
+    if (!isNewSignup) {
+      const existingSub = await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.tenantId, tenantId),
+      });
+
+      if (existingSub && existingSub.status === 'active') {
+        return res.status(400).json({ message: 'You already have an active subscription. Use the subscription management page to change plans.' });
+      }
     }
 
     // Get plan details
@@ -1008,20 +1159,17 @@ subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, r
       return res.status(400).json({ message: `No Stripe price configured for ${isYearly ? 'yearly' : 'monthly'} billing` });
     }
 
-    // Get or create Stripe customer
-    let stripeCustomerId: string | undefined;
-
-    // Check if we already have a Stripe customer for this tenant
-    if (existingSub?.stripeCustomerId && !existingSub.stripeCustomerId.startsWith('free_') && !existingSub.stripeCustomerId.startsWith('manual_')) {
-      stripeCustomerId = existingSub.stripeCustomerId;
-    }
-
-    if (!stripeCustomerId) {
+    // Reuse existing Stripe customer or create a new one (prevents duplicates on retry)
+    let stripeCustomerId: string;
+    const existingCustomers = await stripe.customers.list({ email: userEmail, limit: 1 });
+    if (existingCustomers.data.length > 0) {
+      stripeCustomerId = existingCustomers.data[0].id;
+    } else {
       const customer = await stripe.customers.create({
         email: userEmail,
         metadata: {
-          tenantId,
           userId,
+          ...(isNewSignup ? {} : { tenantId }),
         },
       });
       stripeCustomerId = customer.id;
@@ -1029,6 +1177,15 @@ subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, r
 
     const isFree = parseFloat(plan.price) === 0;
     const frontendUrl = process.env.FRONTEND_URL || 'https://web.zendwise.work';
+
+    // Metadata uses userId as primary key — tenantId may not exist yet
+    const sessionMetadata = {
+      userId,
+      planId: plan.id,
+      billingCycle: isYearly ? 'yearly' : 'monthly',
+      setupType: isNewSignup ? 'new_signup' : 'existing_user',
+      ...(isNewSignup ? {} : { tenantId }),
+    };
 
     // Create Checkout Session
     // For Free plan: use 'setup' mode to collect card without charging
@@ -1040,15 +1197,10 @@ subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, r
         payment_method_types: ['card'],
         success_url: `${frontendUrl}/select-plan?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${frontendUrl}/select-plan?canceled=true`,
-        metadata: {
-          tenantId,
-          userId,
-          planId: plan.id,
-          billingCycle: isYearly ? 'yearly' : 'monthly',
-          setupType: 'new_signup',
-        },
+        metadata: sessionMetadata,
       });
 
+      console.log(`🛒 [Setup Checkout] Created FREE checkout session ${session.id} for user ${truncateId(userId)} (new_signup=${isNewSignup})`);
       return res.json({
         checkoutUrl: session.url,
         sessionId: session.id,
@@ -1066,15 +1218,13 @@ subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, r
         ],
         success_url: `${frontendUrl}/select-plan?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${frontendUrl}/select-plan?canceled=true`,
-        metadata: {
-          tenantId,
-          userId,
-          planId: plan.id,
-          billingCycle: isYearly ? 'yearly' : 'monthly',
-          setupType: 'new_signup',
+        metadata: sessionMetadata,
+        subscription_data: {
+          metadata: sessionMetadata,
         },
       });
 
+      console.log(`🛒 [Setup Checkout] Created PAID checkout session ${session.id} for user ${truncateId(userId)} (new_signup=${isNewSignup})`);
       return res.json({
         checkoutUrl: session.url,
         sessionId: session.id,
@@ -1094,18 +1244,15 @@ subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, r
 });
 
 // Confirm checkout session and create subscription record in DB
+// For new signups: also provisions the tenant + company AFTER payment is confirmed
 subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any, res) => {
   try {
     if (!stripe) {
       return res.status(503).json({ message: 'Payment processing is not configured' });
     }
 
-    if (!req.user || !req.user.tenantId) {
+    if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    if (req.user.role !== 'Owner') {
-      return res.status(403).json({ message: 'Only account owners can manage billing' });
     }
 
     const { sessionId } = req.body;
@@ -1114,7 +1261,6 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
       return res.status(400).json({ message: 'Session ID is required' });
     }
 
-    const tenantId = req.user.tenantId;
     const userId = req.user.id;
 
     // Retrieve the checkout session from Stripe
@@ -1124,18 +1270,43 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
       return res.status(404).json({ message: 'Checkout session not found' });
     }
 
-    // Verify the session belongs to this tenant
-    if (session.metadata?.tenantId !== tenantId) {
-      return res.status(403).json({ message: 'Session does not belong to this tenant' });
+    // Verify the session belongs to this user (use userId, since tenantId may not exist yet)
+    if (session.metadata?.userId !== userId) {
+      return res.status(403).json({ message: 'Session does not belong to this user' });
+    }
+
+    // Verify the checkout session is complete — reject expired/incomplete/replayed sessions
+    if (session.status !== 'complete') {
+      return res.status(400).json({ message: `Checkout session is not complete (status: ${session.status})` });
     }
 
     const planId = session.metadata?.planId;
     const billingCycle = session.metadata?.billingCycle || 'monthly';
     const isYearly = billingCycle === 'yearly';
+    const isNewSignup = session.metadata?.setupType === 'new_signup';
     const stripeCustomerId = typeof session.customer === 'string' ? session.customer : session.customer?.id || '';
 
     if (!planId) {
       return res.status(400).json({ message: 'Plan ID not found in session metadata' });
+    }
+
+    // ── Provision tenant if this is a new signup ──
+    let tenantId: string;
+    if (isNewSignup) {
+      try {
+        tenantId = await provisionTenantForUser(userId);
+        console.log(`🏠 [Confirm Checkout] Provisioned tenant ${truncateId(tenantId)} for new signup user ${truncateId(userId)}`);
+      } catch (provisionError) {
+        console.error('❌ [Confirm Checkout] Failed to provision tenant:', provisionError);
+        return res.status(500).json({ message: 'Failed to create your account. Please try again.' });
+      }
+    } else {
+      // Existing user — use tenantId from metadata or from the user record
+      tenantId = session.metadata?.tenantId || req.user.tenantId;
+      if (isPlaceholderTenant(tenantId)) {
+        // Fallback: try to provision anyway
+        tenantId = await provisionTenantForUser(userId);
+      }
     }
 
     // Check if subscription already exists for this tenant
@@ -1144,7 +1315,6 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
     });
 
     // Idempotency: only skip if the existing active subscription already has THIS plan
-    // If planId differs, this is an upgrade/change and must proceed
     if (existingSub && existingSub.status === 'active' && existingSub.planId === planId) {
       return res.json({
         message: 'Subscription already active',
@@ -1162,18 +1332,18 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
     }
 
     if (session.mode === 'setup') {
-      // Verify the SetupIntent succeeded before provisioning
-      if (session.setup_intent) {
-        const setupIntent = await stripe.setupIntents.retrieve(
-          typeof session.setup_intent === 'string' ? session.setup_intent : (session.setup_intent as any).id
-        );
-        if (setupIntent.status !== 'succeeded') {
-          return res.status(402).json({ message: `SetupIntent not succeeded (status: ${setupIntent.status})` });
-        }
+      // Free plan: a valid SetupIntent MUST exist and have succeeded
+      if (!session.setup_intent) {
+        return res.status(402).json({ message: 'No SetupIntent found — payment method not provided' });
+      }
+      const setupIntent = await stripe.setupIntents.retrieve(
+        typeof session.setup_intent === 'string' ? session.setup_intent : (session.setup_intent as any).id
+      );
+      if (setupIntent.status !== 'succeeded') {
+        return res.status(402).json({ message: `SetupIntent not succeeded (status: ${setupIntent.status})` });
       }
 
       // Free plan — setup mode, no Stripe subscription created
-      // Create a local subscription record
       const subValues = {
         tenantId,
         userId,
@@ -1195,14 +1365,13 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
         await db.insert(subscriptions).values(subValues);
       }
 
-      console.log(`✅ [Confirm Checkout] Free plan subscription created for tenant ${tenantId}`);
+      console.log(`✅ [Confirm Checkout] Free plan subscription created for tenant ${truncateId(tenantId)}`);
     } else {
       // Paid plan — subscription mode: verify payment before provisioning
       if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
         return res.status(402).json({ message: `Payment not completed (status: ${session.payment_status})` });
       }
 
-      // Paid plan — subscription mode
       const stripeSubscriptionId = typeof session.subscription === 'string'
         ? session.subscription
         : (session.subscription as any)?.id;
@@ -1211,10 +1380,8 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
         return res.status(400).json({ message: 'No subscription found in checkout session' });
       }
 
-      // Get subscription details from Stripe
       const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId) as any;
 
-      // Safe date parsing — fallback to computed period if Stripe timestamps are missing or invalid
       console.log(`📅 [Confirm Checkout] Stripe sub dates: start=${stripeSub.current_period_start}, end=${stripeSub.current_period_end}, status=${stripeSub.status}`);
       const safeDate = (ts: any, fallback: Date) => {
         if (typeof ts === 'number' && isFinite(ts)) return new Date(ts * 1000);
@@ -1244,7 +1411,7 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
         await db.insert(subscriptions).values(subValues);
       }
 
-      console.log(`✅ [Confirm Checkout] Paid subscription ${stripeSub.id} ${existingSub ? 'updated (upgrade)' : 'created'} for tenant ${tenantId}, planId: ${planId}`);
+      console.log(`✅ [Confirm Checkout] Paid subscription ${stripeSub.id} ${existingSub ? 'updated (upgrade)' : 'created'} for tenant ${truncateId(tenantId)}, planId: ${planId}`);
     }
 
     // If this is a plan change (not initial signup), send notification email
@@ -1347,10 +1514,11 @@ subscriptionRoutes.post("/webhook", async (req: any, res) => {
 // Helper functions for webhook handling
 async function handleCheckoutSessionCompleted(session: any) {
   try {
-    const { tenantId, userId, planId, billingCycle, setupType } = session.metadata || {};
+    const { userId, planId, billingCycle, setupType } = session.metadata || {};
+    let metadataTenantId = session.metadata?.tenantId;
 
-    if (!tenantId || !planId) {
-      console.error('Missing metadata in checkout session:', session.id);
+    if (!userId || !planId) {
+      console.error('[Webhook] Missing userId or planId in checkout session metadata:', session.id);
       return;
     }
 
@@ -1362,6 +1530,21 @@ async function handleCheckoutSessionCompleted(session: any) {
     const stripeCustomerId = session.customer;
     const isYearly = billingCycle === 'yearly';
     const isUpgrade = setupType === 'upgrade';
+    const isNewSignup = setupType === 'new_signup';
+
+    // ── Provision tenant for new signups ──
+    let tenantId: string;
+    if (isNewSignup || !metadataTenantId) {
+      try {
+        tenantId = await provisionTenantForUser(userId);
+        console.log(`🏠 [Webhook] Provisioned tenant ${truncateId(tenantId)} for user ${truncateId(userId)}`);
+      } catch (provisionError) {
+        console.error('❌ [Webhook] Failed to provision tenant:', provisionError);
+        return;
+      }
+    } else {
+      tenantId = metadataTenantId;
+    }
 
     // Check if subscription already exists (confirm-checkout may have already created it)
     const existingSub = await db.query.subscriptions.findFirst({
@@ -1378,11 +1561,6 @@ async function handleCheckoutSessionCompleted(session: any) {
           console.warn(`[Webhook] SetupIntent not succeeded (status: ${setupIntent.status}), skipping provisioning for session ${session.id}`);
           return;
         }
-      }
-
-      if (!userId) {
-        console.error('[Webhook] Missing userId in checkout session metadata, skipping subscription insert to avoid FK violation:', session.id);
-        return;
       }
 
       const now = new Date();
@@ -1414,7 +1592,7 @@ async function handleCheckoutSessionCompleted(session: any) {
         await db.insert(subscriptions).values(subValues);
       }
 
-      console.log('✅ [Webhook] Free plan subscription created for tenant:', tenantId);
+      console.log(`✅ [Webhook] Free plan subscription created for tenant: ${truncateId(tenantId)}`);
     } else {
       // Paid plan — subscription mode: verify payment before provisioning
       if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
@@ -1426,9 +1604,6 @@ async function handleCheckoutSessionCompleted(session: any) {
       const stripeSubscription = await stripe.subscriptions.retrieve(session.subscription) as any;
 
       // If this is an upgrade and there's an old Stripe subscription, cancel it.
-      // Use previousStripeSubscriptionId from metadata as the authoritative source —
-      // confirm-checkout may have already overwritten existingSub.stripeSubscriptionId
-      // by the time this webhook fires.
       const previousStripeId = session.metadata?.previousStripeSubscriptionId
         || stripeSubscription.metadata?.previousStripeSubscriptionId;
       const oldStripeIdToCancel = previousStripeId
@@ -1449,11 +1624,6 @@ async function handleCheckoutSessionCompleted(session: any) {
       const now = new Date();
       const fallbackEnd = new Date(now);
       if (isYearly) { fallbackEnd.setFullYear(fallbackEnd.getFullYear() + 1); } else { fallbackEnd.setMonth(fallbackEnd.getMonth() + 1); }
-
-      if (!userId) {
-        console.error('[Webhook] Missing userId in checkout session metadata, skipping subscription insert to avoid FK violation:', session.id);
-        return;
-      }
 
       const subValues: any = {
         tenantId,
@@ -1483,7 +1653,7 @@ async function handleCheckoutSessionCompleted(session: any) {
         await db.insert(subscriptions).values(subValues);
       }
 
-      console.log(`✅ [Webhook] ${isUpgrade ? 'Upgraded' : 'Paid'} subscription ${stripeSubscription.id} created for tenant:`, tenantId, `planId: ${planId}`);
+      console.log(`✅ [Webhook] ${isUpgrade ? 'Upgraded' : 'Paid'} subscription ${stripeSubscription.id} created for tenant: ${truncateId(tenantId)}, planId: ${planId}`);
 
       // Send plan change notification for upgrades via webhook
       if (isUpgrade && existingSub && existingSub.planId !== planId) {

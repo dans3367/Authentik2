@@ -20,7 +20,14 @@ type AuthView = "login" | "register" | "forgot" | "twoFactor";
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
-  const [currentView, setCurrentView] = useState<AuthView>("login");
+
+  // Derive initial view from URL hash so the tab persists across browser tab switches
+  const getInitialView = (): AuthView => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash === 'register' || hash === 'login' || hash === 'forgot') return hash;
+    return 'login';
+  };
+  const [currentView, setCurrentView] = useState<AuthView>(getInitialView);
 
   // Force light theme on auth page regardless of user preference
   useEffect(() => {
@@ -37,6 +44,32 @@ export default function AuthPage() {
       }
     };
   }, []);
+
+  // Sync URL hash when view changes
+  useEffect(() => {
+    if (currentView === 'twoFactor') return; // Don't expose 2FA state in URL
+    const newHash = currentView === 'login' ? '' : `#${currentView}`;
+    if (window.location.hash !== (newHash || '#')) {
+      window.history.replaceState(null, '', newHash || window.location.pathname + window.location.search);
+    }
+  }, [currentView]);
+
+  // Listen for hash changes (e.g. browser back/forward)
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash === 'register' || hash === 'login' || hash === 'forgot') {
+        setCurrentView(hash);
+      } else {
+        setCurrentView('login');
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  // Persist register form data in sessionStorage so it survives browser tab switches
+  const REGISTER_STORAGE_KEY = 'auth_register_form';
 
   // Removed free trial URL parameter logic for simplified flow
   const [showPassword, setShowPassword] = useState(false);
@@ -167,14 +200,25 @@ export default function AuthPage() {
     },
   });
 
+  // Restore saved register form data from sessionStorage
+  const getSavedRegisterData = (): Partial<RegisterData> => {
+    try {
+      const saved = sessionStorage.getItem(REGISTER_STORAGE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  };
+  const savedRegister = getSavedRegisterData();
+
   const registerForm = useForm<RegisterData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      email: "",
-      password: "",
-      firstName: "",
-      lastName: "",
-      confirmPassword: "",
+      email: savedRegister.email || "",
+      password: savedRegister.password || "",
+      firstName: savedRegister.firstName || "",
+      lastName: savedRegister.lastName || "",
+      confirmPassword: savedRegister.confirmPassword || "",
+      companyName: savedRegister.companyName || "",
     },
   });
 
@@ -182,6 +226,7 @@ export default function AuthPage() {
   const handleRegister = async (data: RegisterData) => {
     try {
       await registerMutation.mutateAsync(data);
+      sessionStorage.removeItem(REGISTER_STORAGE_KEY);
     } catch (error) {
       console.error('Registration failed:', error);
     }
@@ -200,6 +245,14 @@ export default function AuthPage() {
     },
   });
 
+  // Save register form data to sessionStorage whenever it changes
+  const watchAllRegister = registerForm.watch();
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(REGISTER_STORAGE_KEY, JSON.stringify(watchAllRegister));
+    } catch {}
+  }, [watchAllRegister]);
+
   const watchPassword = registerForm.watch("password");
 
   useEffect(() => {
@@ -214,6 +267,8 @@ export default function AuthPage() {
   const onRegister = async (data: RegisterData) => {
     const result = await registerMutation.mutateAsync(data);
     if (result) {
+      // Clear saved form data on successful registration
+      sessionStorage.removeItem(REGISTER_STORAGE_KEY);
       setCurrentView("login");
       loginForm.setValue("email", data.email);
     }

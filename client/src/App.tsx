@@ -199,6 +199,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }, [userId]);
 
   // Check onboarding status once per authenticated user
+  // New flow: if user has no company (pre-payment), skip onboarding and go to /select-plan
+  // Onboarding happens AFTER payment creates the tenant+company
   useEffect(() => {
     if (!isAuthenticated || !isInitialized || !userId || isEmailVerified !== true) {
       return;
@@ -221,10 +223,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       try {
         const response = await fetch('/api/company', { credentials: 'include' });
         if (cancelled) return;
-        if (response.ok) {
+
+        if (response.status === 404) {
+          // No company exists yet — user hasn't paid. Skip onboarding, go to plan selection.
+          setNeedsOnboarding(false);
+          if (location !== '/select-plan' && !signupFlowPages.includes(location)) {
+            console.log('🔒 [ProtectedRoute] No company found (pre-payment), redirecting to /select-plan');
+            setLocation('/select-plan');
+          }
+        } else if (response.ok) {
           const company = await response.json();
           if (company && !company.setupCompleted) {
-            // Redirect to onboarding if not already there or on select-plan
+            // Company exists but onboarding not done — redirect to onboarding
             if (location !== '/onboarding' && location !== '/select-plan') {
               setNeedsOnboarding(true);
               setLocation('/onboarding');
@@ -232,7 +242,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
           } else {
             localStorage.setItem(cacheKey, 'true');
             setNeedsOnboarding(false);
-            // If on /onboarding but setup is done, redirect to plan selection
             if (location === '/onboarding') {
               setLocation('/select-plan');
             }
