@@ -173,7 +173,6 @@ export class EnhancedEmailService {
           .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
           .button:hover { background: #5a32a3; }
           .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
-          .url-box { background: #e9ecef; padding: 10px; border-radius: 4px; word-break: break-all; font-family: monospace; }
         </style>
       </head>
       <body>
@@ -189,9 +188,6 @@ export class EnhancedEmailService {
             <div style="text-align: center;">
               <a href="${verificationUrl}" class="button">Verify Email Address</a>
             </div>
-            
-            <p>If the button doesn't work, you can also copy and paste this link into your browser:</p>
-            <div class="url-box">${verificationUrl}</div>
             
             <p><strong>This verification link will expire in 24 hours.</strong></p>
             

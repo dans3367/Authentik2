@@ -180,11 +180,6 @@ function buildVerificationEmailHtml(displayName: string, verificationUrl: string
                   </a>
                 </div>
 
-                <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b;">If the button doesn't work, copy and paste this link into your browser:</p>
-                <div style="background: #f1f5f9; padding: 12px; border-radius: 6px; word-break: break-all; font-family: monospace; font-size: 13px; color: #475569; margin-bottom: 20px;">
-                  ${escapeHtml(verificationUrl)}
-                </div>
-
                 <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748b;"><strong>This verification link will expire in 24 hours.</strong></p>
                 <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748b;">If you didn't create an account with us, you can safely ignore this email.</p>
 

@@ -86,11 +86,6 @@ export class EmailService {
                   <a href="${verificationUrl}" class="button">Verify Email Address</a>
                 </div>
                 
-                <p>If the button doesn't work, you can also copy and paste this link into your browser:</p>
-                <p style="background: #e9ecef; padding: 10px; border-radius: 4px; word-break: break-all;">
-                  ${verificationUrl}
-                </p>
-                
                 <p><strong>This verification link will expire in 24 hours.</strong></p>
                 
                 <p>If you didn't create an account with us, you can safely ignore this email.</p>

@@ -15,8 +15,10 @@ import {
     ArrowLeft,
     CheckCircle2,
     Loader2,
-    Shield
+    Shield,
+    LogOut
 } from 'lucide-react';
+import { clearAllAuthState } from '@/lib/clearAuthState';
 
 interface OnboardingData {
     geographicalLocation: string;
@@ -251,8 +253,20 @@ export default function OnboardingPage() {
                     </div>
                     <span className="text-white text-lg font-semibold tracking-tight">SecureAuth</span>
                 </div>
-                <div className="text-blue-300/60 text-sm">
-                    Step {step} of {STEPS.length}
+                <div className="flex items-center gap-4">
+                    <div className="text-blue-300/60 text-sm">
+                        Step {step} of {STEPS.length}
+                    </div>
+                    <button
+                        onClick={async () => {
+                            await clearAllAuthState();
+                            window.location.href = '/auth';
+                        }}
+                        className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/80 transition-colors"
+                    >
+                        <LogOut className="w-4 h-4" />
+                        Log out
+                    </button>
                 </div>
             </header>
 
