@@ -359,6 +359,42 @@ export const themes: Record<string, ThemeStyles> = {
     background: 'bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50'
   },
 
+  'terminal': {
+    id: 'terminal',
+    name: 'Terminal',
+    container: 'min-h-screen py-8',
+    card: 'bg-black/95 rounded-lg shadow-2xl border border-green-500/40 shadow-green-500/10',
+    header: 'p-6 border-b border-green-500/30',
+    title: 'text-2xl font-mono font-bold text-green-400 tracking-wide',
+    description: 'text-green-300/70 mt-2 font-mono text-sm',
+    label: 'text-xs font-mono font-bold text-green-500 uppercase tracking-widest',
+    input: 'w-full px-4 py-3 bg-black border-b-2 border-green-500/50 rounded-none font-mono text-green-300 placeholder-green-700 transition-all duration-150 focus:border-green-400 focus:outline-none focus:shadow-[0_2px_8px_rgba(34,197,94,0.2)] caret-green-400',
+    textarea: 'w-full px-4 py-3 bg-black border-b-2 border-green-500/50 rounded-none font-mono text-green-300 placeholder-green-700 transition-all duration-150 focus:border-green-400 focus:outline-none focus:shadow-[0_2px_8px_rgba(34,197,94,0.2)] caret-green-400 resize-none',
+    select: 'w-full px-4 py-3 bg-black border-b-2 border-green-500/50 rounded-none font-mono text-green-300 transition-all duration-150 focus:border-green-400 focus:outline-none',
+    radio: 'h-4 w-4 text-green-500 focus:ring-green-500 border-green-600',
+    checkbox: 'h-4 w-4 text-green-500 focus:ring-green-500 border-green-600',
+    button: 'w-full bg-green-500/20 hover:bg-green-500/30 text-green-400 font-mono font-bold py-4 px-6 rounded-none border-2 border-green-500 uppercase tracking-widest transition-all duration-150 hover:shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:text-green-300 active:bg-green-500/40 disabled:opacity-50 disabled:cursor-not-allowed',
+    background: 'bg-[#0a0a0a]'
+  },
+
+  'blueprint': {
+    id: 'blueprint',
+    name: 'Blueprint',
+    container: 'min-h-screen py-8',
+    card: 'bg-[#0a1628] rounded-none shadow-2xl border-2 border-sky-400/50 shadow-sky-500/10',
+    header: 'p-6 border-b-2 border-dashed border-sky-400/40',
+    title: 'text-2xl font-mono font-bold text-sky-300 uppercase tracking-[0.25em]',
+    description: 'text-sky-400/60 mt-2 font-mono text-sm tracking-wide',
+    label: 'text-xs font-mono font-semibold text-sky-300/80 uppercase tracking-[0.2em]',
+    input: 'w-full px-4 py-3 bg-[#0d1f3c] border border-dashed border-sky-400/40 rounded-none font-mono text-sky-200 placeholder-sky-700 transition-all duration-200 focus:border-sky-300 focus:outline-none focus:bg-[#0f2444] focus:shadow-[inset_0_0_12px_rgba(56,189,248,0.08)]',
+    textarea: 'w-full px-4 py-3 bg-[#0d1f3c] border border-dashed border-sky-400/40 rounded-none font-mono text-sky-200 placeholder-sky-700 transition-all duration-200 focus:border-sky-300 focus:outline-none focus:bg-[#0f2444] focus:shadow-[inset_0_0_12px_rgba(56,189,248,0.08)] resize-none',
+    select: 'w-full px-4 py-3 bg-[#0d1f3c] border border-dashed border-sky-400/40 rounded-none font-mono text-sky-200 transition-all duration-200 focus:border-sky-300 focus:outline-none',
+    radio: 'h-4 w-4 text-sky-400 focus:ring-sky-400 border-sky-500',
+    checkbox: 'h-4 w-4 text-sky-400 focus:ring-sky-400 border-sky-500',
+    button: 'w-full bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 font-mono font-bold py-4 px-6 rounded-none border-2 border-sky-400/60 uppercase tracking-[0.2em] transition-all duration-200 hover:shadow-[0_0_24px_rgba(56,189,248,0.2)] hover:border-sky-300 active:bg-sky-500/35 disabled:opacity-50 disabled:cursor-not-allowed',
+    background: 'bg-[#060f1f]'
+  },
+
   'newspaper': {
     id: 'newspaper',
     name: 'Newspaper',

@@ -20,32 +20,42 @@ export async function verifyTurnstileToken(
 
   // Graceful degradation: if no secret key configured, skip verification
   if (!secret) {
+    console.warn('[Turnstile] TURNSTILE_SECRET_KEY not configured — skipping verification');
     return { success: true };
   }
 
-  try {
-    const body: Record<string, string> = { secret, response: token };
-    if (remoteIp) body.remoteip = remoteIp;
+  const body: Record<string, string> = { secret, response: token };
+  if (remoteIp) body.remoteip = remoteIp;
 
-    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(body).toString(),
-    });
+  // Attempt verification with one retry on network failure
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(body).toString(),
+        signal: AbortSignal.timeout(5000),
+      });
 
-    const data: TurnstileVerifyResponse = await res.json();
+      const data: TurnstileVerifyResponse = await res.json();
 
-    if (!data.success) {
-      console.warn('[Turnstile] Verification failed:', data['error-codes']);
+      if (!data.success) {
+        console.warn('[Turnstile] Verification failed:', data['error-codes']);
+      }
+
+      return {
+        success: data.success,
+        errorCodes: data['error-codes'],
+      };
+    } catch (error) {
+      console.error(`[Turnstile] Verification request failed (attempt ${attempt}/2):`, error);
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
     }
-
-    return {
-      success: data.success,
-      errorCodes: data['error-codes'],
-    };
-  } catch (error) {
-    console.error('[Turnstile] Verification request failed:', error);
-    // On network error, allow submission to avoid blocking legitimate users
-    return { success: true };
   }
+
+  // Fail closed: reject submission when Cloudflare is unreachable
+  console.error('[Turnstile] All verification attempts failed — rejecting submission');
+  return { success: false, errorCodes: ['network-error'] };
 }
