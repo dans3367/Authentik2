@@ -3,6 +3,16 @@ import { store, persistor } from "@/store";
 import { clearAuth } from "@/store/authSlice";
 import { queryClient } from "@/lib/queryClient";
 
+let _isIntentionalLogout = false;
+
+export function isIntentionalLogout(): boolean {
+  return _isIntentionalLogout;
+}
+
+export function setIntentionalLogout(value: boolean): void {
+  _isIntentionalLogout = value;
+}
+
 /**
  * Clears ALL authentication state across the entire application.
  * Call this on logout, before new account signup, and on 401 errors.

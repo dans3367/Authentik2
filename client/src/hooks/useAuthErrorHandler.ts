@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { signOut } from '@/lib/betterAuthClient';
-import { clearAllAuthState, clearClientCaches } from '@/lib/clearAuthState';
+import { clearAllAuthState, clearClientCaches, isIntentionalLogout } from '@/lib/clearAuthState';
 
 export interface AuthErrorHandlerOptions {
   showToast?: boolean;
@@ -51,6 +51,10 @@ export function setGlobalAuthErrorHandler(handler: (options?: AuthErrorHandlerOp
 }
 
 export function triggerGlobalAuthError(options?: AuthErrorHandlerOptions) {
+  if (isIntentionalLogout()) {
+    console.log('ℹ️ [Auth] Suppressing auth error during intentional logout');
+    return;
+  }
   if (globalAuthErrorHandler) {
     globalAuthErrorHandler(options);
   } else {

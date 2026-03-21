@@ -50,7 +50,7 @@ export const sendReviewNotificationTask = task({
     // Build the review link using the frontend URL from environment
     const baseUrl = process.env.FRONTEND_URL || process.env.BASE_URL || "http://localhost:5173";
 
-    const reviewLink = `${baseUrl}/newsletters/${data.newsletterId}?reviewer=true&code=${data.approvalCode}`;
+    const reviewLink = `${baseUrl}/newsletters/${data.newsletterId}?reviewer=true`;
     const submittedDate = new Date(data.submittedAt).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',

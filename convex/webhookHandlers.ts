@@ -679,25 +679,41 @@ export const postmarkWebhook = httpAction(async (ctx, request) => {
     return new Response("Webhook secret not configured", { status: 500 });
   }
 
+  // Signature header is required — reject requests that omit it
+  if (!signature) {
+    console.warn("Postmark webhook rejected: missing x-postmark-signature header");
+    return new Response("Missing signature header", { status: 401 });
+  }
+
   // Verify webhook signature
-  if (signature) {
-    const body = await request.text();
-    const expectedSignature = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(webhookSecret + body)
-    );
-    const expectedSignatureHex = Array.from(new Uint8Array(expectedSignature))
-      .map(b => b.toString(16).padStart(2, "0"))
-      .join("");
+  const body = await request.text();
+  const expectedSignature = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(webhookSecret + body)
+  );
+  const expectedSignatureHex = Array.from(new Uint8Array(expectedSignature))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
 
-    if (signature !== expectedSignatureHex) {
-      console.error("Invalid Postmark webhook signature");
-      return new Response("Invalid signature", { status: 401 });
-    }
+  if (signature !== expectedSignatureHex) {
+    console.error("Postmark webhook rejected: invalid signature");
+    return new Response("Invalid signature", { status: 401 });
+  }
 
-    // Parse and forward to action
-    const event = JSON.parse(body);
+  // Parse and forward to action
+  let event: any;
+  try {
+    event = JSON.parse(body);
+  } catch (error) {
+    console.error("Error parsing Postmark webhook body:", error);
+    return new Response("Invalid JSON body", { status: 400 });
+  }
+
+  try {
     await ctx.runAction(api.webhookHandlers.handlePostmarkWebhook, { payload: event });
+  } catch (error) {
+    console.error("Error processing Postmark webhook:", error);
+    return new Response("Webhook processing failed", { status: 500 });
   }
 
   return new Response(JSON.stringify({ received: true }), {
@@ -709,15 +725,86 @@ export const postmarkWebhook = httpAction(async (ctx, request) => {
 /**
  * Direct HTTP endpoint for AhaSend webhook events.
  * AhaSend uses Standard Webhooks spec: webhook-id, webhook-timestamp, webhook-signature headers.
+ * HMAC-SHA256 signature is verified using the Web Crypto API (Convex runtime).
  */
 export const ahasendWebhook = httpAction(async (ctx, request) => {
   const webhookId = request.headers.get("webhook-id");
   const webhookTimestamp = request.headers.get("webhook-timestamp");
   const webhookSignature = request.headers.get("webhook-signature");
+  const webhookSecret = process.env.AHASEND_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error("AHASEND_WEBHOOK_SECRET not configured");
+    return new Response("Webhook secret not configured", { status: 500 });
+  }
+
+  // All Standard Webhooks headers are required
+  if (!webhookId || !webhookTimestamp || !webhookSignature) {
+    console.error("Missing AhaSend webhook headers");
+    return new Response("Missing webhook headers", { status: 401 });
+  }
+
+  // Reject timestamps older than 5 minutes to prevent replay attacks
+  const now = Math.floor(Date.now() / 1000);
+  const ts = parseInt(webhookTimestamp, 10);
+  if (isNaN(ts) || Math.abs(now - ts) > 300) {
+    console.warn("AhaSend webhook rejected: timestamp too old", { webhookTimestamp, now, diff: Math.abs(now - ts) });
+    return new Response("Timestamp too old", { status: 401 });
+  }
 
   const body = await request.text();
 
-  // Parse event early so we can log details
+  // Verify HMAC-SHA256 signature (Standard Webhooks spec)
+  // Secret may have "whsec_" or "aha-whsec-" prefix before the base64-encoded key
+  const secretBase64 = webhookSecret.replace(/^(whsec_|aha-whsec-)/, "");
+  let secretBytes: ArrayBuffer;
+  try {
+    const decoded = atob(secretBase64);
+    const bytes = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i++) {
+      bytes[i] = decoded.charCodeAt(i);
+    }
+    secretBytes = bytes.buffer;
+  } catch (e) {
+    console.error("AHASEND_WEBHOOK_SECRET is not valid base64:", e);
+    return new Response("Webhook secret misconfigured", { status: 500 });
+  }
+
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    secretBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+
+  // Standard Webhooks signs: "${webhook-id}.${webhook-timestamp}.${body}"
+  const signedContent = `${webhookId}.${webhookTimestamp}.${body}`;
+  const signatureBytes = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    enc.encode(signedContent),
+  );
+
+  const expectedSignature = btoa(
+    Array.from(new Uint8Array(signatureBytes), (b) => String.fromCharCode(b)).join(""),
+  );
+
+  // webhook-signature header can contain multiple signatures: "v1,<base64> v1,<base64>"
+  const signatures = webhookSignature.split(" ");
+  const isValid = signatures.some((sig) => {
+    const parts = sig.split(",");
+    if (parts.length !== 2 || parts[0] !== "v1") return false;
+    return parts[1] === expectedSignature;
+  });
+
+  if (!isValid) {
+    console.error("AhaSend webhook rejected: invalid signature");
+    return new Response("Invalid signature", { status: 401 });
+  }
+
+  // Parse event after signature verification
   let event: any;
   try {
     event = JSON.parse(body);
@@ -726,38 +813,13 @@ export const ahasendWebhook = httpAction(async (ctx, request) => {
     return new Response("Invalid JSON body", { status: 400 });
   }
 
-  // Log incoming webhook with full details for debugging
-  console.log("AhaSend webhook received", {
+  // Log incoming webhook with details for debugging
+  console.log("AhaSend webhook received (verified)", {
     webhookId,
-    webhookTimestamp,
-    hasSignature: !!webhookSignature,
     eventType: event?.type,
     recipient: event?.data?.recipient,
     messageId: event?.data?.id,
-    subject: event?.data?.subject,
-    from: event?.data?.from,
-    timestamp: event?.timestamp,
   });
-
-  // Basic replay protection: reject timestamps older than 5 minutes
-  if (webhookTimestamp) {
-    const now = Math.floor(Date.now() / 1000);
-    const ts = parseInt(webhookTimestamp, 10);
-    if (!isNaN(ts) && Math.abs(now - ts) > 300) {
-      console.warn("AhaSend webhook rejected: timestamp too old", { webhookTimestamp, now, diff: Math.abs(now - ts) });
-      return new Response("Timestamp too old", { status: 401 });
-    }
-  }
-
-  // TODO: Implement full Standard Webhooks HMAC signature verification
-  // AhaSend uses the standardwebhooks library with aha-whsec- prefixed secrets.
-  // For now, we accept events based on the presence of valid webhook headers
-  // and replay protection. Add full HMAC verification via the standardwebhooks
-  // npm package in the Express server layer (server/routes/webhookRoutes.ts).
-  if (!webhookId || !webhookSignature) {
-    console.error("Missing AhaSend webhook headers");
-    return new Response("Missing webhook headers", { status: 401 });
-  }
 
   try {
     await ctx.runAction(api.webhookHandlers.handleAhaSendWebhook, {

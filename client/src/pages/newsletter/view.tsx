@@ -100,19 +100,9 @@ export default function NewsletterViewPage() {
   const [approvalCode, setApprovalCode] = useState("");
   const [approvalCodeError, setApprovalCodeError] = useState("");
 
-  // Detect if reviewer arrived via email link with code in URL
+  // Detect if reviewer arrived via email link
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const isReviewerFromEmail = urlParams.get('reviewer') === 'true';
-  const emailApprovalCode = urlParams.get('code') || '';
-
-  // Pre-fill approval code from URL if present
-  useEffect(() => {
-    if (emailApprovalCode && emailApprovalCode.length === 5) {
-      setApprovalCode(emailApprovalCode);
-      // Clear the URL parameters to prevent approval code from being stored in browser history
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, [emailApprovalCode]);
 
   const liveStats = useNewsletterStats(id);
 

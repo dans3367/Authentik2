@@ -3,7 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { getApiBaseUrl } from "@/lib/apiConfig";
 import { queryClient } from "@/lib/queryClient";
-import { clearAllAuthState, clearClientCaches } from "@/lib/clearAuthState";
+import { clearAllAuthState, clearClientCaches, setIntentionalLogout } from "@/lib/clearAuthState";
 import type {
   LoginCredentials,
   RegisterData,
@@ -149,6 +149,7 @@ export function useLogout() {
   return {
     mutateAsync: async () => {
       try {
+        setIntentionalLogout(true);
         // Clear ALL auth state: server session, cookies, localStorage, sessionStorage, React Query cache, Redux
         await clearAllAuthState();
         toast({

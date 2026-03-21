@@ -18,7 +18,7 @@ import {
     Shield,
     LogOut
 } from 'lucide-react';
-import { clearAllAuthState } from '@/lib/clearAuthState';
+import { clearAllAuthState, setIntentionalLogout } from '@/lib/clearAuthState';
 
 interface OnboardingData {
     geographicalLocation: string;
@@ -259,6 +259,7 @@ export default function OnboardingPage() {
                     </div>
                     <button
                         onClick={async () => {
+                            setIntentionalLogout(true);
                             await clearAllAuthState();
                             window.location.href = '/auth';
                         }}

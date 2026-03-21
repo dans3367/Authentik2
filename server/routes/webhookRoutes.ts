@@ -3,7 +3,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { emailSends, bouncedEmails, emailContacts, emailEvents, emailActivity } from '@shared/schema';
 import { authenticateToken } from '../middleware/auth-middleware';
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { getConvexClient, api } from '../utils/convexClient';
 
 export const webhookRoutes = Router();
@@ -109,9 +109,13 @@ webhookRoutes.post("/test/webhook-open", authenticateToken, async (req: any, res
 });
 
 // Resend webhook endpoint (POST)
+// Resend uses the Svix standard: svix-id, svix-timestamp, svix-signature headers
+// with a whsec_<base64> secret format.
 webhookRoutes.post("/resend", async (req, res) => {
   try {
-    const signature = req.headers['resend-signature'] as string;
+    const svixId = req.headers['svix-id'] as string;
+    const svixTimestamp = req.headers['svix-timestamp'] as string;
+    const svixSignature = req.headers['svix-signature'] as string;
     const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
@@ -119,16 +123,48 @@ webhookRoutes.post("/resend", async (req, res) => {
       return res.status(500).json({ message: 'Webhook secret not configured' });
     }
 
-    // Verify webhook signature
-    if (signature) {
-      const expectedSignature = createHmac('sha256', webhookSecret)
-        .update(JSON.stringify(req.body))
-        .digest('hex');
+    // All three Svix headers are required — reject requests missing any of them
+    if (!svixId || !svixTimestamp || !svixSignature) {
+      console.warn('Resend webhook rejected: missing required Svix signature headers');
+      return res.status(401).json({ message: 'Missing signature headers' });
+    }
 
-      if (signature !== expectedSignature) {
-        console.error('Invalid webhook signature');
-        return res.status(401).json({ message: 'Invalid signature' });
-      }
+    // Reject timestamps older than 5 minutes to prevent replay attacks
+    const now = Math.floor(Date.now() / 1000);
+    const ts = parseInt(svixTimestamp, 10);
+    if (isNaN(ts) || Math.abs(now - ts) > 300) {
+      console.warn('Resend webhook rejected: timestamp out of range', { svixTimestamp, now, diff: Math.abs(now - ts) });
+      return res.status(401).json({ message: 'Timestamp too old' });
+    }
+
+    // Svix secret is base64-encoded after the "whsec_" prefix
+    if (!webhookSecret.startsWith('whsec_')) {
+      console.error('RESEND_WEBHOOK_SECRET has invalid format (expected whsec_<base64>)');
+      return res.status(500).json({ message: 'Webhook secret misconfigured' });
+    }
+    const secretBuffer = Buffer.from(webhookSecret.slice(6), 'base64');
+
+    // Svix signs: "${svix-id}.${svix-timestamp}.${body}"
+    const rawBody = JSON.stringify(req.body);
+    const signedContent = `${svixId}.${svixTimestamp}.${rawBody}`;
+    const expectedSignature = createHmac('sha256', secretBuffer)
+      .update(signedContent)
+      .digest('base64');
+
+    // svix-signature header can contain multiple signatures: "v1,<base64> v1,<base64>"
+    const signatures = svixSignature.split(' ');
+    const expectedBuf = Buffer.from(expectedSignature, 'utf8');
+    const isValid = signatures.some((sig) => {
+      const parts = sig.split(',');
+      if (parts.length !== 2 || parts[0] !== 'v1') return false;
+      const candidateBuf = Buffer.from(parts[1], 'utf8');
+      if (candidateBuf.length !== expectedBuf.length) return false;
+      return timingSafeEqual(candidateBuf, expectedBuf);
+    });
+
+    if (!isValid) {
+      console.error('Resend webhook rejected: invalid signature');
+      return res.status(401).json({ message: 'Invalid signature' });
     }
 
     const event = req.body;
@@ -195,16 +231,22 @@ webhookRoutes.post("/postmark", async (req, res) => {
       return res.status(500).json({ message: 'Webhook secret not configured' });
     }
 
-    // Verify webhook signature
-    if (signature) {
-      const expectedSignature = createHmac('sha256', webhookSecret)
-        .update(JSON.stringify(req.body))
-        .digest('hex');
+    // Signature header is required — reject requests that omit it
+    if (!signature) {
+      console.warn('Postmark webhook rejected: missing x-postmark-signature header');
+      return res.status(401).json({ message: 'Missing signature header' });
+    }
 
-      if (signature !== expectedSignature) {
-        console.error('Invalid Postmark webhook signature');
-        return res.status(401).json({ message: 'Invalid signature' });
-      }
+    // Verify webhook signature using constant-time comparison
+    const expectedSignature = createHmac('sha256', webhookSecret)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expectedBuf = Buffer.from(expectedSignature, 'utf8');
+    if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) {
+      console.error('Postmark webhook rejected: invalid signature');
+      return res.status(401).json({ message: 'Invalid signature' });
     }
 
     const event = req.body;
@@ -262,33 +304,48 @@ webhookRoutes.post("/ahasend", async (req, res) => {
     const webhookSecret = process.env.AHASEND_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
-      console.warn('⚠️ AHASEND_WEBHOOK_SECRET not configured - skipping signature verification');
+      console.error('AHASEND_WEBHOOK_SECRET not configured');
+      return res.status(500).json({ message: 'Webhook secret not configured' });
     }
 
-    // Verify Standard Webhooks signature if secret is configured
-    if (webhookSecret && webhookId && webhookTimestamp && webhookSignature) {
-      // Standard Webhooks: sign "${webhook-id}.${webhook-timestamp}.${body}"
-      const secretBase64 = webhookSecret.startsWith('whsec_')
-        ? webhookSecret.slice(6)
-        : webhookSecret;
-      const secretBuffer = Buffer.from(secretBase64, 'base64');
-      const signedContent = `${webhookId}.${webhookTimestamp}.${JSON.stringify(req.body)}`;
-      const expectedSignature = createHmac('sha256', secretBuffer)
-        .update(signedContent)
-        .digest('base64');
+    // All Standard Webhooks headers are required
+    if (!webhookId || !webhookTimestamp || !webhookSignature) {
+      console.warn('AhaSend webhook rejected: missing required Standard Webhooks headers');
+      return res.status(401).json({ message: 'Missing webhook headers' });
+    }
 
-      const signatures = webhookSignature.split(' ');
-      const isValid = signatures.some((sig) => {
-        const parts = sig.split(',');
-        if (parts.length !== 2 || parts[0] !== 'v1') return false;
-        return parts[1] === expectedSignature;
-      });
+    // Reject timestamps older than 5 minutes to prevent replay attacks
+    const ahasendNow = Math.floor(Date.now() / 1000);
+    const ahasendTs = parseInt(webhookTimestamp, 10);
+    if (isNaN(ahasendTs) || Math.abs(ahasendNow - ahasendTs) > 300) {
+      console.warn('AhaSend webhook rejected: timestamp out of range', { webhookTimestamp, now: ahasendNow, diff: Math.abs(ahasendNow - ahasendTs) });
+      return res.status(401).json({ message: 'Timestamp too old' });
+    }
 
-      if (!isValid) {
-        console.error('Invalid AhaSend webhook signature');
-        return res.status(401).json({ message: 'Invalid signature' });
-      }
-      console.log('✅ AhaSend webhook signature verified');
+    // Verify Standard Webhooks HMAC signature
+    // Standard Webhooks: sign "${webhook-id}.${webhook-timestamp}.${body}"
+    const secretBase64 = webhookSecret.startsWith('whsec_') || webhookSecret.startsWith('aha-whsec-')
+      ? webhookSecret.replace(/^(whsec_|aha-whsec-)/, '')
+      : webhookSecret;
+    const secretBuffer = Buffer.from(secretBase64, 'base64');
+    const signedContent = `${webhookId}.${webhookTimestamp}.${JSON.stringify(req.body)}`;
+    const ahasendExpected = createHmac('sha256', secretBuffer)
+      .update(signedContent)
+      .digest('base64');
+
+    const signatures = webhookSignature.split(' ');
+    const ahasendExpectedBuf = Buffer.from(ahasendExpected, 'utf8');
+    const isValid = signatures.some((sig) => {
+      const parts = sig.split(',');
+      if (parts.length !== 2 || parts[0] !== 'v1') return false;
+      const candidateBuf = Buffer.from(parts[1], 'utf8');
+      if (candidateBuf.length !== ahasendExpectedBuf.length) return false;
+      return timingSafeEqual(candidateBuf, ahasendExpectedBuf);
+    });
+
+    if (!isValid) {
+      console.error('AhaSend webhook rejected: invalid signature');
+      return res.status(401).json({ message: 'Invalid signature' });
     }
 
     const event = req.body;
