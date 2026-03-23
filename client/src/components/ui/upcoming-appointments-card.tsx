@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useAppSelector } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,7 @@ interface Appointment {
 export function UpcomingAppointmentsCard() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -55,7 +57,7 @@ export function UpcomingAppointmentsCard() {
   const { data: appointmentsData, isLoading } = useQuery<{
     appointments: Appointment[];
   }>({
-    queryKey: ["/api/appointments/upcoming-dashboard"],
+    queryKey: ["/api/appointments/upcoming-dashboard", { shopId: selectedShopId }],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/appointments");
       return response.json();

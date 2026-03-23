@@ -1,6 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { authClient } from "./betterAuthClient";
 import { triggerGlobalAuthError } from "@/hooks/useAuthErrorHandler";
+import { store } from "@/store";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -68,8 +69,12 @@ export async function apiRequest(
   
   try {
     
+    // Include selected shop ID header for shop-level filtering
+    const selectedShopId = store.getState().shop?.selectedShopId;
+
     const headers: Record<string, string> = {
       ...(data ? { "Content-Type": "application/json" } : {}),
+      ...(selectedShopId ? { "x-shop-id": selectedShopId } : {}),
     };
 
     const res = await fetch(fullUrl, {

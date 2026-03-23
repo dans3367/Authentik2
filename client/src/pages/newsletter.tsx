@@ -65,6 +65,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useAppSelector } from "@/store";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { EditorPickerModal } from "@/components/EditorPickerModal";
 import { format, formatDistanceToNow } from "date-fns";
@@ -114,6 +115,7 @@ export default function NewsletterPage() {
   const { user } = useReduxAuth();
   const currentUserId = (user as any)?.id;
   const tenantId = (user as any)?.tenantId as string | undefined;
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
   const dateFnsLocale = currentLanguage === 'es' ? { locale: esLocale } : {};
 
   useSetBreadcrumbs([
@@ -122,7 +124,7 @@ export default function NewsletterPage() {
   ]);
 
   const { data: newslettersData, isLoading, error, refetch } = useQuery({
-    queryKey: ['/api/newsletters', { emailType: 'newsletter' }],
+    queryKey: ['/api/newsletters', { emailType: 'newsletter', shopId: selectedShopId }],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/newsletters?emailType=newsletter');
       const data = await response.json();
@@ -319,7 +321,7 @@ export default function NewsletterPage() {
 
   // Fetch archived newsletters
   const { data: archivedNewslettersData } = useQuery({
-    queryKey: ['/api/newsletters', { emailType: 'newsletter', archived: true }],
+    queryKey: ['/api/newsletters', { emailType: 'newsletter', archived: true, shopId: selectedShopId }],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/newsletters?emailType=newsletter&archived=true');
       const data = await response.json();
@@ -331,7 +333,7 @@ export default function NewsletterPage() {
   });
 
   // Layer Convex real-time data on top of archived TanStack Query data
-  const { newsletters: realtimeArchivedNewsletters } = useRealtimeNewsletters(archivedNewslettersData, tenantId, true, "newsletter");
+  const { newsletters: realtimeArchivedNewsletters } = useRealtimeNewsletters(archivedNewslettersData, tenantId, selectedShopId, true, "newsletter");
   const archivedNewsletters: NewsletterListItem[] = realtimeArchivedNewsletters || [];
 
   const handleEditRecipientsSegmentSelected = async (segmentData: {
@@ -360,7 +362,7 @@ export default function NewsletterPage() {
   };
 
   // Layer Convex real-time data on top of TanStack Query data for instant kanban updates
-  const { newsletters: realtimeNewsletters } = useRealtimeNewsletters(newslettersData, tenantId, false, "newsletter");
+  const { newsletters: realtimeNewsletters } = useRealtimeNewsletters(newslettersData, tenantId, selectedShopId, false, "newsletter");
   const newsletters: NewsletterListItem[] = realtimeNewsletters || [];
 
   const filteredNewsletters = useMemo(() => {

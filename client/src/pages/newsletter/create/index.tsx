@@ -444,6 +444,11 @@ export default function NewsletterCreatePage() {
             setNotionHtmlContent(parsed.notionHtml);
           } else {
             setDetectedEditorType('classic');
+            // Ensure root props include title/subject from DB for the Puck fields
+            if (parsed.root?.props) {
+              parsed.root.props.title = nl.title || parsed.root.props.title || "";
+              parsed.root.props.subject = nl.subject || parsed.root.props.subject || "";
+            }
             setData(parsed);
           }
         } catch {
@@ -696,6 +701,10 @@ export default function NewsletterCreatePage() {
   const handleDataChange = useCallback((newData: UserData) => {
     dataRef.current = newData;
     setHasUnsavedChanges(true);
+    // Sync Puck root props to component state for classic editor
+    const rootProps = newData?.root?.props;
+    if (rootProps?.title !== undefined) setTitle(rootProps.title);
+    if (rootProps?.subject !== undefined) setSubject(rootProps.subject);
   }, []);
 
   const handleConfirmExit = useCallback(() => {

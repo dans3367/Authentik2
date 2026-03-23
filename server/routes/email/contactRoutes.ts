@@ -35,6 +35,11 @@ contactRoutes.get("/email-contacts", authenticateToken, requireTenant, requirePe
 
     let whereClause = sql`${emailContacts.tenantId} = ${req.user.tenantId}`;
 
+    // Shop-level filtering when a specific shop is selected
+    if (req.shopId) {
+      whereClause = sql`${whereClause} AND ${emailContacts.shopId} = ${req.shopId}`;
+    }
+
     if (search) {
       const sanitizedSearch = escapeLikePattern(sanitizeString(search as string) || '');
       whereClause = sql`${whereClause} AND (
@@ -161,11 +166,12 @@ contactRoutes.get("/scheduled-emails/upcoming", authenticateToken, requireTenant
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
 
     // Query trigger_tasks for all pending/triggered scheduled emails for this tenant
+    const shopFilter = req.shopId ? sql` AND ${triggerTasks.shopId} = ${req.shopId}` : sql``;
     const tasks = await db.query.triggerTasks.findMany({
       where: sql`${triggerTasks.tenantId} = ${tenantId}
         AND ${triggerTasks.relatedType} = 'scheduled_email'
         AND ${triggerTasks.status} IN ('pending', 'triggered', 'running')
-        AND ${triggerTasks.scheduledFor} > NOW()`,
+        AND ${triggerTasks.scheduledFor} > NOW()${shopFilter}`,
       orderBy: sql`${triggerTasks.scheduledFor} ASC`,
       limit,
     });

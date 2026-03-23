@@ -12,6 +12,7 @@ import { getConvexClient, api } from './convexClient';
 interface NewsletterSyncPayload {
   id: string;
   tenantId: string;
+  shopId?: string | null;
   title: string;
   subject: string;
   status: string;
@@ -51,6 +52,7 @@ export async function syncNewsletterToConvex(newsletter: NewsletterSyncPayload):
 
     await client.mutation(api.newsletterListItems.upsertItem, {
       tenantId: newsletter.tenantId,
+      shopId: newsletter.shopId ?? undefined,
       newsletterId: newsletter.id,
       title: newsletter.title,
       subject: newsletter.subject,

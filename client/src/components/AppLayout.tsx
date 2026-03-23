@@ -16,6 +16,7 @@ import { AppFooter } from "@/components/AppFooter";
 import { useLanguage } from "@/hooks/useLanguage";
 import { PageTitleProvider, usePageTitle } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
+import { ShopSelector } from "@/components/ShopSelector";
 import { Zap, UserPlus, Bell, ChevronRight, X } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -133,6 +134,11 @@ function AppHeader() {
           </div>
         </>
       ) : null}
+
+      {/* Shop Selector */}
+      <Separator orientation="vertical" className="h-6 mx-2" />
+      <ShopSelector />
+
       <div className="flex-1" />
 
       {/* Action Icons */}

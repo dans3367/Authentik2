@@ -11,6 +11,7 @@ import { query, mutation } from "./_generated/server";
 export const upsertItem = mutation({
   args: {
     tenantId: v.string(),
+    shopId: v.optional(v.string()),
     newsletterId: v.string(),
     title: v.string(),
     subject: v.string(),
@@ -42,6 +43,7 @@ export const upsertItem = mutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         tenantId: args.tenantId,
+        shopId: args.shopId,
         title: args.title,
         subject: args.subject,
         status: args.status,
@@ -92,13 +94,14 @@ export const removeItem = mutation({
 // ─── QUERIES ─────────────────────────────────────────────────────────────────
 
 /**
- * Returns all newsletter list items for a tenant.
+ * Returns all newsletter list items for a tenant, optionally filtered by shop.
  * Filters out deletedAt items. If archived is false (default), also filters out archivedAt items.
  * Sorted by updatedAt desc.
  */
 export const listByTenant = query({
   args: {
     tenantId: v.string(),
+    shopId: v.optional(v.string()),
     archived: v.optional(v.boolean()),
     emailType: v.optional(v.string()),
   },
@@ -110,9 +113,12 @@ export const listByTenant = query({
 
     const showArchived = args.archived ?? false;
     const emailTypeFilter = args.emailType ?? "newsletter";
+    const shopIdFilter = args.shopId;
 
     return items
       .filter((item) => {
+        // Filter by shopId if provided
+        if (shopIdFilter && item.shopId !== shopIdFilter) return false;
         // Filter by emailType
         if (item.emailType !== emailTypeFilter) return false;
         // Always filter out deleted items

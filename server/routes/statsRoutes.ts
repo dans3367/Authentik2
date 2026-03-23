@@ -7,7 +7,7 @@ export const statsRoutes = Router();
 // GET /api/stats/highlights — dashboard highlight metrics
 statsRoutes.get('/highlights', authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    const stats = await getHighlightStats(req.user.tenantId);
+    const stats = await getHighlightStats(req.user.tenantId, req.shopId);
     res.json(stats);
   } catch (error) {
     console.error('Get highlight stats error:', error);

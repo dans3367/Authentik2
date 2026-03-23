@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useAppSelector } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -106,12 +107,13 @@ function getDaysUntil(scheduledAt: string): number {
 export function UpcomingScheduledEmailsCard() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
 
   const { data, isLoading } = useQuery<{
     scheduled: ScheduledEmail[];
     total: number;
   }>({
-    queryKey: ["/api/scheduled-emails/upcoming"],
+    queryKey: ["/api/scheduled-emails/upcoming", { shopId: selectedShopId }],
     queryFn: async () => {
       const response = await apiRequest(
         "GET",

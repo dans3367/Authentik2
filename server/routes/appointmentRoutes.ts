@@ -103,6 +103,11 @@ router.get('/', async (req: Request, res: Response) => {
     // Build where conditions
     const conditions = [eq(appointments.tenantId, tenantId)];
 
+    // Shop-level filtering when a specific shop is selected
+    if ((req as any).shopId) {
+      conditions.push(eq(appointments.shopId, (req as any).shopId));
+    }
+
     if (status && status !== 'all') {
       conditions.push(eq(appointments.status, status as string));
     }

@@ -65,6 +65,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useAppSelector } from "@/store";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { EditorPickerModal } from "@/components/EditorPickerModal";
 import { format, formatDistanceToNow } from "date-fns";
@@ -114,6 +115,7 @@ export default function AdvertisePage() {
   const { user } = useReduxAuth();
   const currentUserId = (user as any)?.id;
   const tenantId = (user as any)?.tenantId as string | undefined;
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
   const dateFnsLocale = currentLanguage === "es" ? { locale: esLocale } : {};
 
   useSetBreadcrumbs([
@@ -122,7 +124,7 @@ export default function AdvertisePage() {
   ]);
 
   const { data: itemsData, isLoading, error, refetch } = useQuery({
-    queryKey: ["/api/newsletters", { emailType: "advertise" }],
+    queryKey: ["/api/newsletters", { emailType: "advertise", shopId: selectedShopId }],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/newsletters?emailType=advertise");
       const data = await response.json();
@@ -282,7 +284,7 @@ export default function AdvertisePage() {
 
   // Fetch archived items
   const { data: archivedItemsData } = useQuery({
-    queryKey: ["/api/newsletters", { emailType: "advertise", archived: true }],
+    queryKey: ["/api/newsletters", { emailType: "advertise", archived: true, shopId: selectedShopId }],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/newsletters?emailType=advertise&archived=true");
       const data = await response.json();
@@ -293,7 +295,7 @@ export default function AdvertisePage() {
     refetchOnMount: "always",
   });
 
-  const { newsletters: realtimeArchivedItems } = useRealtimeNewsletters(archivedItemsData, tenantId, true, "advertise");
+  const { newsletters: realtimeArchivedItems } = useRealtimeNewsletters(archivedItemsData, tenantId, selectedShopId, true, "advertise");
   const archivedItems: AdvertiseItem[] = realtimeArchivedItems || [];
 
   const handleEditRecipientsSegmentSelected = async (segmentData: {
@@ -317,7 +319,7 @@ export default function AdvertisePage() {
     }
   };
 
-  const { newsletters: realtimeItems } = useRealtimeNewsletters(itemsData, tenantId, false, "advertise");
+  const { newsletters: realtimeItems } = useRealtimeNewsletters(itemsData, tenantId, selectedShopId, false, "advertise");
   const items: AdvertiseItem[] = realtimeItems || [];
 
   const filteredItems = useMemo(() => {

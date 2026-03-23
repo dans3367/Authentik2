@@ -18,6 +18,7 @@ import { newsletterRoutes } from "./routes/newsletterRoutes";
 import { cardImageRoutes } from "./routes/cardImageRoutes";
 import { newsletterImageRoutes } from "./routes/newsletterImageRoutes";
 import { authenticateToken, requireTenant } from "./middleware/auth-middleware";
+import { filterByShop } from "./middleware/shop-filter";
 
 import { webhookRoutes } from "./routes/webhookRoutes";
 import { devRoutes } from "./routes/devRoutes";
@@ -64,6 +65,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Rate limiting
   // Note: Auth rate limiting handled by better-auth
   app.use("/api", apiRateLimiter);
+
+  // Shop filter middleware — reads x-shop-id header, validates shop ownership,
+  // and attaches req.shopId for downstream route handlers to use for filtering.
+  // Runs on all /api routes; skips gracefully if user is not authenticated.
+  app.use("/api", filterByShop);
 
   // API Routes
   // Note: Auth routes handled by better-auth middleware

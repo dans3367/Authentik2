@@ -3471,7 +3471,8 @@
       "imagePosition": "Image Position",
       "productTitle": "Product Title",
       "price": "Price",
-      "pageTitle": "Page Title",
+      "newsletterName": "Newsletter Name",
+      "emailSubjectLine": "Email Subject Line",
       "products": "Products",
       "logos": "Logos"
     },

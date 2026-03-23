@@ -231,6 +231,7 @@ export const tenantLimits = pgTable("tenant_limits", {
 export const emailSends = pgTable("email_sends", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  shopId: varchar("shop_id").references(() => shops.id, { onDelete: 'set null' }),
 
   // Email details
   recipientEmail: text("recipient_email").notNull(),
@@ -349,6 +350,7 @@ export const temp2faSessions = pgTable("temp_2fa_sessions", {
 export const emailContacts = pgTable("email_contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  shopId: varchar("shop_id").references(() => shops.id, { onDelete: 'set null' }),
   email: text("email").notNull(),
   firstName: text("first_name"),
   lastName: text("last_name"),
@@ -492,6 +494,7 @@ export const formResponses = pgTable("form_responses", {
 export const newsletters = pgTable("newsletters", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  shopId: varchar("shop_id").references(() => shops.id, { onDelete: 'set null' }),
   userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   title: text("title").notNull(),
   subject: text("subject").notNull(),
@@ -2458,6 +2461,7 @@ export type UpdateCustomCardData = z.infer<typeof updateCustomCardSchema>;
 export const appointments = pgTable("appointments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  shopId: varchar("shop_id").references(() => shops.id, { onDelete: 'set null' }),
   customerId: varchar("customer_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
   userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }), // Who created the appointment
   title: text("title").notNull(),
@@ -2594,6 +2598,7 @@ export const tenantRelationsUpdated = relations(tenants, ({ many }) => ({
 export const triggerTasks = pgTable("trigger_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: 'cascade' }),
+  shopId: varchar("shop_id").references(() => shops.id, { onDelete: 'set null' }),
 
   // Task identification
   taskId: text("task_id").notNull(), // Trigger.dev task identifier e.g., 'send-appointment-reminder'

@@ -2,6 +2,6 @@ import { UserData } from "./types";
 
 export const initialData: UserData = {
   content: [],
-  root: { props: { title: "Newsletter Editor" } },
+  root: { props: { title: "Newsletter Editor", subject: "" } },
   zones: {},
 };

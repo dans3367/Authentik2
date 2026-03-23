@@ -77,7 +77,7 @@ app.use((req, res, next) => {
   // Always set Vary header for proper caching
   res.header('Vary', 'Origin');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Cookie, Set-Cookie, X-Internal-Service');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, Cookie, Set-Cookie, X-Internal-Service, X-Shop-Id');
 
   // Keep existing security headers (static)
   res.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');

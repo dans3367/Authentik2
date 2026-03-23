@@ -53,6 +53,7 @@ export default defineSchema({
   // Only stores fields the kanban card displays — no content/puckData.
   newsletterListItems: defineTable({
     tenantId: v.string(),
+    shopId: v.optional(v.string()),
     newsletterId: v.string(), // PostgreSQL newsletter.id
     title: v.string(),
     subject: v.string(),
@@ -76,11 +77,13 @@ export default defineSchema({
     recipientType: v.optional(v.string()), // all, selected, tags
   })
     .index("by_tenant", ["tenantId"])
-    .index("by_newsletter", ["newsletterId"]),
+    .index("by_newsletter", ["newsletterId"])
+    .index("by_tenant_shop", ["tenantId", "shopId"]),
 
   // Aggregated real-time stats per newsletter (updated on each event)
   newsletterStats: defineTable({
     tenantId: v.string(),
+    shopId: v.optional(v.string()),
     newsletterId: v.string(),
     status: v.string(), // 'sending', 'sent', 'completed'
     totalRecipients: v.number(),
@@ -101,5 +104,6 @@ export default defineSchema({
     lastEventAt: v.optional(v.number()),
   })
     .index("by_newsletter", ["newsletterId"])
-    .index("by_tenant", ["tenantId"]),
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_shop", ["tenantId", "shopId"]),
 });

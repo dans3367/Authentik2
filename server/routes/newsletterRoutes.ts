@@ -467,6 +467,11 @@ newsletterRoutes.get("/", newsletterListRateLimiter, authenticateToken, requireT
 
     let whereClause = sql`${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`;
 
+    // Shop-level filtering when a specific shop is selected
+    if (req.shopId) {
+      whereClause = sql`${whereClause} AND ${newsletters.shopId} = ${req.shopId}`;
+    }
+
     // Archive filtering: archived=true returns only archived, default excludes archived
     if (archived === 'true') {
       whereClause = sql`${whereClause} AND ${newsletters.archivedAt} IS NOT NULL`;
@@ -769,6 +774,7 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, requirePermission('
 
     const newNewsletter = await db.insert(newsletters).values({
       tenantId: req.user.tenantId,
+      shopId: req.shopId || null,
       userId: userRecord.id,
       title: sanitizedTitle,
       subject: sanitizedSubject,

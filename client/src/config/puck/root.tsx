@@ -2,6 +2,7 @@ import { DefaultRootProps } from "@puckeditor/core";
 import { TFunction } from "i18next";
 
 export type RootProps = DefaultRootProps & {
+  subject?: string;
   backgroundColor?: string;
   bodyBackgroundColor?: string;
   footerTextColor?: string;
@@ -65,12 +66,14 @@ const rootRender = ({ backgroundColor, puck: { renderDropZone: DropZone } }: any
 export const Root = {
   defaultProps: {
     title: "My Newsletter",
+    subject: "",
     backgroundColor: "#ffffff",
     bodyBackgroundColor: "#f7fafc",
     footerTextColor: "#64748b",
   },
   fields: {
-    title: { type: "text" as const, label: "Page Title" },
+    title: { type: "text" as const, label: "Newsletter Name" },
+    subject: { type: "text" as const, label: "Email Subject Line" },
     backgroundColor: {
       type: "custom" as const,
       label: "Content Background Color",
@@ -94,7 +97,8 @@ export function createTranslatedRoot(t: TFunction) {
   return {
     ...Root,
     fields: {
-      title: { type: "text" as const, label: t("puckEditor.fields.pageTitle", "Page Title") },
+      title: { type: "text" as const, label: t("puckEditor.fields.newsletterName", "Newsletter Name") },
+      subject: { type: "text" as const, label: t("puckEditor.fields.emailSubjectLine", "Email Subject Line") },
       backgroundColor: {
         type: "custom" as const,
         label: t("puckEditor.fields.contentBackgroundColor", "Content Background Color"),

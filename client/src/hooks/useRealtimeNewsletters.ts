@@ -25,19 +25,23 @@ type NewsletterListItem = NewsletterWithUser & {
  *
  * @param tanstackNewsletters - The newsletters fetched via TanStack Query (existing, unchanged)
  * @param tenantId - Current user's tenant ID
+ * @param shopId - Selected shop ID (null/undefined for all shops)
  * @param archived - Whether we're looking at the archived view
  * @param emailType - Filter by email type ('newsletter' or 'advertise')
  */
 export function useRealtimeNewsletters(
   tanstackNewsletters: NewsletterListItem[] | undefined,
   tenantId: string | undefined,
+  shopId?: string | null,
   archived?: boolean,
   emailType?: string,
 ) {
   // Subscribe to Convex real-time list items
   const convexItems = useConvexQuery(
     api.newsletterListItems.listByTenant,
-    tenantId ? { tenantId, archived: archived ?? false, emailType: emailType ?? "newsletter" } : "skip",
+    tenantId 
+      ? { tenantId, shopId: shopId ?? undefined, archived: archived ?? false, emailType: emailType ?? "newsletter" } 
+      : "skip",
   );
 
   // Subscribe to live metrics for sending newsletters

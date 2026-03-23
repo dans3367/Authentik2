@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useAppSelector } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,9 +46,10 @@ const avatarColors = [
 export function UpcomingBirthdaysCard() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
 
   const { data: contactsData, isLoading } = useQuery({
-    queryKey: ["/api/email-contacts"],
+    queryKey: ["/api/email-contacts", { shopId: selectedShopId }],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/email-contacts?limit=1000`);
       return response.json();

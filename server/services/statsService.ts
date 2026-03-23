@@ -32,10 +32,27 @@ function getMonthRange(offset: number = 0): { start: Date; end: Date } {
 
 // --- Stats Functions ---
 
-export async function getHighlightStats(tenantId: string): Promise<HighlightStats> {
+export async function getHighlightStats(tenantId: string, shopId?: string | null): Promise<HighlightStats> {
   const currentMonth = getMonthRange(0);
   const previousMonth = getMonthRange(-1);
   const now = new Date();
+
+  // Build base conditions per table, optionally scoped to a shop
+  const contactBase = shopId
+    ? and(eq(emailContacts.tenantId, tenantId), eq(emailContacts.shopId, shopId))
+    : eq(emailContacts.tenantId, tenantId);
+
+  const sendsBase = (extra: any[]) => shopId
+    ? and(eq(emailSends.tenantId, tenantId), eq(emailSends.shopId, shopId), ...extra)
+    : and(eq(emailSends.tenantId, tenantId), ...extra);
+
+  const nlBase = (extra: any[]) => shopId
+    ? and(eq(newsletters.tenantId, tenantId), eq(newsletters.shopId, shopId), ...extra)
+    : and(eq(newsletters.tenantId, tenantId), ...extra);
+
+  const apptBase = shopId
+    ? and(eq(appointments.tenantId, tenantId), eq(appointments.shopId, shopId), gte(appointments.appointmentDate, now), sql`${appointments.status} IN ('scheduled', 'confirmed')`)
+    : and(eq(appointments.tenantId, tenantId), gte(appointments.appointmentDate, now), sql`${appointments.status} IN ('scheduled', 'confirmed')`);
 
   const [
     // Total contacts (current)
@@ -56,62 +73,37 @@ export async function getHighlightStats(tenantId: string): Promise<HighlightStat
     // Total contacts
     db.select({ count: count() })
       .from(emailContacts)
-      .where(eq(emailContacts.tenantId, tenantId)),
+      .where(contactBase),
 
     // Contacts created before this month (previous snapshot)
     db.select({ count: count() })
       .from(emailContacts)
-      .where(and(
-        eq(emailContacts.tenantId, tenantId),
-        lt(emailContacts.createdAt, currentMonth.start)
-      )),
+      .where(and(contactBase, lt(emailContacts.createdAt, currentMonth.start))),
 
     // Emails sent this month
     db.select({ count: count() })
       .from(emailSends)
-      .where(and(
-        eq(emailSends.tenantId, tenantId),
-        gte(emailSends.sentAt, currentMonth.start),
-        lt(emailSends.sentAt, currentMonth.end)
-      )),
+      .where(sendsBase([gte(emailSends.sentAt, currentMonth.start), lt(emailSends.sentAt, currentMonth.end)])),
 
     // Emails sent previous month
     db.select({ count: count() })
       .from(emailSends)
-      .where(and(
-        eq(emailSends.tenantId, tenantId),
-        gte(emailSends.sentAt, previousMonth.start),
-        lt(emailSends.sentAt, previousMonth.end)
-      )),
+      .where(sendsBase([gte(emailSends.sentAt, previousMonth.start), lt(emailSends.sentAt, previousMonth.end)])),
 
     // Newsletters sent this month
     db.select({ count: count() })
       .from(newsletters)
-      .where(and(
-        eq(newsletters.tenantId, tenantId),
-        eq(newsletters.status, 'sent'),
-        gte(newsletters.sentAt, currentMonth.start),
-        lt(newsletters.sentAt, currentMonth.end)
-      )),
+      .where(nlBase([eq(newsletters.status, 'sent'), gte(newsletters.sentAt, currentMonth.start), lt(newsletters.sentAt, currentMonth.end)])),
 
     // Newsletters sent previous month
     db.select({ count: count() })
       .from(newsletters)
-      .where(and(
-        eq(newsletters.tenantId, tenantId),
-        eq(newsletters.status, 'sent'),
-        gte(newsletters.sentAt, previousMonth.start),
-        lt(newsletters.sentAt, previousMonth.end)
-      )),
+      .where(nlBase([eq(newsletters.status, 'sent'), gte(newsletters.sentAt, previousMonth.start), lt(newsletters.sentAt, previousMonth.end)])),
 
     // Upcoming appointments (scheduled or confirmed, in the future)
     db.select({ count: count() })
       .from(appointments)
-      .where(and(
-        eq(appointments.tenantId, tenantId),
-        gte(appointments.appointmentDate, now),
-        sql`${appointments.status} IN ('scheduled', 'confirmed')`
-      )),
+      .where(apptBase),
   ]);
 
   const totalContactsVal = contactsCurrent[0]?.count ?? 0;
