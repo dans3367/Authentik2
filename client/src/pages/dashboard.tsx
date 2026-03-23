@@ -102,7 +102,7 @@ export default function Dashboard() {
     {
       label: t("dashboard.quickActions.addContact"),
       icon: Users,
-      path: "/email-contacts",
+      path: "/email-contacts?action=add",
       gradient: "from-violet-500 to-purple-600",
       lightBg: "bg-violet-50 dark:bg-violet-950/40",
     },

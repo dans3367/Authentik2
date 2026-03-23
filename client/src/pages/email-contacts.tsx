@@ -110,7 +110,7 @@ export default function EmailContacts() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
@@ -120,6 +120,17 @@ export default function EmailContacts() {
     { label: "Dashboard", href: "/", icon: LayoutDashboard },
     { label: "Email Contacts", icon: Users }
   ]);
+
+  // Check for action=add URL parameter to open add contact modal
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('action') === 'add') {
+      setAddContactOpen(true);
+      // Clean up the URL parameter after opening the modal
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
 
   // Store search params in a ref to use in query function without changing dependencies
   const searchParamsRef = useRef({
