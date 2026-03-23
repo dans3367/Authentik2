@@ -522,14 +522,6 @@ export default function EmailContacts() {
                     {selectedContacts.length} {t('emailContacts.bulkActions.selected')}
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
-                      <Tag className="w-4 h-4 mr-2" />
-                      {t('emailContacts.bulkActions.addTags')}
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
-                      <Users className="w-4 h-4 mr-2" />
-                      {t('emailContacts.bulkActions.addToList')}
-                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

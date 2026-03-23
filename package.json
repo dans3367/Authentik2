@@ -85,6 +85,7 @@
     "@types/multer": "^2.0.0",
     "@types/pg": "^8.15.5",
     "ai": "^5.0.59",
+    "animejs": "^4.3.6",
     "bcryptjs": "^3.0.2",
     "better-auth": "^1.4.20",
     "class-variance-authority": "^0.7.1",
