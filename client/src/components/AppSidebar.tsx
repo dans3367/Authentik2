@@ -9,6 +9,7 @@ import {
   Users,
   Building2,
   Store,
+  Tag,
   Mail,
   UserCheck,
   BarChart3,
@@ -107,6 +108,7 @@ const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, max
   // maxShops is null while loading — show nav item by default until plan data confirms otherwise
   if (maxShops === undefined || maxShops === null || maxShops > 0) {
     managementChildren.push({ name: t?.('navigation.shops') || "Shops", href: "/shops", icon: Store });
+    managementChildren.push({ name: t?.('navigation.shopTags') || "Tags", href: "/shops/tags", icon: Tag });
   }
 
   // Add Users under Management only if plan allows user management AND role permits it

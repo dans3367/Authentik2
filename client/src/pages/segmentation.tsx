@@ -344,24 +344,27 @@ export default function SegmentationPage() {
   // --- Loading Skeleton ---
   if (listsLoading) {
     return (
-      <div className="container mx-auto p-4 lg:p-6 space-y-6">
+      <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8">
         {/* Header skeleton */}
-        <div className="flex items-center justify-between bg-card p-6 rounded-xl border shadow-sm animate-pulse">
+        <div className="flex items-center justify-between animate-pulse">
           <div>
-            <div className="h-7 w-48 bg-muted rounded mb-2" />
-            <div className="h-4 w-72 bg-muted rounded" />
+            <div className="h-8 w-56 bg-muted rounded mb-2" />
+            <div className="h-4 w-80 bg-muted rounded" />
           </div>
           <div className="h-10 w-36 bg-muted rounded" />
         </div>
 
         {/* Stat cards skeleton */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="animate-pulse">
-              <CardContent className="p-5">
-                <div className="h-4 bg-muted rounded w-1/3 mb-3" />
-                <div className="h-7 bg-muted rounded w-1/2 mb-1" />
-                <div className="h-3 bg-muted rounded w-2/3" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="h-4 bg-muted rounded w-1/3" />
+                <div className="h-4 w-4 bg-muted rounded" />
+              </CardHeader>
+              <CardContent>
+                <div className="h-7 bg-muted rounded w-1/4 mb-1" />
+                <div className="h-3 bg-muted rounded w-1/2" />
               </CardContent>
             </Card>
           ))}
@@ -383,91 +386,73 @@ export default function SegmentationPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 lg:p-6 space-y-6">
-      {/* ── Hero Header ── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card p-6 rounded-xl border shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600 dark:text-indigo-400">
-            <Target className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground">
-              {t("segmentation.title")}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {t("segmentation.subtitle")}
-            </p>
-          </div>
+    <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
+            {t("segmentation.title")}
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            {t("segmentation.subtitle")}
+          </p>
         </div>
-
-        <Button onClick={handleCreate} className="shrink-0">
-          <Plus className="h-4 w-4 mr-1.5" />
+        <Button onClick={handleCreate}>
+          <Plus className="h-4 w-4 mr-2" />
           {t("segmentation.createSegment")}
         </Button>
       </div>
 
-      {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300 hover:shadow-md">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {t("segmentation.stats.totalSegments")}
-                </p>
-                <p className="text-2xl font-bold mt-1 text-foreground">
-                  {stats.totalLists}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  {t("segmentation.stats.activeSegmentLists")}
-                </p>
-              </div>
-              <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
-                <Target className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-              </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              {t("segmentation.stats.totalSegments")}
+            </CardTitle>
+            <Target className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats.totalLists}
             </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t("segmentation.stats.activeSegmentLists")}
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300 hover:shadow-md">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {t("segmentation.stats.totalContacts")}
-                </p>
-                <p className="text-2xl font-bold mt-1 text-foreground">
-                  {stats.totalContacts}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  {t("segmentation.stats.acrossAllSegments")}
-                </p>
-              </div>
-              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-                <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              {t("segmentation.stats.totalContacts")}
+            </CardTitle>
+            <Users className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats.totalContacts}
             </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t("segmentation.stats.acrossAllSegments")}
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300 hover:shadow-md">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {t("segmentation.stats.avgSegmentSize")}
-                </p>
-                <p className="text-2xl font-bold mt-1 text-foreground">
-                  {stats.averageListSize}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  {t("segmentation.stats.contactsPerSegment")}
-                </p>
-              </div>
-              <div className="p-2.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                <BarChart3 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+              {t("segmentation.stats.avgSegmentSize")}
+            </CardTitle>
+            <BarChart3 className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats.averageListSize}
             </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t("segmentation.stats.contactsPerSegment")}
+            </p>
           </CardContent>
         </Card>
       </div>

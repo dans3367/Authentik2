@@ -32,6 +32,7 @@ import {
   ShieldAlert,
   Settings2,
   ExternalLink,
+  Store,
 } from "lucide-react";
 
 interface Contact {
@@ -58,6 +59,8 @@ interface Contact {
   prefNewsletters?: boolean;
   prefSurveysForms?: boolean;
   addedByUserId?: string | null;
+  shopId?: string | null;
+  shopName?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -519,6 +522,15 @@ export default function ViewContact() {
                         en: 'English', es: 'Español',
                       }[contact.preferredLanguage] || contact.preferredLanguage}
                     </p>
+                  </div>
+                )}
+                {contact.shopName && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Shop</label>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <Store className="h-3.5 w-3.5 text-gray-400" />
+                      <p className="text-gray-900 dark:text-white">{contact.shopName}</p>
+                    </div>
                   </div>
                 )}
               </div>

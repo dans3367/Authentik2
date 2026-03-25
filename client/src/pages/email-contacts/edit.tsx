@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Loader2, X, Mail, CheckCircle2, UserCheck, Tag, Calendar, Shield, AlertTriangle, CalendarIcon, ShieldAlert, Settings2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, X, Mail, CheckCircle2, UserCheck, Tag, Calendar, Shield, AlertTriangle, CalendarIcon, ShieldAlert, Settings2, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -54,6 +54,7 @@ const editContactSchema = z.object({
   phoneNumber: z.string().optional(),
   dateOfBirth: z.date().optional().nullable(),
   preferredLanguage: z.string().optional(),
+  shopId: z.string().optional().nullable(),
 });
 
 type EditContactForm = z.infer<typeof editContactSchema>;
@@ -78,6 +79,7 @@ interface UpdateContactRequest {
   phoneNumber?: string | null;
   dateOfBirth?: string | null;
   preferredLanguage?: string | null;
+  shopId?: string | null;
 }
 
 export default function EditEmailContact() {
@@ -125,6 +127,17 @@ export default function EditEmailContact() {
     },
   });
 
+  // Fetch shops for shop assignment dropdown
+  const { data: shopsData } = useQuery({
+    queryKey: ["/api/shops", { limit: 100 }],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/shops?limit=100");
+      return response.json();
+    },
+    staleTime: Infinity,
+  });
+  const shopsList: { id: string; name: string; status: string }[] = shopsData?.shops || [];
+
   // Fetch custom field definitions + values for this contact
   const { data: customFieldsData } = useQuery({
     queryKey: ["/api/email-contacts", contactId, "custom-fields"],
@@ -158,6 +171,7 @@ export default function EditEmailContact() {
       phoneNumber: "",
       dateOfBirth: undefined,
       preferredLanguage: "en",
+      shopId: null,
     },
   });
 
@@ -184,6 +198,7 @@ export default function EditEmailContact() {
         phoneNumber: contact.phoneNumber || "",
         dateOfBirth: contact.dateOfBirth ? new Date(contact.dateOfBirth) : undefined,
         preferredLanguage: contact.preferredLanguage || "en",
+        shopId: contact.shopId || null,
       });
       setSelectedTags(contact.tags?.map((tag: any) => tag.id) || []);
       setSelectedLists(contact.lists?.map((list: any) => list.id) || []);
@@ -250,6 +265,7 @@ export default function EditEmailContact() {
       phoneNumber: data.phoneNumber || null,
       dateOfBirth: data.dateOfBirth ? format(data.dateOfBirth, 'yyyy-MM-dd') : null,
       preferredLanguage: data.preferredLanguage || 'en',
+      shopId: data.shopId || null,
     };
 
     // Save custom field values in parallel with contact update
@@ -582,6 +598,42 @@ export default function EditEmailContact() {
                         </FormItem>
                       )}
                     />
+
+                    {/* Shop Assignment */}
+                    {shopsList.length > 0 && (
+                      <FormField
+                        control={form.control}
+                        name="shopId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-1.5">
+                              <Store className="h-3.5 w-3.5" />
+                              Shop
+                            </FormLabel>
+                            <Select
+                              onValueChange={(value) => field.onChange(value === "__none__" ? null : value)}
+                              value={field.value || "__none__"}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select shop" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="__none__">No shop assigned</SelectItem>
+                                {shopsList.filter((s) => s.status === 'active').map((shop) => (
+                                  <SelectItem key={shop.id} value={shop.id}>{shop.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription className="text-xs">
+                              The shop this contact belongs to
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
 
                   {/* Custom Fields */}

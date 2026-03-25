@@ -404,6 +404,7 @@ export const emailLists = pgTable("email_lists", {
 export const contactTags = pgTable("contact_tags", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  shopId: varchar("shop_id").references(() => shops.id, { onDelete: 'set null' }),
   name: text("name").notNull(),
   color: text("color").default('#3B82F6'),
   description: text("description"),

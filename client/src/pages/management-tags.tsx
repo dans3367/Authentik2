@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
+import { useAppSelector } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +23,8 @@ import {
   Search,
   Palette,
   AlertTriangle,
+  Store,
+  ArrowRight,
 } from "lucide-react";
 
 interface TagItem {
@@ -30,6 +33,8 @@ interface TagItem {
   color: string;
   description?: string | null;
   contactCount?: number;
+  shopId?: string | null;
+  shopName?: string | null;
 }
 
 const PRESET_COLORS = [
@@ -73,12 +78,34 @@ export default function ManagementTags() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
+
+  // Fetch shops to resolve selected shop name
+  const { data: shopsData } = useQuery({
+    queryKey: ["/api/shops", { limit: 100 }],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/shops?limit=100");
+      return res.json();
+    },
+    staleTime: Infinity,
+  });
+  const allShops: { id: string; name: string; status: string }[] = shopsData?.shops || [];
+  const needsShopSelection = selectedShopId === null && allShops.length > 1;
+  const shopLabel = useMemo(() => {
+    if (!selectedShopId) return t("management.tags.allShops", "All Shops");
+    return allShops.find((s) => s.id === selectedShopId)?.name ?? t("management.tags.allShops", "All Shops");
+  }, [selectedShopId, allShops, t]);
+
+  // Shop picker (shown when user clicks New Tag while on "All Shops")
+  const [shopPickerOpen, setShopPickerOpen] = useState(false);
+  const [shopPickerSelection, setShopPickerSelection] = useState<string | null>(null);
 
   // Search
   const [searchTerm, setSearchTerm] = useState("");
 
   // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
+  const [createShopId, setCreateShopId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("#3B82F6");
   const [newDesc, setNewDesc] = useState("");
@@ -95,7 +122,7 @@ export default function ManagementTags() {
   const [deletingTag, setDeletingTag] = useState<TagItem | null>(null);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["/api/contact-tags"],
+    queryKey: ["/api/contact-tags", selectedShopId],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/contact-tags");
       return res.json();
@@ -129,12 +156,15 @@ export default function ManagementTags() {
   // — Mutations —
 
   const createMutation = useMutation({
-    mutationFn: async () => {
-      const payload = {
+    mutationFn: async (shopId?: string) => {
+      const payload: Record<string, unknown> = {
         name: newName.trim(),
         color: newColor,
         description: newDesc.trim() || undefined,
       };
+      if (shopId) {
+        payload.shopId = shopId;
+      }
       const res = await apiRequest("POST", "/api/contact-tags", payload);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: 'Failed to create tag' }));
@@ -147,6 +177,7 @@ export default function ManagementTags() {
       setNewColor("#3B82F6");
       setNewDesc("");
       setCreateOpen(false);
+      setCreateShopId(null);
       await qc.invalidateQueries({ queryKey: ["/api/contact-tags"] });
       toast({ title: t("management.tags.toasts.created") });
     },
@@ -230,6 +261,24 @@ export default function ManagementTags() {
     setNewColor("#3B82F6");
     setNewDesc("");
     setCreateOpen(false);
+    setCreateShopId(null);
+  };
+
+  const handleNewTagClick = () => {
+    if (needsShopSelection) {
+      setShopPickerSelection(null);
+      setShopPickerOpen(true);
+    } else {
+      setCreateOpen(true);
+    }
+  };
+
+  const handleShopPickerConfirm = () => {
+    if (shopPickerSelection) {
+      setCreateShopId(shopPickerSelection);
+      setShopPickerOpen(false);
+      setCreateOpen(true);
+    }
   };
 
   // — Permission denied —
@@ -316,10 +365,16 @@ export default function ManagementTags() {
                 "Create, organize, and manage tags for your contacts"
               )}
             </p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <Store className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground">
+                {t("management.tags.showingFor", "Showing tags for")} <span className="text-foreground">{shopLabel}</span>
+              </span>
+            </div>
           </div>
         </div>
 
-        <Button onClick={() => setCreateOpen(true)} className="shrink-0">
+        <Button onClick={handleNewTagClick} className="shrink-0">
           <Plus className="h-4 w-4 mr-1.5" />
           {t("management.tags.newTag")}
         </Button>
@@ -437,7 +492,7 @@ export default function ManagementTags() {
                   "Tags help you organize contacts into groups for better management and targeted campaigns."
                 )}
               </p>
-              <Button onClick={() => setCreateOpen(true)}>
+              <Button onClick={handleNewTagClick}>
                 <Plus className="h-4 w-4 mr-1.5" />
                 {t("management.tags.empty.createFirst", "Create Your First Tag")}
               </Button>
@@ -483,14 +538,21 @@ export default function ManagementTags() {
                       </p>
                     )}
 
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <Users className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-[11px] text-muted-foreground font-medium">
-                        {tag.contactCount ?? 0}{" "}
-                        {(tag.contactCount ?? 0) === 1
-                          ? t("management.tags.contact", "contact")
-                          : t("management.tags.contacts", "contacts")}
-                      </span>
+                    <div className="flex items-center gap-3 mt-2">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-[11px] text-muted-foreground font-medium">
+                          {tag.contactCount ?? 0}{" "}
+                          {(tag.contactCount ?? 0) === 1
+                            ? t("management.tags.contact", "contact")
+                            : t("management.tags.contacts", "contacts")}
+                        </span>
+                      </div>
+                      {!selectedShopId && tag.shopName && (
+                        <span className="text-[11px] text-muted-foreground">
+                          {tag.shopName}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -521,6 +583,61 @@ export default function ManagementTags() {
           )}
         </CardContent>
       </Card>
+
+      {/* ──────── SHOP PICKER DIALOG ──────── */}
+      <Dialog open={shopPickerOpen} onOpenChange={setShopPickerOpen}>
+        <DialogContent className="sm:max-w-[520px] p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-2">
+            <DialogTitle className="text-xl font-bold">
+              {t("management.tags.shopPicker.title", "Select a Shop")}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              {t("management.tags.shopPicker.description", "Choose which shop this tag belongs to before continuing.")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="px-6 py-4 space-y-2 max-h-[360px] overflow-y-auto">
+            {allShops.filter((s) => s.status === 'active').map((shop) => (
+              <button
+                key={shop.id}
+                type="button"
+                onClick={() => setShopPickerSelection(shop.id)}
+                className={`relative w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${
+                  shopPickerSelection === shop.id
+                    ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 shadow-md ring-1 ring-blue-500/20'
+                    : 'border-border bg-background hover:border-muted-foreground/30 hover:bg-muted/50'
+                }`}
+              >
+                <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+                  shopPickerSelection === shop.id
+                    ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                    : 'bg-muted text-muted-foreground'
+                }`}>
+                  <Store className="w-5 h-5" />
+                </div>
+                <span className="font-medium text-sm flex-1">{shop.name}</span>
+                {shopPickerSelection === shop.id && (
+                  <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="px-6 pb-6 pt-2 flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setShopPickerOpen(false)}>
+              {t("common.cancel", "Cancel")}
+            </Button>
+            <Button onClick={handleShopPickerConfirm} disabled={!shopPickerSelection} className="gap-2">
+              {t("common.next", "Next")}
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ──────── CREATE DIALOG ──────── */}
       <Dialog open={createOpen} onOpenChange={(open) => !open && resetCreate()}>
@@ -593,7 +710,7 @@ export default function ManagementTags() {
               {t("management.tags.cancel")}
             </Button>
             <Button
-              onClick={() => createMutation.mutate()}
+              onClick={() => createMutation.mutate(createShopId ?? undefined)}
               disabled={!newName.trim() || createMutation.isPending}
             >
               {createMutation.isPending

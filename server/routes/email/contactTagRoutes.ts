@@ -1,28 +1,44 @@
 import { Router } from 'express';
 import { db } from '../../db';
-import { sql } from 'drizzle-orm';
-import { emailContacts, contactTags, contactTagAssignments } from '@shared/schema';
+import { sql, eq, and } from 'drizzle-orm';
+import { emailContacts, contactTags, contactTagAssignments, shops } from '@shared/schema';
 import { authenticateToken, requireTenant, requirePermission } from '../../middleware/auth-middleware';
 import { sanitizeString } from '../../utils/sanitization';
+import { resolveShopId } from '../../utils/defaultShop';
 
 export const contactTagRoutes = Router();
 
-// Get contact tags
+// Get contact tags (filtered by shop when x-shop-id header is present)
 contactTagRoutes.get("/contact-tags", authenticateToken, requireTenant, requirePermission('tags.view'), async (req: any, res) => {
   try {
+    const whereClause = req.shopId
+      ? sql`${contactTags.tenantId} = ${req.user.tenantId} AND ${contactTags.shopId} = ${req.shopId}`
+      : sql`${contactTags.tenantId} = ${req.user.tenantId}`;
+
     const tags = await db.query.contactTags.findMany({
-      where: sql`${contactTags.tenantId} = ${req.user.tenantId}`,
+      where: whereClause,
       orderBy: sql`${contactTags.name} ASC`,
       with: {
         assignments: true,
       },
     });
 
-    // Add contact count to each tag
-    const tagsWithCount = tags.map((tag: any) => ({
-      ...tag,
-      contactCount: tag.assignments?.length || 0,
-      assignments: undefined, // Remove assignments from response
+    // Add contact count and shop name to each tag
+    const tagsWithCount = await Promise.all(tags.map(async (tag: any) => {
+      let shopName: string | null = null;
+      if (tag.shopId) {
+        const shop = await db.query.shops.findFirst({
+          where: eq(shops.id, tag.shopId),
+          columns: { name: true },
+        });
+        shopName = shop?.name ?? null;
+      }
+      return {
+        ...tag,
+        shopName,
+        contactCount: tag.assignments?.length || 0,
+        assignments: undefined,
+      };
     }));
 
     res.json({ tags: tagsWithCount });
@@ -35,7 +51,7 @@ contactTagRoutes.get("/contact-tags", authenticateToken, requireTenant, requireP
 // Create contact tag
 contactTagRoutes.post("/contact-tags", authenticateToken, requireTenant, requirePermission('tags.create'), async (req: any, res) => {
   try {
-    const { name, color, description } = req.body;
+    const { name, color, description, shopId: bodyShopId } = req.body;
 
     if (!name) {
       return res.status(400).json({ message: 'Name is required' });
@@ -44,18 +60,22 @@ contactTagRoutes.post("/contact-tags", authenticateToken, requireTenant, require
     const sanitizedName = sanitizeString(name);
     const sanitizedDescription = description ? sanitizeString(description) : null;
 
-    // Additional validation after sanitization
     if (!sanitizedName) {
       return res.status(400).json({ message: 'Name cannot be empty or contain only whitespace' });
     }
 
-    // Validate color is a safe hex value
     const hexColorRegex = /^#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?$/;
     const sanitizedColor = color && hexColorRegex.test(color) ? color : '#3B82F6';
 
-    // Check for duplicate name within tenant
+    // Resolve shopId: prefer explicit body shopId, then header, then tenant default
+    const tagShopId = await resolveShopId(bodyShopId || req.shopId, req.user.tenantId);
+
+    // Check for duplicate name within tenant + shop
+    const dupWhere = tagShopId
+      ? sql`${contactTags.tenantId} = ${req.user.tenantId} AND ${contactTags.shopId} = ${tagShopId} AND lower(${contactTags.name}) = lower(${sanitizedName})`
+      : sql`${contactTags.tenantId} = ${req.user.tenantId} AND lower(${contactTags.name}) = lower(${sanitizedName})`;
     const existingTag = await db.query.contactTags.findFirst({
-      where: sql`${contactTags.tenantId} = ${req.user.tenantId} AND lower(${contactTags.name}) = lower(${sanitizedName})`,
+      where: dupWhere,
       columns: { id: true },
     });
     if (existingTag) {
@@ -64,6 +84,7 @@ contactTagRoutes.post("/contact-tags", authenticateToken, requireTenant, require
 
     const newTag = await db.insert(contactTags).values({
       tenantId: req.user!.tenantId,
+      shopId: tagShopId,
       name: sanitizedName!,
       color: sanitizedColor,
       description: sanitizedDescription,

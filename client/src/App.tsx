@@ -34,6 +34,7 @@ const ShopsPage = lazy(() => import("@/pages/shops"));
 const NewShopPage = lazy(() => import("@/pages/shops/new"));
 const ShopDetailsPage = lazy(() => import("@/pages/shops/$id"));
 const EditShopPage = lazy(() => import("@/pages/shops/$id.edit"));
+const ShopTagsPage = lazy(() => import("@/pages/management-tags"));
 const FormsPage = lazy(() => import("@/pages/forms"));
 const FormsAddPage = lazy(() => import("@/pages/forms/add"));
 const FormsEditPage = lazy(() => import("@/pages/forms/edit"));
@@ -442,6 +443,7 @@ function Router() {
                   <Route path="/reminders" component={RemindersPage} />
                   <Route path="/shops" component={ShopsPage} />
                   <Route path="/shops/new" component={NewShopPage} />
+                  <Route path="/shops/tags" component={ShopTagsPage} />
                   <Route path="/shops/:id" component={ShopDetailsPage} />
                   <Route path="/shops/:id/edit" component={EditShopPage} />
                   <Route path="/management" component={ManagementPage} />

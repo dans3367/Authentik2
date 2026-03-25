@@ -35,7 +35,8 @@ import {
   Send,
   TrendingUp,
   Clock,
-  Cake
+  Cake,
+  Store,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
@@ -61,6 +62,8 @@ interface Contact {
   prefNewsletters?: boolean;
   prefSurveysForms?: boolean;
   addedByUserId?: string | null;
+  shopId?: string | null;
+  shopName?: string | null;
   address?: string | null;
   city?: string | null;
   state?: string | null;
@@ -424,6 +427,17 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                         <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.emailAddress')}</label>
                         <p className="text-gray-900 dark:text-white font-mono text-sm break-all">{contact.email}</p>
                       </div>
+
+                      {/* Shop */}
+                      {contact.shopName && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.shop', 'Shop')}</label>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <Store className="h-3.5 w-3.5 text-gray-400" />
+                            <p className="text-gray-900 dark:text-white text-sm">{contact.shopName}</p>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Address Information */}
                       {(contact.address || contact.city || contact.state || contact.zipCode || contact.country || contact.phoneNumber || contact.dateOfBirth) && (

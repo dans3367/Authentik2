@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { emailContacts, emailLists, bouncedEmails, contactListMemberships, contactTagAssignments, betterAuthUser, emailActivity, tenants, emailSends, emailContent, companies, masterEmailDesign, triggerTasks, birthdaySettings, unsubscribeTokens } from '@shared/schema';
+import { emailContacts, emailLists, bouncedEmails, contactListMemberships, contactTagAssignments, betterAuthUser, emailActivity, tenants, emailSends, emailContent, companies, masterEmailDesign, triggerTasks, birthdaySettings, unsubscribeTokens, shops } from '@shared/schema';
 import { authenticateToken, requireTenant, requirePermission } from '../../middleware/auth-middleware';
 import { sanitizeString, sanitizeEmail, escapeLikePattern } from '../../utils/sanitization';
 import { LANGUAGE_NAMES } from '../../utils/translationService';
@@ -523,6 +523,7 @@ contactRoutes.get("/email-contacts/:id", authenticateToken, requireTenant, requi
       columns: {
         id: true,
         tenantId: true,
+        shopId: true,
         email: true,
         firstName: true,
         lastName: true,
@@ -577,9 +578,20 @@ contactRoutes.get("/email-contacts/:id", authenticateToken, requireTenant, requi
     const tags = contact.tagAssignments?.map((assignment: any) => assignment.tag).filter(Boolean) || [];
     const lists = contact.listMemberships?.map((membership: any) => membership.list).filter(Boolean) || [];
 
+    // Look up shop name if shopId is set
+    let shopName: string | null = null;
+    if (contact.shopId) {
+      const shop = await db.query.shops.findFirst({
+        where: eq(shops.id, contact.shopId),
+        columns: { name: true },
+      });
+      shopName = shop?.name ?? null;
+    }
+
     const { tagAssignments, listMemberships, ...contactData } = contact;
     const transformedContact = {
       ...contactData,
+      shopName,
       tags,
       lists,
     };
@@ -1287,7 +1299,7 @@ async function autoSendBirthdayCard(contact: any, tenantId: string) {
 contactRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { email, firstName, lastName, status, birthday, address, city, state, zipCode, country, phoneNumber, dateOfBirth, preferredLanguage } = req.body;
+    const { email, firstName, lastName, status, birthday, address, city, state, zipCode, country, phoneNumber, dateOfBirth, preferredLanguage, shopId } = req.body;
 
     const contact = await db.query.emailContacts.findFirst({
       where: sql`${emailContacts.id} = ${id} AND ${emailContacts.tenantId} = ${req.user.tenantId}`,
@@ -1388,6 +1400,23 @@ contactRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, requi
         updateData.dateOfBirth = dateOfBirth;
       } else {
         updateData.dateOfBirth = null;
+      }
+    }
+
+    // Optional shop assignment
+    if (shopId !== undefined) {
+      if (shopId) {
+        // Verify the shop belongs to the same tenant
+        const shop = await db.query.shops.findFirst({
+          where: and(eq(shops.id, shopId), eq(shops.tenantId, req.user.tenantId)),
+          columns: { id: true },
+        });
+        if (!shop) {
+          return res.status(400).json({ message: 'Invalid shop' });
+        }
+        updateData.shopId = shopId;
+      } else {
+        updateData.shopId = null;
       }
     }
 
