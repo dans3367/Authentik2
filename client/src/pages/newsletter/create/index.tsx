@@ -79,6 +79,37 @@ function SaveStatusIndicator({
 }
 
 /**
+ * Self-updating title display that reads from a ref.
+ * Polls every 300ms to avoid re-rendering parent on every keystroke.
+ */
+function TitleIndicator({
+  titleRef,
+}: {
+  titleRef: React.MutableRefObject<string>;
+}) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 300);
+    return () => clearInterval(id);
+  }, []);
+
+  const title = titleRef.current;
+
+  return (
+    <span
+      style={{
+        fontSize: "13px",
+        fontWeight: 600,
+        color: title ? "#374151" : "#9ca3af",
+        padding: "2px 4px",
+      }}
+    >
+      {title || "Untitled Newsletter"}
+    </span>
+  );
+}
+
+/**
  * Self-updating save draft button that reads from refs.
  */
 function SaveDraftButton({
@@ -364,6 +395,10 @@ export default function NewsletterCreatePage() {
   useEffect(() => { newsletterIdRef.current = newsletterId; }, [newsletterId]);
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
+  const titleRef = useRef(title);
+  const subjectRef = useRef(subject);
+  titleRef.current = title;
+  subjectRef.current = subject;
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [showSendWizard, setShowSendWizard] = useState(false);
   const [dataReady, setDataReady] = useState(!isEditMode);
@@ -519,8 +554,8 @@ export default function NewsletterCreatePage() {
   const saveToDatabase = useCallback(async (status: 'draft' | 'ready_to_send' | 'scheduled' = 'draft') => {
     const htmlContent = editorType === 'notion' ? notionHtmlContent : extractPuckEmailHtml();
     const puckDataJson = editorType === 'notion' ? JSON.stringify({ notionHtml: notionHtmlContent }) : JSON.stringify(dataRef.current);
-    const currentTitle = title.trim() || t("newsletter.create.untitled", "Untitled Newsletter");
-    const currentSubject = subject.trim() || currentTitle;
+    const currentTitle = titleRef.current.trim() || t("newsletter.create.untitled", "Untitled Newsletter");
+    const currentSubject = subjectRef.current.trim() || currentTitle;
 
     setIsSaving(true);
     try {
@@ -572,7 +607,7 @@ export default function NewsletterCreatePage() {
     } finally {
       setIsSaving(false);
     }
-  }, [title, subject, reactionsEnabled, publishToBlog, toast, queryClient, editorType, notionHtmlContent]);
+  }, [reactionsEnabled, publishToBlog, toast, queryClient, editorType, notionHtmlContent]);
 
   const handleSaveDraft = useCallback(async () => {
     try {
@@ -659,7 +694,29 @@ export default function NewsletterCreatePage() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [hasUnsavedChanges]);
 
-  const handlePublish = async (publishData: UserData) => {
+  const handlePublish = useCallback(async (publishData: UserData) => {
+    // Validate required fields
+    const currentTitle = titleRef.current.trim();
+    const currentSubject = subjectRef.current.trim();
+    
+    if (!currentTitle) {
+      toast({
+        title: t("newsletter.create.validationError", "Validation Error"),
+        description: t("newsletter.create.titleRequired", "Newsletter Name is required"),
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!currentSubject) {
+      toast({
+        title: t("newsletter.create.validationError", "Validation Error"),
+        description: t("newsletter.create.subjectRequired", "Email Subject Line is required"),
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setData(publishData);
     dataRef.current = publishData;
     try {
@@ -669,7 +726,7 @@ export default function NewsletterCreatePage() {
     } catch {
       // Error handled in saveToDatabase
     }
-  };
+  }, [saveToDatabase]);
 
   const handleSegmentSelected = async (segmentData: {
     segmentListId: string | null;
@@ -701,10 +758,11 @@ export default function NewsletterCreatePage() {
   const handleDataChange = useCallback((newData: UserData) => {
     dataRef.current = newData;
     setHasUnsavedChanges(true);
-    // Sync Puck root props to component state for classic editor
+    // Sync Puck root props to refs (not state) to avoid re-rendering
+    // the parent component on every keystroke in Puck's fields
     const rootProps = newData?.root?.props;
-    if (rootProps?.title !== undefined) setTitle(rootProps.title);
-    if (rootProps?.subject !== undefined) setSubject(rootProps.subject);
+    if (rootProps?.title !== undefined) titleRef.current = rootProps.title;
+    if (rootProps?.subject !== undefined) subjectRef.current = rootProps.subject;
   }, []);
 
   const handleConfirmExit = useCallback(() => {
@@ -965,6 +1023,12 @@ export default function NewsletterCreatePage() {
     ),
   }), [emailDesign, viewport, zoom, handleZoomIn, handleZoomOut, handleZoomReset, t]);
 
+  const puckPlugins = useMemo(() => [
+    ...(_blocksPlugin ? [{ ..._blocksPlugin(), label: t("puckEditor.sidebar.blocks", { defaultValue: "Blocks" }) }] : []),
+    ...(_outlinePlugin ? [{ ..._outlinePlugin(), label: t("puckEditor.sidebar.outline", { defaultValue: "Outline" }) }] : []),
+    templatesPlugin((key, fallback) => t(key, { defaultValue: fallback })),
+  ], [t]);
+
   if (!isClient || (isEditMode && isLoadingNewsletter)) {
     return (
       <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1004,16 +1068,7 @@ export default function NewsletterCreatePage() {
             background: "#fff",
             flexShrink: 0,
           }}>
-            <span
-              style={{
-                fontSize: "13px",
-                fontWeight: 600,
-                color: title ? "#374151" : "#9ca3af",
-                padding: "2px 4px",
-              }}
-            >
-              {title || "Untitled Newsletter"}
-            </span>
+            <TitleIndicator titleRef={titleRef} />
             <button
               onClick={() => {
                 if (hasUnsavedChanges) {
@@ -1389,11 +1444,7 @@ export default function NewsletterCreatePage() {
                     onPublish={handlePublish}
                     iframe={iframeConfig}
                     overrides={puckOverrides}
-                    plugins={[
-                      ...(_blocksPlugin ? [{ ..._blocksPlugin(), label: t("puckEditor.sidebar.blocks", { defaultValue: "Blocks" }) }] : []),
-                      ...(_outlinePlugin ? [{ ..._outlinePlugin(), label: t("puckEditor.sidebar.outline", { defaultValue: "Outline" }) }] : []),
-                      templatesPlugin((key, fallback) => t(key, { defaultValue: fallback })),
-                    ]}
+                    plugins={puckPlugins}
                   />
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -1416,7 +1467,7 @@ export default function NewsletterCreatePage() {
           onClose={() => setShowSendWizard(false)}
           onSuccess={() => { setHasUnsavedChanges(false); setLocation(basePath); }}
           newsletterId={newsletterId}
-          newsletterTitle={title || `Untitled ${emailType === 'advertise' ? 'Advertisement' : 'Newsletter'}`}
+          newsletterTitle={titleRef.current || `Untitled ${emailType === 'advertise' ? 'Advertisement' : 'Newsletter'}`}
           newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
           onSegmentSelected={handleSegmentSelected}
           initialRecipientType={initialRecipientType}
@@ -1556,7 +1607,7 @@ export default function NewsletterCreatePage() {
         onClose={() => setShowSendWizard(false)}
         onSuccess={() => { setHasUnsavedChanges(false); setLocation(basePath); }}
         newsletterId={newsletterId}
-        newsletterTitle={title || `Untitled ${emailType === 'advertise' ? 'Advertisement' : 'Newsletter'}`}
+        newsletterTitle={titleRef.current || `Untitled ${emailType === 'advertise' ? 'Advertisement' : 'Newsletter'}`}
         newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
         onSegmentSelected={handleSegmentSelected}
         initialRecipientType={initialRecipientType}

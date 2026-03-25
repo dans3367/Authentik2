@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAppSelector } from "@/store";
+import { apiRequest } from "@/lib/queryClient";
 
 export interface StatMetric {
   value: number;
@@ -17,7 +18,11 @@ export function useDashboardHighlights() {
   const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
 
   const { data, isLoading, error, refetch } = useQuery<HighlightStats>({
-    queryKey: ["/api/stats/highlights", { shopId: selectedShopId }],
+    queryKey: ["/api/stats/highlights", selectedShopId],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/stats/highlights");
+      return response.json();
+    },
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes
     retry: 1,
   });

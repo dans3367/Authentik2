@@ -152,6 +152,7 @@ export const shops = pgTable("shops", {
   socialMedia: text("social_media"), // JSON string of social media links
   settings: text("settings"), // JSON string of custom settings
   isActive: boolean("is_active").default(true),
+  isDefault: boolean("is_default").default(false), // Auto-created default shop per tenant
   // Downgrade soft-lock fields
   suspendedByDowngrade: boolean("suspended_by_downgrade").default(false),
   suspendedAt: timestamp("suspended_at"),

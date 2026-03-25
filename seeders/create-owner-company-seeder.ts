@@ -21,9 +21,9 @@ if (!process.env.DATABASE_URL) {
 }
 
 import { db } from "../server/db";
-import { betterAuthUser, betterAuthAccount, tenants, companies } from "@shared/schema";
+import { betterAuthUser, betterAuthAccount, tenants, companies, shops } from "@shared/schema";
 import { auth } from "../server/auth";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 interface OwnerUserConfig {
   email: string;
@@ -277,6 +277,29 @@ async function createOwnerCompanySeeder() {
         console.log(`✅ Company record created for ${COMPANY_CONFIG.name}`);
       } else {
         console.log(`✅ Company record already exists for ${COMPANY_CONFIG.name}`);
+      }
+
+      // Ensure default shop exists for the tenant
+      const existingDefaultShop = await db
+        .select()
+        .from(shops)
+        .where(and(eq(shops.tenantId, companyTenant.id), eq(shops.isDefault, true)))
+        .limit(1);
+
+      if (existingDefaultShop.length === 0) {
+        await db.insert(shops).values({
+          tenantId: companyTenant.id,
+          name: COMPANY_CONFIG.name,
+          email: OWNER_USERS[0].email,
+          phone: '',
+          country: 'United States',
+          status: 'active',
+          isActive: true,
+          isDefault: true,
+        });
+        console.log(`🏪 Default shop created for ${COMPANY_CONFIG.name}`);
+      } else {
+        console.log(`🏪 Default shop already exists for ${COMPANY_CONFIG.name}`);
       }
     }
 

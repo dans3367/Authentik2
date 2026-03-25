@@ -242,7 +242,7 @@ export interface IStorage {
   bulkAddTagToContacts(contactIds: string[], tagId: string, tenantId: string): Promise<void>;
 
   // Statistics
-  getEmailContactStats(tenantId: string): Promise<{
+  getEmailContactStats(tenantId: string, shopId?: string | null): Promise<{
     totalContacts: number;
     activeContacts: number;
     unsubscribedContacts: number;
@@ -1341,9 +1341,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEmailContact(contactData: CreateEmailContactData, tenantId: string): Promise<EmailContact> {
+    // Resolve shopId to the tenant's default shop if not explicitly provided
+    const defaultShop = await db.query.shops.findFirst({
+      where: and(eq(shops.tenantId, tenantId), eq(shops.isDefault, true)),
+      columns: { id: true },
+    });
     const [contact] = await db.insert(emailContacts).values({
       ...contactData,
       tenantId,
+      shopId: defaultShop?.id ?? null,
     }).returning();
     return contact;
   }
@@ -1517,7 +1523,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Statistics methods
-  async getEmailContactStats(tenantId: string): Promise<{
+  async getEmailContactStats(tenantId: string, shopId?: string | null): Promise<{
     totalContacts: number;
     activeContacts: number;
     unsubscribedContacts: number;
@@ -1526,8 +1532,15 @@ export class DatabaseStorage implements IStorage {
     totalLists: number;
     averageEngagementRate: number;
   }> {
-    const [totalResult] = await db.select({ count: count() }).from(emailContacts).where(eq(emailContacts.tenantId, tenantId));
-    const [activeResult] = await db.select({ count: count() }).from(emailContacts).where(and(eq(emailContacts.tenantId, tenantId), eq(emailContacts.status, 'active')));
+    const baseWhere = shopId
+      ? and(eq(emailContacts.tenantId, tenantId), eq(emailContacts.shopId, shopId))
+      : eq(emailContacts.tenantId, tenantId);
+    const activeWhere = shopId
+      ? and(eq(emailContacts.tenantId, tenantId), eq(emailContacts.shopId, shopId), eq(emailContacts.status, 'active'))
+      : and(eq(emailContacts.tenantId, tenantId), eq(emailContacts.status, 'active'));
+
+    const [totalResult] = await db.select({ count: count() }).from(emailContacts).where(baseWhere);
+    const [activeResult] = await db.select({ count: count() }).from(emailContacts).where(activeWhere);
     const [listsResult] = await db.select({ count: count() }).from(emailLists).where(eq(emailLists.tenantId, tenantId));
 
     return {

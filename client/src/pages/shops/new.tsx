@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,6 +88,7 @@ export default function NewShopPage() {
   const { t } = useTranslation();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { user, isAuthenticated, isLoading: authLoading } = useReduxAuth();
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -202,6 +203,7 @@ export default function NewShopPage() {
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/shops'] });
       toast({
         title: t('common.success'),
         description: t('shops.toasts.shopCreated'),

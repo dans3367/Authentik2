@@ -134,12 +134,28 @@ async function provisionTenantForUser(userId: string): Promise<string> {
       throw new Error('Failed to create company');
     }
 
+    // Create default shop for the tenant
+    const [defaultShop] = await db.insert(shops).values({
+      tenantId: newTenant.id,
+      name: companyName,
+      email: userRecord.email,
+      phone: '',
+      country: 'United States',
+      status: 'active',
+      isActive: true,
+      isDefault: true,
+    }).returning();
+
+    if (defaultShop) {
+      console.log(`🏪 [Provision] Default shop ${truncateId(defaultShop.id)} created for tenant ${truncateId(newTenant.id)}`);
+    }
+
     // Clean up pending company name
     if ((global as any).pendingCompanyNames?.[userRecord.email.toLowerCase()]) {
       delete (global as any).pendingCompanyNames[userRecord.email.toLowerCase()];
     }
 
-    console.log(`✅ [Provision] Tenant ${truncateId(newTenant.id)} + company ${truncateId(newCompany.id)} created for ${maskEmail(userRecord.email)}`);
+    console.log(`✅ [Provision] Tenant ${truncateId(newTenant.id)} + company ${truncateId(newCompany.id)} + default shop created for ${maskEmail(userRecord.email)}`);
     return newTenant.id;
   } finally {
     // Always release the advisory lock

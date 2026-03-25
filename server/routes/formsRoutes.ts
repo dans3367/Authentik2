@@ -11,6 +11,7 @@ import { replaceEmailPlaceholders } from '../utils/emailPlaceholders';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 import { verifyTurnstileToken } from '../utils/turnstile';
+import { getDefaultShopId } from '../utils/defaultShop';
 
 export const formsRoutes = Router();
 
@@ -710,9 +711,11 @@ formsRoutes.post("/public/google-signin", googleSignInLimiter, async (req: any, 
     }
 
     // Create new email contact, form response, and update count in a transaction
+    const formDefaultShopId = await getDefaultShopId(form.tenantId);
     const newContact = await db.transaction(async (tx: any) => {
       const [contact] = await tx.insert(emailContacts).values({
         tenantId: form.tenantId,
+        shopId: formDefaultShopId,
         email: tokenInfo.email,
         firstName: tokenInfo.given_name || null,
         lastName: tokenInfo.family_name || null,
@@ -978,9 +981,11 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
           const contactLastName = submittedLastName || 'Customer';
           const clientIp = req.ip || 'unknown';
           const userAgent = req.get('User-Agent') || 'unknown';
+          const emailFormShopId = await getDefaultShopId(form.tenantId);
 
           await db.insert(emailContacts).values({
             tenantId: form.tenantId,
+            shopId: emailFormShopId,
             email: submittedEmail,
             firstName: contactFirstName,
             lastName: contactLastName,

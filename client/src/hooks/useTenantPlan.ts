@@ -55,7 +55,7 @@ export function useTenantPlan() {
     canSendEmails: hasData ? (data.usage?.emails?.canSend ?? false) : true,
     canAddUsers: hasData ? (data.usage?.users?.canAdd ?? false) : true,
     emailsRemaining: data?.usage?.emails?.remaining ?? 0,
-    maxShops: data?.plan?.maxShops ?? 0,
+    maxShops: hasData ? (data.plan?.maxShops ?? 0) : null,
     maxUsers: data?.plan?.maxUsers ?? 1,
     monthlyEmailLimit: data?.plan?.monthlyEmailLimit ?? 100,
   };

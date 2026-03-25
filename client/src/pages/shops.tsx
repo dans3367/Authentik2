@@ -707,7 +707,8 @@ export default function ShopsPage() {
   }, [data?.shops]);
 
   // Show upgrade prompt for plans that don't include shops (e.g. Free plan)
-  if (maxShops === 0) {
+  // maxShops is null while loading — only show upgrade when confirmed to be 0
+  if (maxShops !== null && maxShops === 0) {
     return (
       <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
         <div className="max-w-4xl mx-auto">

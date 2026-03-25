@@ -80,7 +80,7 @@ interface ExtendedUser {
   avatarUrl?: string | null;
 }
 
-const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, maxShops?: number) => {
+const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, maxShops?: number | null) => {
   const baseNavigation: any[] = [
     { name: t?.('navigation.dashboard') || "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: t?.('navigation.newsletter') || "Newsletter", href: "/newsletter", icon: Newspaper },
@@ -104,7 +104,8 @@ const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, max
   const managementChildren: any[] = [];
 
   // Add Shops under Management only if plan allows shops (maxShops > 0)
-  if (maxShops === undefined || maxShops > 0) {
+  // maxShops is null while loading — show nav item by default until plan data confirms otherwise
+  if (maxShops === undefined || maxShops === null || maxShops > 0) {
     managementChildren.push({ name: t?.('navigation.shops') || "Shops", href: "/shops", icon: Store });
   }
 

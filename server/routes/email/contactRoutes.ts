@@ -13,6 +13,7 @@ import { fromZonedTime } from 'date-fns-tz';
 import { wrapNewsletterContent } from '../../utils/newsletterEmailWrapper';
 import { replaceEmailPlaceholders } from '../../utils/emailPlaceholders';
 import { sanitizeEmailHtml, sanitizeFontFamily, escapeHtml, isValidHttpUrl, maskEmail, renderBirthdayTemplate, enqueuePromotionalEmailJob } from './emailUtils';
+import { resolveShopId } from '../../utils/defaultShop';
 import multer from 'multer';
 import Papa from 'papaparse';
 
@@ -25,7 +26,7 @@ contactRoutes.get("/email-contacts", authenticateToken, requireTenant, requirePe
 
     // If statsOnly is requested, return only statistics
     if (statsOnly === 'true') {
-      const stats = await storage.getEmailContactStats(req.user.tenantId);
+      const stats = await storage.getEmailContactStats(req.user.tenantId, req.shopId);
       return res.json({ stats });
     }
 
@@ -747,9 +748,13 @@ contactRoutes.post("/email-contacts", authenticateToken, requireTenant, requireP
         throw new Error(`Invalid status. Must be one of: ${allowedStatuses.join(', ')}`);
       }
 
+      // Resolve shopId: use selected shop or fall back to tenant's default shop
+      const contactShopId = await resolveShopId(req.shopId, req.user.tenantId);
+
       // Create the contact
       const newContact = await tx.insert(emailContacts).values({
         tenantId: req.user.tenantId,
+        shopId: contactShopId,
         email: sanitizedEmail,
         firstName: sanitizedFirstName,
         lastName: sanitizedLastName,
@@ -894,6 +899,7 @@ contactRoutes.post("/email-contacts/bulk-import", authenticateToken, requireTena
 
       const tenantId = req.user.tenantId;
       const now = new Date();
+      const importShopId = await resolveShopId(req.shopId, tenantId);
 
       // Fetch existing emails for this tenant to check duplicates
       const existingEmails = new Set<string>();
@@ -981,6 +987,7 @@ contactRoutes.post("/email-contacts/bulk-import", authenticateToken, requireTena
 
           toInsert.push({
             tenantId,
+            shopId: importShopId,
             email,
             firstName: firstName ? sanitizeString(firstName) : null,
             lastName: lastName ? sanitizeString(lastName) : null,

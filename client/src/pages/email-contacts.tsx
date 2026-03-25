@@ -4,6 +4,8 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAppSelector, useAppDispatch } from "@/store";
+import { setSelectedShop } from "@/store/shopSlice";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,8 +38,17 @@ import {
   LayoutDashboard,
   ShieldAlert,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Store,
+  ArrowRight,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -114,6 +125,44 @@ export default function EmailContacts() {
   const { toast } = useToast();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
+  const [shopPickerOpen, setShopPickerOpen] = useState(false);
+  const [shopPickerSelection, setShopPickerSelection] = useState<string | null>(null);
+
+  // Fetch shops for shop picker + stat card labels
+  const { data: shopsData } = useQuery({
+    queryKey: ["/api/shops", { limit: 100 }],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/shops?limit=100");
+      return response.json();
+    },
+    staleTime: Infinity,
+  });
+  const allShops: { id: string; name: string; status: string }[] = shopsData?.shops || [];
+  const needsShopSelection = selectedShopId === null && allShops.length > 1;
+  const selectedShopName = useMemo(() => {
+    if (!selectedShopId) return null;
+    return allShops.find((s) => s.id === selectedShopId)?.name ?? null;
+  }, [selectedShopId, allShops]);
+  const shopLabel = selectedShopName || t('emailContacts.stats.allShops', 'All Shops');
+
+  const handleAddContactClick = useCallback(() => {
+    if (needsShopSelection) {
+      setShopPickerSelection(null);
+      setShopPickerOpen(true);
+    } else {
+      setAddContactOpen(true);
+    }
+  }, [needsShopSelection]);
+
+  const handleShopPickerConfirm = useCallback(() => {
+    if (shopPickerSelection) {
+      dispatch(setSelectedShop(shopPickerSelection));
+      setShopPickerOpen(false);
+      setAddContactOpen(true);
+    }
+  }, [shopPickerSelection, dispatch]);
 
   // Set breadcrumbs in header
   useSetBreadcrumbs([
@@ -122,15 +171,23 @@ export default function EmailContacts() {
   ]);
 
   // Check for action=add URL parameter to open add contact modal
+  // Deferred until shopsData loads so we can show the shop picker if needed
+  const [pendingAddAction, setPendingAddAction] = useState(false);
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('action') === 'add') {
-      setAddContactOpen(true);
-      // Clean up the URL parameter after opening the modal
+      setPendingAddAction(true);
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
   }, []);
+
+  useEffect(() => {
+    if (pendingAddAction && shopsData) {
+      setPendingAddAction(false);
+      handleAddContactClick();
+    }
+  }, [pendingAddAction, shopsData, handleAddContactClick]);
 
   // Store search params in a ref to use in query function without changing dependencies
   const searchParamsRef = useRef({
@@ -151,7 +208,7 @@ export default function EmailContacts() {
 
   // Fetch email contacts stats (independent of search/filters) with enhanced caching
   const { data: statsData } = useQuery({
-    queryKey: ['/api/email-contacts-stats'],
+    queryKey: ['/api/email-contacts-stats', selectedShopId],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/email-contacts?statsOnly=true');
       return response.json();
@@ -177,7 +234,7 @@ export default function EmailContacts() {
 
   // Fetch email contacts with stable query key to prevent focus loss
   const { data: contactsData, isLoading: contactsLoading, error: contactsError, isFetching, refetch } = useQuery({
-    queryKey: ['/api/email-contacts'], // Stable key - no search params to prevent rerenders
+    queryKey: ['/api/email-contacts', selectedShopId], // Include shop to refetch on shop change
     queryFn: async () => {
       const params = new URLSearchParams();
       const currentParams = searchParamsRef.current;
@@ -198,6 +255,12 @@ export default function EmailContacts() {
     // Disable refetchOnMount to prevent unnecessary requests
     refetchOnMount: false,
   });
+
+  // Reset to page 1 when shop selection changes
+  useEffect(() => {
+    setCurrentPage(1);
+    searchParamsRef.current = { ...searchParamsRef.current, page: 1 };
+  }, [selectedShopId]);
 
   // Debounced search effect
   useEffect(() => {
@@ -399,7 +462,7 @@ export default function EmailContacts() {
             {t('emailContacts.subtitle')}
           </p>
         </div>
-        <Button onClick={() => setAddContactOpen(true)}>
+        <Button onClick={handleAddContactClick}>
           <UserPlus className="h-4 w-4 mr-2" />
           {t('emailContacts.addContact')}
         </Button>
@@ -410,6 +473,61 @@ export default function EmailContacts() {
         open={addContactOpen}
         onOpenChange={setAddContactOpen}
       />
+
+      {/* Shop Picker for Add Contact */}
+      <Dialog open={shopPickerOpen} onOpenChange={setShopPickerOpen}>
+        <DialogContent className="sm:max-w-[520px] p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-2">
+            <DialogTitle className="text-xl font-bold">
+              {t("newsletter.shopPicker.title", "Select a Shop")}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              {t("newsletter.shopPicker.description", "Choose which shop this item belongs to before continuing.")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="px-6 py-4 space-y-2 max-h-[360px] overflow-y-auto">
+            {allShops.filter((s) => s.status === 'active').map((shop) => (
+              <button
+                key={shop.id}
+                type="button"
+                onClick={() => setShopPickerSelection(shop.id)}
+                className={`relative w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${
+                  shopPickerSelection === shop.id
+                    ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 shadow-md ring-1 ring-blue-500/20'
+                    : 'border-border bg-background hover:border-muted-foreground/30 hover:bg-muted/50'
+                }`}
+              >
+                <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+                  shopPickerSelection === shop.id
+                    ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                    : 'bg-muted text-muted-foreground'
+                }`}>
+                  <Store className="w-5 h-5" />
+                </div>
+                <span className="font-medium text-sm flex-1">{shop.name}</span>
+                {shopPickerSelection === shop.id && (
+                  <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="px-6 pb-6 pt-2 flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setShopPickerOpen(false)}>
+              {t("common.cancel", "Cancel")}
+            </Button>
+            <Button onClick={handleShopPickerConfirm} disabled={!shopPickerSelection} className="gap-2">
+              {t("common.next", "Next")}
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
@@ -425,7 +543,7 @@ export default function EmailContacts() {
               {stats.totalContacts.toLocaleString()}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              {t('emailContacts.stats.allContacts')}
+              {shopLabel}
             </p>
           </CardContent>
         </Card>
@@ -442,7 +560,7 @@ export default function EmailContacts() {
               {stats.activeContacts.toLocaleString()}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              {stats.totalContacts > 0 ? Math.round((stats.activeContacts / stats.totalContacts) * 100) : 0}% {t('emailContacts.stats.ofTotal')}
+              {stats.totalContacts > 0 ? Math.round((stats.activeContacts / stats.totalContacts) * 100) : 0}% {t('emailContacts.stats.ofTotal')} · {shopLabel}
             </p>
           </CardContent>
         </Card>
@@ -476,7 +594,7 @@ export default function EmailContacts() {
               {stats.averageEngagementRate}%
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              {t('emailContacts.stats.openRate')}
+              {shopLabel}
             </p>
           </CardContent>
         </Card>
