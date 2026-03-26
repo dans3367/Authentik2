@@ -231,7 +231,7 @@ export function BirthdayCardsContent() {
 
   // Handler to navigate to add customer page
   const handleAddCustomer = () => {
-    setLocation('/email-contacts/new');
+    setLocation('/email-contacts?action=add');
   };
 
   // Handler to open customer modal

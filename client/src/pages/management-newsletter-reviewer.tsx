@@ -174,39 +174,48 @@ export default function ManagementNewsletterReviewer() {
 
     if (settingsLoading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[400px]">
-                <FileCheck2 className="w-10 h-10 animate-bounce text-primary mb-4" />
-                <p className="text-muted-foreground animate-pulse">{t("newsletterReviewer.loading", "Loading reviewer settings...")}</p>
+            <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+            <div className="max-w-7xl mx-auto">
+                <div className="flex flex-col items-center justify-center min-h-[400px]">
+                    <FileCheck2 className="w-10 h-10 animate-bounce text-primary mb-4" />
+                    <p className="text-muted-foreground animate-pulse">{t("newsletterReviewer.loading", "Loading reviewer settings...")}</p>
+                </div>
+            </div>
             </div>
         );
     }
 
     if (!isAdmin) {
         return (
-            <Card>
-                <CardContent className="py-8">
-                    <div className="flex flex-col items-center gap-2 py-4 text-center">
-                        <ShieldAlert className="h-8 w-8 text-orange-500" />
-                        <p className="font-medium text-sm">{t("newsletterReviewer.permissionDenied", "Permission Denied")}</p>
-                        <p className="text-xs text-muted-foreground max-w-xs">
-                            {t("newsletterReviewer.permissionDeniedDesc", "You need Owner or Administrator access to manage newsletter reviewer settings.")}
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+            <div className="max-w-7xl mx-auto">
+                <Card>
+                    <CardContent className="py-8">
+                        <div className="flex flex-col items-center gap-2 py-4 text-center">
+                            <ShieldAlert className="h-8 w-8 text-orange-500" />
+                            <p className="font-medium text-sm">{t("newsletterReviewer.permissionDenied", "Permission Denied")}</p>
+                            <p className="text-xs text-muted-foreground max-w-xs">
+                                {t("newsletterReviewer.permissionDeniedDesc", "You need Owner or Administrator access to manage newsletter reviewer settings.")}
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+            </div>
         );
     }
 
     return (
-        <div className="space-y-6 max-w-[1200px] mx-auto">
+        <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-7xl mx-auto">
+        <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card p-6 rounded-xl border shadow-sm">
+            <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                        <UserCheck className="w-6 h-6 text-primary" />
+                    <h2 className="text-lg font-medium">
                         {t("newsletterReviewer.title", "Newsletter Reviewer")}
                     </h2>
-                    <p className="text-muted-foreground mt-1">
+                    <p className="text-sm text-muted-foreground mt-1">
                         {t("newsletterReviewer.description", "Configure a reviewer who must approve newsletters before they can be sent.")}
                     </p>
                 </div>
@@ -483,6 +492,8 @@ export default function ManagementNewsletterReviewer() {
                     </Card>
                 </div>
             </div>
+        </div>
+        </div>
         </div>
     );
 }

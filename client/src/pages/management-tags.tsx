@@ -286,6 +286,8 @@ export default function ManagementTags() {
 
   if (is403) {
     return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="max-w-7xl mx-auto">
       <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
         <CardContent className="p-8">
           <div className="flex flex-col items-center gap-3 py-4 text-center">
@@ -304,18 +306,22 @@ export default function ManagementTags() {
           </div>
         </CardContent>
       </Card>
+      </div>
+      </div>
     );
   }
 
   // — Loading skeleton —
   if (isLoading) {
     return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="max-w-7xl mx-auto">
       <div className="space-y-6">
         {/* Header skeleton */}
-        <div className="flex items-center justify-between bg-card p-6 rounded-xl border shadow-sm animate-pulse">
-          <div>
-            <div className="h-6 w-40 bg-muted rounded mb-2" />
-            <div className="h-4 w-64 bg-muted rounded" />
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-6 w-20 bg-muted rounded" />
+            <div className="h-4 w-48 bg-muted rounded" />
           </div>
           <div className="h-9 w-28 bg-muted rounded" />
         </div>
@@ -344,33 +350,32 @@ export default function ManagementTags() {
           </CardContent>
         </Card>
       </div>
+      </div>
+      </div>
     );
   }
 
   return (
+    <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+    <div className="max-w-7xl mx-auto">
     <div className="space-y-6">
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card p-6 rounded-xl border shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400">
-            <Tags className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-foreground">
-              {t("management.tags.title")}
-            </h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {t(
-                "management.tags.subtitle",
-                "Create, organize, and manage tags for your contacts"
-              )}
-            </p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <Store className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">
-                {t("management.tags.showingFor", "Showing tags for")} <span className="text-foreground">{shopLabel}</span>
-              </span>
-            </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-medium">
+            {t("management.tags.title")}
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            {t(
+              "management.tags.subtitle",
+              "Create, organize, and manage tags for your contacts"
+            )}
+          </p>
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <Store className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground">
+              {t("management.tags.showingFor", "Showing tags for")} <span className="text-foreground">{shopLabel}</span>
+            </span>
           </div>
         </div>
 
@@ -858,6 +863,8 @@ export default function ManagementTags() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+    </div>
     </div>
   );
 }

@@ -323,9 +323,13 @@ export default function ManagementEmailDesign() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <Mail className="w-10 h-10 animate-bounce text-primary mb-4" />
-        <p className="text-muted-foreground animate-pulse">Loading design studio...</p>
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col items-center justify-center min-h-[400px]">
+          <Mail className="w-10 h-10 animate-bounce text-primary mb-4" />
+          <p className="text-muted-foreground animate-pulse">Loading design studio...</p>
+        </div>
+      </div>
       </div>
     );
   }
@@ -333,28 +337,33 @@ export default function ManagementEmailDesign() {
   const is403 = error instanceof Error && (error.message?.startsWith('403:') || (error as any).status === 403);
   if (is403) {
     return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="flex flex-col items-center gap-2 py-4 text-center">
-            <ShieldAlert className="h-8 w-8 text-orange-500" />
-            <p className="font-medium text-sm">{t('common.permissionDenied', 'Permission Denied')}</p>
-            <p className="text-xs text-muted-foreground max-w-xs">{t('common.permissionDeniedDescription', 'You do not have permission to view this section. Contact your administrator to request access.')}</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <Card>
+          <CardContent className="py-8">
+            <div className="flex flex-col items-center gap-2 py-4 text-center">
+              <ShieldAlert className="h-8 w-8 text-orange-500" />
+              <p className="font-medium text-sm">{t('common.permissionDenied', 'Permission Denied')}</p>
+              <p className="text-xs text-muted-foreground max-w-xs">{t('common.permissionDeniedDescription', 'You do not have permission to view this section. Contact your administrator to request access.')}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto">
+    <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+    <div className="max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card p-6 rounded-xl border shadow-sm">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Palette className="w-6 h-6 text-primary" />
+          <h2 className="text-lg font-medium">
             {t('management.emailDesign.title')}
           </h2>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {t('management.emailDesign.subtitle') || "Customize the look and feel of all your automated emails."}
           </p>
         </div>
@@ -923,6 +932,8 @@ export default function ManagementEmailDesign() {
           </div>
         </div>
       </div>
+    </div>
+    </div>
     </div>
   );
 }

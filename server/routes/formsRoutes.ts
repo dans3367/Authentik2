@@ -11,7 +11,7 @@ import { replaceEmailPlaceholders } from '../utils/emailPlaceholders';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 import { verifyTurnstileToken } from '../utils/turnstile';
-import { getDefaultShopId } from '../utils/defaultShop';
+import { getDefaultShopId, resolveShopId } from '../utils/defaultShop';
 
 export const formsRoutes = Router();
 
@@ -340,6 +340,11 @@ formsRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => 
 
     let whereClause = sql`${forms.tenantId} = ${req.user.tenantId}`;
 
+    // Shop-level filtering when a specific shop is selected
+    if (req.shopId) {
+      whereClause = sql`${whereClause} AND ${forms.shopId} = ${req.shopId}`;
+    }
+
     if (search) {
       const sanitizedSearch = sanitizeString(search as string);
       whereClause = sql`${whereClause} AND (
@@ -424,6 +429,9 @@ formsRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) =>
       return res.status(400).json({ message: 'Invalid formData: must be valid JSON' });
     }
 
+    // Resolve shopId from header or tenant default
+    const formShopId = await resolveShopId(req.shopId, req.user.tenantId);
+
     const newForm = await db.insert(forms).values({
       title: sanitizedTitle,
       description: sanitizedDescription,
@@ -431,6 +439,7 @@ formsRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) =>
       formData: sanitizedFormData,
       theme: sanitizedTheme || 'modern',
       tenantId: req.user.tenantId,
+      shopId: formShopId,
       userId: req.user.id,
       isActive: true,
     }).returning();
@@ -711,11 +720,11 @@ formsRoutes.post("/public/google-signin", googleSignInLimiter, async (req: any, 
     }
 
     // Create new email contact, form response, and update count in a transaction
-    const formDefaultShopId = await getDefaultShopId(form.tenantId);
+    const formShopId = form.shopId || await getDefaultShopId(form.tenantId);
     const newContact = await db.transaction(async (tx: any) => {
       const [contact] = await tx.insert(emailContacts).values({
         tenantId: form.tenantId,
-        shopId: formDefaultShopId,
+        shopId: formShopId,
         email: tokenInfo.email,
         firstName: tokenInfo.given_name || null,
         lastName: tokenInfo.family_name || null,
@@ -734,6 +743,7 @@ formsRoutes.post("/public/google-signin", googleSignInLimiter, async (req: any, 
 
       await tx.insert(formResponses).values({
         tenantId: form.tenantId,
+        shopId: formShopId,
         formId,
         responseData: JSON.stringify({
           email: tokenInfo.email,
@@ -923,9 +933,13 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
       return res.status(404).json({ message: 'Form not found or not active' });
     }
 
+    // Resolve shop from form or tenant default
+    const publicFormShopId = form.shopId || await getDefaultShopId(form.tenantId);
+
     // Create form response
     const newResponse = await db.insert(formResponses).values({
       tenantId: form.tenantId,
+      shopId: publicFormShopId,
       formId: id,
       responseData: JSON.stringify(data),
       submittedAt: new Date(),
@@ -981,11 +995,10 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
           const contactLastName = submittedLastName || 'Customer';
           const clientIp = req.ip || 'unknown';
           const userAgent = req.get('User-Agent') || 'unknown';
-          const emailFormShopId = await getDefaultShopId(form.tenantId);
 
           await db.insert(emailContacts).values({
             tenantId: form.tenantId,
-            shopId: emailFormShopId,
+            shopId: publicFormShopId,
             email: submittedEmail,
             firstName: contactFirstName,
             lastName: contactLastName,

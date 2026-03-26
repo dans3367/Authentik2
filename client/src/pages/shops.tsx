@@ -741,31 +741,21 @@ export default function ShopsPage() {
           {/* Header */}
           {isLoading ? (
             <div className="flex items-center justify-between">
-              <div className="mb-8">
-                <div className="flex items-center space-x-4">
-                  <Skeleton className="w-10 h-10 rounded-lg" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-8 w-20" />
-                    <Skeleton className="h-4 w-48" />
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-20" />
+                <Skeleton className="h-4 w-48" />
               </div>
               <Skeleton className="h-10 w-24" />
             </div>
           ) : (
             <div className="flex items-center justify-between">
-              <div className="mb-8">
-                <div className="flex items-center space-x-4">
-                  <Store className="text-blue-600 dark:text-blue-500 w-8 h-8" />
-                  <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                      {t('shops.title')}
-                    </h1>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">
-                      {t('shops.subtitle')}
-                    </p>
-                  </div>
-                </div>
+              <div>
+                <h2 className="text-lg font-medium">
+                  {t('shops.title')}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {t('shops.subtitle')}
+                </p>
               </div>
               {data?.limits && !data.limits.canAddShop ? (
                 <Button

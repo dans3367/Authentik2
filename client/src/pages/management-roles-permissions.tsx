@@ -333,6 +333,8 @@ export default function ManagementRolesPermissions() {
   // Check if plan data is loading
   if (planLoading) {
     return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="max-w-7xl mx-auto">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-medium">
@@ -349,6 +351,8 @@ export default function ManagementRolesPermissions() {
             </Card>
           ))}
         </div>
+      </div>
+      </div>
       </div>
     );
   }
@@ -503,6 +507,8 @@ export default function ManagementRolesPermissions() {
   }
 
   return (
+    <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+    <div className="max-w-7xl mx-auto">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -1175,6 +1181,8 @@ export default function ManagementRolesPermissions() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+    </div>
     </div>
   );
 }

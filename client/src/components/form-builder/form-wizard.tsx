@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppSelector } from '@/store';
 import { useLocation } from 'wouter';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +33,7 @@ interface FormWizardProps {
 export function FormWizard({ editMode = false, formData: existingFormData }: FormWizardProps) {
   const { isAuthenticated, isLoading: authLoading } = useReduxAuth();
   const { hasInitialized } = useAuth();
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
 const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -127,6 +129,7 @@ const [, setLocation] = useLocation();
       
       // Invalidate the forms cache to refresh the forms list
       queryClient.invalidateQueries({ queryKey: ['/api/forms'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/forms', selectedShopId] });
       if (editMode && existingFormData) {
         queryClient.invalidateQueries({ queryKey: ['/api/forms', existingFormData.id] });
       }

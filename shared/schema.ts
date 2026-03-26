@@ -468,6 +468,7 @@ export const companies = pgTable("companies", {
 export const forms = pgTable("forms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  shopId: varchar("shop_id").references(() => shops.id, { onDelete: 'set null' }),
   userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   title: text("title").notNull(),
   description: text("description"),
@@ -485,6 +486,7 @@ export const forms = pgTable("forms", {
 export const formResponses = pgTable("form_responses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  shopId: varchar("shop_id").references(() => shops.id, { onDelete: 'set null' }),
   formId: varchar("form_id").notNull().references(() => forms.id, { onDelete: 'cascade' }),
   responseData: text("response_data").notNull(), // JSON string of form responses
   submittedAt: timestamp("submitted_at").defaultNow(),

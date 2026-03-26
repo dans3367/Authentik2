@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Loader2, Calendar, User, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText, ClipboardList, FileQuestion, Mail } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppSelector } from '@/store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -183,6 +184,7 @@ const getThemePreviewContent = (themeId: string) => {
 
 export default function Forms2() {
   const { isAuthenticated, isLoading: authLoading, isInitialized } = useReduxAuth();
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -211,9 +213,9 @@ export default function Forms2() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
-  // Fetch forms data
+  // Fetch forms data (x-shop-id header automatically injected by queryClient)
   const { data: formsData, isLoading: formsLoading, error: formsError, refetch } = useQuery({
-    queryKey: ['/api/forms'],
+    queryKey: ['/api/forms', selectedShopId],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/forms');
       const data = await response.json();
@@ -233,6 +235,7 @@ export default function Forms2() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/forms'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/forms', selectedShopId] });
       toast({
         title: "Success",
         description: "Form deleted successfully!",

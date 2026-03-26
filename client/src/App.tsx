@@ -45,7 +45,7 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 
 const EmailApprovalsPage = lazy(() => import("@/pages/email-approvals"));
 const EmailContactsPage = lazy(() => import("@/pages/email-contacts"));
-const NewEmailContactPage = lazy(() => import("@/pages/email-contacts/new"));
+
 const ViewEmailContactPage = lazy(() => import("@/pages/email-contacts/view"));
 const ScheduleEmailContactPage = lazy(() => import("@/pages/email-contacts/schedule"));
 const ScheduledTimelineContactPage = lazy(() => import("@/pages/email-contacts/scheduled"));
@@ -428,7 +428,7 @@ function Router() {
                   <Route path="/email-approvals" component={EmailApprovalsPage} />
                   <Route path="/email-compose" component={EmailComposePage} />
                   <Route path="/email-contacts" component={EmailContactsPage} />
-                  <Route path="/email-contacts/new" component={NewEmailContactPage} />
+
                   <Route path="/email-contacts/view/:id" component={ViewEmailContactPage} />
                   <Route path="/email-contacts/view/:id/schedule" component={ScheduleEmailContactPage} />
                   <Route path="/email-contacts/view/:id/scheduled" component={ScheduledTimelineContactPage} />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -6,6 +6,7 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAppSelector } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +30,7 @@ import {
   Settings2,
   CalendarIcon,
   Cake,
+  Store,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -93,9 +95,29 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
   const { toast } = useToast();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedLists, setSelectedLists] = useState<string[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [contactShopId, setContactShopId] = useState<string | null>(selectedShopId);
+
+  // Sync contactShopId when selectedShopId changes or dialog opens
+  useEffect(() => {
+    if (open) {
+      setContactShopId(selectedShopId);
+    }
+  }, [open, selectedShopId]);
+
+  // Fetch shops for the dropdown
+  const { data: shopsData } = useQuery({
+    queryKey: ["/api/shops", { limit: 100 }],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/shops?limit=100");
+      return res.json();
+    },
+    staleTime: Infinity,
+  });
+  const allShops: { id: string; name: string; status: string }[] = shopsData?.shops || [];
 
   const form = useForm<AddContactForm>({
     resolver: zodResolver(addContactSchema),
@@ -159,6 +181,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
         dateOfBirth: data.dateOfBirth ? format(data.dateOfBirth, 'yyyy-MM-dd') : undefined,
         tags: selectedTags,
         lists: selectedLists,
+        shopId: contactShopId || undefined,
         consentIpAddress: window.location.hostname,
         consentUserAgent: navigator.userAgent,
       };
@@ -197,6 +220,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
       setSelectedTags([]);
       setSelectedLists([]);
       setCustomFieldValues({});
+      setContactShopId(selectedShopId);
       onOpenChange(false);
     },
     onError: (err: any) => {
@@ -305,6 +329,36 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
                 )}
               />
             </div>
+
+            {/* Shop Assignment */}
+            {allShops.length > 1 && (
+              <div>
+                <Label className="flex items-center gap-2 mb-2">
+                  <Store className="w-4 h-4" />
+                  Shop
+                </Label>
+                <Select
+                  value={contactShopId || ""}
+                  onValueChange={(val) => setContactShopId(val)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select shop..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allShops
+                      .filter((s) => s.status === "active")
+                      .map((shop) => (
+                        <SelectItem key={shop.id} value={shop.id}>
+                          {shop.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Which shop this contact belongs to
+                </p>
+              </div>
+            )}
 
             {/* Date of Birth */}
             <FormField

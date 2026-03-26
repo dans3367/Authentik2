@@ -437,18 +437,13 @@ export default function UsersPage() {
       <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
         <div className="max-w-7xl mx-auto">
           <div className="space-y-6">
-            <div className="mb-8">
-              <div className="flex items-center space-x-4">
-                <UsersIcon className="text-blue-600 dark:text-blue-500 w-8 h-8" />
-                <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                    {t('users.title')}
-                  </h1>
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    {t('users.loadingSubtitle')}
-                  </p>
-                </div>
-              </div>
+            <div>
+              <h2 className="text-lg font-medium">
+                {t('users.title')}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {t('users.loadingSubtitle')}
+              </p>
             </div>
             <div className="grid gap-4">
               {[1, 2, 3].map((i) => (
@@ -895,18 +890,13 @@ export default function UsersPage() {
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <div className="mb-8">
-              <div className="flex items-center space-x-4">
-                <UsersIcon className="text-blue-600 dark:text-blue-500 w-8 h-8" />
-                <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                    {t('users.title')}
-                  </h1>
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    {t('users.subtitle')}
-                  </p>
-                </div>
-              </div>
+            <div>
+              <h2 className="text-lg font-medium">
+                {t('users.title')}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {t('users.subtitle')}
+              </p>
             </div>
             {isAdmin && (
               <TooltipProvider>

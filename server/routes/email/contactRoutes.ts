@@ -674,7 +674,7 @@ contactRoutes.get("/email-contacts/:id/stats", authenticateToken, requireTenant,
 // Create email contact with batch operations
 contactRoutes.post("/email-contacts", authenticateToken, requireTenant, requirePermission('contacts.create'), async (req: any, res) => {
   try {
-    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent, address, city, state, zipCode, country, phoneNumber, dateOfBirth, preferredLanguage } = req.body;
+    const { email, firstName, lastName, tags, lists, status, consentGiven, consentMethod, consentIpAddress, consentUserAgent, address, city, state, zipCode, country, phoneNumber, dateOfBirth, preferredLanguage, shopId: bodyShopId } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
@@ -760,8 +760,8 @@ contactRoutes.post("/email-contacts", authenticateToken, requireTenant, requireP
         throw new Error(`Invalid status. Must be one of: ${allowedStatuses.join(', ')}`);
       }
 
-      // Resolve shopId: use selected shop or fall back to tenant's default shop
-      const contactShopId = await resolveShopId(req.shopId, req.user.tenantId);
+      // Resolve shopId: prefer explicit body shopId, then header, then tenant default
+      const contactShopId = await resolveShopId(bodyShopId || req.shopId, req.user.tenantId);
 
       // Create the contact
       const newContact = await tx.insert(emailContacts).values({
