@@ -282,7 +282,7 @@ export default function AdvertisePage() {
     },
   });
 
-  // Fetch archived items
+  // Fetch archived items (always enabled so the toggle button appears when archived items exist)
   const { data: archivedItemsData } = useQuery({
     queryKey: ["/api/newsletters", { emailType: "advertise", archived: true, shopId: selectedShopId }],
     queryFn: async () => {
@@ -290,7 +290,6 @@ export default function AdvertisePage() {
       const data = await response.json();
       return data.newsletters || [];
     },
-    enabled: showArchived,
     staleTime: 0,
     refetchOnMount: "always",
   });
@@ -611,7 +610,7 @@ export default function AdvertisePage() {
                                         {t("advertise.actions.review")}
                                       </DropdownMenuItem>
                                     )}
-                                    {isPendingReview && (
+                                    {isPendingReview && !isCurrentUserReviewer && (item.userId === currentUserId || ['Owner', 'Administrator'].includes((user as any)?.role)) && (
                                       <DropdownMenuItem
                                         onClick={(e) => { e.stopPropagation(); recallToDraftMutation.mutate(item.id); }}
                                         disabled={recallToDraftMutation.isPending && recallToDraftMutation.variables === item.id}
@@ -737,7 +736,7 @@ export default function AdvertisePage() {
         )}
 
         {/* Archived Section */}
-        {items.length > 0 && (
+        {(items.length > 0 || showArchived || archivedItems.length > 0) && (
           <div className="mt-8">
             <button
               onClick={() => setShowArchived(!showArchived)}

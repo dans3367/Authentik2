@@ -319,7 +319,7 @@ export default function NewsletterPage() {
     },
   });
 
-  // Fetch archived newsletters
+  // Fetch archived newsletters (always enabled so the toggle button appears when archived items exist)
   const { data: archivedNewslettersData } = useQuery({
     queryKey: ['/api/newsletters', { emailType: 'newsletter', archived: true, shopId: selectedShopId }],
     queryFn: async () => {
@@ -327,7 +327,6 @@ export default function NewsletterPage() {
       const data = await response.json();
       return data.newsletters || [];
     },
-    enabled: showArchived,
     staleTime: 0,
     refetchOnMount: 'always',
   });
@@ -766,7 +765,7 @@ export default function NewsletterPage() {
                                         {t("newsletter.actions.reviewNewsletter")}
                                       </DropdownMenuItem>
                                     )}
-                                    {isPendingReview && (
+                                    {isPendingReview && !isCurrentUserReviewer && (newsletter.userId === currentUserId || ['Owner', 'Administrator'].includes((user as any)?.role)) && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -908,7 +907,7 @@ export default function NewsletterPage() {
         )}
 
         {/* Archived Newsletters Section */}
-        {newsletters.length > 0 && (
+        {(newsletters.length > 0 || showArchived || archivedNewsletters.length > 0) && (
           <div className="mt-8">
             <button
               onClick={() => setShowArchived(!showArchived)}

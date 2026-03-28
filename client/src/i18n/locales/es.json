@@ -3737,6 +3737,9 @@
   },
   "userMenu": {
     "profile": "Perfil",
+    "viewProfile": "Ver Perfil",
+    "billing": "Facturación",
+    "accountSettings": "Configuración de Cuenta",
     "company": "Empresa",
     "sessions": "Sesiones",
     "logout": "Cerrar Sesión",

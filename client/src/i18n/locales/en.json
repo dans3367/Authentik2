@@ -3749,9 +3749,12 @@
   },
   "userMenu": {
     "profile": "Profile",
+    "viewProfile": "View Profile",
+    "billing": "Billing",
+    "accountSettings": "Account Settings",
     "company": "Company",
     "sessions": "Sessions",
-    "logout": "Logout",
+    "logout": "Log out",
     "tooltip": "User Menu",
     "upgradeToPro": "Upgrade to Pro",
     "unlockPremium": "Unlock unlimited views & premium features"

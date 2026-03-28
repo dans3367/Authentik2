@@ -16,6 +16,7 @@ import {
   Newspaper,
   Settings,
   ClipboardList,
+  CreditCard,
   X,
   Megaphone,
   Bell,
@@ -357,37 +358,60 @@ export function AppSidebar() {
               <DropdownMenuContent
                 side="right"
                 align="end"
-                className="w-64 rounded-2xl p-1"
+                className="w-64 rounded-xl p-0 overflow-hidden shadow-lg"
                 sideOffset={8}
               >
                 {/* User Profile Header */}
-                <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex items-start gap-3 px-4 pt-4 pb-3 border-b border-gray-200 dark:border-gray-800">
                   <CustomAvatar
                     user={extendedUser}
-                    size="sm"
-                    className="w-10 h-10 ring-2 ring-gray-100 dark:ring-gray-700"
+                    size="md"
+                    className="w-10 h-10 flex-shrink-0 ring-2 ring-gray-200 dark:ring-gray-700"
                   />
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+                  <div className="flex flex-col min-w-0">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight truncate">
                       {extendedUser.firstName || extendedUser.name} {extendedUser.lastName || ''}
                     </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {planName}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {extendedUser.email}
                     </p>
+                    {planName && (
+                      <span className={cn(
+                        "inline-block mt-1 w-fit px-2 py-px rounded-full text-[10px] font-medium",
+                        planName.toLowerCase().includes('pro')
+                          ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                          : planName.toLowerCase().includes('plus')
+                            ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300"
+                            : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                      )}>
+                        {planName}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {/* Menu Items */}
-                <div className="py-2">
+                <div className="py-1 px-1">
                   <DropdownMenuItem
                     onClick={() => {
                       setLocation('/profile');
                       handleMobileNavClick();
                     }}
-                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
+                    className="cursor-pointer flex items-center gap-3 px-3 py-2 rounded-md"
                   >
-                    <User className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
-                    <span className="text-sm">{t('userMenu.profile') || "Profile"}</span>
+                    <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <span className="text-sm">{t('userMenu.viewProfile') || "View Profile"}</span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setLocation('/profile?tab=subscription');
+                      handleMobileNavClick();
+                    }}
+                    className="cursor-pointer flex items-center gap-3 px-3 py-2 rounded-md"
+                  >
+                    <CreditCard className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <span className="text-sm">{t('userMenu.billing') || "Billing"}</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuItem
@@ -395,103 +419,23 @@ export function AppSidebar() {
                       setLocation('/company');
                       handleMobileNavClick();
                     }}
-                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
+                    className="cursor-pointer flex items-center gap-3 px-3 py-2 rounded-md"
                   >
-                    <Building2 className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
-                    <span className="text-sm">{t('userMenu.company') || "Company"}</span>
+                    <Settings className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <span className="text-sm">{t('userMenu.accountSettings') || "Account Settings"}</span>
                   </DropdownMenuItem>
-
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setLocation('/sessions');
-                      handleMobileNavClick();
-                    }}
-                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
-                  >
-                    <Activity className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
-                    <span className="text-sm">{t('userMenu.sessions') || "Sessions"}</span>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem asChild>
-                    <Link href="/legal-agreements" className="flex items-center gap-3 px-4 py-2.5 cursor-pointer w-full" onClick={handleMobileNavClick}>
-                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{t('navigation.help') || "Help"}</span>
-                    </Link>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-700" />
-
                 </div>
 
-                {planName?.toLowerCase().includes('free') && (
-                  <>
-                    <DropdownMenuSeparator />
-
-                    {/* Plan Section - Enhanced Upgrade */}
-                    <div className="mx-3 my-2 rounded-xl overflow-hidden relative group/upgrade">
-                      <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 opacity-95" />
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.15),transparent_50%)]" />
-                      <div className="absolute top-1 right-2 opacity-10 group-hover/upgrade:opacity-20 transition-opacity duration-500">
-                        <Crown className="h-12 w-12 text-yellow-300" />
-                      </div>
-
-                      <div className="relative px-4 py-3.5 space-y-2.5">
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-white/15 backdrop-blur-sm">
-                            <Zap className="h-3.5 w-3.5 text-yellow-300" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold text-white/90 tracking-wide uppercase">
-                              {planName}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <p className="text-[11px] text-white/70">
-                              12,000 / 50,000 views
-                            </p>
-                            <p className="text-[11px] text-white/50">24%</p>
-                          </div>
-                          <div className="w-full h-1.5 bg-white/15 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-400 rounded-full transition-all duration-1000 ease-out"
-                              style={{ width: '24%' }}
-                            />
-                          </div>
-                        </div>
-
-                        <Button
-                          onClick={() => setLocation('/profile?tab=subscription')}
-                          size="sm"
-                          data-testid="button-upgrade-plan"
-                          className="w-full relative overflow-hidden bg-white hover:bg-gray-50 text-indigo-700 font-bold text-xs py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] group/btn"
-                        >
-                          <span className="relative z-10 flex items-center justify-center gap-1.5">
-                            <Sparkles className="h-3.5 w-3.5 text-indigo-600 group-hover/btn:animate-spin" />
-                            <span>{t('userMenu.upgradeToPro') || "Upgrade to Pro"}</span>
-                          </span>
-                        </Button>
-
-                        <p className="text-[10px] text-center text-white/50">
-                          {t('userMenu.unlockPremium') || "Unlock unlimited views & premium features"}
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <DropdownMenuSeparator />
+                <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-800 mx-3" />
 
                 {/* Logout */}
-                <div className="py-2">
+                <div className="py-1 px-1">
                   <DropdownMenuItem
                     onClick={handleLogout}
-                    className="cursor-pointer flex items-center gap-3 px-4 py-2.5"
+                    className="cursor-pointer flex items-center gap-3 px-3 py-2 rounded-md text-red-500 hover:text-red-600 focus:text-red-600 dark:text-red-400 dark:hover:text-red-300"
                   >
-                    <LogOut className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
-                    <span className="text-sm">{t('userMenu.logout') || "Logout"}</span>
+                    <LogOut className="h-4 w-4" />
+                    <span className="text-sm">{t('userMenu.logout') || "Log out"}</span>
                   </DropdownMenuItem>
                 </div>
               </DropdownMenuContent>
