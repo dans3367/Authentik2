@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from 'react-i18next';
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { useAppSelector } from "@/store";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -118,6 +119,7 @@ export default function RemindersPage() {
   const { t } = useTranslation();
   const { user } = useReduxAuth();
   const userTimezone = user?.timezone || 'America/Chicago';
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
 
   const [appointmentsTab, setAppointmentsTab] = useState<"upcoming" | "past">("upcoming");
 
@@ -236,9 +238,12 @@ export default function RemindersPage() {
     isFetching: appointmentsFetching,
     refetch: refetchAppointments
   } = useQuery<{ appointments: AppointmentWithCustomer[] }>({
-    queryKey: ['/api/appointments'],
+    queryKey: ['/api/appointments', { shopId: selectedShopId }],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/appointments');
+      const response = await apiRequest(
+        'GET',
+        `/api/appointments${selectedShopId ? `?shopId=${selectedShopId}` : ''}`
+      );
       return response.json();
     },
     staleTime: 5 * 60 * 1000,
@@ -546,8 +551,8 @@ export default function RemindersPage() {
       const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
       if (!selectedCustomer) throw new Error('Selected customer not found.');
 
-      await queryClient.cancelQueries({ queryKey: ['/api/appointments'] });
-      const previousAppointments = queryClient.getQueryData<{ appointments: Appointment[] }>(['/api/appointments']);
+      await queryClient.cancelQueries({ queryKey: ['/api/appointments', { shopId: selectedShopId }] });
+      const previousAppointments = queryClient.getQueryData<{ appointments: Appointment[] }>(['/api/appointments', { shopId: selectedShopId }]);
 
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
       const optimisticAppointment: AppointmentWithCustomer = {
@@ -570,7 +575,7 @@ export default function RemindersPage() {
 
       if (isMountedRef.current) setPendingAppointmentIds(prev => new Set(prev).add(tempId));
       queryClient.setQueryData<{ appointments: AppointmentWithCustomer[] }>(
-        ['/api/appointments'],
+        ['/api/appointments', { shopId: selectedShopId }],
         (old) => ({ appointments: old?.appointments ? [optimisticAppointment, ...old.appointments] : [optimisticAppointment] })
       );
       return { previousAppointments, tempId };
@@ -583,7 +588,7 @@ export default function RemindersPage() {
 
       if (data?.appointment) {
         queryClient.setQueryData<{ appointments: AppointmentWithCustomer[] }>(
-          ['/api/appointments'],
+          ['/api/appointments', { shopId: selectedShopId }],
           (old) => {
             if (!old?.appointments) return old;
             return { appointments: old.appointments.map(apt => apt.id === context?.tempId ? { ...data.appointment, customer: data.appointment.customer || apt.customer } : apt) };
@@ -613,7 +618,7 @@ export default function RemindersPage() {
       }
     },
     onError: (error: any, _variables, context) => {
-      if (context?.previousAppointments) queryClient.setQueryData(['/api/appointments'], context.previousAppointments);
+      if (context?.previousAppointments) queryClient.setQueryData(['/api/appointments', { shopId: selectedShopId }], context.previousAppointments);
       if (context?.tempId && isMountedRef.current) {
         setPendingAppointmentIds(prev => { const next = new Set(prev); next.delete(context.tempId); return next; });
       }

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, User, ArrowRight, Timer } from "lucide-react";
+import { Calendar, Clock, User, ArrowRight, Timer, Building2 } from "lucide-react";
 import { addHours, isWithinInterval, formatDistanceToNow, format } from "date-fns";
 import {
   Select,
@@ -47,10 +47,6 @@ export function NextUpAppointments({ appointments, onViewDetails }: NextUpAppoin
     }) && apt.status !== 'cancelled' && apt.status !== 'completed' && apt.status !== 'no_show';
   }).sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime());
 
-  if (nextUp.length === 0) return null;
-
-
-
   return (
     <Card className="mb-6 border-l-4 border-l-blue-500 bg-blue-50/10 dark:bg-blue-900/10 shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
@@ -79,6 +75,11 @@ export function NextUpAppointments({ appointments, onViewDetails }: NextUpAppoin
         </div>
       </CardHeader>
       <CardContent>
+        {nextUp.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-2">
+            No upcoming appointments in the next {hoursRange} hours.
+          </p>
+        ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {nextUp.map(apt => {
             const aptDate = new Date(apt.appointmentDate);
@@ -137,6 +138,14 @@ export function NextUpAppointments({ appointments, onViewDetails }: NextUpAppoin
                       </div>
                       <span>{format(aptDate, 'h:mm a')} ({apt.duration} min)</span>
                     </div>
+                    {apt.shop?.name && (
+                      <div className="flex items-center gap-2">
+                        <div className="p-1 rounded bg-gray-100 dark:bg-gray-800">
+                          <Building2 className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                        </div>
+                        <span className="truncate">{apt.shop.name}</span>
+                      </div>
+                    )}
                   </div>
 
                   <Button
@@ -153,6 +162,7 @@ export function NextUpAppointments({ appointments, onViewDetails }: NextUpAppoin
             );
           })}
         </div>
+        )}
       </CardContent>
     </Card>
   );

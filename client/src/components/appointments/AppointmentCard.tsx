@@ -21,7 +21,8 @@ import {
   MoreVertical,
   Send,
   Trash2,
-  Loader2
+  Loader2,
+  Building2
 } from "lucide-react";
 import {
   getCustomerName,
@@ -122,6 +123,12 @@ export function AppointmentCard({
               <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                 <MapPin className="h-4 w-4 text-gray-500" />
                 <span>{appointment.location}</span>
+              </div>
+            )}
+            {appointment.shop?.name && (
+              <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                <Building2 className="h-4 w-4 text-gray-500" />
+                <span>{appointment.shop.name}</span>
               </div>
             )}
 

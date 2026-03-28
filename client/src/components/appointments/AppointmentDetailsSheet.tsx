@@ -26,6 +26,7 @@ import {
   Plus,
   Loader2,
   BellOff,
+  Building2,
 } from "lucide-react";
 import { getCustomerName, formatDateTime } from "@/utils/appointment-utils";
 import type { AppointmentWithCustomer, Customer, AppointmentReminder } from "@/utils/appointment-utils";
@@ -271,6 +272,16 @@ export function AppointmentDetailsSheet({
                           <p className="text-sm text-foreground flex items-center gap-1.5">
                             <MapPin className="h-3 w-3 text-muted-foreground" />
                             {appointment.location}
+                          </p>
+                        </div>
+                      )}
+
+                      {appointment.shop?.name && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Shop</p>
+                          <p className="text-sm text-foreground flex items-center gap-1.5">
+                            <Building2 className="h-3 w-3 text-muted-foreground" />
+                            {appointment.shop.name}
                           </p>
                         </div>
                       )}

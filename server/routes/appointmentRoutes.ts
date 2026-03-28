@@ -7,6 +7,7 @@ import {
   appointmentReminders,
   emailContacts,
   companies,
+  shops,
   createAppointmentSchema,
   updateAppointmentSchema,
   createAppointmentReminderSchema,
@@ -18,6 +19,7 @@ import { requireRole } from '../middleware/auth-middleware';
 import { logActivity, computeChanges } from '../utils/activityLogger';
 import { v4 as uuidv4 } from 'uuid';
 import { cancelReminderRun, triggerRescheduleEmail, triggerThankYouEmail } from '../lib/trigger';
+import { resolveShopId } from '../utils/defaultShop';
 
 const router = Router();
 
@@ -165,10 +167,16 @@ router.get('/', async (req: Request, res: Response) => {
           zipCode: emailContacts.zipCode,
           country: emailContacts.country,
           phoneNumber: emailContacts.phoneNumber,
-        }
+        },
+        // Shop details
+        shop: {
+          id: shops.id,
+          name: shops.name,
+        },
       })
       .from(appointments)
-      .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id));
+      .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
+      .leftJoin(shops, eq(appointments.shopId, shops.id));
 
     // Apply search filter across multiple fields (case-insensitive)
     let finalQuery;
@@ -306,6 +314,9 @@ router.post('/', async (req: Request, res: Response) => {
     // Generate confirmation token
     const confirmationToken = uuidv4();
 
+    // Resolve shopId: use selected shop from header, or fall back to tenant default
+    const shopId = await resolveShopId((req as any).shopId, tenantId);
+
     // Create appointment
     const newAppointment = await db
       .insert(appointments)
@@ -313,6 +324,7 @@ router.post('/', async (req: Request, res: Response) => {
         tenantId,
         userId,
         confirmationToken,
+        shopId,
         ...validatedData,
       })
       .returning();

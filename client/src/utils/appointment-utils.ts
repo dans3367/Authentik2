@@ -63,9 +63,10 @@ export const TIMING_MAP: Record<string, number> = {
   '10h': 600,
 };
 
-// Appointment with customer relation
+// Appointment with customer and shop relation
 export interface AppointmentWithCustomer extends Appointment {
   customer?: Customer;
+  shop?: { id: string; name: string } | null;
 }
 
 // Filter appointments that are upcoming (after current date)
