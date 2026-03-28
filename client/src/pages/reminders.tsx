@@ -182,6 +182,11 @@ export default function RemindersPage() {
     appointmentId: string;
     updateLocal: boolean;
   } | null>(null);
+  const [pendingEditCompleted, setPendingEditCompleted] = useState<{
+    appointment: AppointmentWithCustomer;
+    reminderEnabled: boolean;
+    reminderData: EditReminderData;
+  } | null>(null);
 
   // Pending creation state for optimistic UI
   const [pendingAppointmentIds, setPendingAppointmentIds] = useState<Set<string>>(new Set());
@@ -799,6 +804,13 @@ export default function RemindersPage() {
       }
     }
 
+    // If status changed to completed, show thank-you email dialog first
+    if (appointment.status === 'completed' && editingAppointment?.status !== 'completed') {
+      setPendingEditCompleted({ appointment, reminderEnabled, reminderData });
+      setThankYouEmailDialogOpen(true);
+      return;
+    }
+
     updateAppointmentMutation.mutate({
       id: appointment.id,
       data: {
@@ -879,6 +891,55 @@ export default function RemindersPage() {
   };
 
   const handleThankYouEmailConfirm = (sendEmail: boolean) => {
+    // Handle edit-dialog completed flow
+    if (pendingEditCompleted) {
+      const { appointment, reminderEnabled, reminderData: editReminderData } = pendingEditCompleted;
+      updateAppointmentMutation.mutate(
+        { id: appointment.id, data: {
+          title: appointment.title,
+          description: appointment.description,
+          appointmentDate: appointment.appointmentDate,
+          duration: appointment.duration,
+          location: appointment.location,
+          serviceType: appointment.serviceType,
+          status: 'completed',
+          notes: appointment.notes,
+        }},
+        {
+          onSuccess: (data: any) => {
+            if (sendEmail) sendThankYouEmailMutation.mutate(appointment.id);
+            // Handle reminder from edit dialog
+            const existingReminder = reminders.find(r => r.appointmentId === appointment.id && r.status === 'pending');
+            if (reminderEnabled) {
+              const appointmentDate = new Date(appointment.appointmentDate);
+              let scheduledFor: Date;
+              if (editReminderData.reminderTiming === 'custom' && editReminderData.customMinutesBefore) {
+                scheduledFor = new Date(appointmentDate.getTime() - editReminderData.customMinutesBefore * 60 * 1000);
+              } else {
+                const minutes = TIMING_MAP[editReminderData.reminderTiming] || 60;
+                scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
+              }
+              if (existingReminder) deleteReminderMutation.mutate(existingReminder.id);
+              createScheduledReminderMutation.mutate({
+                appointmentId: appointment.id,
+                data: { reminderType: editReminderData.reminderType, reminderTiming: editReminderData.reminderTiming, customMinutesBefore: editReminderData.customMinutesBefore, scheduledFor, timezone: editReminderData.timezone, content: editReminderData.content },
+              });
+            } else if (existingReminder) {
+              deleteReminderMutation.mutate(existingReminder.id);
+            }
+            setThankYouEmailDialogOpen(false);
+            setPendingEditCompleted(null);
+          },
+          onError: () => {
+            setThankYouEmailDialogOpen(false);
+            setPendingEditCompleted(null);
+          }
+        }
+      );
+      return;
+    }
+
+    // Handle details-sheet status-only change
     if (!pendingCompletedChange) return;
     const { appointmentId, updateLocal } = pendingCompletedChange;
     updateAppointmentMutation.mutate(

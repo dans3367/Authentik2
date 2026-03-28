@@ -643,7 +643,7 @@ export function AppointmentDetailsSheet({
             )}
             <Button
               variant="outline"
-              className="flex-1 sm:flex-none sm:w-1/3 hover:bg-muted/50 transition-colors active:scale-[0.98]"
+              className="flex-1 hover:bg-muted/50 transition-colors active:scale-[0.98]"
               onClick={() => onOpenChange(false)}
             >
               {t('reminders.details.close')}
