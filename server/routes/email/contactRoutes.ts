@@ -1403,6 +1403,14 @@ contactRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, requi
       }
     }
 
+    // Optional email preference toggles
+    const prefFields = ['prefMarketing', 'prefCustomerEngagement', 'prefNewsletters', 'prefSurveysForms'] as const;
+    for (const field of prefFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = Boolean(req.body[field]);
+      }
+    }
+
     // Optional shop assignment
     if (shopId !== undefined) {
       if (shopId) {
@@ -1440,6 +1448,10 @@ contactRoutes.put("/email-contacts/:id", authenticateToken, requireTenant, requi
       'phoneNumber',
       'dateOfBirth',
       'preferredLanguage',
+      'prefMarketing',
+      'prefCustomerEngagement',
+      'prefNewsletters',
+      'prefSurveysForms',
     ]);
 
     if (changes) {

@@ -54,6 +54,10 @@ const editContactSchema = z.object({
   phoneNumber: z.string().optional(),
   dateOfBirth: z.date().optional().nullable(),
   preferredLanguage: z.string().optional(),
+  prefMarketing: z.boolean().optional(),
+  prefCustomerEngagement: z.boolean().optional(),
+  prefNewsletters: z.boolean().optional(),
+  prefSurveysForms: z.boolean().optional(),
   shopId: z.string().optional().nullable(),
 });
 
@@ -79,6 +83,10 @@ interface UpdateContactRequest {
   phoneNumber?: string | null;
   dateOfBirth?: string | null;
   preferredLanguage?: string | null;
+  prefMarketing?: boolean;
+  prefCustomerEngagement?: boolean;
+  prefNewsletters?: boolean;
+  prefSurveysForms?: boolean;
   shopId?: string | null;
 }
 
@@ -172,6 +180,10 @@ export default function EditEmailContact() {
       dateOfBirth: undefined,
       preferredLanguage: "en",
       shopId: null,
+      prefMarketing: true,
+      prefCustomerEngagement: true,
+      prefNewsletters: true,
+      prefSurveysForms: true,
     },
   });
 
@@ -199,6 +211,10 @@ export default function EditEmailContact() {
         dateOfBirth: contact.dateOfBirth ? new Date(contact.dateOfBirth) : undefined,
         preferredLanguage: contact.preferredLanguage || "en",
         shopId: contact.shopId || null,
+        prefMarketing: contact.prefMarketing ?? true,
+        prefCustomerEngagement: contact.prefCustomerEngagement ?? true,
+        prefNewsletters: contact.prefNewsletters ?? true,
+        prefSurveysForms: contact.prefSurveysForms ?? true,
       });
       setSelectedTags(contact.tags?.map((tag: any) => tag.id) || []);
       setSelectedLists(contact.lists?.map((list: any) => list.id) || []);
@@ -266,6 +282,10 @@ export default function EditEmailContact() {
       dateOfBirth: data.dateOfBirth ? format(data.dateOfBirth, 'yyyy-MM-dd') : null,
       preferredLanguage: data.preferredLanguage || 'en',
       shopId: data.shopId || null,
+      prefMarketing: data.prefMarketing ?? true,
+      prefCustomerEngagement: data.prefCustomerEngagement ?? true,
+      prefNewsletters: data.prefNewsletters ?? true,
+      prefSurveysForms: data.prefSurveysForms ?? true,
     };
 
     // Save custom field values in parallel with contact update
@@ -598,6 +618,42 @@ export default function EditEmailContact() {
                         </FormItem>
                       )}
                     />
+
+                    {/* Email Preferences */}
+                    <div className="space-y-4 border-t pt-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">Email Preferences</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {([
+                          { name: 'prefMarketing' as const, label: 'Marketing', description: 'Promotions & offers' },
+                          { name: 'prefCustomerEngagement' as const, label: 'Customer Engagement', description: 'Birthday & loyalty' },
+                          { name: 'prefNewsletters' as const, label: 'Newsletters', description: 'Updates & digests' },
+                          { name: 'prefSurveysForms' as const, label: 'Surveys & Forms', description: 'Feedback requests' },
+                        ]).map((pref) => (
+                          <FormField
+                            key={pref.name}
+                            control={form.control}
+                            name={pref.name}
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                                <div>
+                                  <FormLabel className="text-sm font-medium">{pref.label}</FormLabel>
+                                  <FormDescription className="text-xs">{pref.description}</FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value ?? true}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        ))}
+                      </div>
+                    </div>
 
                     {/* Shop Assignment */}
                     {shopsList.length > 0 && (

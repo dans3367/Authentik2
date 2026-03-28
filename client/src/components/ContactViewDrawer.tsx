@@ -763,10 +763,10 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {[
-                        { label: t('contactDrawer.preferences.marketing'), value: contact.prefMarketing, desc: t('contactDrawer.preferences.marketingDesc') },
-                        { label: t('contactDrawer.preferences.customerEngagement'), value: contact.prefCustomerEngagement, desc: t('contactDrawer.preferences.customerEngagementDesc') },
-                        { label: t('contactDrawer.preferences.newsletters'), value: contact.prefNewsletters, desc: t('contactDrawer.preferences.newslettersDesc') },
-                        { label: t('contactDrawer.preferences.surveysForms'), value: contact.prefSurveysForms, desc: t('contactDrawer.preferences.surveysFormsDesc') },
+                        { label: t('contactDrawer.preferences.marketing'), value: contact.prefMarketing, field: 'prefMarketing', desc: t('contactDrawer.preferences.marketingDesc') },
+                        { label: t('contactDrawer.preferences.customerEngagement'), value: contact.prefCustomerEngagement, field: 'prefCustomerEngagement', desc: t('contactDrawer.preferences.customerEngagementDesc') },
+                        { label: t('contactDrawer.preferences.newsletters'), value: contact.prefNewsletters, field: 'prefNewsletters', desc: t('contactDrawer.preferences.newslettersDesc') },
+                        { label: t('contactDrawer.preferences.surveysForms'), value: contact.prefSurveysForms, field: 'prefSurveysForms', desc: t('contactDrawer.preferences.surveysFormsDesc') },
                       ].map((pref) => {
                         let badgeClass = 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
                         let badgeText = t('contactDrawer.preferences.notSet');
@@ -780,7 +780,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                         }
 
                         return (
-                          <div key={pref.label} className="flex items-center justify-between">
+                          <div key={pref.field} className="flex items-center justify-between">
                             <div>
                               <p className="text-sm font-medium text-gray-900 dark:text-white">{pref.label}</p>
                               <p className="text-xs text-gray-500 dark:text-gray-400">{pref.desc}</p>
