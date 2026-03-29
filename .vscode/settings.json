@@ -1,7 +1,7 @@
 {
-  "typescript.preferences.includePackageJsonAutoImports": "on",
-  "typescript.suggest.autoImports": true,
-  "typescript.updateImportsOnFileMove.enabled": "always",
+  "js/ts.preferences.includePackageJsonAutoImports": "on",
+  "js/ts.suggest.autoImports": true,
+  "js/ts.updateImportsOnFileMove.enabled": "always",
   "debug.javascript.usePreview": true,
   "debug.javascript.unmapMissingSources": true,
   "debug.allowBreakpointsEverywhere": true,
