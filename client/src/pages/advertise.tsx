@@ -79,7 +79,7 @@ type AdvertiseItem = NewsletterWithUser & {
   webSlug?: string | null;
 };
 
-const getStatusBadge = (status: string, t: (key: string, fallback?: string) => string) => {
+const getStatusBadge = (status: string, t: any) => {
   switch (status) {
     case "draft":
       return <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800"><FileText className="h-3 w-3 mr-1" />{t("advertise.status.draft")}</Badge>;
@@ -491,18 +491,25 @@ export default function AdvertisePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {kanbanColumns.map((column) => (
-              <div key={column.key} className={`flex flex-col rounded-xl border ${column.borderColor} bg-gray-50/60 dark:bg-gray-900/40 overflow-hidden`}>
+              <div
+                key={column.key}
+                className="flex flex-col rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40 overflow-hidden"
+              >
                 {/* Column Header */}
-                <div className={`${column.bgHeader} px-4 py-3 border-b ${column.borderColor}`}>
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${column.accentBar}`} />
-                      <column.icon className={`h-4 w-4 ${column.textColor}`} />
-                      <h3 className={`text-sm font-semibold ${column.textColor}`}>{column.title}</h3>
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-2.5 h-2.5 rounded-full ${column.accentBar}`} />
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        {column.title}
+                      </h3>
+                      <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                        {column.items.length}
+                      </span>
                     </div>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${column.badgeBg}`}>
-                      {column.items.length}
-                    </span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
 
@@ -510,9 +517,7 @@ export default function AdvertisePage() {
                 <div className="flex-1 p-3 space-y-3 overflow-y-auto max-h-[calc(100vh-380px)] min-h-[200px]">
                   {column.items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-10 text-center">
-                      <div className={`w-10 h-10 rounded-xl ${column.bgHeader} flex items-center justify-center mb-3`}>
-                        <column.icon className={`h-5 w-5 ${column.textColor} opacity-50`} />
-                      </div>
+                      <column.icon className="h-5 w-5 text-gray-300 dark:text-gray-600 mb-2" />
                       <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
                         {t("advertise.kanban.empty")}
                       </p>
