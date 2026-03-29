@@ -530,6 +530,56 @@ export const defaultThemes: FormTheme[] = [
         fill: 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 h-3 rounded-full transition-all duration-700 ease-out shadow-sm'
       }
     }
+  },
+  {
+    id: 'monospace-terminal',
+    name: 'Monospace Terminal',
+    description: 'Retro CRT terminal with phosphor-green text, scanlines, and monospace font',
+    preview: 'bg-black border-4 border-gray-700 shadow-inner shadow-green-500/10',
+    styles: {
+      container: 'max-w-2xl mx-auto p-8 bg-gray-950 border-2 border-green-900/60 rounded-lg shadow-2xl shadow-green-500/5 font-mono relative overflow-hidden after:content-[""] after:absolute after:inset-0 after:pointer-events-none after:bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,255,65,0.03)_2px,rgba(0,255,65,0.03)_4px)]',
+      header: 'text-2xl font-bold text-green-400 mb-8 tracking-tight font-mono',
+      field: 'mb-6',
+      label: 'block text-xs font-bold text-green-500 mb-2 tracking-widest uppercase font-mono',
+      input: 'w-full px-4 py-3 h-12 bg-gray-900 border border-green-800/50 rounded-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-green-300 placeholder-green-800 font-mono caret-green-400',
+      button: 'w-full bg-green-600/20 border border-green-500 text-green-400 py-3 px-6 rounded-sm hover:bg-green-500/30 hover:text-green-300 transition-all duration-200 font-mono font-bold tracking-widest uppercase',
+      background: 'bg-black',
+      booleanSwitch: {
+        track: 'border-2 data-[state=unchecked]:bg-gray-800 data-[state=unchecked]:border-green-900/50 data-[state=checked]:bg-green-600/30 data-[state=checked]:border-green-500',
+        thumb: 'data-[state=unchecked]:bg-green-900 data-[state=checked]:bg-green-400 shadow-lg shadow-green-500/30',
+        activeLabel: 'text-green-400 font-mono font-bold text-xs uppercase tracking-widest',
+        inactiveLabel: 'text-green-900 font-mono text-xs uppercase tracking-widest'
+      },
+      progressBar: {
+        container: 'w-full bg-gray-900 rounded-sm h-2 mb-8 border border-green-900/50',
+        fill: 'bg-green-500 h-2 rounded-sm transition-all duration-500 ease-out shadow-lg shadow-green-500/40'
+      }
+    }
+  },
+  {
+    id: 'silk',
+    name: 'Silk',
+    description: 'Refined rose gold accents with soft neutral tones, serif headers, and delicate shadows',
+    preview: 'bg-gradient-to-br from-stone-100 via-rose-50 to-stone-100',
+    styles: {
+      container: 'max-w-lg mx-auto p-10 bg-white/80 backdrop-blur-md border border-stone-200/70 rounded-2xl shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] border-t-2 [border-image:linear-gradient(to_right,#fda4af,#fde68a,#fda4af)_1]',
+      header: 'text-3xl font-light font-serif text-stone-800 mb-8 tracking-wide',
+      field: 'mb-7',
+      label: 'block text-[11px] font-medium text-stone-500 mb-2.5 tracking-[0.15em] uppercase',
+      input: 'w-full px-4 py-3 h-12 bg-stone-50/80 border border-stone-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-300/40 focus:border-rose-300 transition-all duration-300 text-stone-800 placeholder-stone-400',
+      button: 'w-full bg-gradient-to-r from-stone-800 to-stone-900 text-white py-3.5 px-6 rounded-xl hover:from-stone-700 hover:to-stone-800 transition-all duration-300 font-medium tracking-wider text-sm shadow-lg shadow-stone-900/10 hover:shadow-xl hover:shadow-stone-900/20',
+      background: 'bg-gradient-to-br from-stone-50 via-rose-50/30 to-stone-100',
+      booleanSwitch: {
+        track: 'border border-stone-200 data-[state=unchecked]:bg-stone-100 data-[state=unchecked]:border-stone-300 data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-rose-300 data-[state=checked]:to-amber-300 data-[state=checked]:border-rose-300',
+        thumb: 'data-[state=unchecked]:bg-stone-400 data-[state=checked]:bg-white shadow-md',
+        activeLabel: 'text-stone-700 font-medium text-sm',
+        inactiveLabel: 'text-stone-400 text-sm'
+      },
+      progressBar: {
+        container: 'w-full bg-stone-100 rounded-full h-[3px] mb-8',
+        fill: 'bg-gradient-to-r from-rose-300 via-amber-200 to-rose-300 h-[3px] rounded-full transition-all duration-700 ease-out'
+      }
+    }
   }
 ];
 

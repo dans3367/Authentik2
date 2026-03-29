@@ -296,6 +296,40 @@ const themes: Record<string, ThemeStyles> = {
     checkbox: 'h-5 w-5 text-blue-600 focus:ring-blue-600 border-2 border-blue-300 rounded',
     button: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 px-6 rounded-xl uppercase tracking-wide transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
     background: 'bg-gradient-to-br from-blue-50 to-indigo-100'
+  },
+  'monospace-terminal': {
+    id: 'monospace-terminal',
+    name: 'Monospace Terminal',
+    container: 'min-h-screen py-8',
+    card: 'bg-gray-950 border-2 border-green-900/60 rounded-lg shadow-2xl shadow-green-500/5 relative overflow-hidden after:content-[""] after:absolute after:inset-0 after:pointer-events-none after:bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,255,65,0.03)_2px,rgba(0,255,65,0.03)_4px)]',
+    header: 'p-6 border-b border-green-900/40',
+    title: 'text-2xl font-bold text-green-400 font-mono',
+    description: 'text-green-600 mt-2 font-mono text-sm',
+    label: 'text-xs font-bold text-green-500 font-mono tracking-widest uppercase',
+    input: 'w-full px-4 py-3 bg-gray-900 border border-green-800/50 rounded-sm transition-all duration-200 focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none text-green-300 placeholder-green-900 font-mono caret-green-400',
+    textarea: 'w-full px-4 py-3 bg-gray-900 border border-green-800/50 rounded-sm transition-all duration-200 focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none text-green-300 placeholder-green-900 font-mono caret-green-400 resize-none',
+    select: 'w-full px-4 py-3 bg-gray-900 border border-green-800/50 rounded-sm transition-all duration-200 focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none text-green-300 font-mono',
+    radio: 'h-4 w-4 text-green-500 focus:ring-green-500 border-green-800',
+    checkbox: 'h-4 w-4 text-green-500 focus:ring-green-500 border-green-800 rounded-sm',
+    button: 'w-full bg-green-600/20 border border-green-500 text-green-400 hover:bg-green-500/30 hover:text-green-300 font-mono font-bold py-3 px-6 rounded-sm tracking-widest uppercase transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
+    background: 'bg-black'
+  },
+  'silk': {
+    id: 'silk',
+    name: 'Silk',
+    container: 'min-h-screen py-8',
+    card: 'bg-white/80 backdrop-blur-md border border-stone-200/70 rounded-2xl shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] border-t-2 [border-image:linear-gradient(to_right,#fda4af,#fde68a,#fda4af)_1]',
+    header: 'p-6 border-b border-stone-100',
+    title: 'text-3xl font-light font-serif text-stone-800 tracking-wide',
+    description: 'text-stone-500 mt-2 text-sm',
+    label: 'text-[11px] font-medium text-stone-500 tracking-[0.15em] uppercase',
+    input: 'w-full px-4 py-3 bg-stone-50/80 border border-stone-200/80 rounded-xl transition-all duration-300 focus:border-rose-300 focus:ring-2 focus:ring-rose-300/40 focus:outline-none text-stone-800 placeholder-stone-400',
+    textarea: 'w-full px-4 py-3 bg-stone-50/80 border border-stone-200/80 rounded-xl transition-all duration-300 focus:border-rose-300 focus:ring-2 focus:ring-rose-300/40 focus:outline-none text-stone-800 placeholder-stone-400 resize-none',
+    select: 'w-full px-4 py-3 bg-stone-50/80 border border-stone-200/80 rounded-xl transition-all duration-300 focus:border-rose-300 focus:ring-2 focus:ring-rose-300/40 focus:outline-none text-stone-800',
+    radio: 'h-4 w-4 text-rose-400 focus:ring-rose-300 border-stone-300',
+    checkbox: 'h-4 w-4 text-rose-400 focus:ring-rose-300 border-stone-300 rounded-lg',
+    button: 'w-full bg-gradient-to-r from-stone-800 to-stone-900 text-white font-medium py-3.5 px-6 rounded-xl tracking-wider text-sm transition-all duration-300 shadow-lg shadow-stone-900/10 hover:shadow-xl hover:shadow-stone-900/20 hover:from-stone-700 hover:to-stone-800 disabled:opacity-50 disabled:cursor-not-allowed',
+    background: 'bg-gradient-to-br from-stone-50 via-rose-50/30 to-stone-100'
   }
 };
 

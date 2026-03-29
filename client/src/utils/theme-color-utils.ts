@@ -242,6 +242,34 @@ export function extractThemeColors(theme: FormTheme): CustomColors {
       containerShadow = 'large';
       progressBar = '#FFFFFF';
       break;
+    case 'monospace-terminal':
+      text = '#4ADE80';
+      header = '#4ADE80';
+      button = '#4ADE80';
+      background = '#000000';
+      font = 'mono';
+      label = '#22C55E';
+      inputBackground = '#030712';
+      inputBorder = '#166534';
+      inputText = '#4ADE80';
+      borderRadius = 'none';
+      containerShadow = 'large';
+      progressBar = '#22C55E';
+      break;
+    case 'silk':
+      text = '#44403C';
+      header = '#44403C';
+      button = '#1C1917';
+      background = '#FAFAF9';
+      font = 'serif';
+      label = '#78716C';
+      inputBackground = '#F5F5F4';
+      inputBorder = '#D6D3D1';
+      inputText = '#44403C';
+      borderRadius = 'large';
+      containerShadow = 'medium';
+      progressBar = '#FDA4AF';
+      break;
   }
 
   return { 

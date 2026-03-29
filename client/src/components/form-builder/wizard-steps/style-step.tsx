@@ -92,6 +92,16 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           Sunset Warmth
                         </div>
                       )}
+                      {theme.id === 'monospace-terminal' && (
+                        <div className="text-green-400 font-mono font-bold text-lg tracking-widest">
+                          &gt;_ TERMINAL
+                        </div>
+                      )}
+                      {theme.id === 'silk' && (
+                        <div className="text-stone-600 font-serif font-light text-lg tracking-wide">
+                          Silk
+                        </div>
+                      )}
                       {theme.id === 'professional' && (
                         <div className="text-blue-600 font-semibold text-lg">
                           PROFESSIONAL
@@ -117,7 +127,7 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           MINIMAL
                         </div>
                       )}
-                      {!['neon', 'nature', 'luxury', 'retro', 'cosmic', 'brutalist', 'pastel-dream', 'ocean-breeze', 'sunset-warmth', 'professional', 'neo-modern', 'minimal', 'modern-bold', 'glassmorphism', 'aurora'].includes(theme.id) && (
+                      {!['neon', 'nature', 'luxury', 'retro', 'cosmic', 'brutalist', 'pastel-dream', 'ocean-breeze', 'sunset-warmth', 'monospace-terminal', 'silk', 'professional', 'neo-modern', 'minimal', 'modern-bold', 'glassmorphism', 'aurora'].includes(theme.id) && (
                         <>
                           <div className="text-white font-semibold opacity-90 text-lg">{theme.name}</div>
                           <div className="text-white text-sm opacity-60 mt-1">Theme Preview</div>
