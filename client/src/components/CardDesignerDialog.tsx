@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/LazyRichTextEditor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift, CalendarIcon } from "lucide-react";
+import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift, CalendarIcon, Eye, Monitor, Smartphone } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -98,6 +98,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [unsplashOpen, setUnsplashOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"design" | "promotions">("design");
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [searchQuery, setSearchQuery] = useState("");
   const [unsplashImages, setUnsplashImages] = useState<Array<{ id: string; urls: { small: string; regular: string }; alt_description: string }>>([]);
   const [loading, setLoading] = useState(false);
@@ -900,6 +902,95 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
         titleInputRef.current?.focus();
       }, 100);
     }
+  };
+
+  const generatePreviewHtml = (): string => {
+    const defaultThemeImages: Record<string, string> = {
+      'default': 'https://images.unsplash.com/photo-1588195538326-c5b1e9f80a1b?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      'confetti': 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      'balloons': 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?q=80&w=2550&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
+    };
+    const themeColors: Record<string, { primary: string; secondary: string }> = {
+      'default': { primary: '#667eea', secondary: '#764ba2' },
+      'confetti': { primary: '#ff6b6b', secondary: '#feca57' },
+      'balloons': { primary: '#54a0ff', secondary: '#5f27cd' }
+    };
+
+    const recipientName = customerInfo?.firstName || 'John';
+    const themeId = initialThemeId || 'default';
+    const isCustom = themeId === 'custom' || themeId.startsWith('custom-');
+
+    const displayTitle = title || `Happy Birthday${recipientName ? ', ' + recipientName : ''}!`;
+    const displayMessage = (message || 'Wishing you a wonderful day!')
+      .replace(/\{\{firstName\}\}/g, recipientName)
+      .replace(/\{\{lastName\}\}/g, customerInfo?.lastName || 'Doe')
+      .replace(/\{\{businessName\}\}/g, businessName || 'Our Business');
+    const displaySignature = signature
+      ? signature
+        .replace(/\{\{firstName\}\}/g, recipientName)
+        .replace(/\{\{lastName\}\}/g, customerInfo?.lastName || 'Doe')
+        .replace(/\{\{businessName\}\}/g, businessName || 'Our Business')
+      : '';
+    const fromMessage = senderName || 'The Team';
+
+    // Determine header image
+    let headerImageHtml: string;
+    if (isCustom && imageUrl) {
+      headerImageHtml = `<div style="height: 200px; background-image: url('${imageUrl}'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;"></div>`;
+    } else if (isCustom && !imageUrl) {
+      headerImageHtml = `<div style="background: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 100%); height: 200px; border-radius: 12px 12px 0 0;"></div>`;
+    } else {
+      const headerImg = defaultThemeImages[themeId] || defaultThemeImages['default'];
+      headerImageHtml = `<div style="height: 200px; background-image: url('${headerImg}'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;"></div>`;
+    }
+
+    const colors = isCustom
+      ? { primary: '#667eea', secondary: '#764ba2' }
+      : (themeColors[themeId] || themeColors['default']);
+
+    const signatureSection = displaySignature
+      ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-style: italic; color: #718096;">${displaySignature}</div>`
+      : '';
+
+    const fromMessageSection = !displaySignature && fromMessage
+      ? `<div style="padding: 20px 30px 10px 30px; border-top: 1px solid #e2e8f0; text-align: center;">
+           <div style="font-size: 0.9rem; color: #718096;">
+             <p style="margin: 0; font-weight: 600; color: #4a5568;">${fromMessage}</p>
+           </div>
+        </div>`
+      : '';
+
+    const unsubscribeSection = `
+      <div style="padding: 0 30px 30px 30px;">
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
+          <p style="margin: 0; font-size: 0.8rem; color: #a0aec0; line-height: 1.4;">
+            Don't want to receive these emails?
+            <a href="#" style="color: #667eea; text-decoration: none;">Manage preferences</a>
+          </p>
+        </div>
+      </div>`;
+
+    return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%); min-height: 100vh;">
+    <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
+      ${headerImageHtml}
+      <div style="padding: 30px 30px 20px 30px; text-align: center; border-bottom: 1px solid #f0f0f0;">
+        <h1 style="color: #2d3748; font-size: 2.5rem; margin: 0; font-weight: bold;">${displayTitle}</h1>
+      </div>
+      <div style="padding: 30px;">
+        <div style="font-size: 1.2rem; line-height: 1.6; color: #4a5568; ${isCustom ? '' : 'text-align: center;'} margin-bottom: 20px;">${displayMessage}</div>
+        ${signatureSection}
+      </div>
+      ${fromMessageSection}
+      ${unsubscribeSection}
+    </div>
+  </body>
+</html>`;
   };
 
   const handleSave = () => {
@@ -1760,6 +1851,10 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 <Button variant="outline" onClick={handleClose} className="text-sm">
                   Close
                 </Button>
+                <Button variant="outline" onClick={() => setShowPreview(true)} className="text-sm">
+                  <Eye className="w-4 h-4 mr-1" />
+                  Preview
+                </Button>
                 <Button onClick={handleSave} className="text-sm">
                   Save
                 </Button>
@@ -1903,6 +1998,73 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               </div>
             </DialogContent>
           </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-[95vw] sm:max-w-[900px] max-h-[95vh] overflow-hidden p-0">
+          <DialogHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6">
+            <DialogTitle className="text-lg sm:text-xl">Email Client Preview</DialogTitle>
+            <DialogDescription className="text-sm">
+              This is how your birthday card will appear in an email client.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center gap-1 px-4 sm:px-6 pb-2">
+            <Button
+              variant={previewMode === "desktop" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPreviewMode("desktop")}
+              className="text-xs"
+            >
+              <Monitor className="w-3.5 h-3.5 mr-1" />
+              Desktop
+            </Button>
+            <Button
+              variant={previewMode === "mobile" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPreviewMode("mobile")}
+              className="text-xs"
+            >
+              <Smartphone className="w-3.5 h-3.5 mr-1" />
+              Mobile
+            </Button>
+          </div>
+          <div className="px-4 pb-4 sm:px-6 sm:pb-6 flex justify-center overflow-auto" style={{ maxHeight: 'calc(95vh - 160px)' }}>
+            <div
+              className="border rounded-lg shadow-inner bg-gray-100 transition-all duration-300 overflow-hidden"
+              style={{
+                width: previewMode === "mobile" ? '375px' : '100%',
+                maxWidth: previewMode === "mobile" ? '375px' : '800px',
+              }}
+            >
+              <div className="bg-gray-200 px-3 py-2 flex items-center gap-2 text-xs text-gray-500 border-b">
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+                </div>
+                <div className="flex-1 text-center truncate">
+                  Birthday Card — {title || 'Happy Birthday!'}
+                </div>
+              </div>
+              <div className="bg-white px-3 py-2 border-b text-xs text-gray-600 space-y-0.5">
+                <div><span className="font-medium text-gray-500">From:</span> {senderName || 'Your Business'}</div>
+                <div><span className="font-medium text-gray-500">To:</span> {customerInfo?.firstName || 'John'} {customerInfo?.lastName || 'Doe'}</div>
+                <div><span className="font-medium text-gray-500">Subject:</span> {title || 'Happy Birthday!'}</div>
+              </div>
+              <iframe
+                srcDoc={generatePreviewHtml()}
+                title="Birthday card email preview"
+                className="w-full border-0"
+                style={{
+                  height: previewMode === "mobile" ? '600px' : '700px',
+                  pointerEvents: 'none',
+                }}
+                sandbox="allow-same-origin"
+              />
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
