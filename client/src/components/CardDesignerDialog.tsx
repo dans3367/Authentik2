@@ -138,6 +138,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const previewIframeRef = useRef<HTMLIFrameElement>(null);
 
 
   // Initialize state on open
@@ -2003,14 +2004,14 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
       {/* Email Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[900px] max-h-[95vh] overflow-hidden p-0">
-          <DialogHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6">
+        <DialogContent className="max-w-[95vw] sm:max-w-[900px] max-h-[95vh] flex flex-col p-0">
+          <DialogHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6 flex-shrink-0">
             <DialogTitle className="text-lg sm:text-xl">Email Client Preview</DialogTitle>
             <DialogDescription className="text-sm">
               This is how your birthday card will appear in an email client.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex items-center justify-center gap-1 px-4 sm:px-6 pb-2">
+          <div className="flex items-center justify-center gap-1 px-4 sm:px-6 pb-2 flex-shrink-0">
             <Button
               variant={previewMode === "desktop" ? "default" : "outline"}
               size="sm"
@@ -2030,9 +2031,9 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
               Mobile
             </Button>
           </div>
-          <div className="px-4 pb-4 sm:px-6 sm:pb-6 flex justify-center overflow-auto" style={{ maxHeight: 'calc(95vh - 160px)' }}>
+          <div className="px-4 pb-4 sm:px-6 sm:pb-6 flex justify-center overflow-auto flex-1 min-h-0">
             <div
-              className="border rounded-lg shadow-inner bg-gray-100 transition-all duration-300 overflow-hidden"
+              className="border rounded-lg shadow-inner bg-gray-100 transition-all duration-300"
               style={{
                 width: previewMode === "mobile" ? '375px' : '100%',
                 maxWidth: previewMode === "mobile" ? '375px' : '800px',
@@ -2054,14 +2055,22 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 <div><span className="font-medium text-gray-500">Subject:</span> {title || 'Happy Birthday!'}</div>
               </div>
               <iframe
+                ref={previewIframeRef}
                 srcDoc={generatePreviewHtml()}
                 title="Birthday card email preview"
                 className="w-full border-0"
                 style={{
-                  height: previewMode === "mobile" ? '600px' : '700px',
+                  minHeight: previewMode === "mobile" ? '600px' : '700px',
                   pointerEvents: 'none',
                 }}
                 sandbox="allow-same-origin"
+                onLoad={() => {
+                  const iframe = previewIframeRef.current;
+                  if (iframe?.contentDocument?.body) {
+                    const height = iframe.contentDocument.body.scrollHeight;
+                    iframe.style.height = `${Math.max(height + 20, previewMode === "mobile" ? 600 : 700)}px`;
+                  }
+                }}
               />
             </div>
           </div>
