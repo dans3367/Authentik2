@@ -37,7 +37,7 @@ const client = postgres(connectionString, {
   max: 1,
 });
 
-const db = drizzle(client, { schema, logger: false });
+const db = drizzle(client, { schema, logger: true });
 
 export { db };
 export { schema };

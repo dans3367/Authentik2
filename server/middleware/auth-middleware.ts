@@ -1,9 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../db';
-import { betterAuthSession, betterAuthUser, tenants, rolePermissions } from '@shared/schema';
+import { betterAuthUser, tenants, rolePermissions } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '../auth';
 import { storage } from '../storage';
+
+// Shape of session.user returned by Better Auth with additionalFields
+interface SessionUser {
+  id: string;
+  email: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: string;
+  tenantId?: string;
+  isActive?: boolean;
+  language?: string;
+}
 
 // Better Auth session-based authentication middleware
 export interface AuthUser {
@@ -33,32 +46,43 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       return res.status(401).json({ message: 'No authentication token provided' });
     }
 
-    // Get additional user data from our database for tenant info
+    const sessionUser = session.user as SessionUser;
+
+    // Always verify security-critical fields (role, tenantId, isActive) against
+    // the database. Session data may be stale (sessions last up to 7 days) and
+    // would not reflect admin actions like deactivation or role changes.
     const userRecord = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, session.user.id)
+      where: eq(betterAuthUser.id, sessionUser.id),
+      columns: {
+        id: true,
+        role: true,
+        tenantId: true,
+        isActive: true,
+        language: true,
+      },
     });
 
     if (!userRecord) {
       return res.status(401).json({ message: 'User not found' });
     }
 
-    // Check if user account is active
-    if (userRecord.isActive === false) {
+    // Check if user account is active (treat missing/undefined as inactive to be safe)
+    if (userRecord.isActive !== true) {
       return res.status(403).json({ message: 'Account is deactivated. Please contact your administrator.' });
     }
 
-    // Parse user name for firstName/lastName
-    let firstName: string | undefined = userRecord.firstName || undefined;
-    let lastName: string | undefined = userRecord.lastName || undefined;
+    // Use session data for display-only fields (avoids fetching unnecessary columns)
+    let firstName: string | undefined = sessionUser.firstName || undefined;
+    let lastName: string | undefined = sessionUser.lastName || undefined;
 
     // Fallback to parsing name if fields are missing
-    if (!firstName && !lastName && userRecord.name) {
-      const nameParts = userRecord.name.split(' ');
+    if (!firstName && !lastName && sessionUser.name) {
+      const nameParts = sessionUser.name.split(' ');
       firstName = nameParts[0];
       lastName = nameParts.slice(1).join(' ') || undefined;
     }
 
-    // Check if user has a valid tenant ID
+    // Check if user has a valid tenant ID (use DB-authoritative value)
     const placeholderTenantIds = [
       '00000000-0000-0000-0000-000000000000',
       '2f6f5ec2-a56f-47d0-887d-c6b9c1bb56ff', // Old schema default
@@ -71,11 +95,12 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       // which is the intended stricter behavior.
     }
 
-    // Create authenticated user object using Better Auth session data
+    // Create authenticated user object using DB-authoritative security fields
+    // and session-sourced display fields
     const authUser: AuthUser = {
       id: userRecord.id,
-      email: userRecord.email,
-      name: userRecord.name || undefined,
+      email: sessionUser.email,
+      name: sessionUser.name || undefined,
       firstName,
       lastName,
       role: userRecord.role || 'Employee',

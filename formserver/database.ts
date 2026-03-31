@@ -19,4 +19,4 @@ const sql = postgres(databaseUrl, {
   connect_timeout: 10,
 });
 
-export const db = drizzle(sql, { logger: false });
+export const db = drizzle(sql, { logger: true });

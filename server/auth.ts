@@ -149,6 +149,16 @@ const authInstance = betterAuth({
         defaultValue: "America/Chicago",
         required: false,
       },
+      isActive: {
+        type: "boolean",
+        defaultValue: true,
+        required: false,
+      },
+      language: {
+        type: "string",
+        defaultValue: "en",
+        required: false,
+      },
     },
   },
   // Hooks — post-signup: parse name into firstName/lastName only.

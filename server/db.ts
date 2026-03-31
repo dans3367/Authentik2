@@ -19,6 +19,6 @@ const pool = postgres(databaseUrl, {
   connect_timeout: 10,
 });
 
-const db = drizzle(pool, { schema, logger: false });
+const db = drizzle(pool, { schema, logger: true });
 
 export { pool, db };
