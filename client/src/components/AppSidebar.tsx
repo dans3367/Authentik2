@@ -83,7 +83,7 @@ interface ExtendedUser {
   avatarUrl?: string | null;
 }
 
-const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, maxShops?: number | null, canViewUsers?: boolean) => {
+const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, maxShops?: number | null, canViewUsers?: boolean, canViewShops?: boolean) => {
   const baseNavigation: any[] = [
     { name: t?.('navigation.dashboard') || "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: t?.('navigation.newsletter') || "Newsletter", href: "/newsletter", icon: Newspaper },
@@ -106,9 +106,8 @@ const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, max
 
   const managementChildren: any[] = [];
 
-  // Add Shops under Management only if plan allows shops (maxShops > 0)
-  // maxShops is null while loading — show nav item by default until plan data confirms otherwise
-  if (maxShops === undefined || maxShops === null || maxShops > 0) {
+  // Add Shops under Management only if plan allows shops AND user has shops.view permission
+  if ((maxShops === undefined || maxShops === null || maxShops > 0) && canViewShops) {
     managementChildren.push({ name: t?.('navigation.shops') || "Shops", href: "/shops", icon: Store });
     managementChildren.push({ name: t?.('navigation.shopTags') || "Tags", href: "/shops/tags", icon: Tag });
   }
@@ -136,8 +135,9 @@ export function AppSidebar() {
   const { planName, canManageUsers, maxShops } = useTenantPlan();
   const { hasPermission } = usePermissions();
   const canViewUsers = hasPermission('users.view');
+  const canViewShops = hasPermission('shops.view');
 
-  const navigation = getNavigation(extendedUser?.role, t, canManageUsers, maxShops, canViewUsers);
+  const navigation = getNavigation(extendedUser?.role, t, canManageUsers, maxShops, canViewUsers, canViewShops);
   const { state, isMobile, setOpenMobile, setOpen } = useSidebar();
 
   const handleLogout = async () => {

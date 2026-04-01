@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requireRole, requirePlanFeature } from '../middleware/auth-middleware';
+import { authenticateToken, requireRole, requirePlanFeature, getAssignableRoles, ROLE_HIERARCHY } from '../middleware/auth-middleware';
 import { db } from '../db';
 import { betterAuthUser, rolePermissions } from '@shared/schema';
 import { sql, eq, and } from 'drizzle-orm';
@@ -32,8 +32,8 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     // Subscriptions & Billing (Owner-only)
     'billing.view': true,
     'billing.manage_subscription': true,
-    'billing.manage_checkout': true,
     'billing.view_usage': true,
+    'billing.delete_account': true,
     // Tenant & Limits
     'tenant.view_limits': true,
     'tenant.edit_limits': true,
@@ -141,8 +141,8 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     'company.manage_users': true,
     'billing.view': true,
     'billing.manage_subscription': false,
-    'billing.manage_checkout': false,
     'billing.view_usage': true,
+    'billing.delete_account': false,
     'tenant.view_limits': true,
     'tenant.edit_limits': true,
     'tenant.fix_issues': true,
@@ -230,8 +230,8 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     'company.manage_users': false,
     'billing.view': false,
     'billing.manage_subscription': false,
-    'billing.manage_checkout': false,
     'billing.view_usage': false,
+    'billing.delete_account': false,
     'tenant.view_limits': false,
     'tenant.edit_limits': false,
     'tenant.fix_issues': false,
@@ -319,8 +319,8 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     'company.manage_users': false,
     'billing.view': false,
     'billing.manage_subscription': false,
-    'billing.manage_checkout': false,
     'billing.view_usage': false,
+    'billing.delete_account': false,
     'tenant.view_limits': false,
     'tenant.edit_limits': false,
     'tenant.fix_issues': false,
@@ -440,9 +440,9 @@ const PERMISSION_CATEGORIES = [
     icon: 'credit-card',
     permissions: [
       { key: 'billing.view', label: 'View Billing', description: 'View subscription and billing info' },
-      { key: 'billing.manage_subscription', label: 'Manage Subscription', description: 'Change, cancel, or reactivate plans' },
-      { key: 'billing.manage_checkout', label: 'Manage Checkout', description: 'Create checkout and portal sessions' },
+      { key: 'billing.manage_subscription', label: 'Manage Subscription', description: 'Upgrade, downgrade, cancel, or reactivate plans' },
       { key: 'billing.view_usage', label: 'View Usage', description: 'View subscription usage data' },
+      { key: 'billing.delete_account', label: 'Delete Account', description: 'Permanently delete the account and all data' },
     ],
   },
   {
@@ -919,8 +919,10 @@ roleRoutes.patch("/users/:userId/role", authenticateToken, requireRole(['Owner',
     const { role } = req.body;
     const tenantId = req.user.tenantId;
 
-    if (!role || !['Administrator', 'Manager', 'Employee'].includes(role)) {
-      return res.status(400).json({ message: 'Invalid role. Must be Administrator, Manager, or Employee.' });
+    // Role must be strictly below the current user's level (anti-escalation)
+    const assignable = getAssignableRoles(req.user.role);
+    if (!role || !assignable.includes(role)) {
+      return res.status(403).json({ message: `You can only assign roles below your own level (${assignable.join(', ') || 'none'})` });
     }
 
     // Check if user exists and belongs to the same tenant
@@ -940,12 +942,16 @@ roleRoutes.patch("/users/:userId/role", authenticateToken, requireRole(['Owner',
       return res.status(400).json({ message: 'Cannot change your own role' });
     }
 
-    // Owner account cannot be modified and Owner role cannot be assigned to others
+    // Owner account cannot be modified
     if (existingUser.role === 'Owner') {
       return res.status(403).json({ message: 'Owner account cannot be modified. The Owner is assigned at signup.' });
     }
-    if (role === 'Owner') {
-      return res.status(403).json({ message: 'There can only be one Owner per account. The Owner is assigned at signup and cannot be changed.' });
+
+    // Cannot modify users at or above your own role level
+    const currentLevel = ROLE_HIERARCHY[req.user.role] || 0;
+    const targetLevel = ROLE_HIERARCHY[existingUser.role] || 0;
+    if (targetLevel >= currentLevel) {
+      return res.status(403).json({ message: 'You cannot change the role of users at or above your own role level' });
     }
 
     // Update user role

@@ -26,6 +26,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
 import type { ShopWithManager } from "@shared/schema";
 import ActivityFeed from "@/components/activity/ActivityFeed";
@@ -34,6 +35,8 @@ export default function ShopDetailsPage() {
   const { id } = useParams();
   const { t, i18n } = useTranslation();
   const [, navigate] = useLocation();
+  const { hasPermission } = usePermissions();
+  const canEditShops = hasPermission('shops.edit');
 
   // Fetch shop data
   const { data: shopData, isLoading } = useQuery<{ shop: ShopWithManager }>({
@@ -233,12 +236,14 @@ export default function ShopDetailsPage() {
               {statusConfig.icon}
               {statusConfig.label}
             </Badge>
-            <Link href={`/shops/${shop.id}/edit`}>
-              <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
-                <Edit className="mr-2 h-4 w-4" />
-                {t('shops.editShop')}
-              </Button>
-            </Link>
+            {canEditShops && (
+              <Link href={`/shops/${shop.id}/edit`}>
+                <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                  <Edit className="mr-2 h-4 w-4" />
+                  {t('shops.editShop')}
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
 

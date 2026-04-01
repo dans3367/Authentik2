@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useTenantPlan } from "@/hooks/useTenantPlan";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -156,9 +157,12 @@ interface ShopCardProps {
   onToggleStatus: (shopId: string, isActive: boolean) => void;
   onDelete: (shopId: string) => void;
   t: (key: string) => string;
+  canEdit: boolean;
+  canDelete: boolean;
+  canToggle: boolean;
 }
 
-function ShopCard({ shop, onToggleStatus, onDelete, t }: ShopCardProps) {
+function ShopCard({ shop, onToggleStatus, onDelete, t, canEdit, canDelete, canToggle }: ShopCardProps) {
   const location = [shop.city, shop.state, shop.country].filter(Boolean).join(', ');
 
   return (
@@ -209,27 +213,37 @@ function ShopCard({ shop, onToggleStatus, onDelete, t }: ShopCardProps) {
                     {t('shops.actions.viewShop')}
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/shops/${shop.id}/edit`}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    {t('shops.actions.editShop')}
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => onToggleStatus(shop.id, shop.status === 'active')}
-                >
-                  <Power className="mr-2 h-4 w-4" />
-                  {shop.status === 'active' ? t('shops.status.inactive') : t('shops.status.active')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-red-600"
-                  onClick={() => onDelete(shop.id)}
-                >
-                  <Trash className="mr-2 h-4 w-4" />
-                  {t('shops.actions.deleteShop')}
-                </DropdownMenuItem>
+                {canEdit && (
+                  <DropdownMenuItem asChild>
+                    <Link href={`/shops/${shop.id}/edit`}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      {t('shops.actions.editShop')}
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {canToggle && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => onToggleStatus(shop.id, shop.status === 'active')}
+                    >
+                      <Power className="mr-2 h-4 w-4" />
+                      {shop.status === 'active' ? t('shops.status.inactive') : t('shops.status.active')}
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {canDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-red-600"
+                      onClick={() => onDelete(shop.id)}
+                    >
+                      <Trash className="mr-2 h-4 w-4" />
+                      {t('shops.actions.deleteShop')}
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -295,12 +309,14 @@ function ShopCard({ shop, onToggleStatus, onDelete, t }: ShopCardProps) {
               {t('shops.actions.viewShop')}
             </Button>
           </Link>
-          <Link href={`/shops/${shop.id}/edit`} className="flex-1">
-            <Button variant="outline" size="sm" className="w-full">
-              <Edit className="mr-2 h-4 w-4" />
-              {t('shops.actions.editShop')}
-            </Button>
-          </Link>
+          {canEdit && (
+            <Link href={`/shops/${shop.id}/edit`} className="flex-1">
+              <Button variant="outline" size="sm" className="w-full">
+                <Edit className="mr-2 h-4 w-4" />
+                {t('shops.actions.editShop')}
+              </Button>
+            </Link>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -318,6 +334,12 @@ export default function ShopsPage() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { canAddShops, maxShops, planName } = useTenantPlan();
+  const { hasPermission } = usePermissions();
+  const canViewShops = hasPermission('shops.view');
+  const canCreateShops = hasPermission('shops.create');
+  const canEditShops = hasPermission('shops.edit');
+  const canDeleteShops = hasPermission('shops.delete');
+  const canToggleShops = hasPermission('shops.toggle_status');
 
   // Create a ref to hold the current search params
   const searchParamsRef = useRef({
@@ -418,6 +440,7 @@ export default function ShopsPage() {
         throw fetchError;
       }
     },
+    enabled: canViewShops,
   });
 
   // Debug logging for query state changes
@@ -653,30 +676,40 @@ export default function ShopsPage() {
                   {t('shops.actions.viewShop')}
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/shops/${shop.id}/edit`}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  {t('shops.actions.editShop')}
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => toggleStatusMutation.mutate({
-                  shopId: shop.id,
-                  isActive: shop.status !== 'active'
-                })}
-              >
-                <Power className="mr-2 h-4 w-4" />
-                {shop.status === 'active' ? t('shops.status.inactive') : t('shops.status.active')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-red-600"
-                onClick={() => setDeleteShopId(shop.id)}
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                {t('shops.actions.deleteShop')}
-              </DropdownMenuItem>
+              {canEditShops && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/shops/${shop.id}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    {t('shops.actions.editShop')}
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canToggleShops && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => toggleStatusMutation.mutate({
+                      shopId: shop.id,
+                      isActive: shop.status !== 'active'
+                    })}
+                  >
+                    <Power className="mr-2 h-4 w-4" />
+                    {shop.status === 'active' ? t('shops.status.inactive') : t('shops.status.active')}
+                  </DropdownMenuItem>
+                </>
+              )}
+              {canDeleteShops && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-red-600"
+                    onClick={() => setDeleteShopId(shop.id)}
+                  >
+                    <Trash className="mr-2 h-4 w-4" />
+                    {t('shops.actions.deleteShop')}
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -705,6 +738,27 @@ export default function ShopsPage() {
     const cats = new Set((data?.shops || []).map(shop => shop.category).filter(Boolean));
     return Array.from(cats);
   }, [data?.shops]);
+
+  // Show permission denied if user doesn't have shops.view
+  if (!canViewShops) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-4xl mx-auto">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardContent className="p-8">
+              <div className="text-center">
+                <AlertCircle className="mx-auto h-12 w-12 text-orange-500 dark:text-orange-400 mb-4" />
+                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{t('common.permissionDenied', 'Permission Denied')}</h2>
+                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                  {t('common.permissionDeniedDescription', 'You do not have permission to view shops. Contact your administrator to request access.')}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   // Show upgrade prompt for plans that don't include shops (e.g. Free plan)
   // maxShops is null while loading — only show upgrade when confirmed to be 0
@@ -757,23 +811,25 @@ export default function ShopsPage() {
                   {t('shops.subtitle')}
                 </p>
               </div>
-              {data?.limits && !data.limits.canAddShop ? (
-                <Button
-                  onClick={() => setShowLimitModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('shops.addShop')}
-                </Button>
-              ) : (
-                <Link href="/shops/new">
+              {canCreateShops && (
+                data?.limits && !data.limits.canAddShop ? (
                   <Button
+                    onClick={() => setShowLimitModal(true)}
                     className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     {t('shops.addShop')}
                   </Button>
-                </Link>
+                ) : (
+                  <Link href="/shops/new">
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t('shops.addShop')}
+                    </Button>
+                  </Link>
+                )
               )}
             </div>
           )}
@@ -999,12 +1055,12 @@ export default function ShopsPage() {
           ) : error ? (
             <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
               <CardContent className="py-8">
-                {(error as any)?.status === 403 ? (
+                {(error as any)?.status === 403 || error.message?.includes('403') || error.message?.toLowerCase().includes('permission') ? (
                   <div className="text-center space-y-3">
                     <AlertCircle className="mx-auto h-10 w-10 text-orange-500" />
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('common.permissionDenied', 'Permission Denied')}</h3>
                     <p className="text-gray-600 dark:text-gray-300 text-sm max-w-md mx-auto">
-                      {error.message || t('common.permissionDeniedDescription', 'You do not have permission to access this section. Contact your administrator to request access.')}
+                      {t('common.permissionDeniedDescription', 'You do not have permission to view shops. Contact your administrator to request access.')}
                     </p>
                   </div>
                 ) : (
@@ -1030,7 +1086,7 @@ export default function ShopsPage() {
                           ? t('shops.empty.tryAdjusting')
                           : t('shops.empty.noShopsDescription')}
                       </p>
-                      {!searchTerm && statusFilter === 'all' && categoryFilter === 'all' && (
+                      {canCreateShops && !searchTerm && statusFilter === 'all' && categoryFilter === 'all' && (
                         <Link href="/shops/new">
                           <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                             <Plus className="mr-2 h-4 w-4" />
@@ -1054,6 +1110,9 @@ export default function ShopsPage() {
                         }
                         onDelete={setDeleteShopId}
                         t={t}
+                        canEdit={canEditShops}
+                        canDelete={canDeleteShops}
+                        canToggle={canToggleShops}
                       />
                     ))}
                   </div>

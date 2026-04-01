@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth, useUpdateProfile, useChangePassword, useDeleteAccount, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { use2FA } from "@/hooks/use2FA";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
@@ -77,6 +78,8 @@ interface SubscriptionManagementProps {
 
 const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading, isCheckingDowngrade }: SubscriptionManagementProps) => {
   const { t } = useLanguage();
+  const { hasPermission } = usePermissions();
+  const canManage = hasPermission('billing.manage_subscription');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(
     subscription?.isYearly ? 'yearly' : 'monthly'
   );
@@ -195,7 +198,7 @@ const SubscriptionManagement = ({ subscription, plans, onUpgrade, isUpgrading, i
                   <Button
                     variant={isCurrent ? "outline" : "default"}
                     className="w-full"
-                    disabled={isCurrent || isUpgrading || isCheckingDowngrade}
+                    disabled={isCurrent || isUpgrading || isCheckingDowngrade || !canManage}
                     onClick={() => onUpgrade(plan.id, billingCycle)}
                   >
                     {isUpgrading ? (
@@ -276,6 +279,11 @@ export default function ProfilePage() {
   };
   const { user, isLoading: authLoading, isAuthenticated, isInitialized, refetch } = useReduxAuth();
   const { toast } = useToast();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const canViewBilling = hasPermission('billing.view');
+  const canManageSubscription = hasPermission('billing.manage_subscription');
+  const canViewUsage = hasPermission('billing.view_usage');
+  const canDeleteAccount = hasPermission('billing.delete_account');
 
   // Debug logging
   console.log("🔍 [ProfilePage] User data:", {
@@ -334,7 +342,7 @@ export default function ProfilePage() {
   // Check if user already has a subscription
   const { data: userSubscription, isLoading: subscriptionLoading } = useQuery<UserSubscriptionResponse>({
     queryKey: ['/api/subscription/my-subscription'],
-    enabled: isInitialized && !!user && !authLoading && user?.role === 'Owner',
+    enabled: isInitialized && !!user && !authLoading && !permissionsLoading && canViewBilling,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 60 * 1000, // 1 minute
   });
@@ -342,7 +350,7 @@ export default function ProfilePage() {
   // Fetch subscription plans
   const { data: plans, isLoading: plansLoading, error: plansError, refetch: refetchPlans } = useQuery<SubscriptionPlan[]>({
     queryKey: ['/api/subscription/plans'],
-    enabled: user?.role === 'Owner',
+    enabled: !permissionsLoading && canViewBilling,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     retry: 3,
@@ -426,6 +434,7 @@ export default function ProfilePage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [twoFactorSetup, setTwoFactorSetup] = useState<{
     secret: string;
     qrCode: string;
@@ -650,7 +659,7 @@ export default function ProfilePage() {
         </Dialog>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-8">
-          <TabsList className="grid w-full grid-cols-6 h-auto">
+          <TabsList className="flex flex-wrap justify-start w-full h-auto">
             <TabsTrigger value="profile">{t('profile.tabs.profile')}</TabsTrigger>
             <TabsTrigger value="preferences">{t('profile.tabs.preferences')}</TabsTrigger>
             <TabsTrigger value="security">{t('profile.tabs.security')}</TabsTrigger>
@@ -658,10 +667,12 @@ export default function ProfilePage() {
               <span className="hidden sm:inline">{t('profile.tabs.twoFactor')}</span>
               <span className="sm:hidden">2FA</span>
             </TabsTrigger>
-            {user?.role === 'Owner' && (
+            {(permissionsLoading || canViewBilling) && (
               <TabsTrigger value="subscription">{t('profile.tabs.subscription')}</TabsTrigger>
             )}
-            <TabsTrigger value="danger" className="text-red-600">{t('profile.tabs.danger')}</TabsTrigger>
+            {(permissionsLoading || canDeleteAccount) && (
+              <TabsTrigger value="danger" className="text-red-600">{t('profile.tabs.danger')}</TabsTrigger>
+            )}
           </TabsList>
 
           {/* Profile Tab */}
@@ -1306,8 +1317,8 @@ export default function ProfilePage() {
             </Card>
           </TabsContent>
 
-          {/* Subscription Tab - Only for Owner */}
-          {user?.role === 'Owner' && (
+          {/* Subscription Tab - Requires billing.view permission */}
+          {(permissionsLoading || canViewBilling) && (
             <TabsContent value="subscription">
               <Card className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 shadow-sm">
                 <CardHeader>
@@ -1361,7 +1372,8 @@ export default function ProfilePage() {
             </TabsContent>
           )}
 
-          {/* Danger Zone Tab */}
+          {/* Danger Zone Tab - Requires billing.delete_account permission */}
+          {(permissionsLoading || canDeleteAccount) && (
           <TabsContent value="danger">
             <Card className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 shadow-sm">
               <CardHeader>
@@ -1408,6 +1420,7 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
         </Tabs>
 
         {/* Downgrade Confirmation Dialog */}
@@ -1506,22 +1519,42 @@ export default function ProfilePage() {
         </AlertDialog>
 
         {/* Delete Account Confirmation Dialog */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialog open={showDeleteDialog} onOpenChange={(open) => {
+          setShowDeleteDialog(open);
+          if (!open) setDeleteConfirmText("");
+        }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center space-x-2 text-red-600">
                 <AlertTriangle className="w-5 h-5" />
                 <span>{t('profile.danger.deleteAccount')}</span>
               </AlertDialogTitle>
-              <AlertDialogDescription>
-                {t('profile.danger.confirmDescription')}
+              <AlertDialogDescription asChild>
+                <div className="space-y-4">
+                  <p>
+                    Are you absolutely sure you want to delete your account? This action cannot be undone and will permanently remove all your data.
+                  </p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Type <span className="font-mono font-bold text-red-600">Delete Account</span> to confirm:
+                    </p>
+                    <Input
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder="Delete Account"
+                      className="border-red-200 focus:border-red-400 focus:ring-red-400"
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t('profile.danger.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={onDeleteAccount}
-                className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                disabled={deleteConfirmText !== 'Delete Account'}
+                className="bg-red-600 hover:bg-red-700 focus:ring-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('profile.danger.confirmDelete')}
               </AlertDialogAction>

@@ -91,16 +91,39 @@ function getRoleTranslationKey(role: string): string {
   return roleMap[role] || role;
 }
 
+const ROLE_HIERARCHY: Record<string, number> = {
+  'Employee': 1,
+  'Manager': 2,
+  'Administrator': 3,
+  'Owner': 4,
+};
+
+/** Roles strictly below the given role — the only ones this user can assign. */
+function getAssignableRoles(currentRole: string): string[] {
+  const currentLevel = ROLE_HIERARCHY[currentRole] || 0;
+  return Object.entries(ROLE_HIERARCHY)
+    .filter(([, level]) => level < currentLevel)
+    .sort(([, a], [, b]) => b - a) // highest first
+    .map(([role]) => role);
+}
+
+/** Whether the caller can act on a target user (target must be strictly below). */
+function canActOnUser(callerRole: string, targetRole: string): boolean {
+  return (ROLE_HIERARCHY[callerRole] || 0) > (ROLE_HIERARCHY[targetRole] || 0);
+}
+
 export default function UsersPage() {
   const { user, isLoading: authLoading } = useReduxAuth();
   const currentUser = user as ExtendedUser | null;
   const { toast } = useToast();
   const { t } = useLanguage();
 
-  // Check if the current user can set a password for a target user
+  // Check if the current user can act on a target user (strictly lower role only)
   const canSetPasswordFor = (targetRole: string) =>
-    currentUser?.role === 'Owner' || currentUser?.role === 'Administrator' ||
-    (currentUser?.role === 'Manager' && targetRole !== 'Administrator' && targetRole !== 'Owner');
+    currentUser?.role ? canActOnUser(currentUser.role, targetRole) : false;
+
+  // Roles this user is allowed to assign (strictly below their own level)
+  const assignableRoles = currentUser?.role ? getAssignableRoles(currentUser.role) : [];
   const queryClient = useQueryClient();
   const { canManageUsers, planName } = useTenantPlan();
   const [, setLocation] = useLocation();
@@ -547,8 +570,8 @@ export default function UsersPage() {
   };
 
   const handleEditUser = (user: User) => {
-    if (user.role === 'Owner') {
-      // View-only for Owner accounts
+    if (!canActOnUser(currentUser?.role || '', user.role || '')) {
+      // View-only for users at or above your role level
       handleViewUser(user);
       return;
     }
@@ -788,8 +811,8 @@ export default function UsersPage() {
         // No actions for current non-owner
         if (user.id === currentUser.id) return null;
 
-        // Owner accounts (not current user) are view-only
-        if (user.role === 'Owner') {
+        // Users at or above your role level are view-only
+        if (!canActOnUser(currentUser.role || '', user.role || '')) {
           return (
             <div className="flex items-center space-x-2">
               <Button
@@ -805,7 +828,7 @@ export default function UsersPage() {
           );
         }
 
-        const canSetPassword = canEditUsers && canSetPasswordFor(user.role);
+        const canSetPassword = canEditUsers && canSetPasswordFor(user.role || '');
 
         return (
           <div className="flex items-center space-x-2">
@@ -1011,7 +1034,7 @@ export default function UsersPage() {
                                         </SelectTrigger>
                                       </FormControl>
                                       <SelectContent>
-                                        {nonOwnerRoles.map((role) => (
+                                        {assignableRoles.map((role) => (
                                           <SelectItem key={role} value={role}>
                                             {t(getRoleTranslationKey(role))}
                                           </SelectItem>
@@ -1309,7 +1332,7 @@ export default function UsersPage() {
                                     </Button>
                                   )}
                                 </>
-                              ) : user.role === 'Owner' ? (
+                              ) : !canActOnUser(currentUser.role || '', user.role || '') ? (
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -1332,7 +1355,7 @@ export default function UsersPage() {
                                       <Edit className="h-4 w-4" />
                                     </Button>
                                   )}
-                                  {canEditUsers && canSetPasswordFor(user.role) && (
+                                  {canEditUsers && canSetPasswordFor(user.role || '') && (
                                     <Button
                                       variant="ghost"
                                       size="icon"
@@ -1449,7 +1472,7 @@ export default function UsersPage() {
                           </div>
 
                           {/* Status Toggle */}
-                          {canToggleStatus && user.id !== currentUser.id && user.role !== 'Owner' && (
+                          {canToggleStatus && user.id !== currentUser.id && canActOnUser(currentUser.role || '', user.role || '') && (
                             <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                               <div className="flex items-center justify-between">
                                 <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Account Status</span>
@@ -1541,7 +1564,7 @@ export default function UsersPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {nonOwnerRoles.map((role) => (
+                              {assignableRoles.map((role) => (
                                 <SelectItem key={role} value={role}>
                                   {t(getRoleTranslationKey(role))}
                                 </SelectItem>

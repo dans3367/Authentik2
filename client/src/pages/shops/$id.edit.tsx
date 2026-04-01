@@ -36,6 +36,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { updateShopSchema, type UpdateShopData, type ShopWithManager } from "@shared/schema";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Manager {
   id: string;
@@ -118,6 +119,13 @@ export default function EditShopPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+
+  // Redirect if user doesn't have edit permission
+  if (!hasPermission('shops.edit')) {
+    navigate(`/shops/${id}`);
+    return null;
+  }
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 

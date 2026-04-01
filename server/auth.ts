@@ -168,6 +168,25 @@ const authInstance = betterAuth({
     after: createAuthMiddleware(async (ctx) => {
       try {
         const path = ctx.path || "";
+
+        // Post sign-in: update lastLoginAt
+        if (path.includes("sign-in")) {
+          const returned = ctx.context.returned as any;
+          const userId = returned?.user?.id || returned?.body?.user?.id;
+          const email = ctx.body?.email || returned?.user?.email || returned?.body?.user?.email;
+          if (userId) {
+            await db.update(betterAuthUser)
+              .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+              .where(eq(betterAuthUser.id, userId));
+          } else if (email) {
+            await db.update(betterAuthUser)
+              .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+              .where(eq(betterAuthUser.email, email.toLowerCase()));
+          }
+          return;
+        }
+
+        // Post sign-up: parse name into firstName/lastName
         if (!path.includes("sign-up")) return;
 
         const email = ctx.body?.email || (ctx.context.returned as any)?.user?.email;
@@ -192,8 +211,8 @@ const authInstance = betterAuth({
 
         console.log(`✅ [Signup Hook] User created: ${email} (tenant will be created after payment)`);
       } catch (error) {
-        console.error('❌ [Signup Hook] Error in post-signup hook:', error);
-        // Don't throw — signup should still succeed
+        console.error('❌ [Signup Hook] Error in post-signup/signin hook:', error);
+        // Don't throw — auth should still succeed
       }
     }),
   },

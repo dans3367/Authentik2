@@ -149,6 +149,10 @@ export default function ManagementRolesPermissions() {
     role: string | null;
     resetAll: boolean;
   }>({ open: false, role: null, resetAll: false });
+  const [dangerousPermDialog, setDangerousPermDialog] = useState<{
+    open: boolean;
+    permKey: string;
+  }>({ open: false, permKey: "" });
 
   const currentUser = user as { id: string; role?: string } | null;
   const isOwner = currentUser?.role === "Owner";
@@ -315,12 +319,17 @@ export default function ManagementRolesPermissions() {
     ).length;
   }, [pendingChanges, editingRole, roles]);
 
-  // Determine which roles the current user can assign
+  // Determine which roles the current user can assign (strictly below own level)
+  const ROLE_HIERARCHY: Record<string, number> = {
+    'Employee': 1, 'Manager': 2, 'Administrator': 3, 'Owner': 4,
+  };
   const assignableRoles = useMemo(() => {
-    if (isOwner) return ["Owner", "Administrator", "Manager", "Employee"];
-    if (isAdmin) return ["Administrator", "Manager", "Employee"];
-    return [];
-  }, [isOwner, isAdmin]);
+    const currentLevel = ROLE_HIERARCHY[currentUser?.role || ''] || 0;
+    return Object.entries(ROLE_HIERARCHY)
+      .filter(([, level]) => level < currentLevel)
+      .sort(([, a], [, b]) => b - a)
+      .map(([role]) => role);
+  }, [currentUser?.role]);
 
   // Permission count per role
   const getPermissionCount = useCallback(
@@ -423,7 +432,18 @@ export default function ManagementRolesPermissions() {
   };
 
   const togglePermission = (permKey: string) => {
+    // Warn when enabling billing.delete_account for a non-Owner role
+    if (permKey === 'billing.delete_account' && editingRole !== 'Owner' && !pendingChanges[permKey]) {
+      setDangerousPermDialog({ open: true, permKey });
+      return;
+    }
     setPendingChanges((prev) => ({ ...prev, [permKey]: !prev[permKey] }));
+  };
+
+  const confirmDangerousPermission = () => {
+    const { permKey } = dangerousPermDialog;
+    setPendingChanges((prev) => ({ ...prev, [permKey]: true }));
+    setDangerousPermDialog({ open: false, permKey: "" });
   };
 
   const resetEditingRole = () => {
@@ -919,9 +939,10 @@ export default function ManagementRolesPermissions() {
                               {roleUsers.map((roleUser) => {
                                 const isSelf = roleUser.id === currentUser?.id;
                                 const isOwnerUser = roleUser.role === "Owner";
+                                const callerLevel = ROLE_HIERARCHY[currentUser?.role || ''] || 0;
+                                const targetLevel = ROLE_HIERARCHY[roleUser.role] || 0;
                                 const canChangeRole =
-                                  !isSelf &&
-                                  (isOwner || (!isOwnerUser && isAdmin));
+                                  !isSelf && targetLevel < callerLevel;
 
                                 return (
                                   <TableRow key={roleUser.id}>
@@ -1057,6 +1078,43 @@ export default function ManagementRolesPermissions() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Dangerous Permission Warning Dialog */}
+      <Dialog
+        open={dangerousPermDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setDangerousPermDialog({ open: false, permKey: "" });
+        }}
+      >
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              {t('management.rolesPermissions.dangerousPermission', 'Critical Permission Warning')}
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-sm leading-relaxed">
+              {t(
+                'management.rolesPermissions.deleteAccountWarning',
+                'You are about to grant the Delete Account permission to the {{role}} role. This gives users with this role full ability to permanently delete the entire account, including all data, users, shops, and subscriptions. This action cannot be undone.',
+              ).replace('{{role}}', editingRole || '')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setDangerousPermDialog({ open: false, permKey: "" })}
+            >
+              {t('common.cancel', 'Cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDangerousPermission}
+            >
+              {t('management.rolesPermissions.confirmEnable', 'I understand, enable it')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirm Role Change Dialog */}
       <Dialog

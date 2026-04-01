@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql, eq, or } from 'drizzle-orm';
 import { betterAuthUser, subscriptionPlans, forms, formResponses, companies, subscriptions, subscriptionPlanRelations, tenants, shopLimitEvents, shops } from '@shared/schema';
-import { authenticateToken, requireTenant, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { storage } from '../storage';
 import Stripe from 'stripe';
 
@@ -245,7 +245,7 @@ subscriptionRoutes.post("/free-trial-signup", async (req: any, res) => {
 });
 
 // Get user's subscription
-subscriptionRoutes.get("/my-subscription", authenticateToken, requireTenant, async (req: any, res) => {
+subscriptionRoutes.get("/my-subscription", authenticateToken, requireTenant, requirePermission('billing.view'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
     console.log('🔍 [Subscription] Fetching subscription for tenant:', tenantId);
@@ -328,7 +328,7 @@ subscriptionRoutes.get("/my-subscription", authenticateToken, requireTenant, asy
 });
 
 // Create Stripe checkout session
-subscriptionRoutes.post("/create-checkout-session", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
+subscriptionRoutes.post("/create-checkout-session", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     const { planId, successUrl, cancelUrl } = req.body;
 
@@ -408,7 +408,7 @@ subscriptionRoutes.post("/create-checkout-session", authenticateToken, requireRo
 });
 
 // Create billing portal session
-subscriptionRoutes.post("/create-portal-session", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
+subscriptionRoutes.post("/create-portal-session", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     const { returnUrl } = req.body;
 
@@ -449,7 +449,7 @@ subscriptionRoutes.post("/create-portal-session", authenticateToken, requireRole
 });
 
 // Cancel subscription
-subscriptionRoutes.post("/cancel", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
+subscriptionRoutes.post("/cancel", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     const { cancelAtPeriodEnd = true } = req.body;
 
@@ -501,7 +501,7 @@ subscriptionRoutes.post("/cancel", authenticateToken, requireRole(["Owner"]), as
 });
 
 // Reactivate subscription
-subscriptionRoutes.post("/reactivate", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
+subscriptionRoutes.post("/reactivate", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({ message: 'Stripe is not configured' });
@@ -551,7 +551,7 @@ subscriptionRoutes.post("/reactivate", authenticateToken, requireRole(["Owner"])
 });
 
 // Pre-flight check for downgrade impact
-subscriptionRoutes.post("/check-downgrade", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
+subscriptionRoutes.post("/check-downgrade", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     if (!req.user || !req.user.tenantId) {
       return res.status(401).json({ message: 'Authentication required' });
@@ -641,7 +641,7 @@ subscriptionRoutes.post("/check-downgrade", authenticateToken, requireRole(["Own
 });
 
 // Upgrade or downgrade subscription plan (Owner only)
-subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
+subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     if (!req.user || !req.user.tenantId) {
       return res.status(401).json({ message: 'Authentication required' });
@@ -1046,7 +1046,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireRole(
 });
 
 // Get subscription usage
-subscriptionRoutes.get("/usage", authenticateToken, requireRole(["Owner"]), async (req: any, res) => {
+subscriptionRoutes.get("/usage", authenticateToken, requirePermission('billing.view_usage'), async (req: any, res) => {
   try {
     // Validate authentication
     if (!req.user || !req.user.tenantId) {

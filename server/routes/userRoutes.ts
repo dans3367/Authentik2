@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requirePermission, requirePlanFeature, getEffectivePermissions } from '../middleware/auth-middleware';
+import { authenticateToken, requirePermission, requirePlanFeature, getEffectivePermissions, getAssignableRoles, ROLE_HIERARCHY } from '../middleware/auth-middleware';
 import { validatePasswordStrength } from '../middleware/security-enhanced';
 import { storage } from '../storage';
 import { db } from '../db';
@@ -177,6 +177,12 @@ userRoutes.post("/", authenticateToken, requirePlanFeature('allowUsersManagement
       return res.status(400).json({ message: validationError.errors?.[0]?.message || 'Invalid input' });
     }
 
+    // Role must be strictly below the current user's level (anti-escalation)
+    const assignable = getAssignableRoles(req.user.role);
+    if (parsedBody.role && !assignable.includes(parsedBody.role)) {
+      return res.status(403).json({ message: `You can only create users with roles below your own level (${assignable.join(', ') || 'none'})` });
+    }
+
     // Check for duplicate email within the tenant
     const existingUser = await storage.getUserByEmail(parsedBody.email, tenantId);
     if (existingUser) {
@@ -272,8 +278,10 @@ userRoutes.put("/:userId", authenticateToken, requirePlanFeature('allowUsersMana
       return res.status(400).json({ message: 'First name, last name, email, and role are required' });
     }
 
-    if (!['Administrator', 'Manager', 'Employee'].includes(role)) {
-      return res.status(400).json({ message: 'Invalid role' });
+    // Role must be strictly below the current user's level (anti-escalation)
+    const assignable = getAssignableRoles(req.user.role);
+    if (!assignable.includes(role)) {
+      return res.status(403).json({ message: `You can only assign roles below your own level (${assignable.join(', ') || 'none'})` });
     }
 
     // Check if user exists and belongs to the same tenant
@@ -293,14 +301,11 @@ userRoutes.put("/:userId", authenticateToken, requirePlanFeature('allowUsersMana
       return res.status(403).json({ message: 'Owner account is view-only and cannot be edited' });
     }
 
-    // Owner role cannot be assigned — each tenant has exactly one Owner, created at signup
-    if (role === 'Owner') {
-      return res.status(403).json({ message: 'There can only be one Owner per account. The Owner is assigned at signup and cannot be changed.' });
-    }
-
-    // Administrators cannot edit other Administrators (prevent horizontal privilege abuse)
-    if (req.user.role === 'Administrator' && existingUser.role === 'Administrator') {
-      return res.status(403).json({ message: 'Administrators cannot edit other administrator accounts' });
+    // Cannot edit users at or above your own role level (prevents horizontal privilege abuse)
+    const currentLevel = ROLE_HIERARCHY[req.user.role] || 0;
+    const targetLevel = ROLE_HIERARCHY[existingUser.role] || 0;
+    if (targetLevel >= currentLevel) {
+      return res.status(403).json({ message: 'You cannot edit users at or above your own role level' });
     }
 
     // If the role is being changed, require users.manage_roles permission
@@ -397,9 +402,11 @@ userRoutes.patch("/:userId/status", authenticateToken, requirePlanFeature('allow
       return res.status(400).json({ message: 'Cannot deactivate your own account' });
     }
 
-    // Disallow changing status for Owner accounts
-    if (user.role === 'Owner') {
-      return res.status(403).json({ message: 'Owner account status cannot be changed' });
+    // Cannot toggle status for users at or above your own role level
+    const callerLevel = ROLE_HIERARCHY[req.user.role] || 0;
+    const targetStatusLevel = ROLE_HIERARCHY[user.role] || 0;
+    if (targetStatusLevel >= callerLevel) {
+      return res.status(403).json({ message: 'You cannot change the status of users at or above your own role level' });
     }
 
     // When activating a user, check if the user limit has been reached
@@ -466,9 +473,11 @@ userRoutes.delete("/:userId", authenticateToken, requirePlanFeature('allowUsersM
       return res.status(400).json({ message: 'Cannot delete your own account' });
     }
 
-    // Disallow deleting Owner accounts entirely
-    if (user.role === 'Owner') {
-      return res.status(403).json({ message: 'Owner account cannot be deleted' });
+    // Cannot delete users at or above your own role level
+    const callerDelLevel = ROLE_HIERARCHY[req.user.role] || 0;
+    const targetDelLevel = ROLE_HIERARCHY[user.role] || 0;
+    if (targetDelLevel >= callerDelLevel) {
+      return res.status(403).json({ message: 'You cannot delete users at or above your own role level' });
     }
 
     // Delete user (this will cascade to related records)
@@ -526,9 +535,13 @@ userRoutes.post("/:userId/set-password", authenticateToken, requirePlanFeature('
       return res.status(403).json({ message: 'Owner account password can only be reset by the owner themselves' });
     }
 
-    // Managers cannot set passwords for Administrators or Owners
-    if (currentUserRole === 'Manager' && (targetUser.role === 'Administrator' || targetUser.role === 'Owner')) {
-      return res.status(403).json({ message: 'Managers cannot set passwords for Administrators or Owners' });
+    // Cannot set passwords for users at or above your own role level (unless it's yourself)
+    if (currentUserId !== targetUser.id) {
+      const callerLevel = ROLE_HIERARCHY[currentUserRole] || 0;
+      const targetLevel = ROLE_HIERARCHY[targetUser.role] || 0;
+      if (targetLevel >= callerLevel) {
+        return res.status(403).json({ message: 'You cannot set passwords for users at or above your own role level' });
+      }
     }
 
     // Hash new password using Better Auth's native hashing (scrypt)

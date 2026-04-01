@@ -116,19 +116,32 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
   }
 };
 
+// Role hierarchy: Owner > Administrator > Manager > Employee
+export const ROLE_HIERARCHY: Record<string, number> = {
+  'Employee': 1,
+  'Manager': 2,
+  'Administrator': 3,
+  'Owner': 4,
+};
+
+/**
+ * Returns the list of roles strictly below the given role in the hierarchy.
+ * Used to enforce that users can only assign roles below their own level.
+ */
+export function getAssignableRoles(currentRole: string): string[] {
+  const currentLevel = ROLE_HIERARCHY[currentRole] || 0;
+  return Object.entries(ROLE_HIERARCHY)
+    .filter(([, level]) => level < currentLevel)
+    .map(([role]) => role);
+}
+
 export const requireRole = (requiredRole: string | string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    // Role hierarchy: Owner > Administrator > Manager > Employee
-    const roleHierarchy = {
-      'Employee': 1,
-      'Manager': 2,
-      'Administrator': 3,
-      'Owner': 4
-    };
+    const roleHierarchy = ROLE_HIERARCHY;
 
     const userRoleLevel = roleHierarchy[req.user.role as keyof typeof roleHierarchy] || 0;
 
@@ -157,7 +170,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> =
     'users.view': true, 'users.create': true, 'users.edit': true, 'users.delete': true, 'users.manage_roles': true, 'users.toggle_status': true,
     'shops.view': true, 'shops.create': true, 'shops.edit': true, 'shops.delete': true, 'shops.toggle_status': true,
     'company.view': true, 'company.create': true, 'company.edit': true, 'company.manage_users': true,
-    'billing.view': true, 'billing.manage_subscription': true, 'billing.manage_checkout': true, 'billing.view_usage': true,
+    'billing.view': true, 'billing.manage_subscription': true, 'billing.view_usage': true, 'billing.delete_account': true,
     'tenant.view_limits': true, 'tenant.edit_limits': true, 'tenant.fix_issues': true,
     'emails.view': true, 'emails.send': true, 'emails.view_status': true, 'emails.manage_design': true, 'emails.manage_suppression': true,
     'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true,
@@ -182,7 +195,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> =
     'users.view': true, 'users.create': true, 'users.edit': true, 'users.delete': true, 'users.manage_roles': true, 'users.toggle_status': true,
     'shops.view': true, 'shops.create': true, 'shops.edit': true, 'shops.delete': true, 'shops.toggle_status': true,
     'company.view': true, 'company.create': true, 'company.edit': true, 'company.manage_users': true,
-    'billing.view': true, 'billing.manage_subscription': false, 'billing.manage_checkout': false, 'billing.view_usage': true,
+    'billing.view': true, 'billing.manage_subscription': false, 'billing.view_usage': true, 'billing.delete_account': false,
     'tenant.view_limits': true, 'tenant.edit_limits': true, 'tenant.fix_issues': true,
     'emails.view': true, 'emails.send': true, 'emails.view_status': true, 'emails.manage_design': true, 'emails.manage_suppression': true,
     'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true,
@@ -207,7 +220,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> =
     'users.view': true, 'users.create': false, 'users.edit': false, 'users.delete': false, 'users.manage_roles': false, 'users.toggle_status': false,
     'shops.view': true, 'shops.create': true, 'shops.edit': true, 'shops.delete': false, 'shops.toggle_status': true,
     'company.view': true, 'company.create': false, 'company.edit': false, 'company.manage_users': false,
-    'billing.view': false, 'billing.manage_subscription': false, 'billing.manage_checkout': false, 'billing.view_usage': false,
+    'billing.view': false, 'billing.manage_subscription': false, 'billing.view_usage': false, 'billing.delete_account': false,
     'tenant.view_limits': false, 'tenant.edit_limits': false, 'tenant.fix_issues': false,
     'emails.view': true, 'emails.send': true, 'emails.view_status': false, 'emails.manage_design': false, 'emails.manage_suppression': false,
     'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true,
@@ -232,7 +245,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> =
     'users.view': false, 'users.create': false, 'users.edit': false, 'users.delete': false, 'users.manage_roles': false, 'users.toggle_status': false,
     'shops.view': true, 'shops.create': false, 'shops.edit': false, 'shops.delete': false, 'shops.toggle_status': false,
     'company.view': true, 'company.create': false, 'company.edit': false, 'company.manage_users': false,
-    'billing.view': false, 'billing.manage_subscription': false, 'billing.manage_checkout': false, 'billing.view_usage': false,
+    'billing.view': false, 'billing.manage_subscription': false, 'billing.view_usage': false, 'billing.delete_account': false,
     'tenant.view_limits': false, 'tenant.edit_limits': false, 'tenant.fix_issues': false,
     'emails.view': true, 'emails.send': false, 'emails.view_status': false, 'emails.manage_design': false, 'emails.manage_suppression': false,
     'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true,

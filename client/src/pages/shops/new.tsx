@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { createShopSchema, type CreateShopData } from "@shared/schema";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Manager {
   id: string;
@@ -90,6 +91,13 @@ export default function NewShopPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user, isAuthenticated, isLoading: authLoading } = useReduxAuth();
+  const { hasPermission } = usePermissions();
+
+  // Redirect if user doesn't have create permission
+  if (!hasPermission('shops.create')) {
+    navigate('/shops');
+    return null;
+  }
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
