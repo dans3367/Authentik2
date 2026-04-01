@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserCheck, UserX, Calendar, Mail, MapPin, Eye, EyeOff, X, User as UserIcon, KeyRound, AlertTriangle } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useForm } from "react-hook-form";
@@ -22,7 +23,9 @@ import { createUserSchema, updateUserSchema, userRoles, nonOwnerRoles, type User
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTenantPlan } from "@/hooks/useTenantPlan";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useLocation } from "wouter";
+import ManagementRolesPermissions from "@/pages/management-roles-permissions";
 
 // Extended user type to include custom fields from Better Auth
 interface ExtendedUser {
@@ -133,8 +136,16 @@ export default function UsersPage() {
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
   const [passwordConfirmed, setPasswordConfirmed] = useState(false);
 
+  const { hasPermission } = usePermissions();
+  const canViewUsers = hasPermission('users.view');
+  const canCreateUsers = hasPermission('users.create');
+  const canEditUsers = hasPermission('users.edit');
+  const canDeleteUsers = hasPermission('users.delete');
+  const canManageRoles = hasPermission('users.manage_roles');
+  const canToggleStatus = hasPermission('users.toggle_status');
+
   const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'Administrator';
-  const hasAccess = currentUser && (currentUser.role === 'Owner' || currentUser.role === 'Administrator' || currentUser.role === 'Manager');
+  const hasAccess = canViewUsers;
 
   // Fetch users with stable query key - no search params in key
   const { data: usersData, isLoading: usersLoading, isFetching, refetch } = useQuery({
@@ -462,7 +473,7 @@ export default function UsersPage() {
   }
 
   // Check if current user has permission to access this page
-  if (!currentUser || (currentUser.role !== 'Owner' && currentUser.role !== 'Administrator' && currentUser.role !== 'Manager')) {
+  if (!currentUser || !canViewUsers) {
     return (
       <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
         <div className="max-w-4xl mx-auto">
@@ -742,7 +753,8 @@ export default function UsersPage() {
       header: t('users.table.actions'),
       cell: ({ row }) => {
         const user = row.original;
-        if (!isAdmin) return null;
+        const hasAnyAction = canEditUsers || canDeleteUsers || canToggleStatus;
+        if (!hasAnyAction) return null;
 
         // Current Owner: show profile link + set own password
         if (user.id === currentUser.id && user.role === 'Owner') {
@@ -758,15 +770,17 @@ export default function UsersPage() {
                   <UserIcon className="h-4 w-4" />
                 </Button>
               </Link>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
-                onClick={() => handleOpenSetPassword(user)}
-                title="Set Password"
-              >
-                <KeyRound className="h-4 w-4" />
-              </Button>
+              {canEditUsers && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                  onClick={() => handleOpenSetPassword(user)}
+                  title="Set Password"
+                >
+                  <KeyRound className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           );
         }
@@ -791,18 +805,20 @@ export default function UsersPage() {
           );
         }
 
-        const canSetPassword = canSetPasswordFor(user.role);
+        const canSetPassword = canEditUsers && canSetPasswordFor(user.role);
 
         return (
           <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-              onClick={() => handleEditUser(user)}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
+            {canEditUsers && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                onClick={() => handleEditUser(user)}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            )}
             {canSetPassword && (
               <Button
                 variant="ghost"
@@ -814,18 +830,20 @@ export default function UsersPage() {
                 <KeyRound className="h-4 w-4" />
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-              onClick={() => {
-                if (confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}?`)) {
-                  handleDeleteUser(user.id);
-                }
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {canDeleteUsers && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                onClick={() => {
+                  if (confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}?`)) {
+                    handleDeleteUser(user.id);
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         );
       },
@@ -887,6 +905,23 @@ export default function UsersPage() {
   return (
     <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
       <div className="max-w-7xl mx-auto">
+        <Tabs defaultValue="users" className="w-full">
+          <div className="flex items-center justify-between mb-6">
+            <TabsList>
+              <TabsTrigger value="users">
+                <UsersIcon className="h-4 w-4 mr-2" />
+                {t('users.title')}
+              </TabsTrigger>
+              {canManageRoles && (
+                <TabsTrigger value="roles-permissions">
+                  <Shield className="h-4 w-4 mr-2" />
+                  {t('management.tabs.rolesPermissions', 'Roles & Permissions')}
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
+
+          <TabsContent value="users">
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -898,7 +933,7 @@ export default function UsersPage() {
                 {t('users.subtitle')}
               </p>
             </div>
-            {isAdmin && (
+            {canCreateUsers && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1247,7 +1282,7 @@ export default function UsersPage() {
                           </div>
 
                           {/* Actions */}
-                          {isAdmin && (
+                          {(canEditUsers || canDeleteUsers || canToggleStatus) && (
                             <div className="flex items-center gap-1">
                               {user.id === currentUser.id && user.role === 'Owner' ? (
                                 <>
@@ -1262,15 +1297,17 @@ export default function UsersPage() {
                                       <UserIcon className="h-4 w-4" />
                                     </Button>
                                   </Link>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
-                                    onClick={() => handleOpenSetPassword(user)}
-                                    title="Set Password"
-                                  >
-                                    <KeyRound className="h-4 w-4" />
-                                  </Button>
+                                  {canEditUsers && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                                      onClick={() => handleOpenSetPassword(user)}
+                                      title="Set Password"
+                                    >
+                                      <KeyRound className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                 </>
                               ) : user.role === 'Owner' ? (
                                 <Button
@@ -1284,16 +1321,18 @@ export default function UsersPage() {
                                 </Button>
                               ) : user.id !== currentUser.id ? (
                                 <>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20"
-                                    onClick={() => handleEditUser(user)}
-                                    data-testid={`button-edit-user-card-${user.id}`}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  {canSetPasswordFor(user.role) && (
+                                  {canEditUsers && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                                      onClick={() => handleEditUser(user)}
+                                      data-testid={`button-edit-user-card-${user.id}`}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {canEditUsers && canSetPasswordFor(user.role) && (
                                     <Button
                                       variant="ghost"
                                       size="icon"
@@ -1304,35 +1343,37 @@ export default function UsersPage() {
                                       <KeyRound className="h-4 w-4" />
                                     </Button>
                                   )}
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-                                        data-testid={`button-delete-user-card-${user.id}`}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Delete User</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Are you sure you want to delete {user.firstName} {user.lastName}? This action cannot be undone.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() => handleDeleteUser(user.id)}
-                                          className="bg-red-600 hover:bg-red-700"
+                                  {canDeleteUsers && (
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                                          data-testid={`button-delete-user-card-${user.id}`}
                                         >
-                                          Delete
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Are you sure you want to delete {user.firstName} {user.lastName}? This action cannot be undone.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => handleDeleteUser(user.id)}
+                                            className="bg-red-600 hover:bg-red-700"
+                                          >
+                                            Delete
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  )}
                                 </>
                               ) : null}
                             </div>
@@ -1407,8 +1448,8 @@ export default function UsersPage() {
                             )}
                           </div>
 
-                          {/* Status Toggle for Admins */}
-                          {isAdmin && user.id !== currentUser.id && user.role !== 'Owner' && (
+                          {/* Status Toggle */}
+                          {canToggleStatus && user.id !== currentUser.id && user.role !== 'Owner' && (
                             <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                               <div className="flex items-center justify-between">
                                 <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Account Status</span>
@@ -1495,7 +1536,7 @@ export default function UsersPage() {
                         ) : (
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
-                              <SelectTrigger disabled={isViewMode}>
+                              <SelectTrigger disabled={isViewMode || !canManageRoles}>
                                 <SelectValue placeholder="Select a role" />
                               </SelectTrigger>
                             </FormControl>
@@ -1527,7 +1568,7 @@ export default function UsersPage() {
                           <Switch
                             checked={field.value ?? true}
                             onCheckedChange={field.onChange}
-                            disabled={isViewMode}
+                            disabled={isViewMode || !canToggleStatus}
                           />
                         </FormControl>
                       </FormItem>
@@ -1679,6 +1720,14 @@ export default function UsersPage() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
+          </TabsContent>
+
+          {canManageRoles && (
+            <TabsContent value="roles-permissions">
+              <ManagementRolesPermissions />
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
     </div>
   );

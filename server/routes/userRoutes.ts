@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requireRole, requirePlanFeature } from '../middleware/auth-middleware';
+import { authenticateToken, requirePermission, requirePlanFeature, getEffectivePermissions } from '../middleware/auth-middleware';
 import { validatePasswordStrength } from '../middleware/security-enhanced';
 import { storage } from '../storage';
 import { db } from '../db';
@@ -135,7 +135,7 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
 });
 
 // Get users for tenant
-userRoutes.get("/", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
+userRoutes.get("/", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.view'), async (req: any, res) => {
   try {
     const { search, role, status, showInactive } = req.query;
 
@@ -158,7 +158,7 @@ userRoutes.get("/", authenticateToken, requireRole(['Owner', 'Administrator', 'M
 });
 
 // Create new user
-userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
+userRoutes.post("/", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.create'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -213,7 +213,7 @@ userRoutes.post("/", authenticateToken, requireRole(['Owner', 'Administrator']),
 });
 
 // Get user statistics
-userRoutes.get("/stats", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
+userRoutes.get("/stats", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.view'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -251,7 +251,7 @@ userRoutes.get("/stats", authenticateToken, requireRole(['Owner', 'Administrator
 });
 
 // Get user limits and plan information
-userRoutes.get("/limits", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
+userRoutes.get("/limits", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.view'), async (req: any, res) => {
   try {
     const limits = await storage.checkUserLimits(req.user.tenantId);
     res.json(limits);
@@ -262,7 +262,7 @@ userRoutes.get("/limits", authenticateToken, requireRole(['Owner', 'Administrato
 });
 
 // Update user (full update)
-userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
+userRoutes.put("/:userId", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.edit'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { firstName, lastName, email, role, isActive } = req.body;
@@ -301,6 +301,14 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
     // Administrators cannot edit other Administrators (prevent horizontal privilege abuse)
     if (req.user.role === 'Administrator' && existingUser.role === 'Administrator') {
       return res.status(403).json({ message: 'Administrators cannot edit other administrator accounts' });
+    }
+
+    // If the role is being changed, require users.manage_roles permission
+    if (role !== existingUser.role) {
+      const effectivePerms = await getEffectivePermissions(req.user.role, req.user.tenantId);
+      if (effectivePerms['users.manage_roles'] !== true) {
+        return res.status(403).json({ message: 'You do not have permission to change user roles' });
+      }
     }
 
     // Check if email is already taken by another user in the same tenant
@@ -363,7 +371,7 @@ userRoutes.put("/:userId", authenticateToken, requireRole(['Owner', 'Administrat
 });
 
 // Update user status (active/inactive)
-userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
+userRoutes.patch("/:userId/status", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.toggle_status'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { isActive } = req.body;
@@ -437,7 +445,7 @@ userRoutes.patch("/:userId/status", authenticateToken, requireRole(['Owner', 'Ad
 });
 
 // Delete user
-userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administrator']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
+userRoutes.delete("/:userId", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.delete'), async (req: any, res) => {
   try {
     const { userId } = req.params;
 
@@ -479,7 +487,7 @@ userRoutes.delete("/:userId", authenticateToken, requireRole(['Owner', 'Administ
 
 // Set password for a user (Manager+)
 // Owner accounts can only have their password set by the same owner
-userRoutes.post("/:userId/set-password", authenticateToken, requireRole(['Owner', 'Administrator', 'Manager']), requirePlanFeature('allowUsersManagement'), async (req: any, res) => {
+userRoutes.post("/:userId/set-password", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.edit'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { password, confirmPassword } = req.body;

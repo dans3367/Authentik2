@@ -8,7 +8,6 @@ import ShopsPage from "@/pages/shops";
 import ManagementTags from "@/pages/management-tags";
 import ManagementEmailDesign from "@/pages/management-email-design";
 import ManagementBlogDesign from "@/pages/management-blog-design";
-import ManagementRolesPermissions from "@/pages/management-roles-permissions";
 import ManagementNewsletterReviewer from "@/pages/management-newsletter-reviewer";
 import ManagementCustomFields from "@/pages/management-custom-fields";
 import ManagementBulkImport from "@/pages/management-bulk-import";
@@ -41,7 +40,6 @@ export default function ManagementPage() {
             <TabsTrigger value="users">{t('management.tabs.users')}</TabsTrigger>
             <TabsTrigger value="shops">{t('management.tabs.shops')}</TabsTrigger>
             <TabsTrigger value="tags">{t('management.tabs.tags')}</TabsTrigger>
-            <TabsTrigger value="roles-permissions">{t('management.tabs.rolesPermissions', 'Roles & Permissions')}</TabsTrigger>
             <TabsTrigger value="email-design">{t('management.tabs.emailDesign')}</TabsTrigger>
             <TabsTrigger value="blog-design">{t('management.tabs.blogDesign', 'Blog Design')}</TabsTrigger>
             <TabsTrigger value="newsletter-reviewer">{t('management.tabs.newsletterReviewer', 'Reviewer')}</TabsTrigger>
@@ -63,9 +61,6 @@ export default function ManagementPage() {
             </TabsContent>
             <TabsContent value="tags">
               <ManagementTags />
-            </TabsContent>
-            <TabsContent value="roles-permissions">
-              <ManagementRolesPermissions />
             </TabsContent>
             <TabsContent value="email-design">
               <ManagementEmailDesign />

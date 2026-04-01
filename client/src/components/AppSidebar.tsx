@@ -61,6 +61,7 @@ import {
   useReduxLogout,
 } from "@/hooks/useReduxAuth";
 import { useTenantPlan } from "@/hooks/useTenantPlan";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useState } from "react";
 import {
   Collapsible,
@@ -82,7 +83,7 @@ interface ExtendedUser {
   avatarUrl?: string | null;
 }
 
-const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, maxShops?: number | null) => {
+const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, maxShops?: number | null, canViewUsers?: boolean) => {
   const baseNavigation: any[] = [
     { name: t?.('navigation.dashboard') || "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: t?.('navigation.newsletter') || "Newsletter", href: "/newsletter", icon: Newspaper },
@@ -112,8 +113,8 @@ const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, max
     managementChildren.push({ name: t?.('navigation.shopTags') || "Tags", href: "/shops/tags", icon: Tag });
   }
 
-  // Add Users under Management only if plan allows user management AND role permits it
-  if (canManageUsers && (userRole === "Owner" || userRole === "Administrator" || userRole === "Manager")) {
+  // Add Users under Management only if plan allows user management AND user has users.view permission
+  if (canManageUsers && canViewUsers) {
     managementChildren.push({ name: t?.('navigation.users') || "Users", href: "/users", icon: Users });
   }
 
@@ -133,8 +134,10 @@ export function AppSidebar() {
 
   // Fetch tenant plan data for all users
   const { planName, canManageUsers, maxShops } = useTenantPlan();
+  const { hasPermission } = usePermissions();
+  const canViewUsers = hasPermission('users.view');
 
-  const navigation = getNavigation(extendedUser?.role, t, canManageUsers, maxShops);
+  const navigation = getNavigation(extendedUser?.role, t, canManageUsers, maxShops, canViewUsers);
   const { state, isMobile, setOpenMobile, setOpen } = useSidebar();
 
   const handleLogout = async () => {
