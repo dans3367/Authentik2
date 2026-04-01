@@ -325,7 +325,7 @@ async function getSuppressedNewsletterContacts(newsletter: any, tenantId: string
 }
 
 // Get preview recipients (all tenant users: owners, admins, managers, employees)
-newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, requirePermission('newsletters.send'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
     const limit = 1000; // Reasonable limit to prevent large responses
@@ -503,6 +503,7 @@ newsletterRoutes.get("/", newsletterListRateLimiter, authenticateToken, requireT
       with: {
         user: true,
         tenant: true,
+        shop: true,
       }
     });
 
@@ -1141,7 +1142,7 @@ newsletterRoutes.delete("/:id", authenticateToken, requireTenant, requirePermiss
 
 
 // Get detailed newsletter statistics
-newsletterRoutes.get("/:id/detailed-stats", authenticateToken, requireTenant, requirePermission('newsletters.view_stats'), async (req: any, res) => {
+newsletterRoutes.get("/:id/detailed-stats", authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -1215,7 +1216,7 @@ newsletterRoutes.get("/:id/detailed-stats", authenticateToken, requireTenant, re
 });
 
 // Get email trajectory
-newsletterRoutes.get("/emails/:resendId/trajectory", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.get("/emails/:resendId/trajectory", authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
     const { resendId } = req.params;
 
@@ -1251,7 +1252,7 @@ newsletterRoutes.get("/emails/:resendId/trajectory", authenticateToken, requireT
 });
 
 // Get newsletter task status
-newsletterRoutes.get("/:id/task-status", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.get("/:id/task-status", authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -1424,7 +1425,7 @@ newsletterRoutes.post("/:id/log", authenticateInternalService, async (req: any, 
 });
 
 // Update newsletter task status
-newsletterRoutes.post("/:id/task-status", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.post("/:id/task-status", authenticateToken, requireTenant, requirePermission('newsletters.create'), async (req: any, res) => {
   try {
     const { id } = req.params;
     const { status, progress, totalRecipients, processedRecipients, failedRecipients, error } = req.body;
@@ -1461,7 +1462,7 @@ newsletterRoutes.post("/:id/task-status", authenticateToken, requireTenant, asyn
 });
 
 // Update specific task status
-newsletterRoutes.put("/:newsletterId/task-status/:taskId", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.put("/:newsletterId/task-status/:taskId", authenticateToken, requireTenant, requirePermission('newsletters.create'), async (req: any, res) => {
   try {
     const { newsletterId, taskId } = req.params;
     const { status, progress, error } = req.body;
@@ -1492,7 +1493,7 @@ newsletterRoutes.put("/:newsletterId/task-status/:taskId", authenticateToken, re
 });
 
 // Initialize newsletter tasks
-newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -3260,7 +3261,7 @@ setTimeout(() => {
 }, 15_000);
 
 // Manual trigger endpoint for admins
-newsletterRoutes.post('/fix-stuck-sending', authenticateToken, requireTenant, async (req: any, res) => {
+newsletterRoutes.post('/fix-stuck-sending', authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const count = await finalizeStuckNewsletters();
     res.json({ message: `Finalized ${count} stuck newsletter(s)`, count });

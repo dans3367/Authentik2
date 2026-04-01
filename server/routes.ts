@@ -17,7 +17,7 @@ import { emailManagementRoutes } from "./routes/email";
 import { newsletterRoutes } from "./routes/newsletterRoutes";
 import { cardImageRoutes } from "./routes/cardImageRoutes";
 import { newsletterImageRoutes } from "./routes/newsletterImageRoutes";
-import { authenticateToken, requireTenant } from "./middleware/auth-middleware";
+import { authenticateToken, requireTenant, getEffectivePermissions } from "./middleware/auth-middleware";
 import { filterByShop } from "./middleware/shop-filter";
 
 import { webhookRoutes } from "./routes/webhookRoutes";
@@ -85,6 +85,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/signup", signupRoutes); // Signup helper endpoints
   app.use("/api/tenant-fix", tenantFixRoutes); // Admin tools to fix tenant assignments
   app.use("/api/admin", adminRoutes);
+
+  // Current user's effective permissions (defaults + tenant overrides)
+  app.get("/api/me/permissions", authenticateToken, requireTenant, async (req: any, res) => {
+    try {
+      const permissions = await getEffectivePermissions(req.user.role, req.user.tenantId);
+      res.json({ permissions });
+    } catch (error) {
+      console.error('Get user permissions error:', error);
+      res.status(500).json({ message: 'Failed to get permissions' });
+    }
+  });
+
   app.use("/api/user", authRoutes); // User-facing session endpoints
   app.use("/api/forms", formsRoutes);
   app.use("/api/form-tags", formTagsRoutes);

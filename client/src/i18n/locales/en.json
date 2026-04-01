@@ -2356,7 +2356,6 @@
         "newsletters.view": { "label": "View Newsletters", "description": "View newsletter list and content" },
         "newsletters.create": { "label": "Create Newsletters", "description": "Create new newsletters" },
         "newsletters.send": { "label": "Send Newsletters", "description": "Send and schedule newsletters" },
-        "newsletters.view_stats": { "label": "View Stats", "description": "View newsletter performance stats" },
         "campaigns.view": { "label": "View Campaigns", "description": "View campaign list and details" },
         "campaigns.create": { "label": "Create Campaigns", "description": "Create new marketing campaigns" },
         "campaigns.manage": { "label": "Manage Campaigns", "description": "Edit, pause, and delete campaigns" },

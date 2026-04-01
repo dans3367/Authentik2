@@ -51,6 +51,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   Dialog,
   DialogContent,
@@ -93,6 +94,9 @@ export default function NewsletterViewPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { user } = useReduxAuth();
   const currentUserId = (user as any)?.id;
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission('newsletters.create');
+  const canSend = hasPermission('newsletters.send');
 
   // Reviewer workflow state
   const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -832,7 +836,7 @@ export default function NewsletterViewPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:justify-end shrink-0 pl-0 sm:pl-4">
-            {(newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && newsletter.reviewStatus !== 'approved' && (
+            {canCreate && (newsletter.status === 'draft' || newsletter.status === 'ready_to_send') && newsletter.reviewStatus !== 'approved' && (
               <Button
                 onClick={() => navigate(`/newsletter/create/${newsletter.id}`)}
                 variant="outline"
@@ -843,7 +847,7 @@ export default function NewsletterViewPage() {
                 {t("newsletter.view.edit", "Edit")}
               </Button>
             )}
-            {reviewerEnabled && newsletter.status === 'ready_to_send' && !isCurrentUserDesignatedReviewer && newsletter.reviewStatus !== 'approved' && (
+            {(canCreate || canSend) && reviewerEnabled && newsletter.status === 'ready_to_send' && !isCurrentUserDesignatedReviewer && newsletter.reviewStatus !== 'approved' && (
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -858,7 +862,7 @@ export default function NewsletterViewPage() {
                 {submitForReviewMutation.isPending ? t("newsletter.view.submitting", "Submitting...") : t("newsletter.view.submitForReview", "Submit for Review")}
               </Button>
             )}
-            {newsletter.status === 'ready_to_send' && (
+            {canSend && newsletter.status === 'ready_to_send' && (
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -893,7 +897,7 @@ export default function NewsletterViewPage() {
               </div>
 
               {/* Recall to Draft - show to the submitter or admins/owners (not the reviewer) */}
-              {newsletter.reviewerId !== currentUserId && (newsletter.userId === currentUserId || ['Owner', 'Administrator'].includes((user as any)?.role)) && (
+              {(canCreate || canSend) && newsletter.reviewerId !== currentUserId && (newsletter.userId === currentUserId || ['Owner', 'Administrator'].includes((user as any)?.role)) && (
                 <div className="flex items-center gap-3">
                   <Button
                     onClick={() => recallReviewMutation.mutate(newsletter.id)}

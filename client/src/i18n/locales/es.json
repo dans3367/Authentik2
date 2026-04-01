@@ -2325,7 +2325,6 @@
         "newsletters.view": { "label": "Ver Boletines", "description": "Ver lista y contenido de boletines" },
         "newsletters.create": { "label": "Crear Boletines", "description": "Crear nuevos boletines" },
         "newsletters.send": { "label": "Enviar Boletines", "description": "Enviar y programar boletines" },
-        "newsletters.view_stats": { "label": "Ver Estadísticas", "description": "Ver estadísticas de rendimiento de boletines" },
         "campaigns.view": { "label": "Ver Campañas", "description": "Ver lista y detalles de campañas" },
         "campaigns.create": { "label": "Crear Campañas", "description": "Crear nuevas campañas de marketing" },
         "campaigns.manage": { "label": "Gestionar Campañas", "description": "Editar, pausar y eliminar campañas" },

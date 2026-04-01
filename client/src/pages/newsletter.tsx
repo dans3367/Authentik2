@@ -19,6 +19,7 @@ import {
   Pencil,
   Loader2,
   UserCog,
+  Store,
   ShieldCheck,
   ClipboardCheck,
   CalendarClock,
@@ -32,6 +33,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useRealtimeNewsletters } from "@/hooks/useRealtimeNewsletters";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
@@ -116,6 +118,9 @@ export default function NewsletterPage() {
   const currentUserId = (user as any)?.id;
   const tenantId = (user as any)?.tenantId as string | undefined;
   const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission('newsletters.create');
+  const canSend = hasPermission('newsletters.send');
   const dateFnsLocale = currentLanguage === 'es' ? { locale: esLocale } : {};
 
   useSetBreadcrumbs([
@@ -515,10 +520,12 @@ export default function NewsletterPage() {
               {t("newsletter.subtitle")}
             </p>
           </div>
-          <Button onClick={() => setShowEditorPicker(true)} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="h-4 w-4 mr-2" />
-            {t("newsletter.createNew", "Create Newsletter")}
-          </Button>
+          {canCreate && (
+            <Button onClick={() => setShowEditorPicker(true)} className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4 mr-2" />
+              {t("newsletter.createNew", "Create Newsletter")}
+            </Button>
+          )}
         </div>
 
 
@@ -567,10 +574,12 @@ export default function NewsletterPage() {
             <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-sm mx-auto">
               {t("newsletter.noNewslettersDesc")}
             </p>
-            <Button onClick={() => setShowEditorPicker(true)} className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="h-4 w-4 mr-2" />
-              {t("newsletter.createFirst")}
-            </Button>
+            {canCreate && (
+              <Button onClick={() => setShowEditorPicker(true)} className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="h-4 w-4 mr-2" />
+                {t("newsletter.createFirst")}
+              </Button>
+            )}
           </div>
         ) : filteredNewsletters.length === 0 ? (
           <div className="text-center py-16">
@@ -694,7 +703,7 @@ export default function NewsletterPage() {
                                         Preview article on blog
                                       </DropdownMenuItem>
                                     )}
-                                    {(isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
+                                    {canCreate && (isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -705,7 +714,7 @@ export default function NewsletterPage() {
                                         {t("newsletter.actions.edit")}
                                       </DropdownMenuItem>
                                     )}
-                                    {(isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
+                                    {canCreate && (isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -717,7 +726,7 @@ export default function NewsletterPage() {
                                         {t("newsletter.actions.editRecipients")}
                                       </DropdownMenuItem>
                                     )}
-                                    {isReadyToSend && (
+                                    {canSend && isReadyToSend && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -729,7 +738,7 @@ export default function NewsletterPage() {
                                         {isDeploying ? t("newsletter.actions.sending") : t("newsletter.actions.sendNow")}
                                       </DropdownMenuItem>
                                     )}
-                                    {isScheduled && (
+                                    {canSend && isScheduled && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -742,7 +751,7 @@ export default function NewsletterPage() {
                                         {isCancellingSchedule ? t("newsletter.actions.cancelling") : t("newsletter.actions.cancelSchedule")}
                                       </DropdownMenuItem>
                                     )}
-                                    {reviewerEnabled && isReadyToSend && !isPendingReview && !isCurrentUserDesignatedReviewer && newsletter.reviewStatus !== 'approved' && (
+                                    {(canCreate || canSend) && reviewerEnabled && isReadyToSend && !isPendingReview && !isCurrentUserDesignatedReviewer && newsletter.reviewStatus !== 'approved' && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -765,7 +774,7 @@ export default function NewsletterPage() {
                                         {t("newsletter.actions.reviewNewsletter")}
                                       </DropdownMenuItem>
                                     )}
-                                    {isPendingReview && !isCurrentUserReviewer && (newsletter.userId === currentUserId || ['Owner', 'Administrator'].includes((user as any)?.role)) && (
+                                    {(canCreate || canSend) && isPendingReview && !isCurrentUserReviewer && (newsletter.userId === currentUserId || ['Owner', 'Administrator'].includes((user as any)?.role)) && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -780,7 +789,7 @@ export default function NewsletterPage() {
                                           : t("newsletter.actions.recallToDraft", "Recall to Draft")}
                                       </DropdownMenuItem>
                                     )}
-                                    {isSent && (
+                                    {canCreate && isSent && (
                                       <DropdownMenuItem
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -794,20 +803,34 @@ export default function NewsletterPage() {
                                           : t("newsletter.actions.archive", "Archive")}
                                       </DropdownMenuItem>
                                     )}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDeleteId(newsletter.id);
-                                      }}
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      {t("newsletter.actions.delete")}
-                                    </DropdownMenuItem>
+                                    {canCreate && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setDeleteId(newsletter.id);
+                                          }}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          {t("newsletter.actions.delete")}
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>
+
+                              {/* Shop tag */}
+                              {(newsletter as any).shop?.name && (
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="outline" className="text-[10px] font-medium px-2 py-0.5 bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800">
+                                    <Store className="h-3 w-3 mr-1" />
+                                    {(newsletter as any).shop.name}
+                                  </Badge>
+                                </div>
+                              )}
 
                               {/* Row 2: Title + Subject */}
                               <div>
@@ -1025,18 +1048,20 @@ export default function NewsletterPage() {
                                   >
                                     <Eye className="h-3.5 w-3.5" />
                                   </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 px-2 text-gray-500 hover:text-green-600 dark:text-gray-400 dark:hover:text-green-400"
-                                    disabled={unarchiveMutation.isPending && unarchiveMutation.variables === newsletter.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      unarchiveMutation.mutate(newsletter.id);
-                                    }}
-                                  >
-                                    <ArchiveRestore className="h-3.5 w-3.5" />
-                                  </Button>
+                                  {canCreate && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 px-2 text-gray-500 hover:text-green-600 dark:text-gray-400 dark:hover:text-green-400"
+                                      disabled={unarchiveMutation.isPending && unarchiveMutation.variables === newsletter.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        unarchiveMutation.mutate(newsletter.id);
+                                      }}
+                                    >
+                                      <ArchiveRestore className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
                                 </div>
                               </td>
                             </tr>

@@ -22,6 +22,7 @@ import {
   ClipboardCheck,
   CalendarClock,
   Tv2,
+  Store,
   Archive,
   ArchiveRestore,
   ChevronDown,
@@ -646,6 +647,16 @@ export default function AdvertisePage() {
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>
+
+                              {/* Shop tag */}
+                              {(item as any).shop?.name && (
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="outline" className="text-[10px] font-medium px-2 py-0.5 bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800">
+                                    <Store className="h-3 w-3 mr-1" />
+                                    {(item as any).shop.name}
+                                  </Badge>
+                                </div>
+                              )}
 
                               {/* Row 2: Title + Subject */}
                               <div>

@@ -1759,6 +1759,10 @@ export const newsletterRelations = relations(newsletters, ({ one, many }) => ({
     fields: [newsletters.tenantId],
     references: [tenants.id],
   }),
+  shop: one(shops, {
+    fields: [newsletters.shopId],
+    references: [shops.id],
+  }),
   user: one(betterAuthUser, {
     fields: [newsletters.userId],
     references: [betterAuthUser.id],
@@ -2011,6 +2015,7 @@ export type CampaignForm = typeof campaignForms.$inferSelect;
 
 export interface NewsletterWithUser extends Newsletter {
   user: User;
+  shop?: { id: string; name: string } | null;
   // API transformation fields for unique/total opens
   opens?: number; // Unique opens (primary metric)
   totalOpens?: number; // Total opens (includes repeats)

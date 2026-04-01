@@ -35,30 +35,30 @@ async function initializeDatabase() {
     // This creates or updates plans on every startup to keep them in sync
     await setupSubscriptionPlans();
 
-    // Ensure every tenant has a default shop
-    // This backfills existing tenants that were created before default shops were introduced
-    const allTenants = await db.select({ id: tenants.id, name: tenants.name }).from(tenants);
-    for (const tenant of allTenants) {
-      const existingDefault = await db
-        .select({ id: shops.id })
-        .from(shops)
-        .where(and(eq(shops.tenantId, tenant.id), eq(shops.isDefault, true)))
-        .limit(1);
-
-      if (existingDefault.length === 0) {
-        await db.insert(shops).values({
-          tenantId: tenant.id,
-          name: tenant.name || 'Default Shop',
-          email: 'default@placeholder.local',
-          phone: '',
-          country: 'United States',
-          status: 'active',
-          isActive: true,
-          isDefault: true,
-        });
-        console.log(`🏪 Default shop created for tenant: ${tenant.name || tenant.id}`);
-      }
-    }
+    // NOTE: Default shop backfill disabled — new tenants get a default shop at signup.
+    // This was a one-time migration guard that should not run on every startup in production.
+    // const allTenants = await db.select({ id: tenants.id, name: tenants.name }).from(tenants);
+    // for (const tenant of allTenants) {
+    //   const existingDefault = await db
+    //     .select({ id: shops.id })
+    //     .from(shops)
+    //     .where(and(eq(shops.tenantId, tenant.id), eq(shops.isDefault, true)))
+    //     .limit(1);
+    //
+    //   if (existingDefault.length === 0) {
+    //     await db.insert(shops).values({
+    //       tenantId: tenant.id,
+    //       name: tenant.name || 'Default Shop',
+    //       email: 'default@placeholder.local',
+    //       phone: '',
+    //       country: 'United States',
+    //       status: 'active',
+    //       isActive: true,
+    //       isDefault: true,
+    //     });
+    //     console.log(`🏪 Default shop created for tenant: ${tenant.name || tenant.id}`);
+    //   }
+    // }
 
     console.log("🎉 Database initialization completed successfully!");
   } catch (error) {

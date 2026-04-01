@@ -152,7 +152,7 @@ export const requireRole = (requiredRole: string | string[]) => {
 };
 
 // ─── Default permission definitions per role (must match roleRoutes.ts) ──────
-const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
+export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
   Owner: {
     'users.view': true, 'users.create': true, 'users.edit': true, 'users.delete': true, 'users.manage_roles': true, 'users.toggle_status': true,
     'shops.view': true, 'shops.create': true, 'shops.edit': true, 'shops.delete': true, 'shops.toggle_status': true,
@@ -160,7 +160,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     'billing.view': true, 'billing.manage_subscription': true, 'billing.manage_checkout': true, 'billing.view_usage': true,
     'tenant.view_limits': true, 'tenant.edit_limits': true, 'tenant.fix_issues': true,
     'emails.view': true, 'emails.send': true, 'emails.view_status': true, 'emails.manage_design': true, 'emails.manage_suppression': true,
-    'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true, 'newsletters.view_stats': true,
+    'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true,
     'campaigns.view': true, 'campaigns.create': true, 'campaigns.manage': true,
     'contacts.view': true, 'contacts.create': true, 'contacts.edit': true, 'contacts.delete': true, 'contacts.import': true, 'contacts.export': true,
     'tags.view': true, 'tags.create': true, 'tags.edit': true, 'tags.delete': true,
@@ -185,7 +185,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     'billing.view': true, 'billing.manage_subscription': false, 'billing.manage_checkout': false, 'billing.view_usage': true,
     'tenant.view_limits': true, 'tenant.edit_limits': true, 'tenant.fix_issues': true,
     'emails.view': true, 'emails.send': true, 'emails.view_status': true, 'emails.manage_design': true, 'emails.manage_suppression': true,
-    'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true, 'newsletters.view_stats': true,
+    'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true,
     'campaigns.view': true, 'campaigns.create': true, 'campaigns.manage': true,
     'contacts.view': true, 'contacts.create': true, 'contacts.edit': true, 'contacts.delete': true, 'contacts.import': true, 'contacts.export': true,
     'tags.view': true, 'tags.create': true, 'tags.edit': true, 'tags.delete': true,
@@ -210,7 +210,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     'billing.view': false, 'billing.manage_subscription': false, 'billing.manage_checkout': false, 'billing.view_usage': false,
     'tenant.view_limits': false, 'tenant.edit_limits': false, 'tenant.fix_issues': false,
     'emails.view': true, 'emails.send': true, 'emails.view_status': false, 'emails.manage_design': false, 'emails.manage_suppression': false,
-    'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true, 'newsletters.view_stats': true,
+    'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true,
     'campaigns.view': true, 'campaigns.create': true, 'campaigns.manage': false,
     'contacts.view': true, 'contacts.create': true, 'contacts.edit': true, 'contacts.delete': false, 'contacts.import': true, 'contacts.export': true,
     'tags.view': true, 'tags.create': true, 'tags.edit': true, 'tags.delete': false,
@@ -235,7 +235,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     'billing.view': false, 'billing.manage_subscription': false, 'billing.manage_checkout': false, 'billing.view_usage': false,
     'tenant.view_limits': false, 'tenant.edit_limits': false, 'tenant.fix_issues': false,
     'emails.view': true, 'emails.send': false, 'emails.view_status': false, 'emails.manage_design': false, 'emails.manage_suppression': false,
-    'newsletters.view': true, 'newsletters.create': false, 'newsletters.send': false, 'newsletters.view_stats': true,
+    'newsletters.view': true, 'newsletters.create': true, 'newsletters.send': true,
     'campaigns.view': true, 'campaigns.create': false, 'campaigns.manage': false,
     'contacts.view': true, 'contacts.create': true, 'contacts.edit': false, 'contacts.delete': false, 'contacts.import': false, 'contacts.export': false,
     'tags.view': true, 'tags.create': false, 'tags.edit': false, 'tags.delete': false,
@@ -254,6 +254,43 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> = {
     'settings.view': false, 'settings.edit': false, 'settings.manage_2fa': true,
   },
 };
+
+/**
+ * Resolve the effective permissions for a given role and tenant.
+ * Merges default role permissions with any tenant-specific overrides.
+ * Owner role always gets all permissions set to true.
+ */
+export async function getEffectivePermissions(userRole: string, tenantId: string): Promise<Record<string, boolean>> {
+  if (userRole === 'Owner') {
+    return { ...DEFAULT_ROLE_PERMISSIONS['Owner'] };
+  }
+
+  let effectivePermissions: Record<string, boolean> = { ...(DEFAULT_ROLE_PERMISSIONS[userRole] || {}) };
+
+  try {
+    if (tenantId) {
+      const customRow = await db.query.rolePermissions.findFirst({
+        where: and(
+          eq(rolePermissions.tenantId, tenantId),
+          eq(rolePermissions.role, userRole)
+        ),
+      });
+
+      if (customRow) {
+        try {
+          const customPerms = JSON.parse(customRow.permissions);
+          effectivePermissions = { ...effectivePermissions, ...customPerms };
+        } catch (e) {
+          console.error(`Failed to parse custom permissions for role ${userRole}, tenant ${tenantId}:`, e);
+        }
+      }
+    }
+  } catch (e) {
+    console.log('rolePermissions table not available, using defaults');
+  }
+
+  return effectivePermissions;
+}
 
 // Permission-based access control middleware
 // Checks custom per-tenant permission overrides from rolePermissions table,
