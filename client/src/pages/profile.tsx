@@ -282,7 +282,6 @@ export default function ProfilePage() {
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
   const canViewBilling = hasPermission('billing.view');
   const canManageSubscription = hasPermission('billing.manage_subscription');
-  const canViewUsage = hasPermission('billing.view_usage');
   const canDeleteAccount = hasPermission('billing.delete_account');
 
   // Debug logging

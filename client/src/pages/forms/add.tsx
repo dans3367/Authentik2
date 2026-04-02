@@ -4,15 +4,23 @@ import { Loader2 } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation as useI18n } from 'react-i18next';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export default function AddForm() {
   const { isAuthenticated, isLoading: authLoading, isInitialized } = useReduxAuth();
   const [, setLocation] = useLocation();
   const { t } = useI18n();
+  const { hasPermission } = usePermissions();
 
   // Redirect unauthenticated users immediately
   if (isInitialized && !isAuthenticated) {
     setLocation('/auth');
+    return null;
+  }
+
+  // Redirect if user doesn't have create permission
+  if (!hasPermission('forms.create')) {
+    setLocation('/forms');
     return null;
   }
 

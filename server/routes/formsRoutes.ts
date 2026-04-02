@@ -4,7 +4,7 @@ import { sql, eq, and } from 'drizzle-orm';
 import { forms, formResponses, masterEmailDesign, companies, emailContacts, promotions, unsubscribeTokens, templates } from '@shared/schema';
 import crypto from 'crypto';
 import { EmailService } from '../emailService';
-import { authenticateToken, requireRole, requireTenant } from '../middleware/auth-middleware';
+import { authenticateToken, requireRole, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { sanitizeString } from '../utils/sanitization';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 import { replaceEmailPlaceholders } from '../utils/emailPlaceholders';
@@ -333,7 +333,7 @@ function sanitizeTheme(theme: unknown): string | null {
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 // Get all forms for the user's company
-formsRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
+formsRoutes.get("/", authenticateToken, requireTenant, requirePermission('forms.view'), async (req: any, res) => {
   try {
     const { page: rawPage, limit: rawLimit, search, published, category } = req.query;
     const { page, limit, offset } = parsePagination(rawPage, rawLimit);
@@ -389,7 +389,7 @@ formsRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => 
 });
 
 // Get specific form
-formsRoutes.get("/:id", authenticateToken, requireTenant, validateUuidParam, async (req: any, res) => {
+formsRoutes.get("/:id", authenticateToken, requireTenant, requirePermission('forms.view'), validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -409,7 +409,7 @@ formsRoutes.get("/:id", authenticateToken, requireTenant, validateUuidParam, asy
 });
 
 // Create new form
-formsRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) => {
+formsRoutes.post("/", authenticateToken, requireTenant, requirePermission('forms.create'), async (req: any, res) => {
   try {
     const { title, description, formData, theme, category } = req.body;
 
@@ -452,7 +452,7 @@ formsRoutes.post("/", authenticateToken, requireTenant, async (req: any, res) =>
 });
 
 // Update form
-formsRoutes.put("/:id", authenticateToken, requireTenant, validateUuidParam, async (req: any, res) => {
+formsRoutes.put("/:id", authenticateToken, requireTenant, requirePermission('forms.edit'), validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { title, description, formData, schema, settings, theme, published, category } = req.body;
@@ -515,7 +515,7 @@ formsRoutes.put("/:id", authenticateToken, requireTenant, validateUuidParam, asy
 });
 
 // Delete form
-formsRoutes.delete("/:id", authenticateToken, requireTenant, validateUuidParam, async (req: any, res) => {
+formsRoutes.delete("/:id", authenticateToken, requireTenant, requirePermission('forms.delete'), validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
 
@@ -536,7 +536,7 @@ formsRoutes.delete("/:id", authenticateToken, requireTenant, validateUuidParam, 
 });
 
 // Get form responses
-formsRoutes.get("/:id/responses", authenticateToken, requireTenant, validateUuidParam, async (req: any, res) => {
+formsRoutes.get("/:id/responses", authenticateToken, requireTenant, requirePermission('forms.view'), validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { page: rawPage, limit: rawLimit } = req.query;
@@ -578,7 +578,7 @@ formsRoutes.get("/:id/responses", authenticateToken, requireTenant, validateUuid
 });
 
 // Get form statistics
-formsRoutes.get("/:id/stats", authenticateToken, requireTenant, validateUuidParam, async (req: any, res) => {
+formsRoutes.get("/:id/stats", authenticateToken, requireTenant, requirePermission('forms.view'), validateUuidParam, async (req: any, res) => {
   try {
     const { id } = req.params;
 

@@ -5,6 +5,7 @@ import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface FormData {
   id: string;
@@ -23,6 +24,7 @@ export default function EditForm() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute('/forms/:id/edit');
   const formId = params?.id;
+  const { hasPermission } = usePermissions();
 
   // Fetch form data for editing
   const { data: formData, isLoading: formLoading, error } = useQuery({
@@ -38,6 +40,12 @@ export default function EditForm() {
   // Redirect unauthenticated users immediately
   if (isInitialized && !isAuthenticated) {
     setLocation('/auth');
+    return null;
+  }
+
+  // Redirect if user doesn't have edit permission
+  if (!hasPermission('forms.edit')) {
+    setLocation('/forms');
     return null;
   }
 

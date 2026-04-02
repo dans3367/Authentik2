@@ -11,6 +11,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import { FormPreviewModal } from '@/components/form-preview-modal';
 import { FormQRCode } from '@/components/form-builder/form-qr-code';
@@ -190,6 +191,11 @@ export default function Forms2() {
   const queryClient = useQueryClient();
   const [previewForm, setPreviewForm] = useState<any>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const { hasPermission } = usePermissions();
+  const canViewForms = hasPermission('forms.view');
+  const canCreateForms = hasPermission('forms.create');
+  const canEditForms = hasPermission('forms.edit');
+  const canDeleteForms = hasPermission('forms.delete');
 
   // Set breadcrumbs in header
   useSetBreadcrumbs([
@@ -353,46 +359,50 @@ export default function Forms2() {
                   <FileText className="mr-2 h-4 w-4" />
                   Responses ({form.responseCount})
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleEditForm(form.id)}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <DropdownMenuItem
-                      onSelect={(e) => e.preventDefault()}
-                      className="text-red-600 dark:text-red-400 cursor-pointer"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the form "{form.title}" and all its responses.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => handleDeleteForm(form.id)}
-                        className="bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
-                        disabled={deleteFormMutation.isPending}
+                {canEditForms && (
+                  <DropdownMenuItem onClick={() => handleEditForm(form.id)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
+                {canDeleteForms && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <DropdownMenuItem
+                        onSelect={(e) => e.preventDefault()}
+                        className="text-red-600 dark:text-red-400 cursor-pointer"
                       >
-                        {deleteFormMutation.isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Deleting...
-                          </>
-                        ) : (
-                          'Delete Form'
-                        )}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the form "{form.title}" and all its responses.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteForm(form.id)}
+                          className="bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
+                          disabled={deleteFormMutation.isPending}
+                        >
+                          {deleteFormMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Deleting...
+                            </>
+                          ) : (
+                            'Delete Form'
+                          )}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -481,6 +491,22 @@ export default function Forms2() {
     );
   }
 
+  // Permission denied - no forms.view access
+  if (!canViewForms) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="max-w-7xl mx-auto">
+          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <CardContent className="text-center py-12">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Access Denied</h2>
+              <p className="text-gray-600 dark:text-gray-400">You don't have permission to view forms.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   // Show loading while forms are being fetched
   if (formsLoading) {
     return (
@@ -503,12 +529,14 @@ export default function Forms2() {
                 <RefreshCw className={`mr-2 h-4 w-4 ${formsLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <Link href="/forms/add">
-                <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Form
-                </Button>
-              </Link>
+              {canCreateForms && (
+                <Link href="/forms/add">
+                  <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Form
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
           <div className="flex items-center justify-center min-h-[400px]">
@@ -542,12 +570,14 @@ export default function Forms2() {
                 <RefreshCw className={`mr-2 h-4 w-4 ${formsLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <Link href="/forms/add">
-                <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Form
-                </Button>
-              </Link>
+              {canCreateForms && (
+                <Link href="/forms/add">
+                  <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Form
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
           <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
@@ -586,12 +616,14 @@ export default function Forms2() {
               <RefreshCw className={`mr-2 h-4 w-4 ${formsLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            <Link href="/forms/add">
-              <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Form
-              </Button>
-            </Link>
+            {canCreateForms && (
+              <Link href="/forms/add">
+                <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Form
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
 
@@ -599,9 +631,11 @@ export default function Forms2() {
           <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
             <CardContent className="text-center py-12">
               <p className="text-gray-600 dark:text-gray-300 mb-4">No forms created yet</p>
-              <Link href="/forms/add">
-                <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">Create your first form</Button>
-              </Link>
+              {canCreateForms && (
+                <Link href="/forms/add">
+                  <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">Create your first form</Button>
+                </Link>
+              )}
             </CardContent>
           </Card>
         ) : (

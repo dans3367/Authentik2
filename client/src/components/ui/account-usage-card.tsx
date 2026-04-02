@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface UsageItem {
   current: number;
@@ -111,6 +112,8 @@ function UsageMetric({ icon, label, current, limit, warning, periodLabel }: Usag
 
 export function AccountUsageCard() {
   const { t } = useTranslation();
+  const { hasPermission } = usePermissions();
+  const canManageSubscription = hasPermission('billing.manage_subscription');
 
   const { data, isLoading, error } = useQuery<AccountUsageData>({
     queryKey: ["/api/account-usage"],
@@ -207,10 +210,12 @@ export function AccountUsageCard() {
                 <div className="text-muted-foreground"><Store className="h-4 w-4" /></div>
                 <span className="text-sm font-medium">{t('management.accountUsage.shops', 'Shops')}</span>
               </div>
-              <Link href="/profile?tab=subscription" className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline">
-                {t('common.upgrade', 'Upgrade')}
-                <ArrowUpRight className="h-3 w-3" />
-              </Link>
+              {canManageSubscription && (
+                <Link href="/profile?tab=subscription" className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline">
+                  {t('common.upgrade', 'Upgrade')}
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              )}
             </div>
           ) : (
             <UsageMetric
@@ -226,10 +231,12 @@ export function AccountUsageCard() {
                 <div className="text-muted-foreground"><Users className="h-4 w-4" /></div>
                 <span className="text-sm font-medium">{t('management.accountUsage.teamMembers', 'Team Members')}</span>
               </div>
-              <Link href="/profile?tab=subscription" className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline">
-                {t('common.upgrade', 'Upgrade')}
-                <ArrowUpRight className="h-3 w-3" />
-              </Link>
+              {canManageSubscription && (
+                <Link href="/profile?tab=subscription" className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline">
+                  {t('common.upgrade', 'Upgrade')}
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              )}
             </div>
           ) : (
             <UsageMetric
@@ -241,16 +248,18 @@ export function AccountUsageCard() {
           )}
         </div>
 
-        {/* Upgrade CTA */}
-        <div className="mt-8 pt-6 border-t">
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <span>{t('management.accountUsage.needMore', 'Need even more resources?')}</span>
-            <Link href="/profile?tab=subscription" className="inline-flex items-center gap-1 text-primary font-medium hover:underline">
-              {t('management.accountUsage.checkPlans', 'Check out our higher limit plans')}
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
+        {/* Upgrade CTA - only show if user can manage subscription */}
+        {canManageSubscription && (
+          <div className="mt-8 pt-6 border-t">
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <span>{t('management.accountUsage.needMore', 'Need even more resources?')}</span>
+              <Link href="/profile?tab=subscription" className="inline-flex items-center gap-1 text-primary font-medium hover:underline">
+                {t('management.accountUsage.checkPlans', 'Check out our higher limit plans')}
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

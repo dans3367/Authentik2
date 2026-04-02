@@ -1045,49 +1045,6 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requirePermi
   }
 });
 
-// Get subscription usage
-subscriptionRoutes.get("/usage", authenticateToken, requirePermission('billing.view_usage'), async (req: any, res) => {
-  try {
-    // Validate authentication
-    if (!req.user || !req.user.tenantId) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    const company = await db.query.companies.findFirst({
-      where: eq(companies.tenantId, req.user.tenantId),
-      with: {
-        subscription: true,
-      },
-    });
-
-    if (!company) {
-      return res.status(404).json({ message: 'Company not found' });
-    }
-
-    // Get current usage statistics
-    const [formCount, responseCount, userCount] = await Promise.all([
-      db.select({ count: sql<number>`count(*)` }).from(forms).where(sql`${forms.tenantId} = ${company.id}`),
-      db.select({ count: sql<number>`count(*)` }).from(formResponses).innerJoin(forms, sql`${forms.id} = ${formResponses.formId}`).where(sql`${forms.tenantId} = ${company.id}`),
-      db.select({ count: sql<number>`count(*)` }).from(db.users).where(sql`${betterAuthUser.tenantId} = ${company.id}`),
-    ]);
-
-    const usage = {
-      forms: formCount[0].count,
-      responses: responseCount[0].count,
-      users: userCount[0].count,
-      period: {
-        start: company.subscription?.currentPeriodStart || new Date(),
-        end: company.subscription?.currentPeriodEnd || new Date(),
-      },
-    };
-
-    res.json(usage);
-  } catch (error) {
-    console.error('Get subscription usage error:', error);
-    res.status(500).json({ message: 'Failed to get subscription usage' });
-  }
-});
-
 // Check if current tenant has an active subscription (used by frontend to gate plan selection)
 subscriptionRoutes.get("/check-subscription", authenticateToken, async (req: any, res) => {
   try {
