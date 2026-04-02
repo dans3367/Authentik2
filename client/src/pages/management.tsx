@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { LayoutDashboard, Settings } from "lucide-react";
@@ -11,10 +11,23 @@ import ManagementBlogDesign from "@/pages/management-blog-design";
 import ManagementNewsletterReviewer from "@/pages/management-newsletter-reviewer";
 import ManagementCustomFields from "@/pages/management-custom-fields";
 import ManagementBulkImport from "@/pages/management-bulk-import";
+import ManagementActivityLogs from "@/pages/management-activity-logs";
 import { AccountUsageCard, ResourceUsageCard } from "@/components/ui/account-usage-card";
 
 export default function ManagementPage() {
   const { t } = useTranslation();
+
+  // Read initial tab from URL query param (e.g., /management?tab=activity-logs)
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialTab = urlParams.get("tab") || "account-usage";
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Update tab if URL changes (e.g., navigated from another page)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab) setActiveTab(tab);
+  }, []);
 
   // Set breadcrumbs in header
   useSetBreadcrumbs([
@@ -34,7 +47,7 @@ export default function ManagementPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="account-usage" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList>
             <TabsTrigger value="account-usage">{t('management.tabs.accountUsage', 'Account Usage')}</TabsTrigger>
             <TabsTrigger value="users">{t('management.tabs.users')}</TabsTrigger>
@@ -45,6 +58,7 @@ export default function ManagementPage() {
             <TabsTrigger value="newsletter-reviewer">{t('management.tabs.newsletterReviewer', 'Reviewer')}</TabsTrigger>
             <TabsTrigger value="custom-fields">{t('management.tabs.customFields', 'Custom Fields')}</TabsTrigger>
             <TabsTrigger value="bulk-import">{t('management.tabs.bulkImport', 'Bulk Import')}</TabsTrigger>
+            <TabsTrigger value="activity-logs">{t('management.tabs.activityLogs', 'Activity Logs')}</TabsTrigger>
           </TabsList>
           <div className="mt-6">
             <TabsContent value="account-usage">
@@ -76,6 +90,9 @@ export default function ManagementPage() {
             </TabsContent>
             <TabsContent value="bulk-import">
               <ManagementBulkImport />
+            </TabsContent>
+            <TabsContent value="activity-logs">
+              <ManagementActivityLogs />
             </TabsContent>
           </div>
         </Tabs>

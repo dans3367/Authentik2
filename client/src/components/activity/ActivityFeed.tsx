@@ -6,6 +6,7 @@
 
 import React, { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { useEntityActivityLogs } from "@/hooks/useActivityLogs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +29,7 @@ import {
     Activity,
     ChevronDown,
     ChevronRight,
+    ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ActivityLogWithUser } from "@shared/schema";
@@ -218,6 +220,7 @@ function ActivityFeedSkeleton() {
 
 export default function ActivityFeed({ entityType, entityId, limit = 20, className }: ActivityFeedProps) {
     const { t } = useTranslation();
+    const [, setLocation] = useLocation();
     const [offset, setOffset] = useState(0);
     const [combinedLogs, setCombinedLogs] = useState<ActivityLogWithUser[]>([]);
     const [hasMore, setHasMore] = useState(true);
@@ -298,9 +301,9 @@ export default function ActivityFeed({ entityType, entityId, limit = 20, classNa
 
             {hasMore && (
                 <div className="pt-4 text-center">
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         className="text-gray-500"
                         onClick={handleLoadMore}
                         disabled={isLoadingMore}
@@ -309,6 +312,18 @@ export default function ActivityFeed({ entityType, entityId, limit = 20, classNa
                     </Button>
                 </div>
             )}
+
+            <div className="pt-3 text-center border-t border-gray-100 dark:border-gray-800 mt-3">
+                <Button
+                    variant="link"
+                    size="sm"
+                    className="text-xs text-gray-500 hover:text-primary"
+                    onClick={() => setLocation(`/management?tab=activity-logs&entityType=${entityType}`)}
+                >
+                    {t('activityFeed.viewAllLogs', 'View all activity logs')}
+                    <ExternalLink className="h-3 w-3 ml-1" />
+                </Button>
+            </div>
         </div>
     );
 }

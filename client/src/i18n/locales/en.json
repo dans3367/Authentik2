@@ -2143,7 +2143,37 @@
       "shops": "Shops",
       "tags": "Tags",
       "rolesPermissions": "Roles & Permissions",
-      "emailDesign": "Email Design"
+      "emailDesign": "Email Design",
+      "activityLogs": "Activity Logs"
+    },
+    "activityLogs": {
+      "accessDenied": "Access Denied",
+      "accessDeniedDesc": "You don't have permission to view activity logs.",
+      "searchPlaceholder": "Search activity logs...",
+      "search": "Search",
+      "filters": "Filters",
+      "clearFilters": "Clear",
+      "errorLoading": "Failed to load activity logs. Axiom may not be configured.",
+      "noResults": "No activity logs found",
+      "noResultsFiltered": "Try adjusting your filters or search query.",
+      "noResultsEmpty": "Activity will appear here as actions are performed.",
+      "stats": {
+        "totalEvents": "Total Events",
+        "topEntities": "Top Entity Types",
+        "topActions": "Top Actions"
+      },
+      "table": {
+        "timestamp": "Timestamp",
+        "action": "Action",
+        "entity": "Entity",
+        "description": "Description",
+        "user": "User"
+      },
+      "pagination": {
+        "showing": "Showing",
+        "of": "of",
+        "page": "Page"
+      }
     },
     "rolesPermissions": {
       "title": "Roles & Permissions",
@@ -2621,6 +2651,7 @@
     "noActivityDescription": "Actions taken on this item will appear here as a timeline.",
     "errorLoading": "Failed to load activity logs",
     "loadMore": "Load more activity",
+    "viewAllLogs": "View all activity logs",
     "types": {
       "created": "Created",
       "updated": "Updated",
