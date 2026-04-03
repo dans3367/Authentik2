@@ -10,6 +10,9 @@ import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth-middleware';
 import { getAxiomClient, AXIOM_DATASET } from '../utils/axiomClient';
 import { isAdmin } from '../utils/routeHelpers';
+import { db } from '../db';
+import { betterAuthUser } from '@shared/schema';
+import { inArray } from 'drizzle-orm';
 
 export const axiomActivityRoutes = Router();
 
@@ -32,11 +35,39 @@ function validatePaginationParams(limit?: string | string[], offset?: string | s
 }
 
 /**
+ * Looks up user details from the DB for a set of user IDs.
+ * Returns a map of userId -> { firstName, lastName, email, avatarUrl }.
+ */
+async function fetchUserMap(userIds: string[]): Promise<Map<string, { firstName: string | null; lastName: string | null; email: string; avatarUrl: string | null }>> {
+    const map = new Map();
+    if (userIds.length === 0) return map;
+    try {
+        const users = await db
+            .select({
+                id: betterAuthUser.id,
+                firstName: betterAuthUser.firstName,
+                lastName: betterAuthUser.lastName,
+                email: betterAuthUser.email,
+                avatarUrl: betterAuthUser.avatarUrl,
+            })
+            .from(betterAuthUser)
+            .where(inArray(betterAuthUser.id, userIds));
+        for (const u of users) {
+            map.set(u.id, u);
+        }
+    } catch (err) {
+        console.error('[AxiomActivityRoutes] User lookup failed:', err);
+    }
+    return map;
+}
+
+/**
  * Transforms raw Axiom rows into the same shape as the DB activity routes.
  * Axiom stores changes/metadata as objects already (not JSON strings).
  */
-function transformAxiomLogs(rows: any[], req: any) {
+function transformAxiomLogs(rows: any[], req: any, userMap: Map<string, any>) {
     return rows.map((row: any) => {
+        const dbUser = row.userId ? userMap.get(row.userId) : null;
         const log: any = {
             id: row._rowId || row._time, // Axiom doesn't have a UUID; use rowId or timestamp
             tenantId: row.tenantId,
@@ -49,8 +80,13 @@ function transformAxiomLogs(rows: any[], req: any) {
             changes: row.changes || null,
             metadata: row.metadata || null,
             createdAt: row._time,
-            // Axiom doesn't join user data — provide a minimal stub
-            user: row.userId ? {
+            user: dbUser ? {
+                id: row.userId,
+                firstName: dbUser.firstName,
+                lastName: dbUser.lastName,
+                email: dbUser.email,
+                avatarUrl: dbUser.avatarUrl,
+            } : row.userId ? {
                 id: row.userId,
                 firstName: null,
                 lastName: null,
@@ -75,9 +111,13 @@ function transformAxiomLogs(rows: any[], req: any) {
     });
 }
 
-function buildPaginationResponse(rows: any[], pagination: { limit: number; offset: number }, total: number, req: any) {
+async function buildPaginationResponse(rows: any[], pagination: { limit: number; offset: number }, total: number, req: any) {
+    // Collect unique userIds and fetch user details from DB
+    const userIds = [...new Set(rows.map((r: any) => r.userId).filter(Boolean))] as string[];
+    const userMap = await fetchUserMap(userIds);
+
     return {
-        logs: transformAxiomLogs(rows, req),
+        logs: transformAxiomLogs(rows, req, userMap),
         pagination: {
             limit: pagination.limit,
             offset: pagination.offset,
@@ -122,17 +162,19 @@ async function queryAxiomLogs(opts: {
 
     const whereClause = filters.join(' and ');
 
-    // Count query
-    const countApl = `['${AXIOM_DATASET}'] | where ${whereClause} | summarize total=count()`;
     const startTime = opts.startTime || 'now-90d';
     const endTime = opts.endTime || 'now';
+    const queryOpts = {
+        startTime: new Date(startTime === 'now-90d' ? Date.now() - 90 * 24 * 60 * 60 * 1000 : startTime).toISOString(),
+        endTime: new Date(endTime === 'now' ? Date.now() : endTime).toISOString(),
+    };
+
+    // Count query
+    const countApl = `['${AXIOM_DATASET}'] | where ${whereClause} | summarize total=count()`;
 
     let total = 0;
     try {
-        const countResult = await client.query(countApl, {
-            startTime: new Date(startTime === 'now-90d' ? Date.now() - 90 * 24 * 60 * 60 * 1000 : startTime).toISOString(),
-            endTime: new Date(endTime === 'now' ? Date.now() : endTime).toISOString(),
-        });
+        const countResult = await client.query(countApl, queryOpts);
         // Aggregation results come in status.rowsMatched or buckets.totals
         if (countResult.buckets?.totals && countResult.buckets.totals.length > 0) {
             const agg = countResult.buckets.totals[0].aggregations;
@@ -148,19 +190,20 @@ async function queryAxiomLogs(opts: {
         console.error('[AxiomActivityRoutes] Count query failed:', err);
     }
 
-    // Data query with sort + pagination
-    const dataApl = `['${AXIOM_DATASET}'] | where ${whereClause} | sort by _time desc | offset ${opts.offset} | limit ${opts.limit}`;
+    // Data query — fetch enough rows to cover offset+limit, then slice in JS.
+    // Avoids reliance on APL `offset` operator which may not be supported in all Axiom plans.
+    const fetchLimit = opts.offset + opts.limit;
+    const dataApl = `['${AXIOM_DATASET}'] | where ${whereClause} | sort by _time desc | take ${fetchLimit}`;
 
     let rows: any[] = [];
     try {
-        const dataResult = await client.query(dataApl, {
-            startTime: new Date(startTime === 'now-90d' ? Date.now() - 90 * 24 * 60 * 60 * 1000 : startTime).toISOString(),
-            endTime: new Date(endTime === 'now' ? Date.now() : endTime).toISOString(),
-        });
+        const dataResult = await client.query(dataApl, queryOpts);
 
-        // query() returns matches as Entry[] with { _rowId, _time, data }
-        if (dataResult.matches) {
-            rows = dataResult.matches.map((m) => ({ _rowId: m._rowId, _time: m._time, ...m.data }));
+        // query() in legacy format returns matches as Entry[] with { _rowId, _time, data }
+        if (dataResult.matches && dataResult.matches.length > 0) {
+            const allRows = dataResult.matches.map((m: any) => ({ _rowId: m._rowId, _time: m._time, ...m.data }));
+            // Apply offset in JS
+            rows = allRows.slice(opts.offset);
         }
     } catch (err) {
         console.error('[AxiomActivityRoutes] Data query failed:', err);
@@ -201,7 +244,7 @@ axiomActivityRoutes.get("/", authenticateToken, async (req: any, res) => {
             endTime: endTime as string | undefined,
         });
 
-        res.json(buildPaginationResponse(rows, paginationParams, total, req));
+        res.json(await buildPaginationResponse(rows, paginationParams, total, req));
     } catch (error) {
         console.error('[AxiomActivityRoutes] GET / error:', error);
         res.status(500).json({ message: 'Failed to get activity logs from Axiom' });
@@ -239,7 +282,7 @@ axiomActivityRoutes.get("/entity/:entityType/:entityId", authenticateToken, asyn
             endTime: endTime as string | undefined,
         });
 
-        res.json(buildPaginationResponse(rows, paginationParams, total, req));
+        res.json(await buildPaginationResponse(rows, paginationParams, total, req));
     } catch (error) {
         console.error('[AxiomActivityRoutes] GET /entity error:', error);
         res.status(500).json({ message: 'Failed to get activity logs from Axiom' });
@@ -358,7 +401,7 @@ axiomActivityRoutes.get("/search", authenticateToken, async (req: any, res) => {
             rows = result.matches.map((m) => ({ _rowId: m._rowId, _time: m._time, ...m.data }));
         }
 
-        res.json(buildPaginationResponse(rows, paginationParams, rows.length, req));
+        res.json(await buildPaginationResponse(rows, paginationParams, rows.length, req));
     } catch (error) {
         console.error('[AxiomActivityRoutes] GET /search error:', error);
         res.status(500).json({ message: 'Failed to search activity logs in Axiom' });

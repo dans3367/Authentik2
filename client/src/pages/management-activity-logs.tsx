@@ -138,18 +138,28 @@ function getTimeRange(range: string): { startTime: string; endTime: string } {
 function ChangesDetail({ changes }: { changes: any }) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const parsedChanges = useMemo(() => {
-    if (!changes) return {};
+  const actualChanges = useMemo(() => {
+    let parsed: Record<string, any> = {};
+    if (!changes) return parsed;
     try {
-      if (typeof changes === "string") return JSON.parse(changes);
-      if (typeof changes === "object") return changes;
+      if (typeof changes === "string") parsed = JSON.parse(changes);
+      else if (typeof changes === "object") parsed = changes;
     } catch {
-      return {};
+      return parsed;
     }
-    return {};
+    // Filter to only fields where old !== new
+    const filtered: Record<string, any> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (value && typeof value === "object" && "old" in value && "new" in value) {
+        if (JSON.stringify(value.old) !== JSON.stringify(value.new)) {
+          filtered[key] = value;
+        }
+      }
+    }
+    return filtered;
   }, [changes]);
 
-  const keys = Object.keys(parsedChanges);
+  const keys = Object.keys(actualChanges);
   if (keys.length === 0) return null;
 
   return (
@@ -167,7 +177,7 @@ function ChangesDetail({ changes }: { changes: any }) {
       <CollapsibleContent className="mt-1">
         <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 space-y-1">
           {keys.map((field) => {
-            const v = parsedChanges[field] as { old: any; new: any };
+            const v = actualChanges[field] as { old: any; new: any };
             return (
               <div key={field} className="flex items-start gap-2 text-xs">
                 <span className="font-medium text-gray-700 dark:text-gray-300 min-w-[80px]">
@@ -509,22 +519,22 @@ export default function ManagementActivityLogs() {
             </div>
           ) : (
             <>
-              <Table>
+              <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[180px]">
+                    <TableHead className="w-[12%]">
                       {t("management.activityLogs.table.timestamp", "Timestamp")}
                     </TableHead>
-                    <TableHead className="w-[100px]">
+                    <TableHead className="w-[13%]">
                       {t("management.activityLogs.table.action", "Action")}
                     </TableHead>
-                    <TableHead className="w-[100px]">
+                    <TableHead className="w-[13%]">
                       {t("management.activityLogs.table.entity", "Entity")}
                     </TableHead>
-                    <TableHead>
+                    <TableHead className="w-[47%]">
                       {t("management.activityLogs.table.description", "Description")}
                     </TableHead>
-                    <TableHead className="w-[120px]">
+                    <TableHead className="w-[15%]">
                       {t("management.activityLogs.table.user", "User")}
                     </TableHead>
                   </TableRow>
@@ -532,11 +542,11 @@ export default function ManagementActivityLogs() {
                 <TableBody>
                   {logs.map((log: any) => (
                     <TableRow key={log.id} className="group">
-                      <TableCell className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                      <TableCell className="font-mono text-xs text-gray-500 dark:text-gray-400 align-top">
                         <div>{format(new Date(log.createdAt), "MMM d, yyyy")}</div>
                         <div>{format(new Date(log.createdAt), "HH:mm:ss")}</div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top">
                         <Badge
                           variant="secondary"
                           className={cn(
@@ -548,7 +558,7 @@ export default function ManagementActivityLogs() {
                           {log.activityType}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top">
                         <Badge
                           variant="outline"
                           className={cn(
@@ -559,23 +569,23 @@ export default function ManagementActivityLogs() {
                           {log.entityType}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
+                      <TableCell className="align-top">
+                        <div className="space-y-1 min-w-0">
                           {log.entityName && (
-                            <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                            <span className="font-medium text-sm text-gray-900 dark:text-gray-100 block truncate">
                               {log.entityName}
                             </span>
                           )}
                           {log.description && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 break-words">
                               {log.description}
                             </p>
                           )}
                           <ChangesDetail changes={log.changes} />
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
+                      <TableCell className="align-top">
+                        <div className="text-sm truncate">
                           {log.user?.firstName && log.user?.lastName
                             ? `${log.user.firstName} ${log.user.lastName}`
                             : log.user?.email || (
