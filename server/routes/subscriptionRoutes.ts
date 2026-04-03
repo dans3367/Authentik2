@@ -308,8 +308,7 @@ subscriptionRoutes.get("/my-subscription", authenticateToken, requireTenant, req
         planId: subscription.planId,
         plan: subscription.plan || null,
         isYearly: subscription.isYearly || false,
-        stripeCustomerId: subscription.stripeCustomerId,
-        stripeSubscriptionId: subscription.stripeSubscriptionId,
+        // stripeCustomerId and stripeSubscriptionId intentionally omitted — sensitive
         currentPeriodStart: subscription.currentPeriodStart,
         currentPeriodEnd: subscription.currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
@@ -338,6 +337,20 @@ subscriptionRoutes.post("/create-checkout-session", authenticateToken, requirePe
 
     if (!planId || !successUrl || !cancelUrl) {
       return res.status(400).json({ message: 'Plan ID, success URL, and cancel URL are required' });
+    }
+
+    // Validate redirect URLs to prevent open redirect attacks
+    const allowedOrigin = process.env.FRONTEND_URL || 'https://web.zendwise.work';
+    for (const [label, url] of [['successUrl', successUrl], ['cancelUrl', cancelUrl]] as const) {
+      try {
+        const parsed = new URL(url);
+        const allowed = new URL(allowedOrigin);
+        if (parsed.origin !== allowed.origin) {
+          return res.status(400).json({ message: `${label} must point to ${allowed.origin}` });
+        }
+      } catch {
+        return res.status(400).json({ message: `${label} is not a valid URL` });
+      }
     }
 
     // Validate authentication

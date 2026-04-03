@@ -11,8 +11,8 @@ tenantLimitsRoutes.get('/:tenantId', authenticateToken, requireRole(['Owner', 'A
   try {
     const { tenantId } = req.params;
     
-    // Only allow access to own tenant unless user is super admin
-    if (req.user.role !== 'SuperAdmin' && req.user.tenantId !== tenantId) {
+    // Strict tenant isolation: users can only access their own tenant's limits
+    if (req.user.tenantId !== tenantId) {
       return res.status(403).json({ message: 'Access denied' });
     }
     
@@ -38,8 +38,8 @@ tenantLimitsRoutes.post('/:tenantId', authenticateToken, requireRole(['Owner', '
   try {
     const { tenantId } = req.params;
     
-    // Only allow access to own tenant unless user is super admin
-    if (req.user.role !== 'SuperAdmin' && req.user.tenantId !== tenantId) {
+    // Strict tenant isolation: users can only access their own tenant's limits
+    if (req.user.tenantId !== tenantId) {
       return res.status(403).json({ message: 'Access denied' });
     }
     
@@ -80,8 +80,8 @@ tenantLimitsRoutes.put('/:tenantId', authenticateToken, requireRole(['Owner', 'A
   try {
     const { tenantId } = req.params;
     
-    // Only allow access to own tenant unless user is super admin
-    if (req.user.role !== 'SuperAdmin' && req.user.tenantId !== tenantId) {
+    // Strict tenant isolation: users can only access their own tenant's limits
+    if (req.user.tenantId !== tenantId) {
       return res.status(403).json({ message: 'Access denied' });
     }
     
@@ -118,8 +118,8 @@ tenantLimitsRoutes.delete('/:tenantId', authenticateToken, requireRole(['Owner',
   try {
     const { tenantId } = req.params;
     
-    // Only allow access to own tenant unless user is super admin
-    if (req.user.role !== 'SuperAdmin' && req.user.tenantId !== tenantId) {
+    // Strict tenant isolation: users can only access their own tenant's limits
+    if (req.user.tenantId !== tenantId) {
       return res.status(403).json({ message: 'Access denied' });
     }
     
@@ -145,8 +145,8 @@ tenantLimitsRoutes.get('/:tenantId/events', authenticateToken, requireRole(['Own
     const { tenantId } = req.params;
     const { eventType, fromDate, toDate, limit = 50 } = req.query;
     
-    // Only allow access to own tenant unless user is super admin
-    if (req.user.role !== 'SuperAdmin' && req.user.tenantId !== tenantId) {
+    // Strict tenant isolation: users can only access their own tenant's limits
+    if (req.user.tenantId !== tenantId) {
       return res.status(403).json({ message: 'Access denied' });
     }
     
@@ -181,8 +181,8 @@ tenantLimitsRoutes.get('/:tenantId/summary', authenticateToken, requireRole(['Ow
   try {
     const { tenantId } = req.params;
     
-    // Only allow access to own tenant unless user is super admin
-    if (req.user.role !== 'SuperAdmin' && req.user.tenantId !== tenantId) {
+    // Strict tenant isolation: users can only access their own tenant's limits
+    if (req.user.tenantId !== tenantId) {
       return res.status(403).json({ message: 'Access denied' });
     }
     
