@@ -5,6 +5,7 @@ import { db } from '../db';
 import {
   appointments,
   appointmentReminders,
+  appointmentAutoReminderSettings,
   emailContacts,
   companies,
   shops,
@@ -1010,6 +1011,61 @@ router.post('/:id/send-thank-you-email', requireRole(['Owner', 'Administrator', 
   } catch (error) {
     console.error('Failed to send thank-you email:', error);
     res.status(500).json({ error: 'Failed to send thank-you email' });
+  }
+});
+
+// ─── Auto-reminder settings ─────────────────────────────────────────────────
+
+// GET current auto-reminder settings for the tenant
+router.get("/auto-reminder-settings", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+  try {
+    const row = await db.query.appointmentAutoReminderSettings.findFirst({
+      where: eq(appointmentAutoReminderSettings.tenantId, req.user.tenantId),
+    });
+
+    res.json({ enabled: row?.enabled ?? false });
+  } catch (error) {
+    console.error('Get auto-reminder settings error:', error);
+    res.status(500).json({ message: 'Failed to get auto-reminder settings' });
+  }
+});
+
+// PUT enable/disable auto-reminder for the tenant
+router.put("/auto-reminder-settings", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+  try {
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: 'enabled must be a boolean' });
+    }
+
+    // Upsert: insert or update
+    await db.insert(appointmentAutoReminderSettings).values({
+      tenantId: req.user.tenantId,
+      enabled,
+      updatedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: [appointmentAutoReminderSettings.tenantId],
+      set: {
+        enabled,
+        updatedAt: new Date(),
+      },
+    });
+
+    await logActivity({
+      tenantId: req.user.tenantId,
+      userId: req.user.id,
+      entityType: 'appointment',
+      activityType: 'updated',
+      description: `Appointment auto-reminder ${enabled ? 'enabled' : 'disabled'}`,
+      metadata: { enabled },
+      req,
+    });
+
+    res.json({ message: `Auto-reminder ${enabled ? 'enabled' : 'disabled'} successfully`, enabled });
+  } catch (error) {
+    console.error('Update auto-reminder settings error:', error);
+    res.status(500).json({ message: 'Failed to update auto-reminder settings' });
   }
 });
 

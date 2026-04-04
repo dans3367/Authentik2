@@ -5,6 +5,7 @@ import { storage } from '../storage';
 import { db } from '../db';
 import { betterAuthUser, betterAuthSession, subscriptionPlans, createUserSchema } from '@shared/schema';
 import { sql, eq, and, count } from 'drizzle-orm';
+import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
 export const userRoutes = Router();
 
@@ -122,6 +123,12 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
       firstName: updatedUser?.firstName,
       lastName: updatedUser?.lastName,
       email: updatedUser?.email
+    });
+
+    // Invalidate security cache — language or other cached fields may have changed
+    invalidateUserSecurity(userId, 'profile_update', {
+      tenantId,
+      req,
     });
 
     res.json({
@@ -368,6 +375,13 @@ userRoutes.put("/:userId", authenticateToken, requirePlanFeature('allowUsersMana
         eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
 
+    // Invalidate security cache — role or status may have changed
+    invalidateUserSecurity(userId, 'role_change', {
+      tenantId: req.user.tenantId,
+      performedBy: req.user.id,
+      req,
+    });
+
     res.json({ message: 'User updated successfully' });
   } catch (error) {
     console.error('Update user error:', error);
@@ -440,6 +454,13 @@ userRoutes.patch("/:userId/status", authenticateToken, requirePlanFeature('allow
         eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
 
+    // Invalidate security cache — isActive changed
+    invalidateUserSecurity(userId, 'status_change', {
+      tenantId: req.user.tenantId,
+      performedBy: req.user.id,
+      req,
+    });
+
     res.json({
       message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
       userId,
@@ -486,6 +507,13 @@ userRoutes.delete("/:userId", authenticateToken, requirePlanFeature('allowUsersM
         eq(betterAuthUser.id, userId),
         eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
+
+    // Invalidate security cache for deleted user
+    invalidateUserSecurity(userId, 'user_deleted', {
+      tenantId: req.user.tenantId,
+      performedBy: req.user.id,
+      req,
+    });
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {

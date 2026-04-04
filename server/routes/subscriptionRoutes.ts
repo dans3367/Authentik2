@@ -5,6 +5,7 @@ import { betterAuthUser, subscriptionPlans, forms, formResponses, companies, sub
 import { authenticateToken, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { storage } from '../storage';
 import Stripe from 'stripe';
+import { invalidateUserSecurity, invalidateTenantPlanCache } from '../utils/userSecurityCache';
 
 export const subscriptionRoutes = Router();
 
@@ -120,6 +121,11 @@ async function provisionTenantForUser(userId: string): Promise<string> {
         updatedAt: new Date(),
       })
       .where(eq(betterAuthUser.id, userRecord.id));
+
+    // Invalidate security cache — tenantId and role changed during onboarding
+    invalidateUserSecurity(userRecord.id, 'role_change', {
+      tenantId: newTenant.id,
+    });
 
     // Create company record
     const [newCompany] = await db.insert(companies).values({
@@ -862,6 +868,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requirePermi
         isYearly: isYearly,
       });
 
+      invalidateTenantPlanCache(tenantId);
       return res.json({
         message: `Successfully subscribed to ${targetPlan.displayName}`,
         plan: targetPlan.displayName,
@@ -942,6 +949,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requirePermi
         // Non-blocking: the upgrade still goes through
       }
 
+      invalidateTenantPlanCache(tenantId);
       return res.json({
         message: `Successfully upgraded to ${targetPlan.displayName}`,
         plan: targetPlan.displayName,
@@ -1046,6 +1054,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requirePermi
       // Non-blocking: the downgrade still goes through
     }
 
+    invalidateTenantPlanCache(tenantId);
     res.json({
       message: `Successfully downgraded to ${targetPlan.displayName}`,
       plan: targetPlan.displayName,
@@ -1436,6 +1445,9 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
       }
     }
 
+    // Invalidate tenant plan cache after subscription provisioning
+    if (tenantId) invalidateTenantPlanCache(tenantId);
+
     res.json({
       message: 'Subscription activated successfully',
       success: true,
@@ -1488,6 +1500,14 @@ subscriptionRoutes.post("/webhook", async (req: any, res) => {
         break;
       default:
         console.log(`Unhandled event type ${event.type}`);
+    }
+
+    // Invalidate the tenant plan cache for any tenant affected by this webhook.
+    // Extract tenantId from subscription metadata or the event data.
+    const webhookTenantId = event.data.object?.metadata?.tenantId
+      || event.data.object?.subscription_details?.metadata?.tenantId;
+    if (webhookTenantId) {
+      invalidateTenantPlanCache(webhookTenantId);
     }
 
     res.json({ received: true });

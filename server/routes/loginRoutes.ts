@@ -12,6 +12,7 @@ import { triggerTransactionalEmail } from '../lib/trigger';
 import { randomBytes } from 'crypto';
 import { twoFactorRateLimiter, passwordResetRateLimiter, loginRateLimiter } from '../middleware/security';
 import { validatePasswordStrength } from '../middleware/security-enhanced';
+import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
 export const loginRoutes = Router();
 
@@ -1287,6 +1288,11 @@ loginRoutes.post('/reset-password', async (req, res) => {
         updatedAt: new Date(),
       })
       .where(eq(betterAuthUser.id, user.id));
+
+    // Invalidate security cache — password was reset and all sessions revoked
+    invalidateUserSecurity(user.id, 'password_reset', {
+      tenantId: user.tenantId,
+    });
 
     return res.json({
       success: true,

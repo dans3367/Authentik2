@@ -3,6 +3,7 @@ import { db } from '../db';
 import { sql, and, eq } from 'drizzle-orm';
 import { betterAuthUser, tenants, companies, forms, refreshTokens } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
 export const adminRoutes = Router();
 
@@ -296,6 +297,13 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
         eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
 
+    // Invalidate security cache — role or status may have changed
+    invalidateUserSecurity(userId, 'role_change', {
+      tenantId: req.user.tenantId,
+      performedBy: req.user.id,
+      req,
+    });
+
     res.json({ message: 'User updated successfully' });
   } catch (error) {
     console.error('Update user error:', error);
@@ -356,6 +364,13 @@ adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Admin
         eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
 
+    // Invalidate security cache — isActive changed
+    invalidateUserSecurity(userId, 'status_change', {
+      tenantId: req.user.tenantId,
+      performedBy: req.user.id,
+      req,
+    });
+
     res.json({
       message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
       userId,
@@ -414,6 +429,13 @@ adminRoutes.patch("/users/:userId/role", authenticateToken, requireRole('Adminis
         eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
 
+    // Invalidate security cache — role changed
+    invalidateUserSecurity(userId, 'role_change', {
+      tenantId: req.user.tenantId,
+      performedBy: req.user.id,
+      req,
+    });
+
     res.json({ message: 'User role updated successfully' });
   } catch (error) {
     console.error('Update user role error:', error);
@@ -449,6 +471,13 @@ adminRoutes.delete("/users/:userId", authenticateToken, requireRole('Administrat
         eq(betterAuthUser.id, userId),
         eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
+
+    // Invalidate security cache for deleted user
+    invalidateUserSecurity(userId, 'user_deleted', {
+      tenantId: req.user.tenantId,
+      performedBy: req.user.id,
+      req,
+    });
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {

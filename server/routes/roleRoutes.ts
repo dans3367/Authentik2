@@ -3,6 +3,7 @@ import { authenticateToken, requireRole, requirePlanFeature, getAssignableRoles,
 import { db } from '../db';
 import { betterAuthUser, rolePermissions } from '@shared/schema';
 import { sql, eq, and } from 'drizzle-orm';
+import { invalidateUserSecurity, invalidateTenantSecurity } from '../utils/userSecurityCache';
 
 export const roleRoutes = Router();
 
@@ -681,6 +682,9 @@ roleRoutes.put("/permissions", authenticateToken, requireRole(['Owner']), requir
         },
       });
 
+      // Invalidate all cached users in the tenant — permission matrix changed
+      invalidateTenantSecurity(tenantId);
+
       res.json({
         message: `Permissions for ${role} updated successfully`,
         role,
@@ -720,6 +724,9 @@ roleRoutes.post("/permissions/reset", authenticateToken, requireRole(['Owner']),
       // Table may not exist — that's fine
     }
 
+    // Invalidate all cached users in the tenant — permission defaults restored
+    invalidateTenantSecurity(tenantId);
+
     res.json({
       message: `Permissions for ${role} reset to defaults`,
       role,
@@ -743,6 +750,9 @@ roleRoutes.post("/permissions/reset-all", authenticateToken, requireRole(['Owner
     } catch (e) {
       // Table may not exist — that's fine
     }
+
+    // Invalidate all cached users in the tenant — all permissions reset
+    invalidateTenantSecurity(tenantId);
 
     res.json({
       message: 'All role permissions reset to defaults',
@@ -846,6 +856,13 @@ roleRoutes.patch("/users/:userId/role", authenticateToken, requireRole(['Owner',
         eq(betterAuthUser.id, userId),
         eq(betterAuthUser.tenantId, tenantId)
       ));
+
+    // Invalidate security cache — role changed
+    invalidateUserSecurity(userId, 'role_change', {
+      tenantId,
+      performedBy: req.user.id,
+      req,
+    });
 
     res.json({
       message: `User role updated to ${role} successfully`,

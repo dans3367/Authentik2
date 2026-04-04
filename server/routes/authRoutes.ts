@@ -8,6 +8,7 @@ import { uploadToR2, deleteImageFromR2, R2_CONFIG } from '../config/r2';
 import { optimizeAvatar } from '../lib/imageOptimizer';
 import { auth } from '../auth';
 import crypto from 'crypto';
+import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
 export const authRoutes = Router();
 
@@ -171,7 +172,14 @@ authRoutes.delete("/user-sessions", authenticateToken, async (req: any, res) => 
     console.log('✅ [Session Delete] Successfully deleted session:', sessionId);
     console.log('📊 [Session Delete] Rows affected:', deletedSession.length);
 
-    res.json({ 
+    // Invalidate security cache — a session was revoked
+    invalidateUserSecurity(userId, 'session_revoked', {
+      tenantId: req.user.tenantId,
+      performedBy: req.user.id,
+      req,
+    });
+
+    res.json({
       message: 'Session ended successfully',
       sessionId,
       deleted: true
@@ -227,6 +235,13 @@ authRoutes.post("/logout-all", authenticateToken, async (req: any, res) => {
 
     const deletedCount = deletedSessions.length;
 
+    // Invalidate security cache — all other sessions revoked
+    invalidateUserSecurity(userId, 'logout_all', {
+      tenantId: req.user.tenantId,
+      performedBy: req.user.id,
+      req,
+    });
+
     res.json({
       message: `Successfully logged out ${deletedCount} other session${deletedCount !== 1 ? 's' : ''}`,
       sessionsEnded: deletedCount
@@ -263,6 +278,12 @@ authRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
     if (updatedUser.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
+
+    // Invalidate security cache — language or other cached fields may have changed
+    invalidateUserSecurity(userId, 'profile_update', {
+      tenantId,
+      req,
+    });
 
     res.json({
       message: 'Profile updated successfully',

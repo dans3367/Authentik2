@@ -107,6 +107,12 @@ import { db } from "./db";
 import { eq, and, gt, lt, gte, lte, desc, ne, or, ilike, count, sql, inArray, not, isNull } from "drizzle-orm";
 import { storageLogger } from "./logger";
 import { escapeLikePattern } from "./utils/sanitization";
+import {
+  invalidateUserSecurity, invalidateTenantSecurity,
+  getTenantPlanCached, setTenantPlanCached, invalidateTenantPlanCache,
+  getTenantLimitsCached, setTenantLimitsCached, invalidateTenantLimitsCache,
+  type CachedTenantLimits,
+} from "./utils/userSecurityCache";
 
 export interface IStorage {
   // Tenant management
@@ -591,6 +597,8 @@ export class DatabaseStorage implements IStorage {
     await db.delete(refreshTokens).where(and(eq(refreshTokens.userId, id), eq(refreshTokens.tenantId, tenantId)));
     // Delete user
     await db.delete(betterAuthUser).where(and(eq(betterAuthUser.id, id), eq(betterAuthUser.tenantId, tenantId)));
+    // Invalidate security cache for deleted user
+    invalidateUserSecurity(id, 'user_deleted', { tenantId });
   }
 
   async toggleUserStatus(id: string, isActive: boolean, tenantId: string): Promise<User | undefined> {
@@ -599,6 +607,8 @@ export class DatabaseStorage implements IStorage {
       .set({ isActive, updatedAt: new Date() })
       .where(and(eq(betterAuthUser.id, id), eq(betterAuthUser.tenantId, tenantId)))
       .returning();
+    // Invalidate security cache — isActive changed
+    invalidateUserSecurity(id, 'status_change', { tenantId });
     return user;
   }
 
@@ -662,20 +672,30 @@ export class DatabaseStorage implements IStorage {
 
   // Subscription and limits
   async getTenantSubscription(tenantId: string): Promise<(Subscription & { plan: SubscriptionPlan }) | undefined> {
+    // Check subscription cache first — this query fires from getTenantPlan,
+    // checkUserLimits, checkEmailLimits, logShopLimitEvent, and route handlers.
+    const cachedSub = getTenantPlanCached(tenantId);
+    if (cachedSub !== undefined) return cachedSub as any;
+
     const subscription = await db.query.subscriptions.findFirst({
       where: eq(subscriptions.tenantId, tenantId),
       with: {
         plan: true
       }
     });
+
+    // Cache the result (including undefined/null for "no subscription")
+    setTenantPlanCached(tenantId, subscription as any ?? null);
     return subscription;
   }
 
   async getTenantPlan(tenantId: string): Promise<{ planName: string; maxUsers: number | null; maxShops: number | null; monthlyEmailLimit: number | null; allowUsersManagement: boolean; allowRolesManagement: boolean; subscriptionStatus: string | null }> {
     const subscription = await this.getTenantSubscription(tenantId);
 
+    let result: { planName: string; maxUsers: number | null; maxShops: number | null; monthlyEmailLimit: number | null; allowUsersManagement: boolean; allowRolesManagement: boolean; subscriptionStatus: string | null };
+
     if (subscription?.plan) {
-      return {
+      result = {
         planName: subscription.plan.displayName || subscription.plan.name,
         maxUsers: subscription.plan.maxUsers,
         maxShops: subscription.plan.maxShops,
@@ -684,32 +704,34 @@ export class DatabaseStorage implements IStorage {
         allowRolesManagement: subscription.plan.allowRolesManagement ?? false,
         subscriptionStatus: subscription.status,
       };
+    } else {
+      // No subscription — return Free plan defaults
+      const freePlan = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.name, 'Free')).limit(1);
+      if (freePlan.length > 0) {
+        result = {
+          planName: freePlan[0].displayName,
+          maxUsers: freePlan[0].maxUsers,
+          maxShops: freePlan[0].maxShops,
+          monthlyEmailLimit: freePlan[0].monthlyEmailLimit,
+          allowUsersManagement: freePlan[0].allowUsersManagement ?? false,
+          allowRolesManagement: freePlan[0].allowRolesManagement ?? false,
+          subscriptionStatus: null,
+        };
+      } else {
+        // Hardcoded Free fallback if no plan record exists
+        result = {
+          planName: 'Free Plan',
+          maxUsers: 1,
+          maxShops: 0,
+          monthlyEmailLimit: 100,
+          allowUsersManagement: false,
+          allowRolesManagement: false,
+          subscriptionStatus: null,
+        };
+      }
     }
 
-    // No subscription — return Free plan defaults
-    const freePlan = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.name, 'Free')).limit(1);
-    if (freePlan.length > 0) {
-      return {
-        planName: freePlan[0].displayName,
-        maxUsers: freePlan[0].maxUsers,
-        maxShops: freePlan[0].maxShops,
-        monthlyEmailLimit: freePlan[0].monthlyEmailLimit,
-        allowUsersManagement: freePlan[0].allowUsersManagement ?? false,
-        allowRolesManagement: freePlan[0].allowRolesManagement ?? false,
-        subscriptionStatus: null,
-      };
-    }
-
-    // Hardcoded Free fallback if no plan record exists
-    return {
-      planName: 'Free Plan',
-      maxUsers: 1,
-      maxShops: 0,
-      monthlyEmailLimit: 100,
-      allowUsersManagement: false,
-      allowRolesManagement: false,
-      subscriptionStatus: null,
-    };
+    return result;
   }
 
   async checkUserLimits(tenantId: string): Promise<{ canAddUser: boolean; currentUsers: number; maxUsers: number | null; planName: string }> {
@@ -852,6 +874,7 @@ export class DatabaseStorage implements IStorage {
   // Subscription methods
   async createSubscription(subscription: InsertSubscription): Promise<Subscription> {
     const [newSubscription] = await db.insert(subscriptions).values(subscription).returning();
+    if (newSubscription.tenantId) invalidateTenantPlanCache(newSubscription.tenantId);
     return newSubscription;
   }
 
@@ -876,6 +899,7 @@ export class DatabaseStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date() })
       .where(and(...conditions))
       .returning();
+    if (subscription?.tenantId) invalidateTenantPlanCache(subscription.tenantId);
     return subscription;
   }
 
@@ -890,6 +914,42 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)));
   }
 
+  // Fetch the active, non-expired tenant limits row with caching.
+  // Returns null (cached) if no active limits exist for this tenant.
+  private async getActiveTenantLimits(tenantId: string): Promise<CachedTenantLimits | null> {
+    const cached = getTenantLimitsCached(tenantId);
+    if (cached !== undefined) return cached; // hit (could be null sentinel)
+
+    const row = await db.query.tenantLimits.findFirst({
+      where: and(
+        eq(tenantLimits.tenantId, tenantId),
+        eq(tenantLimits.isActive, true),
+        or(
+          isNull(tenantLimits.expiresAt),
+          gt(tenantLimits.expiresAt, new Date())
+        )
+      ),
+    });
+
+    if (row) {
+      const result: CachedTenantLimits = {
+        id: row.id,
+        maxShops: row.maxShops,
+        maxUsers: row.maxUsers,
+        maxStorageGb: row.maxStorageGb,
+        monthlyEmailLimit: row.monthlyEmailLimit,
+        overrideReason: row.overrideReason,
+        expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
+        isActive: row.isActive,
+      };
+      setTenantLimitsCached(tenantId, result);
+      return result;
+    }
+
+    setTenantLimitsCached(tenantId, null);
+    return null;
+  }
+
   // Enhanced shop limits and validation with tenant-specific overrides
   async checkShopLimits(tenantId: string): Promise<{ canAddShop: boolean; currentShops: number; maxShops: number | null; planName: string; isCustomLimit?: boolean; customLimitReason?: string; expiresAt?: Date }> {
     const shopsResult = await db.select({ count: count() }).from(shops).where(and(
@@ -901,22 +961,8 @@ export class DatabaseStorage implements IStorage {
     ));
     const currentShops = shopsResult[0]?.count || 0;
 
-    // Check for active custom tenant limits first
-    const customLimit = await db.query.tenantLimits.findFirst({
-      where: and(
-        eq(tenantLimits.tenantId, tenantId),
-        eq(tenantLimits.isActive, true),
-        or(
-          isNull(tenantLimits.expiresAt),
-          gt(tenantLimits.expiresAt, new Date())
-        )
-      ),
-      with: {
-        createdByUser: {
-          columns: { firstName: true, lastName: true, email: true }
-        }
-      }
-    });
+    // Check for active custom tenant limits first (cached)
+    const customLimit = await this.getActiveTenantLimits(tenantId);
 
     if (customLimit && customLimit.maxShops !== null) {
       return {
@@ -926,7 +972,7 @@ export class DatabaseStorage implements IStorage {
         planName: 'Custom Limit',
         isCustomLimit: true,
         customLimitReason: customLimit.overrideReason || undefined,
-        expiresAt: customLimit.expiresAt || undefined
+        expiresAt: customLimit.expiresAt ? new Date(customLimit.expiresAt) : undefined
       };
     }
 
@@ -990,18 +1036,8 @@ export class DatabaseStorage implements IStorage {
 
     const currentUsage = usageResult[0]?.count || 0;
 
-    // 2. Determine limits
-    // Check for custom tenant limits first
-    const customLimit = await db.query.tenantLimits.findFirst({
-      where: and(
-        eq(tenantLimits.tenantId, tenantId),
-        eq(tenantLimits.isActive, true),
-        or(
-          isNull(tenantLimits.expiresAt),
-          gt(tenantLimits.expiresAt, new Date())
-        )
-      )
-    });
+    // 2. Determine limits (cached)
+    const customLimit = await this.getActiveTenantLimits(tenantId);
 
     let monthlyLimit: number | null = 100; // Default fallback (Free plan)
     let planName = 'Free Plan';
@@ -1096,6 +1132,11 @@ export class DatabaseStorage implements IStorage {
           .set({ isActive: false, suspendedByDowngrade: true, suspendedAt: now, updatedAt: now })
           .where(inArray(betterAuthUser.id, idsToSuspend));
 
+        // Invalidate security cache for each suspended user — isActive changed to false
+        for (const id of idsToSuspend) {
+          invalidateUserSecurity(id, 'status_change', { tenantId });
+        }
+
         suspendedUsers = idsToSuspend.length;
       }
     }
@@ -1125,6 +1166,11 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning({ id: betterAuthUser.id });
 
+    // Invalidate security cache for each restored user — isActive changed to true
+    for (const { id } of userResult) {
+      invalidateUserSecurity(id, 'status_change', { tenantId });
+    }
+
     return {
       restoredShops: shopResult.length,
       restoredUsers: userResult.length
@@ -1135,12 +1181,7 @@ export class DatabaseStorage implements IStorage {
   async logShopLimitEvent(tenantId: string, eventType: ShopLimitEventType, shopCount: number, limitValue?: number, metadata?: Record<string, any>): Promise<void> {
     try {
       const subscription = await this.getTenantSubscription(tenantId);
-      const customLimit = await db.query.tenantLimits.findFirst({
-        where: and(
-          eq(tenantLimits.tenantId, tenantId),
-          eq(tenantLimits.isActive, true)
-        )
-      });
+      const customLimit = await this.getActiveTenantLimits(tenantId);
 
       await db.insert(shopLimitEvents).values({
         tenantId,
@@ -1165,6 +1206,8 @@ export class DatabaseStorage implements IStorage {
       createdBy,
     }).returning();
 
+    invalidateTenantLimitsCache(tenantId);
+
     // Log the limit change event
     if (limitsData.maxShops !== undefined) {
       const currentShops = await this.getCurrentShopCount(tenantId);
@@ -1182,6 +1225,8 @@ export class DatabaseStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(tenantLimits.tenantId, tenantId))
       .returning();
+
+    invalidateTenantLimitsCache(tenantId);
 
     // Log the limit change event
     if (updated && updates.maxShops !== undefined) {
@@ -1214,6 +1259,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTenantLimits(tenantId: string): Promise<void> {
     await db.delete(tenantLimits).where(eq(tenantLimits.tenantId, tenantId));
+    invalidateTenantLimitsCache(tenantId);
   }
 
   // Helper method to get current shop count

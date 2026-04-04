@@ -4,6 +4,10 @@ import { betterAuthUser, tenants, rolePermissions } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '../auth';
 import { storage } from '../storage';
+import {
+  getUserSecurity, setUserSecurity, type CachedUserSecurity,
+  getSessionResult, setSessionResult,
+} from '../utils/userSecurityCache';
 
 // Shape of session.user returned by Better Auth with additionalFields
 interface SessionUser {
@@ -34,13 +38,44 @@ export interface AuthRequest extends Request {
   user?: AuthUser;
 }
 
+// Extract the base token (without signature suffix) from the session cookie.
+function extractSessionToken(req: Request): string | undefined {
+  const raw = (req as any).cookies?.['better-auth.session_token'];
+  if (!raw) return undefined;
+  const dot = raw.indexOf('.');
+  return dot > 0 ? raw.substring(0, dot) : raw;
+}
+
 // Better Auth session verification middleware
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Use Better Auth's built-in session verification
-    const session = await auth.api.getSession({
-      headers: req.headers as any
-    });
+    // Check session result cache first to avoid the two DB queries that
+    // auth.api.getSession() makes on every call (session + user lookup).
+    const token = extractSessionToken(req);
+    let session: { session: any; user: any } | null = null;
+
+    if (token) {
+      const cached = getSessionResult(token);
+      if (cached) {
+        // Verify the cached session hasn't expired
+        const expiresAt = new Date(cached.session.expiresAt).getTime();
+        if (expiresAt > Date.now()) {
+          session = cached;
+        }
+        // If expired, fall through to getSession() which will clean up
+      }
+    }
+
+    if (!session) {
+      session = await auth.api.getSession({
+        headers: req.headers as any
+      });
+
+      // Populate session cache on success
+      if (session && token) {
+        setSessionResult(token, { session: session.session, user: session.user });
+      }
+    }
 
     if (!session) {
       return res.status(401).json({ message: 'No authentication token provided' });
@@ -48,22 +83,36 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
     const sessionUser = session.user as SessionUser;
 
-    // Always verify security-critical fields (role, tenantId, isActive) against
-    // the database. Session data may be stale (sessions last up to 7 days) and
-    // would not reflect admin actions like deactivation or role changes.
-    const userRecord = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, sessionUser.id),
-      columns: {
-        id: true,
-        role: true,
-        tenantId: true,
-        isActive: true,
-        language: true,
-      },
-    });
+    // Check the in-memory security cache first; fall back to the database on
+    // cache miss. The cache is invalidated on every security-sensitive change
+    // (role, status, password reset, logout, 2FA, etc.) so the data stays fresh.
+    let userRecord: CachedUserSecurity | undefined = getUserSecurity(sessionUser.id);
 
     if (!userRecord) {
-      return res.status(401).json({ message: 'User not found' });
+      const dbRecord = await db.query.betterAuthUser.findFirst({
+        where: eq(betterAuthUser.id, sessionUser.id),
+        columns: {
+          id: true,
+          role: true,
+          tenantId: true,
+          isActive: true,
+          language: true,
+        },
+      });
+
+      if (!dbRecord) {
+        return res.status(401).json({ message: 'User not found' });
+      }
+
+      // Populate cache for subsequent requests
+      userRecord = {
+        id: dbRecord.id,
+        role: dbRecord.role || 'Employee',
+        tenantId: dbRecord.tenantId,
+        isActive: dbRecord.isActive ?? false,
+        language: dbRecord.language || 'en',
+      };
+      setUserSecurity(sessionUser.id, userRecord);
     }
 
     // Check if user account is active (treat missing/undefined as inactive to be safe)

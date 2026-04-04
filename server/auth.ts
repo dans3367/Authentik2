@@ -116,11 +116,13 @@ const authInstance = betterAuth({
         type: "string",
         defaultValue: "Owner", // New users are owners of their own tenant
         required: false,
+        input: false, // SECURITY: Prevent client-side modification via /api/auth/update-user
       },
       tenantId: {
         type: "string",
         defaultValue: "00000000-0000-0000-0000-000000000000", // Temporary placeholder, MUST be updated by signup hook
         required: false,
+        input: false, // SECURITY: Prevent client-side modification via /api/auth/update-user
       },
       firstName: {
         type: "string",
@@ -153,6 +155,7 @@ const authInstance = betterAuth({
         type: "boolean",
         defaultValue: true,
         required: false,
+        input: false, // SECURITY: Prevent client-side modification via /api/auth/update-user
       },
       language: {
         type: "string",

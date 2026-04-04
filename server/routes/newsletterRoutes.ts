@@ -781,7 +781,7 @@ newsletterRoutes.get("/:id/recipients", authenticateToken, requireTenant, requir
 newsletterRoutes.post("/", authenticateToken, requireTenant, requirePermission('newsletters.create'), async (req: any, res) => {
   try {
     const validatedData = createNewsletterSchema.parse(req.body);
-    const { title, subject, content, puckData, scheduledAt, status } = validatedData;
+    const { title, subject, content, puckData, scheduledAt } = validatedData;
 
     const sanitizedTitle = sanitizeString(title);
     const sanitizedSubject = sanitizeString(subject);
@@ -808,7 +808,7 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, requirePermission('
       content,
       puckData: puckData || null,
       scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
-      status: status || 'draft',
+      status: 'draft',
       emailType,
       recipientType: 'all',
       recipientCount: 0,
@@ -826,7 +826,7 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, requirePermission('
       entityName: sanitizedTitle,
       activityType: 'created',
       description: `Created newsletter "${sanitizedTitle}"`,
-      metadata: { subject: sanitizedSubject, status: status || 'draft' },
+      metadata: { subject: sanitizedSubject, status: 'draft' },
       req,
     });
 
@@ -1000,7 +1000,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
   try {
     const { id } = req.params;
     const validatedData = updateNewsletterSchema.parse(req.body);
-    const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds, reactionsEnabled, publishToBlog, publishedAt: _ignoredPublishedAt, webSlug: _ignoredWebSlug, ...rest } = validatedData;
+    const { title, subject, content, puckData, scheduledAt, status, recipientType, selectedContactIds, selectedTagIds, reactionsEnabled, publishToBlog } = validatedData;
 
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
@@ -1013,9 +1013,18 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
       return res.status(404).json({ message: 'Newsletter not found' });
     }
 
-    // Prevent edits on newsletters that are pending review or already approved
+    // Prevent edits on newsletters in immutable or protected states
     if (newsletter.status === 'pending_review') {
       return res.status(403).json({ message: 'This newsletter is pending review and cannot be edited. Recall it from review first if changes are needed.' });
+    }
+    if (newsletter.status === 'sending') {
+      return res.status(403).json({ message: 'This newsletter is currently being sent and cannot be edited.' });
+    }
+    if (newsletter.status === 'sent') {
+      return res.status(403).json({ message: 'This newsletter has already been sent and cannot be edited.' });
+    }
+    if (newsletter.status === 'scheduled') {
+      return res.status(403).json({ message: 'This newsletter is scheduled for delivery. Cancel the schedule first to make edits.' });
     }
     if (newsletter.reviewStatus === 'approved') {
       return res.status(403).json({ message: 'This newsletter has been approved and cannot be edited. Send it as-is or contact the reviewer.' });
@@ -1035,6 +1044,19 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
 
     if (content !== undefined) {
       updateData.content = content;
+    }
+
+    // Run content moderation when subject or content changes
+    if (subject !== undefined || content !== undefined) {
+      const checkSubject = subject !== undefined ? sanitizeString(subject) : newsletter.subject;
+      const checkContent = content !== undefined ? content : newsletter.content;
+      const modResult = moderateContent(checkSubject, checkContent || '');
+      if (!modResult.approved) {
+        return res.status(400).json({
+          message: 'Content moderation failed',
+          violations: modResult.violations,
+        });
+      }
     }
 
     if (puckData !== undefined) {
@@ -1127,6 +1149,11 @@ newsletterRoutes.delete("/:id", authenticateToken, requireTenant, requirePermiss
 
     if (!newsletter) {
       return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    // Prevent deletion of newsletters that are currently being sent
+    if (newsletter.status === 'sending') {
+      return res.status(403).json({ message: 'This newsletter is currently being sent and cannot be deleted.' });
     }
 
     // Log activity: newsletter deleted

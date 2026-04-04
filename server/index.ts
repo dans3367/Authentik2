@@ -17,6 +17,8 @@ import { auth } from "./auth";
 import { toNodeHandler } from "better-auth/node";
 import { serverLogger } from "./logger";
 import { startSessionCleanupWorker, stopSessionCleanupWorker } from "./workers/SessionCleanupWorker";
+import { startAppointmentAutoReminderWorker, stopAppointmentAutoReminderWorker } from "./workers/AppointmentAutoReminderWorker";
+import { flushSecurityCache } from "./utils/userSecurityCache";
 
 const app = express();
 
@@ -113,10 +115,26 @@ app.use((req, res, next) => {
 app.all("/api/auth/*", (req, res, next) => {
   // Skip custom auth routes that should be handled by our custom routes
   const customRoutes = ['verify-login', 'verify-2fa', 'check-2fa-requirement', 'verify-session-2fa', '2fa-status', 'verify-email', 'resend-verification', 'change-email-unverified', 'forgot-password', 'reset-password', 'profile', 'avatar'];
+
+  // SECURITY: Block Better Auth built-in routes that bypass our security controls
+  // (cache invalidation, role hierarchy checks, 2FA, rate limiting, audit logging).
+  // These operations are handled by our custom endpoints instead.
+  // - sign-in/email: bypasses 2FA (our verify-login calls auth.api.signInEmail() programmatically)
+  // - update-user: allows setting role/isActive/tenantId (privilege escalation)
+  // - change-password, set-password: bypass rate limiting and audit logging
+  // - change-email, delete-user: bypass our custom flows
+  // - revoke-*: bypass cache invalidation
+  // - request-password-reset: bypass our forgot-password rate limiting
+  const blockedRoutes = ['sign-in/email', 'update-user', 'change-password', 'change-email', 'delete-user', 'delete-user/callback', 'revoke-session', 'revoke-sessions', 'revoke-other-sessions', 'set-password', 'request-password-reset'];
+
   const path = req.path.replace('/api/auth/', '');
 
   if (customRoutes.includes(path)) {
     return next();
+  }
+
+  if (blockedRoutes.includes(path)) {
+    return res.status(404).json({ message: 'Not found' });
   }
 
   // Handle with Better Auth
@@ -213,11 +231,14 @@ app.use((req, res, next) => {
   server.listen(port, "0.0.0.0", () => {
     log(`serving on port ${port}`);
     startSessionCleanupWorker();
+    startAppointmentAutoReminderWorker();
   });
 
   // Graceful shutdown
   const shutdown = () => {
     stopSessionCleanupWorker();
+    stopAppointmentAutoReminderWorker();
+    flushSecurityCache();
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);

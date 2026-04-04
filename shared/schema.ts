@@ -1827,15 +1827,15 @@ export const createNewsletterSchema = z.object({
   subject: z.string().min(1, "Subject is required"),
   content: z.string().optional().default(''),
   puckData: z.string().optional(),
-  status: z.enum(['draft', 'ready_to_send', 'pending_review', 'scheduled']).default('draft'),
   scheduledAt: z.union([z.string(), z.date()]).optional().nullable(),
   recipientType: z.enum(['all', 'selected', 'tags']).default('all'),
   selectedContactIds: z.array(z.string()).optional(),
   selectedTagIds: z.array(z.string()).optional(),
-  requiresReviewerApproval: z.boolean().optional(),
-  reviewerId: z.string().optional(),
   reactionsEnabled: z.boolean().optional().default(true),
   publishToBlog: z.boolean().optional().default(true),
+  // status is always 'draft' on create — removed from schema to prevent
+  // clients from creating newsletters in 'pending_review' or 'scheduled' state.
+  // reviewerId and requiresReviewerApproval are set by the submit-for-review endpoint.
 });
 
 export const updateNewsletterSchema = z.object({
@@ -1843,24 +1843,19 @@ export const updateNewsletterSchema = z.object({
   subject: z.string().min(1, "Subject is required").optional(),
   content: z.string().optional(),
   puckData: z.string().optional(),
-  status: z.enum(['draft', 'ready_to_send', 'pending_review', 'scheduled', 'sending', 'sent']).optional(),
+  // Only allow statuses a user can set directly; 'sending'/'sent'/'pending_review'/'scheduled'
+  // are managed by dedicated endpoints (send, schedule, submit-for-review).
+  status: z.enum(['draft', 'ready_to_send']).optional(),
   scheduledAt: z.union([z.string(), z.date()]).optional().nullable(),
-  sentAt: z.union([z.string(), z.date()]).optional(),
   recipientType: z.enum(['all', 'selected', 'tags']).optional(),
   selectedContactIds: z.array(z.string()).optional(),
   selectedTagIds: z.array(z.string()).optional(),
-  recipientCount: z.number().int().nonnegative().optional(),
-  openCount: z.number().int().nonnegative().optional(),
-  uniqueOpenCount: z.number().int().nonnegative().optional(),
-  clickCount: z.number().int().nonnegative().optional(),
-  requiresReviewerApproval: z.boolean().optional(),
-  reviewerId: z.string().optional(),
-  reviewStatus: z.enum(['pending', 'approved', 'rejected']).optional(),
-  reviewNotes: z.string().optional(),
   reactionsEnabled: z.boolean().optional(),
   publishToBlog: z.boolean().optional(),
-  publishedAt: z.union([z.string(), z.date()]).optional().nullable(),
-  webSlug: z.string().optional().nullable(),
+  // Review fields (reviewStatus, reviewerId, requiresReviewerApproval, reviewNotes),
+  // analytics counters (recipientCount, openCount, etc.), sentAt, publishedAt, and
+  // webSlug are system-managed and intentionally excluded to prevent client-side
+  // manipulation of approval workflow and metrics.
 });
 
 export const insertNewsletterSchema = createInsertSchema(newsletters).omit({
@@ -2524,6 +2519,22 @@ export const appointmentReminders = pgTable("appointment_reminders", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Appointment auto-reminder settings (per-tenant toggle for 1-hour-before unconfirmed reminders)
+export const appointmentAutoReminderSettings = pgTable("appointment_auto_reminder_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }).unique(),
+  enabled: boolean("enabled").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const appointmentAutoReminderSettingsRelations = relations(appointmentAutoReminderSettings, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [appointmentAutoReminderSettings.tenantId],
+    references: [tenants.id],
+  }),
+}));
 
 // Appointment relations
 export const appointmentRelations = relations(appointments, ({ one, many }) => ({

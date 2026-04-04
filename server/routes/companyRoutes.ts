@@ -5,6 +5,7 @@ import { betterAuthUser, tenants, shops, stores, companies, forms, formResponses
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import { createCompanySchema, updateCompanySchema, completeOnboardingSchema } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
+import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
 export const companyRoutes = Router();
 
@@ -300,6 +301,13 @@ companyRoutes.patch("/users/:userId/role", authenticateToken, requireRole(["Owne
       })
       .where(sql`${betterAuthUser.id} = ${userId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`);
 
+    // Invalidate security cache — role changed
+    invalidateUserSecurity(userId, 'role_change', {
+      tenantId: req.user.tenantId,
+      performedBy: req.user.id,
+      req,
+    });
+
     res.json({ message: 'User role updated successfully' });
   } catch (error) {
     console.error('Update user role error:', error);
@@ -334,6 +342,13 @@ companyRoutes.delete("/users/:userId", authenticateToken, requireRole(["Owner", 
     // Delete user (this will cascade to related records)
     await db.delete(betterAuthUser)
       .where(sql`${betterAuthUser.id} = ${userId} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`);
+
+    // Invalidate security cache for removed user
+    invalidateUserSecurity(userId, 'user_deleted', {
+      tenantId: req.user.tenantId,
+      performedBy: req.user.id,
+      req,
+    });
 
     res.json({ message: 'User removed from company successfully' });
   } catch (error) {

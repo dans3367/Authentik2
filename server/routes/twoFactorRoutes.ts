@@ -5,6 +5,7 @@ import { betterAuthUser } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 import * as qrcode from 'qrcode';
+import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
 export const twoFactorRoutes = Router();
 
@@ -158,6 +159,12 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
     // Clear the pending secret now that 2FA is enabled
     clearPending2FASecret(userId);
 
+    // Invalidate security cache after 2FA change
+    invalidateUserSecurity(userId, '2fa_change', {
+      tenantId,
+      req,
+    });
+
     res.json({ message: '2FA enabled successfully' });
   } catch (error) {
     console.error('2FA enable error:', error);
@@ -211,6 +218,12 @@ twoFactorRoutes.post('/disable', authenticateToken, async (req: any, res) => {
         eq(betterAuthUser.id, userId),
         eq(betterAuthUser.tenantId, tenantId)
       ));
+
+    // Invalidate security cache after 2FA change
+    invalidateUserSecurity(userId, '2fa_change', {
+      tenantId,
+      req,
+    });
 
     res.json({ message: '2FA disabled successfully' });
   } catch (error) {
