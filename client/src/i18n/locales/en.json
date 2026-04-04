@@ -2425,7 +2425,6 @@
         "admin.view_sessions": { "label": "View Sessions", "description": "View active user sessions" },
         "admin.manage_sessions": { "label": "Manage Sessions", "description": "Terminate user sessions" },
         "admin.view_system_stats": { "label": "System Stats", "description": "View system-wide statistics" },
-        "admin.system_health": { "label": "System Health", "description": "View system health checks" },
         "settings.view": { "label": "View Settings", "description": "View application settings" },
         "settings.edit": { "label": "Edit Settings", "description": "Modify application settings" },
         "settings.manage_2fa": { "label": "Manage 2FA", "description": "Configure two-factor authentication" }

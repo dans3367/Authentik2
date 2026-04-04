@@ -2364,7 +2364,6 @@
         "admin.view_sessions": { "label": "Ver Sesiones", "description": "Ver sesiones de usuario activas" },
         "admin.manage_sessions": { "label": "Gestionar Sesiones", "description": "Terminar sesiones de usuario" },
         "admin.view_system_stats": { "label": "Estadísticas del Sistema", "description": "Ver estadísticas de todo el sistema" },
-        "admin.system_health": { "label": "Salud del Sistema", "description": "Ver verificaciones de salud del sistema" },
         "settings.view": { "label": "Ver Configuración", "description": "Ver configuración de la aplicación" },
         "settings.edit": { "label": "Editar Configuración", "description": "Modificar configuración de la aplicación" },
         "settings.manage_2fa": { "label": "Gestionar 2FA", "description": "Configurar autenticación de dos factores" }

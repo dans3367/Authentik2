@@ -578,36 +578,3 @@ adminRoutes.get("/activity", authenticateToken, requireRole('Administrator'), as
   }
 });
 
-// System health check
-adminRoutes.get("/health", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
-  try {
-    // Database connectivity check
-    const dbCheck = await db.select({ count: sql<number>`count(*)` }).from(betterAuthUser).where(eq(betterAuthUser.tenantId, req.user.tenantId));
-
-    const health = {
-      database: {
-        status: 'healthy',
-        details: `Connected successfully (${dbCheck[0].count} users found)`,
-      },
-      authentication: {
-        status: 'healthy',
-        details: 'Better Auth is handling authentication and session management',
-      },
-      timestamp: new Date().toISOString(),
-    };
-
-    const overallStatus = health.database.status === 'healthy' ? 'healthy' : 'unhealthy';
-
-    res.status(overallStatus === 'healthy' ? 200 : 503).json({
-      status: overallStatus,
-      ...health,
-    });
-  } catch (error) {
-    console.error('Admin health check error:', error);
-    res.status(503).json({
-      status: 'unhealthy',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString(),
-    });
-  }
-});

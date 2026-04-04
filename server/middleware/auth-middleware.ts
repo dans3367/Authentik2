@@ -184,7 +184,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> =
     'activity.view': true,
     'analytics.view_dashboard': true, 'analytics.view_reports': true, 'analytics.export': true,
     'account_usage.view': true,
-    'admin.view_sessions': true, 'admin.manage_sessions': true, 'admin.view_system_stats': true, 'admin.system_health': true,
+    'admin.view_sessions': true, 'admin.manage_sessions': true, 'admin.view_system_stats': true,
     'settings.view': true, 'settings.edit': true, 'settings.manage_2fa': true,
   },
   Administrator: {
@@ -205,7 +205,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> =
     'activity.view': true,
     'analytics.view_dashboard': true, 'analytics.view_reports': true, 'analytics.export': true,
     'account_usage.view': true,
-    'admin.view_sessions': true, 'admin.manage_sessions': true, 'admin.view_system_stats': true, 'admin.system_health': true,
+    'admin.view_sessions': true, 'admin.manage_sessions': true, 'admin.view_system_stats': true,
     'settings.view': true, 'settings.edit': false, 'settings.manage_2fa': true,
   },
   Manager: {
@@ -226,7 +226,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> =
     'activity.view': true,
     'analytics.view_dashboard': true, 'analytics.view_reports': true, 'analytics.export': false,
     'account_usage.view': true,
-    'admin.view_sessions': false, 'admin.manage_sessions': false, 'admin.view_system_stats': false, 'admin.system_health': false,
+    'admin.view_sessions': false, 'admin.manage_sessions': false, 'admin.view_system_stats': false,
     'settings.view': true, 'settings.edit': false, 'settings.manage_2fa': true,
   },
   Employee: {
@@ -247,7 +247,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<string, boolean>> =
     'activity.view': false,
     'analytics.view_dashboard': false, 'analytics.view_reports': false, 'analytics.export': false,
     'account_usage.view': false,
-    'admin.view_sessions': false, 'admin.manage_sessions': false, 'admin.view_system_stats': false, 'admin.system_health': false,
+    'admin.view_sessions': false, 'admin.manage_sessions': false, 'admin.view_system_stats': false,
     'settings.view': false, 'settings.edit': false, 'settings.manage_2fa': true,
   },
 };
