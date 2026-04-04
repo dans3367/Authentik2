@@ -500,7 +500,7 @@ export default function ManagementActivityLogs() {
             <div className="flex flex-col items-center justify-center py-12">
               <Activity className="h-8 w-8 text-gray-400 mb-2" />
               <p className="text-gray-500 dark:text-gray-400">
-                {t("management.activityLogs.errorLoading", "Failed to load activity logs. Axiom may not be configured.")}
+                {t("management.activityLogs.errorLoading", "Failed to load activity logs.")}
               </p>
             </div>
           ) : logs.length === 0 ? (

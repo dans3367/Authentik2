@@ -39,9 +39,13 @@ const envSchema = z.object({
   R2_PUBLIC_URL: z.string().optional(),
 
   // Observability
-  AXIOM_TOKEN: z.string().optional(),
-  AXIOM_ORG_ID: z.string().optional(),
   LOG_LEVEL: z.string().optional(),
+
+  // ClickHouse (houseclickDB)
+  CLICKHOUSE_URL: z.string().optional(),
+  CLICKHOUSE_DATABASE: z.string().optional(),
+  CLICKHOUSE_USER: z.string().optional(),
+  CLICKHOUSE_PASSWORD: z.string().optional(),
 
   // Services
   TEMPORAL_GRPC_SERVER: z.string().default("localhost:50051"),

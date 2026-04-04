@@ -490,7 +490,7 @@ export default function CustomerViewPage() {
                             Customer's Date of Birth
                           </label>
                           <p className="text-gray-900 dark:text-white">
-                            {new Date(contact.dateOfBirth).toLocaleDateString("en-US", {
+                            {new Date(contact.dateOfBirth + 'T12:00:00').toLocaleDateString("en-US", {
                               month: "long",
                               day: "numeric",
                               year: "numeric"

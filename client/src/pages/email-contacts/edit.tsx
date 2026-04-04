@@ -208,7 +208,7 @@ export default function EditEmailContact() {
         zipCode: contact.zipCode || "",
         country: contact.country || "",
         phoneNumber: contact.phoneNumber || "",
-        dateOfBirth: contact.dateOfBirth ? new Date(contact.dateOfBirth) : undefined,
+        dateOfBirth: contact.dateOfBirth ? new Date(contact.dateOfBirth + 'T12:00:00') : undefined,
         preferredLanguage: contact.preferredLanguage || "en",
         shopId: contact.shopId || null,
         prefMarketing: contact.prefMarketing ?? true,

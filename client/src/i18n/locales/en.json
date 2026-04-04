@@ -2153,7 +2153,7 @@
       "search": "Search",
       "filters": "Filters",
       "clearFilters": "Clear",
-      "errorLoading": "Failed to load activity logs. Axiom may not be configured.",
+      "errorLoading": "Failed to load activity logs.",
       "noResults": "No activity logs found",
       "noResultsFiltered": "Try adjusting your filters or search query.",
       "noResultsEmpty": "Activity will appear here as actions are performed.",

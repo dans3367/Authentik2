@@ -74,8 +74,9 @@ export function extractR2KeyFromUrl(url: string): string | null {
     const urlObj = new URL(url)
     const hostname = urlObj.hostname
     
-    // Check if it's our R2 bucket hostname
-    if (hostname.includes('r2.cloudflarestorage.com') || hostname.includes(R2_CONFIG.bucketName)) {
+    // Check if it's our R2 bucket hostname or configured public URL
+    const publicUrlHostname = new URL(R2_CONFIG.publicUrl).hostname
+    if (hostname.includes('r2.cloudflarestorage.com') || hostname.includes(R2_CONFIG.bucketName) || hostname === publicUrlHostname) {
       // Extract the key from the pathname (remove leading slash)
       const key = urlObj.pathname.substring(1)
       return key || null
