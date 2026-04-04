@@ -8,6 +8,7 @@ const LazyNotionEditor = lazy(() => import("@/components/NotionLikeEditor"));
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createConfig, initialData } from "@/config/puck";
 import { UserData } from "@/config/puck/types";
+import { rootFieldErrors } from "@/config/puck/root";
 import { templatesPlugin } from "@/config/puck/templates-plugin";
 import { usePreviewColors } from "@/components/puck/PreviewWrapper";
 import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X, Rocket, Eye } from "lucide-react";
@@ -74,37 +75,6 @@ function SaveStatusIndicator({
         : hu
         ? t("newsletter.create.unsavedChanges", "Unsaved changes")
         : ""}
-    </span>
-  );
-}
-
-/**
- * Self-updating title display that reads from a ref.
- * Polls every 300ms to avoid re-rendering parent on every keystroke.
- */
-function TitleIndicator({
-  titleRef,
-}: {
-  titleRef: React.MutableRefObject<string>;
-}) {
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => tick((n) => n + 1), 300);
-    return () => clearInterval(id);
-  }, []);
-
-  const title = titleRef.current;
-
-  return (
-    <span
-      style={{
-        fontSize: "13px",
-        fontWeight: 600,
-        color: title ? "#374151" : "#9ca3af",
-        padding: "2px 4px",
-      }}
-    >
-      {title || "Untitled Newsletter"}
     </span>
   );
 }
@@ -397,8 +367,12 @@ export default function NewsletterCreatePage() {
   const [subject, setSubject] = useState("");
   const titleRef = useRef(title);
   const subjectRef = useRef(subject);
-  titleRef.current = title;
-  subjectRef.current = subject;
+  useEffect(() => {
+    titleRef.current = title;
+  }, [title]);
+  useEffect(() => {
+    subjectRef.current = subject;
+  }, [subject]);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [showSendWizard, setShowSendWizard] = useState(false);
   const [dataReady, setDataReady] = useState(!isEditMode);
@@ -407,6 +381,14 @@ export default function NewsletterCreatePage() {
   const [initialSelectedTagIds, setInitialSelectedTagIds] = useState<string[]>([]);
   const [reactionsEnabled, setReactionsEnabled] = useState(true);
   const [publishToBlog, setPublishToBlog] = useState(true);
+  const [titleError, _setTitleError] = useState(false);
+  const setTitleError = useCallback((v: boolean) => {
+    _setTitleError(v);
+    rootFieldErrors.title = v;
+    // Sync data state from ref so the Puck editor remount (triggered by key
+    // change that includes titleError) starts with up-to-date data.
+    setData(dataRef.current);
+  }, []);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { t, currentLanguage } = useLanguage();
@@ -516,6 +498,23 @@ export default function NewsletterCreatePage() {
     }
   }, [existingNewsletter]);
 
+  // Block editing newsletters that are pending review, sending, or already sent
+  useEffect(() => {
+    if (existingNewsletter?.newsletter) {
+      const status = existingNewsletter.newsletter.status;
+      if (['pending_review', 'sending', 'sent'].includes(status)) {
+        toast({
+          title: "Cannot edit",
+          description: status === 'pending_review'
+            ? "This newsletter is pending review and cannot be edited. Recall it from review first."
+            : "This newsletter has already been sent and cannot be edited.",
+          variant: "destructive",
+        });
+        setLocation(`/newsletters/${existingNewsletter.newsletter.id}`);
+      }
+    }
+  }, [existingNewsletter]);
+
   // Fetch the tenant's master email design (same as Management > Email Design)
   const { data: emailDesign } = useQuery<{
     companyName: string;
@@ -551,10 +550,23 @@ export default function NewsletterCreatePage() {
   }, [editorType, notionHtmlContent]);
 
   // Save newsletter to database (create or update)
-  const saveToDatabase = useCallback(async (status: 'draft' | 'ready_to_send' | 'scheduled' = 'draft') => {
+  // Returns true on success, false on validation failure. Throws on API error.
+  const saveToDatabase = useCallback(async (status: 'draft' | 'ready_to_send' | 'scheduled' = 'draft', { silent = false }: { silent?: boolean } = {}) => {
     const htmlContent = editorType === 'notion' ? notionHtmlContent : extractPuckEmailHtml();
     const puckDataJson = editorType === 'notion' ? JSON.stringify({ notionHtml: notionHtmlContent }) : JSON.stringify(dataRef.current);
-    const currentTitle = titleRef.current.trim() || t("newsletter.create.untitled", "Untitled Newsletter");
+    const currentTitle = titleRef.current.trim();
+    if (!currentTitle) {
+      if (!silent) {
+        setTitleError(true);
+        toast({
+          title: t("newsletter.create.validationError", "Validation Error"),
+          description: t("newsletter.create.titleRequired", "Newsletter Name is required"),
+          variant: "destructive",
+        });
+      }
+      return false;
+    }
+    setTitleError(false);
     const currentSubject = subjectRef.current.trim() || currentTitle;
 
     setIsSaving(true);
@@ -611,8 +623,10 @@ export default function NewsletterCreatePage() {
 
   const handleSaveDraft = useCallback(async () => {
     try {
-      await saveToDatabase('draft');
-      toast({ title: t("newsletter.create.draftSaved", "Draft Saved"), description: t("newsletter.create.draftSavedDesc", "Newsletter draft saved successfully.") });
+      const result = await saveToDatabase('draft');
+      if (result) {
+        toast({ title: t("newsletter.create.draftSaved", "Draft Saved"), description: t("newsletter.create.draftSavedDesc", "Newsletter draft saved successfully.") });
+      }
     } catch {
       // Error already handled in saveToDatabase
     }
@@ -641,7 +655,7 @@ export default function NewsletterCreatePage() {
     if (!hasUnsavedChanges || !newsletterId) return;
     const interval = setInterval(async () => {
       try {
-        await saveToDatabase('draft');
+        await saveToDatabase('draft', { silent: true });
       } catch {
         // Silent fail on auto-save
       }
@@ -700,6 +714,7 @@ export default function NewsletterCreatePage() {
     const currentSubject = subjectRef.current.trim();
     
     if (!currentTitle) {
+      setTitleError(true);
       toast({
         title: t("newsletter.create.validationError", "Validation Error"),
         description: t("newsletter.create.titleRequired", "Newsletter Name is required"),
@@ -707,7 +722,8 @@ export default function NewsletterCreatePage() {
       });
       return;
     }
-    
+    setTitleError(false);
+
     if (!currentSubject) {
       toast({
         title: t("newsletter.create.validationError", "Validation Error"),
@@ -758,16 +774,26 @@ export default function NewsletterCreatePage() {
   const handleDataChange = useCallback((newData: UserData) => {
     dataRef.current = newData;
     setHasUnsavedChanges(true);
-    // Sync Puck root props to refs (not state) to avoid re-rendering
-    // the parent component on every keystroke in Puck's fields
     const rootProps = newData?.root?.props;
-    if (rootProps?.title !== undefined) titleRef.current = rootProps.title;
+    if (rootProps?.title !== undefined) {
+      titleRef.current = rootProps.title;
+      if (rootProps.title.trim()) {
+        if (rootFieldErrors.title) rootFieldErrors.title = false;
+        if (titleError) {
+          _setTitleError(false);
+          // Sync data state so the Puck remount from key change has current data
+          setData(newData);
+        }
+      }
+    }
     if (rootProps?.subject !== undefined) subjectRef.current = rootProps.subject;
-  }, []);
+  }, [titleError]);
 
   const handleConfirmExit = useCallback(() => {
     setHasUnsavedChanges(false);
     setShowExitDialog(false);
+    rootFieldErrors.title = false;
+    _setTitleError(false);
     const nav = pendingNavigation;
     setPendingNavigation(null);
     if (nav === "__back__") {
@@ -1067,8 +1093,8 @@ export default function NewsletterCreatePage() {
             borderBottom: "1px solid #e5e7eb",
             background: "#fff",
             flexShrink: 0,
+            justifyContent: "flex-end",
           }}>
-            <TitleIndicator titleRef={titleRef} />
             <button
               onClick={() => {
                 if (hasUnsavedChanges) {
@@ -1077,6 +1103,8 @@ export default function NewsletterCreatePage() {
                 } else {
                   setLocation(basePath);
                 }
+                rootFieldErrors.title = false;
+                _setTitleError(false);
               }}
               style={{
                 padding: "4px",
@@ -1088,7 +1116,6 @@ export default function NewsletterCreatePage() {
                 alignItems: "center",
                 justifyContent: "center",
                 color: "#6b7280",
-                marginLeft: "auto",
               }}
               title="Close editor"
               data-testid="button-close"
@@ -1098,6 +1125,7 @@ export default function NewsletterCreatePage() {
               <X size={18} />
             </button>
           </div>
+
           <div style={{ flex: 1, minHeight: 0 }}>
             <Suspense fallback={
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -1237,8 +1265,8 @@ export default function NewsletterCreatePage() {
                             <input
                               type="text"
                               value={title}
-                              onChange={(e) => { setTitle(e.target.value); setHasUnsavedChanges(true); }}
-                              placeholder="Newsletter Name"
+                              onChange={(e) => { setTitle(e.target.value); setHasUnsavedChanges(true); if (titleError && e.target.value.trim()) setTitleError(false); }}
+                              placeholder="Newsletter Name *"
                               style={{
                                 width: '100%',
                                 border: 'none',
@@ -1437,7 +1465,7 @@ export default function NewsletterCreatePage() {
                 /* ─── Classic Puck Editor ─── */
                 dataReady ? (
                   <LazyPuck
-                    key={puckKeyRef.current}
+                    key={`${puckKeyRef.current}-${titleError}`}
                     config={translatedConfig}
                     data={data}
                     onChange={handleDataChange}

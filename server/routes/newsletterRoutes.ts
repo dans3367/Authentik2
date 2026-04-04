@@ -1013,7 +1013,10 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
       return res.status(404).json({ message: 'Newsletter not found' });
     }
 
-    // Prevent edits on approved newsletters — they must be sent as-is
+    // Prevent edits on newsletters that are pending review or already approved
+    if (newsletter.status === 'pending_review') {
+      return res.status(403).json({ message: 'This newsletter is pending review and cannot be edited. Recall it from review first if changes are needed.' });
+    }
     if (newsletter.reviewStatus === 'approved') {
       return res.status(403).json({ message: 'This newsletter has been approved and cannot be edited. Send it as-is or contact the reviewer.' });
     }

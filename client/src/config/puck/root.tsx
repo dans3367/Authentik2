@@ -48,6 +48,40 @@ const colorPickerRender = ({ value, onChange, field }: { value: string | undefin
   </div>
 );
 
+/** Mutable validation state that field renderers read on each render. */
+export const rootFieldErrors: { title: boolean } = { title: false };
+
+const textWithPlaceholderRender = (placeholder: string, errorKey?: keyof typeof rootFieldErrors) => ({ value, onChange, field }: { value: string | undefined; onChange: (val: string) => void; field: { label?: string } }) => {
+  const hasError = errorKey ? rootFieldErrors[errorKey] : false;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      {field.label && (
+        <label style={{ fontSize: "13px", fontWeight: 500, color: hasError ? "#dc2626" : "#374151", transition: "color 0.2s" }}>
+          {field.label}{hasError ? <span style={{ color: "#dc2626" }}> * required</span> : ""}
+        </label>
+      )}
+      <input
+        type="text"
+        value={value || ""}
+        onChange={(e) => {
+          onChange(e.currentTarget.value);
+          if (errorKey && e.currentTarget.value.trim()) rootFieldErrors[errorKey] = false;
+        }}
+        placeholder={placeholder}
+        style={{
+          width: "100%",
+          padding: "6px 8px",
+          fontSize: "13px",
+          border: `1px solid ${hasError ? "#dc2626" : "#d1d5db"}`,
+          borderRadius: "6px",
+          outline: "none",
+          transition: "border-color 0.2s ease",
+        }}
+      />
+    </div>
+  );
+};
+
 const rootRender = ({ backgroundColor, puck: { renderDropZone: DropZone } }: any) => {
   return (
     <div
@@ -65,15 +99,15 @@ const rootRender = ({ backgroundColor, puck: { renderDropZone: DropZone } }: any
 
 export const Root = {
   defaultProps: {
-    title: "My Newsletter",
+    title: "",
     subject: "",
     backgroundColor: "#ffffff",
     bodyBackgroundColor: "#f7fafc",
     footerTextColor: "#64748b",
   },
   fields: {
-    title: { type: "text" as const, label: "Newsletter Name" },
-    subject: { type: "text" as const, label: "Email Subject Line" },
+    title: { type: "custom" as const, label: "Newsletter Name", render: textWithPlaceholderRender("Enter newsletter name...", "title") },
+    subject: { type: "custom" as const, label: "Email Subject Line", render: textWithPlaceholderRender("Enter email subject line...") },
     backgroundColor: {
       type: "custom" as const,
       label: "Content Background Color",
@@ -97,8 +131,8 @@ export function createTranslatedRoot(t: TFunction) {
   return {
     ...Root,
     fields: {
-      title: { type: "text" as const, label: t("puckEditor.fields.newsletterName", "Newsletter Name") },
-      subject: { type: "text" as const, label: t("puckEditor.fields.emailSubjectLine", "Email Subject Line") },
+      title: { type: "custom" as const, label: t("puckEditor.fields.newsletterName", "Newsletter Name"), render: textWithPlaceholderRender(t("puckEditor.placeholders.newsletterName", "Enter newsletter name..."), "title") },
+      subject: { type: "custom" as const, label: t("puckEditor.fields.emailSubjectLine", "Email Subject Line"), render: textWithPlaceholderRender(t("puckEditor.placeholders.emailSubjectLine", "Enter email subject line...")) },
       backgroundColor: {
         type: "custom" as const,
         label: t("puckEditor.fields.contentBackgroundColor", "Content Background Color"),
