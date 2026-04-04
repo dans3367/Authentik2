@@ -1,4 +1,5 @@
 import { DefaultRootProps } from "@puckeditor/core";
+import { useSyncExternalStore } from "react";
 import { TFunction } from "i18next";
 
 export type RootProps = DefaultRootProps & {
@@ -48,11 +49,40 @@ const colorPickerRender = ({ value, onChange, field }: { value: string | undefin
   </div>
 );
 
-/** Mutable validation state that field renderers read on each render. */
-export const rootFieldErrors: { title: boolean } = { title: false };
+/** Tiny external store so field validation can update without remounting Puck. */
+type RootFieldErrorState = { title: boolean };
+
+let rootFieldErrorState: RootFieldErrorState = { title: false };
+const rootFieldErrorListeners = new Set<() => void>();
+
+function emitRootFieldErrorChange() {
+  rootFieldErrorListeners.forEach((listener) => listener());
+}
+
+export const rootFieldErrors = {
+  get title() {
+    return rootFieldErrorState.title;
+  },
+  set title(value: boolean) {
+    if (rootFieldErrorState.title === value) return;
+    rootFieldErrorState = { ...rootFieldErrorState, title: value };
+    emitRootFieldErrorChange();
+  },
+};
+
+function useRootFieldErrors() {
+  return useSyncExternalStore(
+    (listener) => {
+      rootFieldErrorListeners.add(listener);
+      return () => rootFieldErrorListeners.delete(listener);
+    },
+    () => rootFieldErrorState,
+  );
+}
 
 const textWithPlaceholderRender = (placeholder: string, errorKey?: keyof typeof rootFieldErrors) => ({ value, onChange, field }: { value: string | undefined; onChange: (val: string) => void; field: { label?: string } }) => {
-  const hasError = errorKey ? rootFieldErrors[errorKey] : false;
+  const fieldErrors = useRootFieldErrors();
+  const hasError = errorKey ? fieldErrors[errorKey] : false;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
       {field.label && (

@@ -385,9 +385,6 @@ export default function NewsletterCreatePage() {
   const setTitleError = useCallback((v: boolean) => {
     _setTitleError(v);
     rootFieldErrors.title = v;
-    // Sync data state from ref so the Puck editor remount (triggered by key
-    // change that includes titleError) starts with up-to-date data.
-    setData(dataRef.current);
   }, []);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -1465,7 +1462,7 @@ export default function NewsletterCreatePage() {
                 /* ─── Classic Puck Editor ─── */
                 dataReady ? (
                   <LazyPuck
-                    key={`${puckKeyRef.current}-${titleError}`}
+                    key={puckKeyRef.current}
                     config={translatedConfig}
                     data={data}
                     onChange={handleDataChange}
