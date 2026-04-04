@@ -55,7 +55,6 @@ const ENTITY_TYPES = [
   "user",
   "contact",
   "newsletter",
-  "campaign",
   "appointment",
   "email",
   "tag",
@@ -241,17 +240,20 @@ export default function ManagementActivityLogs() {
   const searchQueryParams = useMemo(() => {
     const params = new URLSearchParams();
     params.set("q", activeSearch);
+    if (entityType !== "all") params.set("entityType", entityType);
+    if (activityType !== "all") params.set("activityType", activityType);
     params.set("limit", String(limit));
     params.set("offset", String(page * limit));
     params.set("startTime", timeParams.startTime);
     params.set("endTime", timeParams.endTime);
     return params.toString();
-  }, [activeSearch, page, timeParams]);
+  }, [activeSearch, entityType, activityType, page, timeParams]);
 
   // Fetch logs
   const {
     data: logsData,
     isLoading,
+    isFetching,
     error,
     refetch,
   } = useQuery({
@@ -415,8 +417,8 @@ export default function ManagementActivityLogs() {
                 <Search className="h-4 w-4 mr-2" />
                 {t("management.activityLogs.search", "Search")}
               </Button>
-              <Button onClick={() => refetch()} variant="outline" size="icon" title="Refresh">
-                <RefreshCw className="h-4 w-4" />
+              <Button onClick={() => refetch()} variant="outline" size="icon" title="Refresh" disabled={isFetching}>
+                <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
               </Button>
             </div>
 

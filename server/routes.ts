@@ -53,7 +53,7 @@ import { analyticsRoutes } from "./routes/analyticsRoutes";
 import { translationRoutes } from "./routes/translationRoutes";
 
 // Import middleware
-import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter } from "./middleware/security";
+import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter, activityLogRateLimiter } from "./middleware/security";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -117,8 +117,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/suppression", suppressionManagementRoutes);
   app.use("/api/templates", authenticateToken, requireTenant, templateRoutes);
   app.use("/api", segmentListRoutes);
-  app.use("/api/activity-logs", authenticateToken, requireTenant, activityRoutes);
-  app.use("/api/axiom-activity-logs", authenticateToken, requireTenant, clickhouseActivityRoutes);
+  app.use("/api/activity-logs", authenticateToken, requireTenant, activityLogRateLimiter, activityRoutes);
+  app.use("/api/axiom-activity-logs", authenticateToken, requireTenant, activityLogRateLimiter, clickhouseActivityRoutes);
   app.use("/api/account-usage", accountUsageRoutes);
   app.use("/api/stats", statsRoutes);
   app.use("/api/analytics", analyticsRoutes);

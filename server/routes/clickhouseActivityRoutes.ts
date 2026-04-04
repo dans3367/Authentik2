@@ -361,7 +361,7 @@ clickhouseActivityRoutes.get("/search", authenticateToken, async (req: any, res)
             return res.status(503).json({ message: 'ClickHouse is not configured. Set CLICKHOUSE_URL to enable.' });
         }
 
-        const { q, limit, offset, startTime, endTime } = req.query;
+        const { q, limit, offset, startTime, endTime, entityType, activityType } = req.query;
         if (!q) {
             return res.status(400).json({ message: 'Search query parameter "q" is required' });
         }
@@ -389,7 +389,21 @@ clickhouseActivityRoutes.get("/search", authenticateToken, async (req: any, res)
             OR metadata ILIKE '%${searchTerm}%'
         )`;
 
-        const whereClause = `tenant_id = '${escapedTenantId}' AND created_at >= '${toClickHouseTimestamp(start)}' AND created_at <= '${toClickHouseTimestamp(end)}' AND ${searchCondition}`;
+        const conditions = [
+            `tenant_id = '${escapedTenantId}'`,
+            `created_at >= '${toClickHouseTimestamp(start)}'`,
+            `created_at <= '${toClickHouseTimestamp(end)}'`,
+            searchCondition,
+        ];
+
+        if (entityType) {
+            conditions.push(`entity_type = '${escapeClickHouse(entityType as string)}'`);
+        }
+        if (activityType) {
+            conditions.push(`activity_type = '${escapeClickHouse(activityType as string)}'`);
+        }
+
+        const whereClause = conditions.join(' AND ');
 
         // Count
         let total = 0;

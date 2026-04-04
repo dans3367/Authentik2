@@ -143,6 +143,13 @@ export const twoFactorRateLimiter = createRateLimiter({
   skipSuccessfulRequests: false,
 });
 
+// Rate limiter for activity log endpoints (read-heavy, prevent abuse)
+export const activityLogRateLimiter = createRateLimiter({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60,
+  message: "Too many activity log requests. Please try again shortly.",
+});
+
 // Rate limiter for password reset requests
 export const passwordResetRateLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour
