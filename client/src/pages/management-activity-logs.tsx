@@ -16,19 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   Search,
   Activity,
   ShieldAlert,
@@ -47,7 +34,7 @@ import {
   Filter,
   X,
 } from "lucide-react";
-import { formatDistanceToNow, format } from "date-fns";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 const ENTITY_TYPES = [
@@ -134,10 +121,8 @@ function getTimeRange(range: string): { startTime: string; endTime: string } {
   };
 }
 
-function ChangesDetail({ changes }: { changes: any }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const actualChanges = useMemo(() => {
+function useChanges(changes: any) {
+  return useMemo(() => {
     let parsed: Record<string, any> = {};
     if (!changes) return parsed;
     try {
@@ -146,7 +131,6 @@ function ChangesDetail({ changes }: { changes: any }) {
     } catch {
       return parsed;
     }
-    // Filter to only fields where old !== new
     const filtered: Record<string, any> = {};
     for (const [key, value] of Object.entries(parsed)) {
       if (value && typeof value === "object" && "old" in value && "new" in value) {
@@ -157,46 +141,130 @@ function ChangesDetail({ changes }: { changes: any }) {
     }
     return filtered;
   }, [changes]);
+}
 
-  const keys = Object.keys(actualChanges);
-  if (keys.length === 0) return null;
+function ChangesButton({ changeCount, isOpen, onToggle }: { changeCount: number; isOpen: boolean; onToggle: () => void }) {
+  if (changeCount === 0) return null;
+  return (
+    <button
+      onClick={onToggle}
+      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+    >
+      {isOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+      {changeCount}
+    </button>
+  );
+}
+
+function ChangesPanel({ changes }: { changes: Record<string, { old: any; new: any }> }) {
+  const keys = Object.keys(changes);
+  return (
+    <td colSpan={5} className="px-4 py-1.5 bg-gray-50/80 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800">
+      <div className="flex flex-wrap gap-x-6 gap-y-0.5 text-xs">
+        {keys.map((field) => {
+          const v = changes[field];
+          return (
+            <span key={field} className="inline-flex items-center gap-1">
+              <span className="font-medium text-gray-600 dark:text-gray-300">{field}:</span>
+              <span className="line-through text-gray-400 dark:text-gray-500">{formatValue(v.old)}</span>
+              <span className="text-gray-400">&rarr;</span>
+              <span className="text-gray-900 dark:text-gray-100">{formatValue(v.new)}</span>
+            </span>
+          );
+        })}
+      </div>
+    </td>
+  );
+}
+
+function ActivityLogRow({ log, isExpanded, onToggle }: { log: any; isExpanded: boolean; onToggle: () => void }) {
+  const actualChanges = useChanges(log.changes);
+  const changeCount = Object.keys(actualChanges).length;
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 px-2 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-        >
-          {isOpen ? <ChevronDown className="h-3 w-3 mr-1" /> : <ChevronRight className="h-3 w-3 mr-1" />}
-          {keys.length} change(s)
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="mt-1">
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 space-y-1">
-          {keys.map((field) => {
-            const v = actualChanges[field] as { old: any; new: any };
-            return (
-              <div key={field} className="flex items-start gap-2 text-xs">
-                <span className="font-medium text-gray-700 dark:text-gray-300 min-w-[80px]">
-                  {field}:
-                </span>
-                <div className="flex-1">
-                  <span className="line-through text-gray-400 dark:text-gray-500">
-                    {formatValue(v.old)}
-                  </span>
-                  <span className="mx-1 text-gray-400">&rarr;</span>
-                  <span className="text-gray-900 dark:text-gray-100">
-                    {formatValue(v.new)}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+    <>
+      <tr className="group border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
+        <td className="px-4 py-2 font-mono text-[11px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
+          {format(new Date(log.createdAt), "MMM d, HH:mm")}
+        </td>
+        <td className="px-4 py-2">
+          <Badge
+            variant="secondary"
+            className={cn(
+              "text-[11px] gap-1 py-0 h-5",
+              activityColors[log.activityType] || "bg-gray-100 text-gray-700"
+            )}
+          >
+            {activityIcons[log.activityType] || <Activity className="h-3 w-3" />}
+            {log.activityType}
+          </Badge>
+        </td>
+        <td className="px-4 py-2">
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[11px] py-0 h-5",
+              entityColors[log.entityType] || ""
+            )}
+          >
+            {log.entityType}
+          </Badge>
+        </td>
+        <td className="px-4 py-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm text-gray-900 dark:text-gray-100 truncate">
+              {log.entityName || log.description || "—"}
+            </span>
+            <ChangesButton changeCount={changeCount} isOpen={isExpanded} onToggle={onToggle} />
+          </div>
+          {log.entityName && log.description && (
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
+              {log.description}
+            </p>
+          )}
+        </td>
+        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 truncate">
+          {log.user?.firstName && log.user?.lastName
+            ? `${log.user.firstName} ${log.user.lastName}`
+            : log.user?.email || (
+              <span className="text-gray-400 italic text-xs">System</span>
+            )}
+        </td>
+      </tr>
+      {isExpanded && changeCount > 0 && (
+        <tr>
+          <ChangesPanel changes={actualChanges} />
+        </tr>
+      )}
+    </>
+  );
+}
+
+function ActivityLogsTable({ logs, t }: { logs: any[]; t: any }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  return (
+    <table className="w-full table-fixed">
+      <thead>
+        <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          <th className="px-4 py-2 w-[11%]">{t("management.activityLogs.table.timestamp", "Timestamp")}</th>
+          <th className="px-4 py-2 w-[11%]">{t("management.activityLogs.table.action", "Action")}</th>
+          <th className="px-4 py-2 w-[10%]">{t("management.activityLogs.table.entity", "Entity")}</th>
+          <th className="px-4 py-2 w-[53%]">{t("management.activityLogs.table.description", "Description")}</th>
+          <th className="px-4 py-2 w-[15%]">{t("management.activityLogs.table.user", "User")}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {logs.map((log: any) => (
+          <ActivityLogRow
+            key={log.id}
+            log={log}
+            isExpanded={expandedId === log.id}
+            onToggle={() => setExpandedId(expandedId === log.id ? null : log.id)}
+          />
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -521,84 +589,7 @@ export default function ManagementActivityLogs() {
             </div>
           ) : (
             <>
-              <Table className="table-fixed w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[12%]">
-                      {t("management.activityLogs.table.timestamp", "Timestamp")}
-                    </TableHead>
-                    <TableHead className="w-[13%]">
-                      {t("management.activityLogs.table.action", "Action")}
-                    </TableHead>
-                    <TableHead className="w-[13%]">
-                      {t("management.activityLogs.table.entity", "Entity")}
-                    </TableHead>
-                    <TableHead className="w-[47%]">
-                      {t("management.activityLogs.table.description", "Description")}
-                    </TableHead>
-                    <TableHead className="w-[15%]">
-                      {t("management.activityLogs.table.user", "User")}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {logs.map((log: any) => (
-                    <TableRow key={log.id} className="group">
-                      <TableCell className="font-mono text-xs text-gray-500 dark:text-gray-400 align-top">
-                        <div>{format(new Date(log.createdAt), "MMM d, yyyy")}</div>
-                        <div>{format(new Date(log.createdAt), "HH:mm:ss")}</div>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            "text-xs gap-1",
-                            activityColors[log.activityType] || "bg-gray-100 text-gray-700"
-                          )}
-                        >
-                          {activityIcons[log.activityType] || <Activity className="h-3.5 w-3.5" />}
-                          {log.activityType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-xs",
-                            entityColors[log.entityType] || ""
-                          )}
-                        >
-                          {log.entityType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <div className="space-y-1 min-w-0">
-                          {log.entityName && (
-                            <span className="font-medium text-sm text-gray-900 dark:text-gray-100 block truncate">
-                              {log.entityName}
-                            </span>
-                          )}
-                          {log.description && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 break-words">
-                              {log.description}
-                            </p>
-                          )}
-                          <ChangesDetail changes={log.changes} />
-                        </div>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <div className="text-sm truncate">
-                          {log.user?.firstName && log.user?.lastName
-                            ? `${log.user.firstName} ${log.user.lastName}`
-                            : log.user?.email || (
-                              <span className="text-gray-400 italic text-xs">System</span>
-                            )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <ActivityLogsTable logs={logs} t={t} />
 
               {/* Pagination */}
               {pagination && (

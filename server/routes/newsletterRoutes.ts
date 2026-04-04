@@ -6,6 +6,7 @@ import { createRateLimiter } from '../middleware/security';
 import { authenticateInternalService } from '../middleware/internal-service-auth';
 import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, newsletterTaskStatus, newsletterReviewerSettings, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
+import { moderateContent } from '@shared/contentModeration';
 import { sanitizeEmailHtml } from './email';
 import { emailService, enhancedEmailService } from '../emailService';
 import { wrapNewsletterContent, extractPuckColorOverrides } from '../utils/newsletterEmailWrapper';
@@ -366,6 +367,31 @@ newsletterRoutes.get("/preview-recipients", authenticateToken, requireTenant, re
   } catch (error) {
     console.error('Get preview recipients error:', error);
     res.status(500).json({ message: 'Failed to get preview recipients' });
+  }
+});
+
+// Content moderation check for newsletter content
+newsletterRoutes.get("/:id/moderation-check", authenticateToken, requireTenant, requirePermission('newsletters.create'), async (req: any, res) => {
+  try {
+    const { id } = req.params;
+
+    const newsletter = await db.query.newsletters.findFirst({
+      where: and(
+        eq(newsletters.id, id),
+        eq(newsletters.tenantId, req.user.tenantId)
+      ),
+    });
+
+    if (!newsletter) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
+
+    const result = moderateContent(newsletter.subject || '', newsletter.content || '');
+
+    res.json(result);
+  } catch (error) {
+    console.error('Content moderation check error:', error);
+    res.status(500).json({ message: 'Failed to check content moderation' });
   }
 });
 
@@ -1618,6 +1644,15 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
       });
     }
 
+    // Content moderation check
+    const moderationResult = moderateContent(newsletter.subject || '', newsletter.content || '');
+    if (!moderationResult.passed) {
+      return res.status(400).json({
+        message: 'Newsletter contains prohibited content that must be removed before sending.',
+        moderationViolations: moderationResult.violations,
+      });
+    }
+
     // If test email is provided, send test email
     if (testEmail) {
       try {
@@ -2196,6 +2231,15 @@ newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, require
       });
     }
 
+    // Content moderation check
+    const moderationResult = moderateContent(newsletter.subject || '', newsletter.content || '');
+    if (!moderationResult.passed) {
+      return res.status(400).json({
+        message: 'Newsletter contains prohibited content that must be removed before scheduling.',
+        moderationViolations: moderationResult.violations,
+      });
+    }
+
     // Get recipients and apply suppression filter (same as send)
     const recipients = await getNewsletterRecipients(newsletter, req.user.tenantId);
     const suppressedMap = await getSuppressionMap(req.user.tenantId);
@@ -2696,6 +2740,15 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
 
     if (newsletter.status !== 'ready_to_send') {
       return res.status(400).json({ message: 'Newsletter must be in "Ready to Send" status with recipients selected before submitting for review' });
+    }
+
+    // Content moderation check
+    const moderationResult = moderateContent(newsletter.subject || '', newsletter.content || '');
+    if (!moderationResult.passed) {
+      return res.status(400).json({
+        message: 'Newsletter contains prohibited content that must be removed before submitting for review.',
+        moderationViolations: moderationResult.violations,
+      });
     }
 
     // Get reviewer settings

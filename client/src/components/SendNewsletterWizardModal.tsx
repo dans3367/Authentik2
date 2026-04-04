@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck, CalendarClock, X, Smile, Globe } from "lucide-react";
+import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck, CalendarClock, X, Smile, Globe, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,17 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import type { SegmentList } from "@shared/schema";
+import type { ModerationViolation } from "@shared/contentModeration";
 
 interface SendNewsletterWizardModalProps {
   isOpen: boolean;
@@ -85,6 +95,9 @@ export function SendNewsletterWizardModal({
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
+  const [isCheckingModeration, setIsCheckingModeration] = useState(false);
+  const [moderationViolations, setModerationViolations] = useState<ModerationViolation[]>([]);
+  const [showModerationDialog, setShowModerationDialog] = useState(false);
   const prevIsOpen = useRef(isOpen);
 
   const { data: segmentListsData, isLoading: segmentListsLoading } = useQuery({
@@ -151,6 +164,9 @@ export function SendNewsletterWizardModal({
       setShowSchedulePicker(false);
       setScheduleDate("");
       setScheduleTime("");
+      setIsCheckingModeration(false);
+      setModerationViolations([]);
+      setShowModerationDialog(false);
     }
     prevIsOpen.current = isOpen;
   }, [isOpen, initialRecipientType]);
@@ -200,8 +216,30 @@ export function SendNewsletterWizardModal({
     };
   };
 
-  const handleGoToReview = () => {
-    setStep(2);
+  const handleGoToReview = async () => {
+    if (!newsletterId) {
+      setStep(2);
+      return;
+    }
+
+    setIsCheckingModeration(true);
+    try {
+      const response = await apiRequest("GET", `/api/newsletters/${newsletterId}/moderation-check`);
+      const result = await response.json();
+
+      if (!result.passed && result.violations?.length > 0) {
+        setModerationViolations(result.violations);
+        setShowModerationDialog(true);
+        return;
+      }
+
+      setStep(2);
+    } catch (error) {
+      // If moderation check fails, still allow proceeding — server will catch at send time
+      setStep(2);
+    } finally {
+      setIsCheckingModeration(false);
+    }
   };
 
   const handleSendNow = async () => {
@@ -801,11 +839,20 @@ export function SendNewsletterWizardModal({
                 </Button>
                 <Button
                   onClick={handleGoToReview}
-                  disabled={!canContinue()}
+                  disabled={!canContinue() || isCheckingModeration}
                   data-testid="button-continue-wizard"
                 >
-                  {t("newsletter.sendWizard.continue", "Continue")}
-                  <ChevronRight className="h-4 w-4 ml-1" />
+                  {isCheckingModeration ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      {t("newsletter.sendWizard.checking", "Checking...")}
+                    </span>
+                  ) : (
+                    <>
+                      {t("newsletter.sendWizard.continue", "Continue")}
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </>
+                  )}
                 </Button>
               </div>
             </DialogFooter>
@@ -1096,6 +1143,49 @@ export function SendNewsletterWizardModal({
           </>
         )}
       </DialogContent>
+
+      {/* Content moderation violations dialog */}
+      <AlertDialog open={showModerationDialog} onOpenChange={setShowModerationDialog}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              {t("newsletter.moderation.title", "Content Issue Detected")}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left">
+              {t("newsletter.moderation.description", "Your newsletter contains content that violates our content policy. Please go back to the editor and remove the following issues before sending.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-[300px] overflow-y-auto space-y-3 py-2">
+            {(() => {
+              const grouped = moderationViolations.reduce<Record<string, ModerationViolation[]>>((acc, v) => {
+                (acc[v.categoryLabel] ||= []).push(v);
+                return acc;
+              }, {});
+              return Object.entries(grouped).map(([category, violations]) => (
+                <div key={category} className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+                  <p className="text-sm font-semibold text-destructive mb-1.5">{category}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {violations.map((v, i) => (
+                      <Badge key={i} variant="outline" className="text-xs border-destructive/30 text-destructive">
+                        {v.matchedTerm}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => {
+              setShowModerationDialog(false);
+              setModerationViolations([]);
+            }}>
+              {t("newsletter.moderation.goBack", "Go Back and Fix Content")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

@@ -11,9 +11,9 @@
 
 ## Content & Sending
 
-- [ ] Add basic content moderation to emails
-  - Flag or block emails containing prohibited content patterns
-  - Add review step for first-time senders or flagged content
+- [x] Add basic content moderation to newsletter content
+  - ~~Flag or block emails containing prohibited content patterns to being, these would be simple bad words, rasism, adult content, and other related keywords.~~
+  - ~~Add review step for first-time senders or flagged content~~
 - [ ] Add confirmation to single email sending modal windows
   - Show "Are you sure?" confirmation before sending individual emails
   - Display recipient and subject in confirmation dialog

@@ -12,15 +12,23 @@ import {
   MousePointer,
   Search,
   LayoutDashboard,
+  Trash2,
   Send,
   FileText,
+  MoreVertical,
+  Pencil,
   Loader2,
+  UserCog,
   Store,
   ShieldCheck,
+  ClipboardCheck,
+  CalendarClock,
+  ExternalLink,
   Archive,
   ArchiveRestore,
   ChevronDown,
   ChevronRight,
+  Undo2,
   XCircle,
   RefreshCw
 } from "lucide-react";
@@ -50,6 +58,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAppSelector } from "@/store";
@@ -100,10 +115,12 @@ export default function NewsletterPage() {
   const { t, currentLanguage } = useLanguage();
   const queryClient = useQueryClient();
   const { user } = useReduxAuth();
+  const currentUserId = (user as any)?.id;
   const tenantId = (user as any)?.tenantId as string | undefined;
   const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('newsletters.create');
+  const canSend = hasPermission('newsletters.send');
   const dateFnsLocale = currentLanguage === 'es' ? { locale: esLocale } : {};
 
   useSetBreadcrumbs([
@@ -131,6 +148,18 @@ export default function NewsletterPage() {
     setRefreshCooldown(true);
     cooldownTimer.current = setTimeout(() => setRefreshCooldown(false), 5000);
   }, [refreshCooldown, isLoading, refetch]);
+
+  // Fetch reviewer settings to know if reviewer workflow is enabled
+  const { data: reviewerSettings } = useQuery<{ enabled: boolean; reviewerId: string | null; reviewer: any }>({
+    queryKey: ['/api/newsletters/reviewer-settings'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/newsletters/reviewer-settings');
+      return response.json();
+    },
+  });
+
+  const reviewerEnabled = reviewerSettings?.enabled ?? false;
+  const isCurrentUserDesignatedReviewer = reviewerSettings?.reviewerId === currentUserId;
 
   const { data: emailDesign } = useQuery<{
     companyName?: string;
@@ -176,6 +205,108 @@ export default function NewsletterPage() {
     },
     onError: (error: any) => {
       toast({ title: t("newsletter.toast.error"), description: error.message || t("newsletter.toast.deleteError"), variant: "destructive" });
+    },
+  });
+
+  const deployMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/send`);
+      return response.json();
+    },
+    onSuccess: (data: any, variables: string) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: t("newsletter.toast.deployed"),
+        description: data.message || t("newsletter.toast.deployedDesc")
+      });
+      setLocation(`/newsletters/${data.newsletterId || data.id || variables}`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("newsletter.toast.deployFailed"),
+        description: error.message || t("newsletter.toast.deployFailedDesc"),
+        variant: "destructive"
+      });
+    },
+  });
+
+  // Cancel schedule mutation
+  const cancelScheduleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/cancel-schedule`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: t("newsletter.toast.scheduleCancelled"),
+        description: t("newsletter.toast.scheduleCancelledDesc")
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("newsletter.toast.cancelFailed"),
+        description: error.message || t("newsletter.toast.cancelFailedDesc"),
+        variant: "destructive"
+      });
+    },
+  });
+
+  // Submit for review mutation
+  const submitForReviewMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/submit-for-review`);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: t("newsletter.toast.submittedForReview"),
+        description: data.message || t("newsletter.toast.submittedForReviewDesc")
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("newsletter.toast.submissionFailed"),
+        description: error.message || t("newsletter.toast.submissionFailedDesc"),
+        variant: "destructive"
+      });
+    },
+  });
+
+  // Recall to draft mutation
+  const recallToDraftMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest('POST', `/api/newsletters/${id}/recall-review`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({
+        title: t("newsletter.toast.recalledToDraft", "Recalled to Draft"),
+        description: t("newsletter.toast.recalledToDraftDesc", "Newsletter has been recalled from review and returned to draft."),
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("newsletter.toast.recallFailed", "Recall Failed"),
+        description: error.message || t("newsletter.toast.recallFailedDesc", "Failed to recall newsletter from review."),
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Archive mutation
+  const archiveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('POST', `/api/newsletters/${id}/archive`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+      toast({ title: t("newsletter.toast.archived", "Archived"), description: t("newsletter.toast.archivedDesc", "Newsletter has been archived.") });
+    },
+    onError: (error: any) => {
+      toast({ title: t("newsletter.toast.error"), description: error.message || t("newsletter.toast.archiveError", "Failed to archive newsletter"), variant: "destructive" });
     },
   });
 
@@ -500,7 +631,16 @@ export default function NewsletterPage() {
                       const isDraft = newsletter.status === 'draft';
                       const isSent = newsletter.status === 'sent';
                       const isReadyToSend = newsletter.status === 'ready_to_send';
+                      const isPendingReview = newsletter.status === 'pending_review';
+                      const isScheduled = newsletter.status === 'scheduled';
+                      const isCurrentUserReviewer = newsletter.reviewerId === currentUserId;
+                      const tenantSlug = (newsletter as any)?.tenant?.slug;
+                      const articlePreviewUrl = tenantSlug ? `/n/preview/${tenantSlug}/${newsletter.id}` : null;
+
                       const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
+                      const isDeploying = deployMutation.isPending && deployMutation.variables === newsletter.id;
+                      const isSubmittingForReview = submitForReviewMutation.isPending && submitForReviewMutation.variables === newsletter.id;
+                      const isCancellingSchedule = cancelScheduleMutation.isPending && cancelScheduleMutation.variables === newsletter.id;
 
                       if (isDeleting) {
                         return (
@@ -528,9 +668,153 @@ export default function NewsletterPage() {
                         >
                           <CardContent className="p-5">
                             <div className="space-y-4">
-                              {/* Row 1: Status badge */}
-                              <div className="flex items-center">
+                              {/* Row 1: Status badge + kebab menu */}
+                              <div className="flex items-center justify-between">
                                 {getStatusBadge(newsletter.status, t)}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                    <Button variant="ghost" size="icon" aria-label="Newsletter actions" className="h-8 w-8 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPreviewNewsletter(newsletter);
+                                      }}
+                                    >
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      {t("newsletter.actions.preview")}
+                                    </DropdownMenuItem>
+                                    {articlePreviewUrl && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          window.open(articlePreviewUrl, '_blank', 'noopener,noreferrer');
+                                        }}
+                                      >
+                                        <ExternalLink className="h-4 w-4 mr-2" />
+                                        Preview article on blog
+                                      </DropdownMenuItem>
+                                    )}
+                                    {canCreate && (isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setLocation(`/newsletter/create/${newsletter.id}`);
+                                        }}
+                                      >
+                                        <Pencil className="h-4 w-4 mr-2" />
+                                        {t("newsletter.actions.edit")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {canCreate && (isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditRecipientsNewsletter(newsletter);
+                                        }}
+                                        data-testid={`button-edit-recipients-${newsletter.id}`}
+                                      >
+                                        <UserCog className="h-4 w-4 mr-2" />
+                                        {t("newsletter.actions.editRecipients")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {canSend && isReadyToSend && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deployMutation.mutate(newsletter.id);
+                                        }}
+                                        disabled={isDeploying}
+                                      >
+                                        <Send className="h-4 w-4 mr-2" />
+                                        {isDeploying ? t("newsletter.actions.sending") : t("newsletter.actions.sendNow")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {canSend && isScheduled && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          cancelScheduleMutation.mutate(newsletter.id);
+                                        }}
+                                        disabled={isCancellingSchedule}
+                                        className="text-orange-600 focus:text-orange-600 focus:bg-orange-50 dark:focus:bg-orange-950/50"
+                                      >
+                                        <CalendarClock className="h-4 w-4 mr-2" />
+                                        {isCancellingSchedule ? t("newsletter.actions.cancelling") : t("newsletter.actions.cancelSchedule")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {(canCreate || canSend) && reviewerEnabled && isReadyToSend && !isPendingReview && !isCurrentUserDesignatedReviewer && newsletter.reviewStatus !== 'approved' && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          submitForReviewMutation.mutate(newsletter.id);
+                                        }}
+                                        disabled={isSubmittingForReview}
+                                      >
+                                        <ClipboardCheck className="h-4 w-4 mr-2" />
+                                        {isSubmittingForReview ? t("newsletter.actions.submitting") : t("newsletter.actions.submitForReview")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {isPendingReview && isCurrentUserReviewer && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setLocation(`/newsletters/${newsletter.id}`);
+                                        }}
+                                      >
+                                        <ShieldCheck className="h-4 w-4 mr-2" />
+                                        {t("newsletter.actions.reviewNewsletter")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {(canCreate || canSend) && isPendingReview && !isCurrentUserReviewer && (newsletter.userId === currentUserId || ['Owner', 'Administrator'].includes((user as any)?.role)) && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          recallToDraftMutation.mutate(newsletter.id);
+                                        }}
+                                        disabled={recallToDraftMutation.isPending && recallToDraftMutation.variables === newsletter.id}
+                                        className="text-orange-600 focus:text-orange-600 focus:bg-orange-50 dark:focus:bg-orange-950/50"
+                                      >
+                                        <Undo2 className="h-4 w-4 mr-2" />
+                                        {recallToDraftMutation.isPending && recallToDraftMutation.variables === newsletter.id
+                                          ? t("newsletter.actions.recalling", "Recalling...")
+                                          : t("newsletter.actions.recallToDraft", "Recall to Draft")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {canCreate && isSent && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          archiveMutation.mutate(newsletter.id);
+                                        }}
+                                        disabled={archiveMutation.isPending && archiveMutation.variables === newsletter.id}
+                                      >
+                                        <Archive className="h-4 w-4 mr-2" />
+                                        {archiveMutation.isPending && archiveMutation.variables === newsletter.id
+                                          ? t("newsletter.actions.archiving", "Archiving...")
+                                          : t("newsletter.actions.archive", "Archive")}
+                                      </DropdownMenuItem>
+                                    )}
+                                    {canCreate && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setDeleteId(newsletter.id);
+                                          }}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          {t("newsletter.actions.delete")}
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
 
                               {/* Shop tag */}
