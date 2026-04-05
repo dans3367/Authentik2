@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck, CalendarClock, X, Smile, Globe, AlertTriangle, Loader2 } from "lucide-react";
+import { Users, Tag, User, Check, Search, CheckCircle, ChevronRight, ChevronLeft, Send, ListChecks, Clock, ArrowRight, Mail, ShieldCheck, CalendarClock, X, Smile, Globe, AlertTriangle, Loader2, KeyRound, Fingerprint } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ interface SendNewsletterWizardModalProps {
   newsletterId: string | null;
   newsletterTitle: string;
   newsletterReviewStatus?: string | null;
+  shopId?: string | null;
   onSegmentSelected: (data: {
     segmentListId: string | null;
     recipientType: "all" | "selected" | "tags";
@@ -68,6 +69,7 @@ export function SendNewsletterWizardModal({
   newsletterId,
   newsletterTitle,
   newsletterReviewStatus,
+  shopId,
   onSegmentSelected,
   initialRecipientType,
   initialSelectedContactIds,
@@ -98,30 +100,39 @@ export function SendNewsletterWizardModal({
   const [isCheckingModeration, setIsCheckingModeration] = useState(false);
   const [moderationViolations, setModerationViolations] = useState<ModerationViolation[]>([]);
   const [showModerationDialog, setShowModerationDialog] = useState(false);
+  // Send confirmation state (password/2FA verification before send)
+  const [showSendConfirmation, setShowSendConfirmation] = useState(false);
+  const [confirmationCredential, setConfirmationCredential] = useState("");
+  const [isVerifyingCredential, setIsVerifyingCredential] = useState(false);
+  const [sendAuthToken, setSendAuthToken] = useState<string | null>(null);
+  const [pendingSendAction, setPendingSendAction] = useState<"send" | "schedule" | null>(null);
   const prevIsOpen = useRef(isOpen);
 
+  const shopParam = shopId ? `?shopId=${shopId}` : '';
+
   const { data: segmentListsData, isLoading: segmentListsLoading } = useQuery({
-    queryKey: ["/api/segment-lists"],
+    queryKey: ["/api/segment-lists", { shopId }],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/segment-lists");
+      const response = await apiRequest("GET", `/api/segment-lists${shopParam}`);
       return response.json();
     },
     enabled: isOpen,
   });
 
+  const contactsShopParam = shopId ? `&shopId=${shopId}` : '';
   const { data: contactsData, isLoading: contactsLoading } = useQuery({
-    queryKey: ["/api/email-contacts"],
+    queryKey: ["/api/email-contacts", { shopId, status: "active" }],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/email-contacts");
+      const response = await apiRequest("GET", `/api/email-contacts?status=active${contactsShopParam}`);
       return response.json();
     },
     enabled: isOpen && selectionMode === "custom" && customRecipientType === "selected",
   });
 
   const { data: tagsData, isLoading: tagsLoading } = useQuery({
-    queryKey: ["/api/contact-tags"],
+    queryKey: ["/api/contact-tags", { shopId }],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/contact-tags");
+      const response = await apiRequest("GET", `/api/contact-tags${shopParam}`);
       return response.json();
     },
     enabled: isOpen && selectionMode === "custom" && customRecipientType === "tags",
@@ -131,6 +142,15 @@ export function SendNewsletterWizardModal({
     queryKey: ['/api/newsletters/reviewer-settings'],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/newsletters/reviewer-settings");
+      return response.json();
+    },
+    enabled: isOpen,
+  });
+
+  const { data: sendConfirmationStatus } = useQuery<{ required: boolean; method?: 'password' | '2fa' }>({
+    queryKey: ['/api/newsletters/send-confirmation-status'],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/newsletters/send-confirmation-status");
       return response.json();
     },
     enabled: isOpen,
@@ -167,6 +187,11 @@ export function SendNewsletterWizardModal({
       setIsCheckingModeration(false);
       setModerationViolations([]);
       setShowModerationDialog(false);
+      setShowSendConfirmation(false);
+      setConfirmationCredential("");
+      setIsVerifyingCredential(false);
+      setSendAuthToken(null);
+      setPendingSendAction(null);
     }
     prevIsOpen.current = isOpen;
   }, [isOpen, initialRecipientType]);
@@ -242,8 +267,17 @@ export function SendNewsletterWizardModal({
     }
   };
 
-  const handleSendNow = async () => {
+  const handleSendNow = async (tokenOverride?: string) => {
     if (!newsletterId) return;
+
+    // Check if send confirmation is required and we don't have a token yet
+    const token = tokenOverride || sendAuthToken;
+    if (sendConfirmationStatus?.required && !requiresReview && !token) {
+      setPendingSendAction("send");
+      setShowSendConfirmation(true);
+      return;
+    }
+
     setIsSending(true);
     try {
       const segmentData = getSegmentData();
@@ -273,7 +307,9 @@ export function SendNewsletterWizardModal({
           selectedTagIds: segmentData.selectedTagIds,
           reactionsEnabled,
         });
-        await apiRequest('POST', `/api/newsletters/${newsletterId}/send`, {});
+        await apiRequest('POST', `/api/newsletters/${newsletterId}/send`, {
+          ...(token ? { sendAuthToken: token } : {}),
+        });
         queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
         queryClient.invalidateQueries({ queryKey: ['/api/newsletter-stats'] });
         toast({
@@ -294,11 +330,21 @@ export function SendNewsletterWizardModal({
       });
     } finally {
       setIsSending(false);
+      setSendAuthToken(null);
     }
   };
 
-  const handleScheduleSend = async () => {
+  const handleScheduleSend = async (tokenOverride?: string) => {
     if (!newsletterId || !scheduleDate || !scheduleTime) return;
+
+    // Check if send confirmation is required and we don't have a token yet
+    const token = tokenOverride || sendAuthToken;
+    if (sendConfirmationStatus?.required && !token) {
+      setPendingSendAction("schedule");
+      setShowSendConfirmation(true);
+      return;
+    }
+
     setIsScheduling(true);
     try {
       const segmentData = getSegmentData();
@@ -314,6 +360,7 @@ export function SendNewsletterWizardModal({
       const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`).toISOString();
       const response = await apiRequest('POST', `/api/newsletters/${newsletterId}/schedule`, {
         scheduledAt,
+        ...(token ? { sendAuthToken: token } : {}),
       });
       const result = await response.json();
 
@@ -333,6 +380,46 @@ export function SendNewsletterWizardModal({
       });
     } finally {
       setIsScheduling(false);
+      setSendAuthToken(null);
+    }
+  };
+
+  // Handle send confirmation verification (password or 2FA)
+  const handleConfirmationVerify = async () => {
+    if (!confirmationCredential.trim()) return;
+    setIsVerifyingCredential(true);
+    try {
+      const body: Record<string, string> = {};
+      if (sendConfirmationStatus?.method === '2fa') {
+        body.totpCode = confirmationCredential;
+      } else {
+        body.password = confirmationCredential;
+      }
+
+      const response = await apiRequest('POST', '/api/newsletters/verify-send-auth', body);
+      const result = await response.json();
+
+      if (result.sendAuthToken) {
+        setSendAuthToken(result.sendAuthToken);
+        setShowSendConfirmation(false);
+        setConfirmationCredential("");
+
+        // Retry the pending action with the token
+        if (pendingSendAction === "send") {
+          handleSendNow(result.sendAuthToken);
+        } else if (pendingSendAction === "schedule") {
+          handleScheduleSend(result.sendAuthToken);
+        }
+        setPendingSendAction(null);
+      }
+    } catch (error: any) {
+      toast({
+        title: t("newsletter.sendWizard.verificationFailed", "Verification Failed"),
+        description: error.message || t("newsletter.sendWizard.verificationFailedDesc", "Incorrect password or 2FA code. Please try again."),
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifyingCredential(false);
     }
   };
 
@@ -1065,7 +1152,7 @@ export function SendNewsletterWizardModal({
                 {!requiresReview && (
                   showSchedulePicker ? (
                     <Button
-                      onClick={handleScheduleSend}
+                      onClick={() => handleScheduleSend()}
                       disabled={isScheduling || !isScheduleValid()}
                       className="bg-blue-600 hover:bg-blue-700"
                       data-testid="button-confirm-schedule"
@@ -1116,7 +1203,7 @@ export function SendNewsletterWizardModal({
                 )}
                 {!showSchedulePicker && (
                   <Button
-                    onClick={handleSendNow}
+                    onClick={() => handleSendNow()}
                     disabled={isSending || isSavingLater || isScheduling}
                     data-testid="button-send-now"
                   >
@@ -1183,6 +1270,88 @@ export function SendNewsletterWizardModal({
             }}>
               {t("newsletter.moderation.goBack", "Go Back and Fix Content")}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Send confirmation dialog (password / 2FA) */}
+      <AlertDialog open={showSendConfirmation} onOpenChange={(open) => {
+        if (!open) {
+          setShowSendConfirmation(false);
+          setConfirmationCredential("");
+          setPendingSendAction(null);
+        }
+      }}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              {sendConfirmationStatus?.method === '2fa' ? (
+                <Fingerprint className="h-5 w-5 text-violet-600" />
+              ) : (
+                <KeyRound className="h-5 w-5 text-blue-600" />
+              )}
+              {sendConfirmationStatus?.method === '2fa'
+                ? t("newsletter.sendConfirm.title2fa", "Enter 2FA Code")
+                : t("newsletter.sendConfirm.titlePassword", "Confirm Password")}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left">
+              {sendConfirmationStatus?.method === '2fa'
+                ? t("newsletter.sendConfirm.desc2fa", "Your organization requires 2FA verification before sending newsletters. Enter your authenticator code to continue.")
+                : t("newsletter.sendConfirm.descPassword", "Your organization requires identity verification before sending newsletters. Enter your account password to continue.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Label htmlFor="send-confirm-input" className="text-sm font-medium mb-2 block">
+              {sendConfirmationStatus?.method === '2fa'
+                ? t("newsletter.sendConfirm.label2fa", "6-digit code")
+                : t("newsletter.sendConfirm.labelPassword", "Account password")}
+            </Label>
+            <Input
+              id="send-confirm-input"
+              type={sendConfirmationStatus?.method === '2fa' ? 'text' : 'password'}
+              inputMode={sendConfirmationStatus?.method === '2fa' ? 'numeric' : undefined}
+              maxLength={sendConfirmationStatus?.method === '2fa' ? 6 : undefined}
+              pattern={sendConfirmationStatus?.method === '2fa' ? '[0-9]*' : undefined}
+              placeholder={sendConfirmationStatus?.method === '2fa' ? '000000' : ''}
+              value={confirmationCredential}
+              onChange={(e) => setConfirmationCredential(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && confirmationCredential.trim()) {
+                  handleConfirmationVerify();
+                }
+              }}
+              autoFocus
+              disabled={isVerifyingCredential}
+            />
+          </div>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSendConfirmation(false);
+                setConfirmationCredential("");
+                setPendingSendAction(null);
+              }}
+              disabled={isVerifyingCredential}
+            >
+              {t("common.cancel", "Cancel")}
+            </Button>
+            <Button
+              onClick={handleConfirmationVerify}
+              disabled={!confirmationCredential.trim() || isVerifyingCredential}
+            >
+              {isVerifyingCredential ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {t("newsletter.sendConfirm.verifying", "Verifying...")}
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" />
+                  {t("newsletter.sendConfirm.verify", "Verify & Continue")}
+                </span>
+              )}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

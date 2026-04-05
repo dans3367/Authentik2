@@ -432,11 +432,14 @@ export const contactTagAssignments = pgTable("contact_tag_assignments", {
 export const segmentLists = pgTable("segment_lists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  shopId: varchar("shop_id").references(() => shops.id, { onDelete: 'set null' }), // shop this segment belongs to (null for universal)
   name: text("name").notNull(),
   description: text("description"),
   type: text("type").notNull(), // 'all', 'selected', 'tags'
   selectedContactIds: text("selected_contact_ids").array().default(sql`'{}'::text[]`), // Array of contact IDs for 'selected' type
   selectedTagIds: text("selected_tag_ids").array().default(sql`'{}'::text[]`), // Array of tag IDs for 'tags' type
+  isUniversal: boolean("is_universal").default(false), // true = spans multiple shops
+  selectedShopIds: text("selected_shop_ids").array().default(sql`'{}'::text[]`), // shops to include when isUniversal
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1620,6 +1623,8 @@ export const createSegmentListSchema = z.object({
   type: z.enum(['all', 'selected', 'tags']),
   selectedContactIds: z.array(z.string()).default([]),
   selectedTagIds: z.array(z.string()).default([]),
+  isUniversal: z.boolean().default(false),
+  selectedShopIds: z.array(z.string()).default([]),
 });
 
 export const updateSegmentListSchema = createSegmentListSchema.partial();
@@ -2532,6 +2537,23 @@ export const appointmentAutoReminderSettings = pgTable("appointment_auto_reminde
 export const appointmentAutoReminderSettingsRelations = relations(appointmentAutoReminderSettings, ({ one }) => ({
   tenant: one(tenants, {
     fields: [appointmentAutoReminderSettings.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+// Newsletter send confirmation settings — per-tenant toggle requiring
+// password or 2FA verification before sending a newsletter.
+export const newsletterSendConfirmation = pgTable("newsletter_send_confirmation", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }).unique(),
+  enabled: boolean("enabled").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const newsletterSendConfirmationRelations = relations(newsletterSendConfirmation, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [newsletterSendConfirmation.tenantId],
     references: [tenants.id],
   }),
 }));

@@ -4,7 +4,7 @@ import { sql, eq, ne, and, like, desc, inArray } from 'drizzle-orm';
 import { authenticateToken, requireTenant, requireRole, requirePermission } from '../middleware/auth-middleware';
 import { createRateLimiter } from '../middleware/security';
 import { authenticateInternalService } from '../middleware/internal-service-auth';
-import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, newsletterTaskStatus, newsletterReviewerSettings, betterAuthUser, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens } from '@shared/schema';
+import { createNewsletterSchema, updateNewsletterSchema, insertNewsletterSchema, newsletters, newsletterTaskStatus, newsletterReviewerSettings, newsletterSendConfirmation, betterAuthUser, betterAuthAccount, emailContacts, contactTagAssignments, bouncedEmails, unsubscribeTokens, masterEmailDesign, companies } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { moderateContent } from '@shared/contentModeration';
 import { sanitizeEmailHtml } from './email';
@@ -485,6 +485,114 @@ newsletterRoutes.get('/internal/suppression-list', authenticateInternalService, 
   }
 });
 
+// Aggregate endpoint: returns everything the newsletter page needs in one request.
+// Replaces 4 parallel client calls (active list, archived list, reviewer settings, email design).
+newsletterRoutes.get("/page-data", newsletterListRateLimiter, authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { emailType = 'newsletter', shopId } = req.query;
+    const resolvedType = (emailType as string) || 'newsletter';
+
+    // Build base where clause
+    let baseWhere = sql`${newsletters.tenantId} = ${tenantId} AND ${newsletters.deletedAt} IS NULL`;
+    if (shopId) {
+      baseWhere = sql`${baseWhere} AND ${newsletters.shopId} = ${shopId}`;
+    }
+    const typeFilter = sql`(${newsletters.emailType} = ${resolvedType} OR (${newsletters.emailType} IS NULL AND ${resolvedType} = 'newsletter'))`;
+
+    const activeWhere = sql`${baseWhere} AND ${newsletters.archivedAt} IS NULL AND ${typeFilter}`;
+    const archivedWhere = sql`${baseWhere} AND ${newsletters.archivedAt} IS NOT NULL AND ${typeFilter}`;
+
+    const userCols = { id: true, firstName: true, lastName: true } as const;
+    const withRelations = {
+      user: { columns: userCols },
+      tenant: { columns: { id: true, name: true } as const },
+      shop: { columns: { id: true, name: true } as const },
+    };
+
+    // Run all queries in parallel
+    const [
+      activeNewsletters,
+      archivedNewsletters,
+      activeCountResult,
+      archivedCountResult,
+      reviewerSettingsRow,
+      design,
+      company,
+      sendConfirmationRow,
+    ] = await Promise.all([
+      db.query.newsletters.findMany({
+        where: activeWhere,
+        orderBy: desc(newsletters.createdAt),
+        limit: 50,
+        with: withRelations,
+      }),
+      db.query.newsletters.findMany({
+        where: archivedWhere,
+        orderBy: desc(newsletters.createdAt),
+        limit: 50,
+        with: withRelations,
+      }),
+      db.select({ count: sql<number>`count(*)` }).from(newsletters).where(activeWhere),
+      db.select({ count: sql<number>`count(*)` }).from(newsletters).where(archivedWhere),
+      db.query.newsletterReviewerSettings.findFirst({
+        where: eq(newsletterReviewerSettings.tenantId, tenantId),
+      }),
+      db.query.masterEmailDesign.findFirst({
+        where: eq(masterEmailDesign.tenantId, tenantId),
+      }),
+      db.query.companies.findFirst({
+        where: sql`${companies.tenantId} = ${tenantId} AND ${companies.isActive} = true`,
+        columns: { name: true },
+      }),
+      db.query.newsletterSendConfirmation.findFirst({
+        where: eq(newsletterSendConfirmation.tenantId, tenantId),
+      }),
+    ]);
+
+    // Resolve reviewer if set
+    let reviewer = null;
+    if (reviewerSettingsRow?.reviewerId) {
+      reviewer = await db.query.betterAuthUser.findFirst({
+        where: and(
+          eq(betterAuthUser.id, reviewerSettingsRow.reviewerId),
+          eq(betterAuthUser.tenantId, tenantId)
+        ),
+        columns: { id: true, email: true, firstName: true, lastName: true, name: true, role: true, avatarUrl: true },
+      }) || null;
+    }
+
+    res.json({
+      newsletters: activeNewsletters,
+      archivedNewsletters,
+      activeCount: activeCountResult[0]?.count ?? 0,
+      archivedCount: archivedCountResult[0]?.count ?? 0,
+      reviewerSettings: {
+        enabled: reviewerSettingsRow?.enabled ?? false,
+        reviewerId: reviewerSettingsRow?.reviewerId ?? null,
+        reviewer,
+      },
+      emailDesign: design || {
+        companyName: company?.name || '',
+        headerMode: 'logo',
+        logoUrl: null,
+        logoSize: 'medium',
+        logoAlignment: 'center',
+        bannerUrl: null,
+        showCompanyName: 'true',
+        primaryColor: '#3B82F6',
+        fontFamily: 'system',
+      },
+      sendConfirmation: {
+        enabled: sendConfirmationRow?.enabled ?? false,
+      },
+    });
+  } catch (error) {
+    console.error('Get newsletter page data error:', error);
+    res.status(500).json({ message: 'Failed to get newsletter page data' });
+  }
+});
+
 // Get all newsletters
 newsletterRoutes.get("/", newsletterListRateLimiter, authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
@@ -527,9 +635,9 @@ newsletterRoutes.get("/", newsletterListRateLimiter, authenticateToken, requireT
       limit: Number(limit),
       offset,
       with: {
-        user: true,
-        tenant: true,
-        shop: true,
+        user: { columns: { id: true, firstName: true, lastName: true } },
+        tenant: { columns: { id: true, name: true } },
+        shop: { columns: { id: true, name: true } },
       }
     });
 
@@ -722,6 +830,192 @@ newsletterRoutes.put("/reviewer-settings", authenticateToken, requireTenant, req
   }
 });
 
+// ─── Newsletter send confirmation settings ──────────────────────────────────
+
+// Get send confirmation setting for tenant
+newsletterRoutes.get("/send-confirmation-settings", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const settings = await db.query.newsletterSendConfirmation.findFirst({
+      where: eq(newsletterSendConfirmation.tenantId, tenantId),
+    });
+    res.json({ enabled: settings?.enabled ?? false });
+  } catch (error) {
+    console.error('Get send confirmation settings error:', error);
+    res.status(500).json({ message: 'Failed to get send confirmation settings' });
+  }
+});
+
+// Update send confirmation setting for tenant
+newsletterRoutes.put("/send-confirmation-settings", authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ message: 'enabled must be a boolean' });
+    }
+
+    const existing = await db.query.newsletterSendConfirmation.findFirst({
+      where: eq(newsletterSendConfirmation.tenantId, tenantId),
+    });
+
+    if (existing) {
+      await db.update(newsletterSendConfirmation)
+        .set({ enabled, updatedAt: new Date() })
+        .where(eq(newsletterSendConfirmation.tenantId, tenantId));
+    } else {
+      await db.insert(newsletterSendConfirmation)
+        .values({ tenantId, enabled });
+    }
+
+    await logActivity({
+      tenantId,
+      userId: req.user.id,
+      entityType: 'newsletter_send_confirmation',
+      entityId: tenantId,
+      entityName: 'Newsletter Send Confirmation',
+      activityType: 'updated',
+      description: `${enabled ? 'Enabled' : 'Disabled'} password/2FA confirmation before newsletter sends`,
+      metadata: { enabled },
+      req,
+    });
+
+    res.json({ enabled });
+  } catch (error) {
+    console.error('Update send confirmation settings error:', error);
+    res.status(500).json({ message: 'Failed to update send confirmation settings' });
+  }
+});
+
+// Verify password or 2FA before sending a newsletter.
+// Returns a short-lived sendAuthToken that the /:id/send endpoint will accept.
+const pendingSendAuthTokens = new Map<string, { userId: string; tenantId: string; expiresAt: number }>();
+const SEND_AUTH_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+newsletterRoutes.post("/verify-send-auth", authenticateToken, requireTenant, requirePermission('newsletters.send'), async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+    const tenantId = req.user.tenantId;
+    const { password, totpCode } = req.body;
+
+    if (!password && !totpCode) {
+      return res.status(400).json({ message: 'Password or 2FA code is required' });
+    }
+
+    // Fetch user to check 2FA status
+    const user = await db.query.betterAuthUser.findFirst({
+      where: and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)),
+      columns: { id: true, twoFactorEnabled: true, twoFactorSecret: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // If user has 2FA enabled, require TOTP code
+    if (user.twoFactorEnabled && user.twoFactorSecret) {
+      if (!totpCode) {
+        return res.status(400).json({ message: '2FA code is required', requires2FA: true });
+      }
+      const { authenticator } = await import('otplib');
+      const isValid = authenticator.verify({ token: totpCode, secret: user.twoFactorSecret });
+      if (!isValid) {
+        return res.status(400).json({ message: 'Invalid 2FA code' });
+      }
+    } else {
+      // No 2FA — verify password
+      if (!password) {
+        return res.status(400).json({ message: 'Password is required' });
+      }
+
+      // Get stored password hash from better_auth_account
+      const account = await db.query.betterAuthAccount.findFirst({
+        where: and(
+          eq(betterAuthAccount.userId, userId),
+          eq(betterAuthAccount.providerId, 'credential')
+        ),
+        columns: { password: true },
+      });
+
+      if (!account?.password) {
+        return res.status(400).json({ message: 'No password credential found for this account' });
+      }
+
+      const { verifyPassword } = await import('better-auth/crypto');
+      const passwordValid = await verifyPassword({ hash: account.password, password });
+      if (!passwordValid) {
+        return res.status(400).json({ message: 'Incorrect password' });
+      }
+    }
+
+    // Issue a short-lived send auth token
+    const sendAuthToken = crypto.randomUUID();
+    pendingSendAuthTokens.set(sendAuthToken, {
+      userId,
+      tenantId,
+      expiresAt: Date.now() + SEND_AUTH_TOKEN_TTL_MS,
+    });
+
+    // Cleanup expired tokens periodically (cap at 500)
+    if (pendingSendAuthTokens.size > 500) {
+      const now = Date.now();
+      for (const [key, val] of pendingSendAuthTokens) {
+        if (val.expiresAt < now) pendingSendAuthTokens.delete(key);
+      }
+    }
+
+    res.json({ sendAuthToken, expiresIn: SEND_AUTH_TOKEN_TTL_MS / 1000 });
+  } catch (error) {
+    console.error('Verify send auth error:', error);
+    res.status(500).json({ message: 'Failed to verify credentials' });
+  }
+});
+
+// Export for use by the send endpoint
+export function validateSendAuthToken(token: string, userId: string, tenantId: string): boolean {
+  const entry = pendingSendAuthTokens.get(token);
+  if (!entry) return false;
+  if (entry.expiresAt < Date.now()) {
+    pendingSendAuthTokens.delete(token);
+    return false;
+  }
+  if (entry.userId !== userId || entry.tenantId !== tenantId) return false;
+  // Single-use: consume the token
+  pendingSendAuthTokens.delete(token);
+  return true;
+}
+
+// Check whether the current user needs send confirmation (called by client before send)
+newsletterRoutes.get("/send-confirmation-status", authenticateToken, requireTenant, requirePermission('newsletters.send'), async (req: any, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const userId = req.user.id;
+
+    const settings = await db.query.newsletterSendConfirmation.findFirst({
+      where: eq(newsletterSendConfirmation.tenantId, tenantId),
+    });
+
+    if (!settings?.enabled) {
+      return res.json({ required: false });
+    }
+
+    // Check if user has 2FA enabled
+    const user = await db.query.betterAuthUser.findFirst({
+      where: and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)),
+      columns: { twoFactorEnabled: true },
+    });
+
+    res.json({
+      required: true,
+      method: user?.twoFactorEnabled ? '2fa' : 'password',
+    });
+  } catch (error) {
+    console.error('Get send confirmation status error:', error);
+    res.status(500).json({ message: 'Failed to get send confirmation status' });
+  }
+});
+
 // Get specific newsletter
 newsletterRoutes.get("/:id", authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
   try {
@@ -730,8 +1024,8 @@ newsletterRoutes.get("/:id", authenticateToken, requireTenant, requirePermission
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
       with: {
-        user: true,
-        reviewer: true
+        user: { columns: { id: true, firstName: true, lastName: true } },
+        reviewer: { columns: { id: true, firstName: true, lastName: true, email: true } },
       }
     });
 
@@ -1005,7 +1299,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
       with: {
-        user: true
+        user: { columns: { id: true, firstName: true, lastName: true } },
       }
     });
 
@@ -1051,7 +1345,7 @@ newsletterRoutes.put("/:id", authenticateToken, requireTenant, requirePermission
       const checkSubject = subject !== undefined ? sanitizeString(subject) : newsletter.subject;
       const checkContent = content !== undefined ? content : newsletter.content;
       const modResult = moderateContent(checkSubject, checkContent || '');
-      if (!modResult.approved) {
+      if (!modResult.passed) {
         return res.status(400).json({
           message: 'Content moderation failed',
           violations: modResult.violations,
@@ -1143,7 +1437,7 @@ newsletterRoutes.delete("/:id", authenticateToken, requireTenant, requirePermiss
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
       with: {
-        user: true
+        user: { columns: { id: true, firstName: true, lastName: true } },
       }
     });
 
@@ -1204,9 +1498,6 @@ newsletterRoutes.get("/:id/detailed-stats", authenticateToken, requireTenant, re
 
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
-      with: {
-        user: true
-      }
     });
 
     if (!newsletter) {
@@ -1314,9 +1605,6 @@ newsletterRoutes.get("/:id/task-status", authenticateToken, requireTenant, requi
 
     const newsletter = await db.query.newsletters.findFirst({
       where: sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId} AND ${newsletters.deletedAt} IS NULL`,
-      with: {
-        user: true
-      }
     });
 
     if (!newsletter) {
@@ -1488,9 +1776,6 @@ newsletterRoutes.post("/:id/task-status", authenticateToken, requireTenant, requ
 
     const newsletter = await db.query.newsletters.findFirst({
       where: and(eq(newsletters.id, id), eq(newsletters.tenantId, req.user.tenantId)),
-      with: {
-        user: true
-      }
     });
 
     if (!newsletter) {
@@ -1555,9 +1840,6 @@ newsletterRoutes.post("/:id/initialize-tasks", authenticateToken, requireTenant,
 
     const newsletter = await db.query.newsletters.findFirst({
       where: and(eq(newsletters.id, id), eq(newsletters.tenantId, req.user.tenantId)),
-      with: {
-        user: true
-      }
     });
 
     if (!newsletter) {
@@ -1641,9 +1923,6 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
         eq(newsletters.id, id),
         eq(newsletters.tenantId, req.user.tenantId)
       ),
-      with: {
-        user: true
-      }
     });
 
     if (!newsletter) {
@@ -1681,6 +1960,22 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
         message: 'Newsletter contains prohibited content that must be removed before sending.',
         moderationViolations: moderationResult.violations,
       });
+    }
+
+    // Send confirmation check — when enabled, require a valid sendAuthToken
+    if (!testEmail) {
+      const confirmSettings = await db.query.newsletterSendConfirmation.findFirst({
+        where: eq(newsletterSendConfirmation.tenantId, req.user.tenantId),
+      });
+      if (confirmSettings?.enabled) {
+        const { sendAuthToken } = req.body;
+        if (!sendAuthToken || !validateSendAuthToken(sendAuthToken, req.user.id, req.user.tenantId)) {
+          return res.status(403).json({
+            message: 'Password or 2FA confirmation is required before sending newsletters.',
+            requiresSendConfirmation: true,
+          });
+        }
+      }
     }
 
     // If test email is provided, send test email
@@ -2227,7 +2522,6 @@ newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, require
         eq(newsletters.id, id),
         eq(newsletters.tenantId, req.user.tenantId)
       ),
-      with: { user: true }
     });
 
     if (!newsletter) {
@@ -2268,6 +2562,20 @@ newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, require
         message: 'Newsletter contains prohibited content that must be removed before scheduling.',
         moderationViolations: moderationResult.violations,
       });
+    }
+
+    // Send confirmation check — scheduling is also a send action
+    const confirmSettings = await db.query.newsletterSendConfirmation.findFirst({
+      where: eq(newsletterSendConfirmation.tenantId, req.user.tenantId),
+    });
+    if (confirmSettings?.enabled) {
+      const { sendAuthToken } = req.body;
+      if (!sendAuthToken || !validateSendAuthToken(sendAuthToken, req.user.id, req.user.tenantId)) {
+        return res.status(403).json({
+          message: 'Password or 2FA confirmation is required before scheduling newsletters.',
+          requiresSendConfirmation: true,
+        });
+      }
     }
 
     // Get recipients and apply suppression filter (same as send)
@@ -2591,7 +2899,7 @@ newsletterRoutes.put('/internal/:id/status', authenticateInternalService, async 
     // Sync to Convex for real-time kanban updates (fire-and-forget)
     const updatedForConvex = await db.query.newsletters.findFirst({
       where: eq(newsletters.id, id),
-      with: { user: true },
+      with: { user: { columns: { id: true, firstName: true, lastName: true } } },
     });
     if (updatedForConvex) {
       syncNewsletterToConvex(updatedForConvex);

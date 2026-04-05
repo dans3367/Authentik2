@@ -17,19 +17,23 @@ export interface ShopFilteredRequest extends AuthRequest {
  */
 export const filterByShop = (req: ShopFilteredRequest, _res: Response, next: NextFunction) => {
   const shopIdHeader = req.headers['x-shop-id'] as string | undefined;
+  // Allow query param override so components can target a specific shop
+  // (e.g. newsletter wizard passing the newsletter's shopId)
+  const shopIdQuery = (req.query?.shopId as string) || undefined;
+  const shopId = shopIdHeader || shopIdQuery;
 
-  if (!shopIdHeader) {
+  if (!shopId) {
     req.shopId = null;
     return next();
   }
 
   // Validate UUID format
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(shopIdHeader)) {
+  if (!uuidRegex.test(shopId)) {
     req.shopId = null;
     return next();
   }
 
-  req.shopId = shopIdHeader;
+  req.shopId = shopId;
   next();
 };

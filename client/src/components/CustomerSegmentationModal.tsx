@@ -49,11 +49,11 @@ export function CustomerSegmentationModal({
   const hasAutoInitialized = useRef(false);
   const queryClient = useQueryClient();
 
-  // Fetch contacts
+  // Fetch contacts (active only — inactive/unsubscribed contacts can't receive emails)
   const { data: contactsData, isLoading: contactsLoading } = useQuery({
-    queryKey: ['/api/email-contacts'],
+    queryKey: ['/api/email-contacts', { status: 'active' }],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/email-contacts');
+      const response = await apiRequest('GET', '/api/email-contacts?status=active');
       return response.json();
     },
     enabled: isOpen,

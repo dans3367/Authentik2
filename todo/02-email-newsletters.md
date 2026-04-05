@@ -11,6 +11,13 @@
 
 ## Content & Sending
 
+- [x] Add password/2FA confirmation requirement before sending newsletters
+  - ~~Add per-tenant toggle in /management section (Owner/Admin only)~~
+  - ~~When enabled, require user to enter account password (or verify 2FA TOTP code if 2FA is enabled) before the send is dispatched~~
+  - ~~Enforce in the UI at the point of clicking "Send" — show a confirmation modal prompting for credentials~~
+  - ~~Server-side enforcement on POST /:id/send: verify credentials before accepting the request, reject with 403 if check fails~~
+  - ~~Store setting in a new `newsletter_send_confirmation` column on `tenant_settings` (or a dedicated table) defaulting to `false`~~
+
 - [x] Add basic content moderation to newsletter content
   - ~~Flag or block emails containing prohibited content patterns to being, these would be simple bad words, rasism, adult content, and other related keywords.~~
   - ~~Add review step for first-time senders or flagged content~~

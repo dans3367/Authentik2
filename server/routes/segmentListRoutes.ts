@@ -8,68 +8,89 @@ import type { CreateSegmentListData, UpdateSegmentListData } from '@shared/schem
 
 export const segmentListRoutes = Router();
 
+/**
+ * Build shop-scoping conditions for contact count queries.
+ * For universal segments: use the segment's selectedShopIds.
+ * For regular segments: use req.shopId from the header/query.
+ */
+function shopConditions(list: { isUniversal: boolean | null; selectedShopIds: string[] | null }, reqShopId: string | null) {
+  if (list.isUniversal && list.selectedShopIds && list.selectedShopIds.length > 0) {
+    return [inArray(emailContacts.shopId, list.selectedShopIds)];
+  }
+  if (reqShopId) {
+    return [eq(emailContacts.shopId, reqShopId)];
+  }
+  return [];
+}
+
+/** Calculate contact count for a single segment list. */
+async function getSegmentContactCount(
+  list: { type: string; selectedContactIds: string[] | null; selectedTagIds: string[] | null; isUniversal: boolean | null; selectedShopIds: string[] | null },
+  tenantId: string,
+  reqShopId: string | null,
+): Promise<number> {
+  const baseConditions = [
+    eq(emailContacts.tenantId, tenantId),
+    eq(emailContacts.status, 'active'),
+    ...shopConditions(list, reqShopId),
+  ];
+
+  if (list.type === 'all') {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(emailContacts)
+      .where(and(...baseConditions));
+    return Number(result[0]?.count || 0);
+  }
+
+  if (list.type === 'selected' && list.selectedContactIds && list.selectedContactIds.length > 0) {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(emailContacts)
+      .where(and(...baseConditions, inArray(emailContacts.id, list.selectedContactIds)));
+    return Number(result[0]?.count || 0);
+  }
+
+  if (list.type === 'tags' && list.selectedTagIds && list.selectedTagIds.length > 0) {
+    const result = await db
+      .select({ count: sql<number>`count(DISTINCT ${emailContacts.id})` })
+      .from(emailContacts)
+      .innerJoin(contactTagAssignments, eq(contactTagAssignments.contactId, emailContacts.id))
+      .where(and(...baseConditions, inArray(contactTagAssignments.tagId, list.selectedTagIds)));
+    return Number(result[0]?.count || 0);
+  }
+
+  return 0;
+}
+
 // Get all segment lists
 segmentListRoutes.get("/segment-lists", authenticateToken, requireTenant, async (req: any, res) => {
   try {
+    const shopId = req.shopId as string | null;
+
+    // When a shop is selected, show: segments belonging to that shop +
+    // universal segments whose selectedShopIds include this shop.
+    // When no shop is selected, show all segments.
+    let whereClause;
+    if (shopId) {
+      whereClause = sql`${segmentLists.tenantId} = ${req.user.tenantId} AND (
+        ${segmentLists.shopId} = ${shopId}
+        OR (${segmentLists.isUniversal} = true AND ${shopId} = ANY(${segmentLists.selectedShopIds}))
+      )`;
+    } else {
+      whereClause = eq(segmentLists.tenantId, req.user.tenantId);
+    }
+
     const lists = await db.query.segmentLists.findMany({
-      where: eq(segmentLists.tenantId, req.user.tenantId),
+      where: whereClause,
       orderBy: sql`${segmentLists.createdAt} DESC`,
     });
 
-    // Calculate contact count for each list
     const listsWithCounts = await Promise.all(
-      lists.map(async (list) => {
-        let contactCount = 0;
-
-        if (list.type === 'all') {
-          // Count all active contacts
-          const result = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(emailContacts)
-            .where(
-              and(
-                eq(emailContacts.tenantId, req.user.tenantId),
-                eq(emailContacts.status, 'active')
-              )
-            );
-          contactCount = Number(result[0]?.count || 0);
-        } else if (list.type === 'selected' && list.selectedContactIds.length > 0) {
-          // Count selected contacts
-          const result = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(emailContacts)
-            .where(
-              and(
-                eq(emailContacts.tenantId, req.user.tenantId),
-                inArray(emailContacts.id, list.selectedContactIds),
-                eq(emailContacts.status, 'active')
-              )
-            );
-          contactCount = Number(result[0]?.count || 0);
-        } else if (list.type === 'tags' && list.selectedTagIds.length > 0) {
-          // Count contacts with selected tags
-          const result = await db
-            .select({ count: sql<number>`count(DISTINCT ${emailContacts.id})` })
-            .from(emailContacts)
-            .innerJoin(
-              contactTagAssignments,
-              eq(contactTagAssignments.contactId, emailContacts.id)
-            )
-            .where(
-              and(
-                eq(emailContacts.tenantId, req.user.tenantId),
-                inArray(contactTagAssignments.tagId, list.selectedTagIds),
-                eq(emailContacts.status, 'active')
-              )
-            );
-          contactCount = Number(result[0]?.count || 0);
-        }
-
-        return {
-          ...list,
-          contactCount,
-        };
-      })
+      lists.map(async (list) => ({
+        ...list,
+        contactCount: await getSegmentContactCount(list, req.user.tenantId, shopId),
+      }))
     );
 
     res.json({ lists: listsWithCounts });
@@ -82,38 +103,48 @@ segmentListRoutes.get("/segment-lists", authenticateToken, requireTenant, async 
 // Get segment list stats
 segmentListRoutes.get("/segment-lists/stats", authenticateToken, requireTenant, async (req: any, res) => {
   try {
-    // Get total lists count
     const listsResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(segmentLists)
       .where(eq(segmentLists.tenantId, req.user.tenantId));
     const totalLists = Number(listsResult[0]?.count || 0);
 
-    // Get total contacts count
     const contactsResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(emailContacts)
-      .where(
-        and(
-          eq(emailContacts.tenantId, req.user.tenantId),
-          eq(emailContacts.status, 'active')
-        )
-      );
+      .where(and(eq(emailContacts.tenantId, req.user.tenantId), eq(emailContacts.status, 'active')));
     const totalContacts = Number(contactsResult[0]?.count || 0);
 
-    // Calculate average list size
     const averageListSize = totalLists > 0 ? totalContacts / totalLists : 0;
 
-    res.json({
-      stats: {
-        totalLists,
-        totalContacts,
-        averageListSize,
-      },
-    });
+    res.json({ stats: { totalLists, totalContacts, averageListSize } });
   } catch (error: any) {
     console.error('Error fetching segment list stats:', error);
     res.status(500).json({ error: 'Failed to fetch segment list stats' });
+  }
+});
+
+// Get active contact counts grouped by shop (for universal segment creation)
+segmentListRoutes.get("/segment-lists/shop-contact-counts", authenticateToken, requireTenant, async (req: any, res) => {
+  try {
+    const rows = await db
+      .select({
+        shopId: emailContacts.shopId,
+        count: sql<number>`count(*)`,
+      })
+      .from(emailContacts)
+      .where(and(eq(emailContacts.tenantId, req.user.tenantId), eq(emailContacts.status, 'active')))
+      .groupBy(emailContacts.shopId);
+
+    // Convert to a map { shopId: count }
+    const counts: Record<string, number> = {};
+    for (const row of rows) {
+      if (row.shopId) counts[row.shopId] = Number(row.count);
+    }
+    res.json({ counts });
+  } catch (error: any) {
+    console.error('Error fetching shop contact counts:', error);
+    res.status(500).json({ error: 'Failed to fetch shop contact counts' });
   }
 });
 
@@ -123,66 +154,16 @@ segmentListRoutes.get("/segment-lists/:id", authenticateToken, requireTenant, as
     const { id } = req.params;
 
     const list = await db.query.segmentLists.findFirst({
-      where: and(
-        eq(segmentLists.id, id),
-        eq(segmentLists.tenantId, req.user.tenantId)
-      ),
+      where: and(eq(segmentLists.id, id), eq(segmentLists.tenantId, req.user.tenantId)),
     });
 
     if (!list) {
       return res.status(404).json({ error: 'Segment list not found' });
     }
 
-    // Calculate contact count
-    let contactCount = 0;
+    const contactCount = await getSegmentContactCount(list, req.user.tenantId, req.shopId);
 
-    if (list.type === 'all') {
-      const result = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(emailContacts)
-        .where(
-          and(
-            eq(emailContacts.tenantId, req.user.tenantId),
-            eq(emailContacts.status, 'active')
-          )
-        );
-      contactCount = Number(result[0]?.count || 0);
-    } else if (list.type === 'selected' && list.selectedContactIds.length > 0) {
-      const result = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(emailContacts)
-        .where(
-          and(
-            eq(emailContacts.tenantId, req.user.tenantId),
-            inArray(emailContacts.id, list.selectedContactIds),
-            eq(emailContacts.status, 'active')
-          )
-        );
-      contactCount = Number(result[0]?.count || 0);
-    } else if (list.type === 'tags' && list.selectedTagIds.length > 0) {
-      const result = await db
-        .select({ count: sql<number>`count(DISTINCT ${emailContacts.id})` })
-        .from(emailContacts)
-        .innerJoin(
-          contactTagAssignments,
-          eq(contactTagAssignments.contactId, emailContacts.id)
-        )
-        .where(
-          and(
-            eq(emailContacts.tenantId, req.user.tenantId),
-            inArray(contactTagAssignments.tagId, list.selectedTagIds),
-            eq(emailContacts.status, 'active')
-          )
-        );
-      contactCount = Number(result[0]?.count || 0);
-    }
-
-    res.json({
-      list: {
-        ...list,
-        contactCount,
-      },
-    });
+    res.json({ list: { ...list, contactCount } });
   } catch (error: any) {
     console.error('Error fetching segment list:', error);
     res.status(500).json({ error: 'Failed to fetch segment list' });
@@ -194,25 +175,29 @@ segmentListRoutes.post("/segment-lists", authenticateToken, requireTenant, async
   try {
     const data: CreateSegmentListData = req.body;
 
-    // Validate required fields
     if (!data.name || !data.type) {
       return res.status(400).json({ error: 'Name and type are required' });
     }
 
-    // Sanitize input
+    if (data.isUniversal && (!data.selectedShopIds || data.selectedShopIds.length === 0)) {
+      return res.status(400).json({ error: 'Cross-store segments must include at least one store' });
+    }
+
     const sanitizedName = sanitizeString(data.name);
     const sanitizedDescription = data.description ? sanitizeString(data.description) : null;
 
-    // Create segment list
     const [newList] = await db
       .insert(segmentLists)
       .values({
         tenantId: req.user.tenantId,
+        shopId: data.isUniversal ? null : (req.shopId || null),
         name: sanitizedName,
         description: sanitizedDescription,
         type: data.type,
         selectedContactIds: data.selectedContactIds || [],
         selectedTagIds: data.selectedTagIds || [],
+        isUniversal: data.isUniversal || false,
+        selectedShopIds: data.isUniversal ? (data.selectedShopIds || []) : [],
       })
       .returning();
 
@@ -229,53 +214,28 @@ segmentListRoutes.patch("/segment-lists/:id", authenticateToken, requireTenant, 
     const { id } = req.params;
     const data: UpdateSegmentListData = req.body;
 
-    // Check if list exists and belongs to tenant
     const existingList = await db.query.segmentLists.findFirst({
-      where: and(
-        eq(segmentLists.id, id),
-        eq(segmentLists.tenantId, req.user.tenantId)
-      ),
+      where: and(eq(segmentLists.id, id), eq(segmentLists.tenantId, req.user.tenantId)),
     });
 
     if (!existingList) {
       return res.status(404).json({ error: 'Segment list not found' });
     }
 
-    // Prepare update data
-    const updateData: any = {
-      updatedAt: new Date(),
-    };
+    const updateData: any = { updatedAt: new Date() };
 
-    if (data.name !== undefined) {
-      updateData.name = sanitizeString(data.name);
-    }
+    if (data.name !== undefined) updateData.name = sanitizeString(data.name);
+    if (data.description !== undefined) updateData.description = data.description ? sanitizeString(data.description) : null;
+    if (data.type !== undefined) updateData.type = data.type;
+    if (data.selectedContactIds !== undefined) updateData.selectedContactIds = data.selectedContactIds;
+    if (data.selectedTagIds !== undefined) updateData.selectedTagIds = data.selectedTagIds;
+    if (data.isUniversal !== undefined) updateData.isUniversal = data.isUniversal;
+    if (data.selectedShopIds !== undefined) updateData.selectedShopIds = data.selectedShopIds;
 
-    if (data.description !== undefined) {
-      updateData.description = data.description ? sanitizeString(data.description) : null;
-    }
-
-    if (data.type !== undefined) {
-      updateData.type = data.type;
-    }
-
-    if (data.selectedContactIds !== undefined) {
-      updateData.selectedContactIds = data.selectedContactIds;
-    }
-
-    if (data.selectedTagIds !== undefined) {
-      updateData.selectedTagIds = data.selectedTagIds;
-    }
-
-    // Update segment list
     const [updatedList] = await db
       .update(segmentLists)
       .set(updateData)
-      .where(
-        and(
-          eq(segmentLists.id, id),
-          eq(segmentLists.tenantId, req.user.tenantId)
-        )
-      )
+      .where(and(eq(segmentLists.id, id), eq(segmentLists.tenantId, req.user.tenantId)))
       .returning();
 
     res.json({ list: updatedList });
@@ -290,27 +250,17 @@ segmentListRoutes.delete("/segment-lists/:id", authenticateToken, requireTenant,
   try {
     const { id } = req.params;
 
-    // Check if list exists and belongs to tenant
     const existingList = await db.query.segmentLists.findFirst({
-      where: and(
-        eq(segmentLists.id, id),
-        eq(segmentLists.tenantId, req.user.tenantId)
-      ),
+      where: and(eq(segmentLists.id, id), eq(segmentLists.tenantId, req.user.tenantId)),
     });
 
     if (!existingList) {
       return res.status(404).json({ error: 'Segment list not found' });
     }
 
-    // Delete segment list
     await db
       .delete(segmentLists)
-      .where(
-        and(
-          eq(segmentLists.id, id),
-          eq(segmentLists.tenantId, req.user.tenantId)
-        )
-      );
+      .where(and(eq(segmentLists.id, id), eq(segmentLists.tenantId, req.user.tenantId)));
 
     res.json({ message: 'Segment list deleted successfully' });
   } catch (error: any) {

@@ -906,6 +906,7 @@ export default function AdvertisePage() {
         newsletterId={editRecipientsItem?.id || null}
         newsletterTitle={editRecipientsItem?.title || ""}
         newsletterReviewStatus={(editRecipientsItem as any)?.reviewStatus}
+        shopId={(editRecipientsItem as any)?.shopId || selectedShopId || null}
         onSegmentSelected={handleEditRecipientsSegmentSelected}
         initialRecipientType={editRecipientsItem?.recipientType as "all" | "selected" | "tags" | undefined}
         initialSelectedContactIds={editRecipientsItem?.selectedContactIds || []}

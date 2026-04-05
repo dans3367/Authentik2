@@ -1494,6 +1494,7 @@ export default function NewsletterCreatePage() {
           newsletterId={newsletterId}
           newsletterTitle={titleRef.current || `Untitled ${emailType === 'advertise' ? 'Advertisement' : 'Newsletter'}`}
           newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
+          shopId={existingNewsletter?.newsletter?.shopId || null}
           onSegmentSelected={handleSegmentSelected}
           initialRecipientType={initialRecipientType}
           initialSelectedContactIds={initialSelectedContactIds}
@@ -1634,6 +1635,7 @@ export default function NewsletterCreatePage() {
         newsletterId={newsletterId}
         newsletterTitle={titleRef.current || `Untitled ${emailType === 'advertise' ? 'Advertisement' : 'Newsletter'}`}
         newsletterReviewStatus={existingNewsletter?.newsletter?.reviewStatus}
+        shopId={existingNewsletter?.newsletter?.shopId || null}
         onSegmentSelected={handleSegmentSelected}
         initialRecipientType={initialRecipientType}
         initialSelectedContactIds={initialSelectedContactIds}

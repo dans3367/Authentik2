@@ -128,18 +128,24 @@ export default function NewsletterPage() {
     { label: t("newsletter.breadcrumbNewsletters", "Email Newsletters"), icon: Mail }
   ]);
 
-  const { data: newslettersData, isLoading, error, refetch } = useQuery({
-    queryKey: ['/api/newsletters', { emailType: 'newsletter', shopId: selectedShopId }],
+  // Single aggregate query replaces 4 parallel calls (newsletters, archived, reviewer settings, email design)
+  const { data: pageData, isLoading, error, refetch } = useQuery({
+    queryKey: ['/api/newsletters/page-data', { emailType: 'newsletter', shopId: selectedShopId }],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/newsletters?emailType=newsletter');
-      const data = await response.json();
-      return data.newsletters || [];
+      const params = new URLSearchParams({ emailType: 'newsletter' });
+      if (selectedShopId) params.set('shopId', selectedShopId);
+      const response = await apiRequest('GET', `/api/newsletters/page-data?${params}`);
+      return response.json();
     },
-    staleTime: 0,
+    staleTime: 5000,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     retry: 2,
   });
+
+  const newslettersData = pageData?.newsletters;
+  const reviewerSettings = pageData?.reviewerSettings as { enabled: boolean; reviewerId: string | null; reviewer: any } | undefined;
+  const emailDesign = pageData?.emailDesign;
 
   const handleRefresh = useCallback(() => {
     if (refreshCooldown || isLoading) return;
@@ -149,55 +155,22 @@ export default function NewsletterPage() {
     cooldownTimer.current = setTimeout(() => setRefreshCooldown(false), 5000);
   }, [refreshCooldown, isLoading, refetch]);
 
-  // Fetch reviewer settings to know if reviewer workflow is enabled
-  const { data: reviewerSettings } = useQuery<{ enabled: boolean; reviewerId: string | null; reviewer: any }>({
-    queryKey: ['/api/newsletters/reviewer-settings'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/newsletters/reviewer-settings');
-      return response.json();
-    },
-  });
-
   const reviewerEnabled = reviewerSettings?.enabled ?? false;
   const isCurrentUserDesignatedReviewer = reviewerSettings?.reviewerId === currentUserId;
-
-  const { data: emailDesign } = useQuery<{
-    companyName?: string;
-    headerMode?: string;
-    logoUrl?: string;
-    logoSize?: string;
-    logoAlignment?: string;
-    bannerUrl?: string;
-    showCompanyName?: string;
-    primaryColor?: string;
-    fontFamily?: string;
-    headerText?: string;
-    footerText?: string;
-    socialLinks?: { facebook?: string; twitter?: string; instagram?: string; linkedin?: string } | string;
-  }>({
-    queryKey: ["/api/master-email-design"],
-    queryFn: async () => {
-      const response = await fetch("/api/master-email-design", { credentials: "include" });
-      if (!response.ok) {
-        throw new Error("Failed to fetch email design");
-      }
-      return response.json();
-    },
-  });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest('DELETE', `/api/newsletters/${id}`);
     },
     onSuccess: (_data, id) => {
-      // Remove from cache immediately so the card doesn't briefly reappear before refetch completes
-      queryClient.setQueryData<NewsletterListItem[]>(
-        ['/api/newsletters', { emailType: 'newsletter' }],
-        (old) => old ? old.filter((n) => n.id !== id) : []
-      );
-      queryClient.setQueryData<NewsletterListItem[]>(
-        ['/api/newsletters', { emailType: 'newsletter', archived: true }],
-        (old) => old ? old.filter((n) => n.id !== id) : []
+      // Remove from aggregate cache immediately so the card disappears before refetch
+      queryClient.setQueryData(
+        ['/api/newsletters/page-data', { emailType: 'newsletter', shopId: selectedShopId }],
+        (old: any) => old ? {
+          ...old,
+          newsletters: old.newsletters?.filter((n: any) => n.id !== id) || [],
+          archivedNewsletters: old.archivedNewsletters?.filter((n: any) => n.id !== id) || [],
+        } : old
       );
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
       toast({ title: t("newsletter.toast.deleted"), description: t("newsletter.toast.deletedDesc") });
@@ -324,17 +297,8 @@ export default function NewsletterPage() {
     },
   });
 
-  // Fetch archived newsletters (always enabled so the toggle button appears when archived items exist)
-  const { data: archivedNewslettersData } = useQuery({
-    queryKey: ['/api/newsletters', { emailType: 'newsletter', archived: true, shopId: selectedShopId }],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/newsletters?emailType=newsletter&archived=true');
-      const data = await response.json();
-      return data.newsletters || [];
-    },
-    staleTime: 0,
-    refetchOnMount: 'always',
-  });
+  // Archived newsletters come from the aggregate query
+  const archivedNewslettersData = pageData?.archivedNewsletters;
 
   // Layer Convex real-time data on top of archived TanStack Query data
   const { newsletters: realtimeArchivedNewsletters } = useRealtimeNewsletters(archivedNewslettersData, tenantId, selectedShopId, true, "newsletter");
@@ -1104,6 +1068,7 @@ export default function NewsletterPage() {
         newsletterId={editRecipientsNewsletter?.id || null}
         newsletterTitle={editRecipientsNewsletter?.title || ""}
         newsletterReviewStatus={(editRecipientsNewsletter as any)?.reviewStatus}
+        shopId={(editRecipientsNewsletter as any)?.shopId || selectedShopId || null}
         onSegmentSelected={handleEditRecipientsSegmentSelected}
         initialRecipientType={editRecipientsNewsletter?.recipientType as "all" | "selected" | "tags" | undefined}
         initialSelectedContactIds={editRecipientsNewsletter?.selectedContactIds || []}
