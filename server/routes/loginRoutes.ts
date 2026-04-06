@@ -16,13 +16,85 @@ import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
 export const loginRoutes = Router();
 
+function getAuthOrigin(req: any) {
+  return process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+}
+
+async function completeBrowserSignIn(req: any, res: any, email: string, password: string) {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+  };
+
+  if (req.headers['user-agent']) {
+    headers['user-agent'] = req.headers['user-agent'] as string;
+  }
+
+  if (req.headers.cookie) {
+    headers['cookie'] = req.headers.cookie as string;
+  }
+
+  const forwardedFor = req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress;
+  if (forwardedFor) {
+    headers['x-forwarded-for'] = String(forwardedFor);
+  }
+
+  const authOrigin = getAuthOrigin(req);
+  const signInUrl = `${authOrigin}/api/auth/sign-in/email`;
+  console.log(`🔍 [completeBrowserSignIn] Making internal request to: ${signInUrl}`);
+
+  const signInRequest = new Request(signInUrl, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      origin: authOrigin,
+      referer: authOrigin,
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const signInResponse = await auth.handler(signInRequest);
+  console.log(`🔍 [completeBrowserSignIn] Better Auth response status: ${signInResponse.status}`);
+
+  if (!signInResponse.ok) {
+    const errorText = await signInResponse.text().catch(() => '');
+    throw new Error(errorText || 'Failed to create authenticated session');
+  }
+
+  // Extract Set-Cookie headers from the Web Response object returned by auth.handler()
+  // auth.handler() returns a standard Web API Response — cookies are in its headers,
+  // NOT set via Express's res.setHeader. We must read them from the Response and
+  // forward them onto the Express response so the browser receives them.
+  const responseCookies: string[] = [];
+  const rawSetCookie = signInResponse.headers.getSetCookie?.();
+  if (rawSetCookie && rawSetCookie.length > 0) {
+    responseCookies.push(...rawSetCookie);
+  } else {
+    // Fallback: some environments don't support getSetCookie(), try get()
+    const cookieHeader = signInResponse.headers.get('set-cookie');
+    if (cookieHeader) {
+      // Multiple cookies may be comma-separated; split carefully (cookies contain '=' and ';')
+      responseCookies.push(cookieHeader);
+    }
+  }
+
+  console.log(`🔍 [completeBrowserSignIn] Extracted ${responseCookies.length} cookies from auth response:`, responseCookies.map(c => c.split(';')[0]));
+
+  if (responseCookies.length > 0) {
+    const existingCookies = (res.getHeader('set-cookie') as string | string[] | undefined) || [];
+    const allCookies = Array.isArray(existingCookies)
+      ? [...existingCookies, ...responseCookies]
+      : existingCookies ? [existingCookies, ...responseCookies] : responseCookies;
+    res.setHeader('Set-Cookie', allCookies);
+  }
+}
+
 // Rate limiting for resend verification
 const resendRateLimit = new Map<string, { count: number; resetAt: number; nextAllowedAt: number }>();
 
 // Clean up expired rate limit entries every 5 minutes
 setInterval(() => {
   const now = Date.now();
-  for (const [email, data] of resendRateLimit.entries()) {
+  for (const [email, data] of Array.from(resendRateLimit.entries())) {
     if (data.resetAt < now) {
       resendRateLimit.delete(email);
     }
@@ -331,11 +403,12 @@ setInterval(async () => {
   try {
     const now = new Date();
     // Use drizzle's lt() function instead of raw SQL to properly handle Date objects
-    const result = await db.delete(temp2faSessions)
-      .where(lt(temp2faSessions.expiresAt, now));
+    const deletedSessions = await db.delete(temp2faSessions)
+      .where(lt(temp2faSessions.expiresAt, now))
+      .returning({ id: temp2faSessions.id });
 
-    if (result.rowCount && result.rowCount > 0) {
-      console.log(`🧹 [Cleanup] Removed ${result.rowCount} expired temporary 2FA sessions`);
+    if (deletedSessions.length > 0) {
+      console.log(`🧹 [Cleanup] Removed ${deletedSessions.length} expired temporary 2FA sessions`);
     }
   } catch (error) {
     console.error('Error cleaning up expired temp 2FA sessions:', error);
@@ -399,21 +472,33 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
     }
 
     // Check if user has 2FA enabled
-    // Always clean up the session that signInEmail created — for non-2FA users
-    // the client will call signIn.email() again creating its own session; for 2FA
-    // users we create a temp session instead.
+    if (!userRecord.twoFactorEnabled || !userRecord.twoFactorSecret) {
+      // No 2FA — create the browser session through Better Auth itself so the
+      // client receives the exact cookies Better Auth expects.
+      console.log(`✅ [2FA Check] No 2FA required for user ${userRecord.email}`);
+
+      if (loginResult.token) {
+        await db.delete(betterAuthSession)
+          .where(eq(betterAuthSession.token, loginResult.token))
+          .catch(err => console.warn('⚠️ [2FA Check] Could not clean up pre-check session:', err));
+      }
+
+      await completeBrowserSignIn(req, res, email, password);
+      console.log('✅ [2FA Check] Better Auth cookies forwarded for non-2FA user');
+
+      return res.json({
+        success: true,
+        requires2FA: false,
+        sessionEstablished: true,
+      });
+    }
+
+    // 2FA required — clean up the pre-check session since the user must complete
+    // 2FA before getting a real session. A temp session is created below instead.
     if (loginResult.token) {
       await db.delete(betterAuthSession)
         .where(eq(betterAuthSession.token, loginResult.token))
         .catch(err => console.warn('⚠️ [2FA Check] Could not clean up pre-check session:', err));
-    }
-
-    if (!userRecord.twoFactorEnabled || !userRecord.twoFactorSecret) {
-      console.log(`✅ [2FA Check] No 2FA required for user ${userRecord.email}`);
-      return res.json({
-        success: true,
-        requires2FA: false
-      });
     }
 
     // Create temporary session for verification
@@ -464,7 +549,7 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
 // New 2FA verification endpoint that follows the flow in the image
 loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
   try {
-    const { token, tempSessionToken } = req.body;
+    const { token, tempSessionToken, email, password } = req.body;
 
     if (!token) {
       return res.status(400).json({
@@ -475,6 +560,12 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
     if (!tempSessionToken) {
       return res.status(400).json({
         message: 'Temporary session token is required'
+      });
+    }
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message: 'Email and password are required to complete sign-in'
       });
     }
 
@@ -529,6 +620,13 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
       });
     }
 
+    if (user.email.toLowerCase() !== String(email).toLowerCase().trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Login session does not match verification request'
+      });
+    }
+
     // Step 3: Verify the 2FA token
     const isValidToken = authenticator.verify({
       token,
@@ -541,41 +639,16 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
       });
     }
 
-    // Step 4: 2FA verification successful - delete temp session and create normal session
+    // Step 4: 2FA verification successful - delete temp session and create a
+    // normal browser session through Better Auth so all auth cookies line up.
     await db.delete(temp2faSessions)
       .where(eq(temp2faSessions.id, tempSession.id));
 
-    // After successful 2FA verification, create a database-backed session directly.
-    // Credentials were already validated at initial login; 2FA code was just verified above.
-    console.log('✅ [2FA] Creating database-backed session after 2FA verification');
-
-    const sessionToken = randomBytes(32).toString('base64url');
-    const sessionId = randomBytes(16).toString('base64url');
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
     try {
-      await db.insert(betterAuthSession).values({
-        id: sessionId,
-        token: sessionToken,
-        userId: user.id,
-        createdAt: now,
-        updatedAt: now,
-        expiresAt: expiresAt,
-        ipAddress: req.ip || req.socket.remoteAddress || null,
-        userAgent: req.headers['user-agent'] || null,
-      });
-
-      res.cookie('better-auth.session_token', sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        path: '/'
-      });
-      console.log('✅ [2FA] Database session created successfully');
+      await completeBrowserSignIn(req, res, email, password);
+      console.log('✅ [2FA] Better Auth cookies forwarded after verification');
     } catch (sessionError) {
-      console.error('❌ [2FA] Failed to create session in database:', sessionError);
+      console.error('❌ [2FA] Failed to create Better Auth session:', sessionError);
       return res.status(500).json({
         success: false,
         message: 'Failed to create session after 2FA verification. Please try logging in again.'

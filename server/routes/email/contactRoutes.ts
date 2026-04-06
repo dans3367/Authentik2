@@ -22,7 +22,7 @@ export const contactRoutes = Router();
 // Get email contacts
 contactRoutes.get("/email-contacts", authenticateToken, requireTenant, requirePermission('contacts.view'), async (req: any, res) => {
   try {
-    const { page = 1, limit = 10, search, tags, lists, status, statsOnly } = req.query;
+    const { page = 1, limit = 10, search, tags, lists, status, statsOnly, allShops: allShopsParam } = req.query;
 
     // If statsOnly is requested, return only statistics
     if (statsOnly === 'true') {
@@ -36,8 +36,14 @@ contactRoutes.get("/email-contacts", authenticateToken, requireTenant, requirePe
 
     let whereClause = sql`${emailContacts.tenantId} = ${req.user.tenantId}`;
 
-    // Shop-level filtering when a specific shop is selected
-    if (req.shopId) {
+    // Shop-level filtering when a specific shop is selected.
+    // allShops=true bypasses per-shop filtering so the segmentation modal can show
+    // contacts across all shops — restricted to privileged roles only.
+    const allowAllShops =
+      allShopsParam === 'true' &&
+      ['Administrator', 'Owner', 'Manager'].includes(req.user.role || '');
+
+    if (req.shopId && !allowAllShops) {
       whereClause = sql`${whereClause} AND ${emailContacts.shopId} = ${req.shopId}`;
     }
 
@@ -63,6 +69,7 @@ contactRoutes.get("/email-contacts", authenticateToken, requireTenant, requirePe
       columns: {
         id: true,
         tenantId: true,
+        shopId: true,
         email: true,
         firstName: true,
         lastName: true,

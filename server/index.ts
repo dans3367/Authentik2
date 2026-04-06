@@ -210,7 +210,7 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    serverLogger.error('Server error:', err);
+    serverLogger.error({ err }, 'Server error');
     res.status(status).json({ message });
   });
 

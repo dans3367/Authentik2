@@ -49,6 +49,9 @@ const getBaseURL = () => {
 
 export const authClient = createAuthClient({
   baseURL: getBaseURL(), // Dynamically determined backend API URL
+  fetchOptions: {
+    credentials: 'include',
+  },
 });
 
 export const { useSession, signIn, signOut, signUp } = authClient;

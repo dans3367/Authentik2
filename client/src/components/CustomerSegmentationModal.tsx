@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Search, Tag, Users, Check, User, CheckCircle, RefreshCw, Target, Filter } from "lucide-react";
+import { Search, Tag, Users, Check, User, CheckCircle, RefreshCw, Target, Filter, Store } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -19,16 +26,24 @@ import {
 } from "@/components/ui/dialog";
 import type { EmailContactWithDetails, ContactTagWithCount } from "@shared/schema";
 
+interface ShopOption {
+  id: string;
+  name: string;
+}
+
 interface CustomerSegmentationModalProps {
   isOpen: boolean;
   onClose: () => void;
   recipientType: 'all' | 'selected' | 'tags';
   selectedContactIds: string[];
   selectedTagIds: string[];
+  selectedShopIds?: string[];
+  allShops?: ShopOption[];
   onSave: (data: {
-    recipientType: 'all' | 'selected' | 'tags';
+    recipientType: 'all' | 'selected' | 'tags' | 'shops';
     selectedContactIds: string[];
     selectedTagIds: string[];
+    selectedShopIds: string[];
   }) => void;
 }
 
@@ -38,22 +53,35 @@ export function CustomerSegmentationModal({
   recipientType,
   selectedContactIds,
   selectedTagIds,
+  selectedShopIds,
+  allShops,
   onSave,
 }: CustomerSegmentationModalProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'all' | 'selected' | 'tags'>(recipientType);
+  const [activeTab, setActiveTab] = useState<'all' | 'shops' | 'selected' | 'tags'>(
+    selectedShopIds && selectedShopIds.length > 0 ? 'shops' : recipientType
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [tempSelectedContacts, setTempSelectedContacts] = useState<string[]>(selectedContactIds);
   const [tempSelectedTags, setTempSelectedTags] = useState<string[]>(selectedTagIds);
+  const [tempSelectedShops, setTempSelectedShops] = useState<string[]>(selectedShopIds ?? []);
+  const [shopFilter, setShopFilter] = useState<string>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasAutoInitialized = useRef(false);
   const queryClient = useQueryClient();
 
   // Fetch contacts (active only — inactive/unsubscribed contacts can't receive emails)
-  const { data: contactsData, isLoading: contactsLoading } = useQuery({
-    queryKey: ['/api/email-contacts', { status: 'active' }],
+  // allShops=true bypasses shop header filtering so users can pick contacts across shops
+  const { data: contactsData, isLoading: contactsLoading, isError: contactsError } = useQuery({
+    queryKey: ['/api/email-contacts', { status: 'active', allShops: true }],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/email-contacts?status=active');
+      // Fetch all contacts (no artificial limit) so per-shop counts are accurate.
+      // The API enforces tenant-level isolation; allShops=true is guarded server-side
+      // to Administrator/Owner/Manager roles only.
+      const response = await apiRequest('GET', '/api/email-contacts?status=active&allShops=true&limit=5000');
+      if (!response.ok) {
+        throw new Error(`Failed to load contacts: ${response.status}`);
+      }
       return response.json();
     },
     enabled: isOpen,
@@ -72,6 +100,14 @@ export function CustomerSegmentationModal({
   const contacts: EmailContactWithDetails[] = (contactsData as any)?.contacts || [];
   const tags: ContactTagWithCount[] = (tagsData as any)?.tags || [];
 
+  // Derive per-shop active contact counts from loaded contacts
+  const shopContactCounts: Record<string, number> = {};
+  for (const c of contacts) {
+    if (c.shopId) {
+      shopContactCounts[c.shopId] = (shopContactCounts[c.shopId] || 0) + 1;
+    }
+  }
+
   // Refresh tags data
   const handleRefreshTags = async () => {
     setIsRefreshing(true);
@@ -82,11 +118,13 @@ export function CustomerSegmentationModal({
     }
   };
 
-  // Filter contacts based on search
-  const filteredContacts = contacts.filter(contact =>
-    contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    `${contact.firstName || ''} ${contact.lastName || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter contacts based on search and shop filter
+  const filteredContacts = contacts.filter(contact => {
+    const matchesSearch = contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      `${contact.firstName || ''} ${contact.lastName || ''}`.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesShop = shopFilter === "all" || contact.shopId === shopFilter;
+    return matchesSearch && matchesShop;
+  });
 
   // Filter tags based on search
   const filteredTags = tags.filter(tag =>
@@ -96,13 +134,15 @@ export function CustomerSegmentationModal({
   // Reset temporary selections when modal opens
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(recipientType);
+      setActiveTab(selectedShopIds && selectedShopIds.length > 0 ? 'shops' : recipientType);
       setTempSelectedContacts(selectedContactIds);
       setTempSelectedTags(selectedTagIds);
+      setTempSelectedShops(selectedShopIds ?? []);
       setSearchTerm("");
+      setShopFilter("all");
       hasAutoInitialized.current = false;
     }
-  }, [isOpen, recipientType, selectedContactIds, selectedTagIds]);
+  }, [isOpen, recipientType, selectedContactIds, selectedTagIds, selectedShopIds]);
 
   // Auto-select all contacts when switching to "selected" tab if none are selected
   useEffect(() => {
@@ -136,9 +176,10 @@ export function CustomerSegmentationModal({
 
   const handleSave = () => {
     onSave({
-      recipientType: activeTab,
+      recipientType: activeTab === 'shops' ? 'shops' : activeTab,
       selectedContactIds: activeTab === 'selected' ? tempSelectedContacts : [],
       selectedTagIds: activeTab === 'tags' ? tempSelectedTags : [],
+      selectedShopIds: activeTab === 'shops' ? tempSelectedShops : [],
     });
     onClose();
   };
@@ -147,6 +188,11 @@ export function CustomerSegmentationModal({
     switch (activeTab) {
       case 'all':
         return t("segmentation.segmentationModal.summaryAll", { count: contacts.length });
+      case 'shops': {
+        const totalContacts = tempSelectedShops.reduce((sum, id) => sum + (shopContactCounts[id] ?? 0), 0);
+        const shopNames = tempSelectedShops.map(id => allShops?.find(s => s.id === id)?.name || id).join(', ');
+        return t("segmentation.segmentationModal.shopsSummaryFooter", { count: tempSelectedShops.length, contacts: totalContacts.toLocaleString() }) + (shopNames ? `: ${shopNames}` : '');
+      }
       case 'selected':
         return t("segmentation.segmentationModal.summarySelected", { count: tempSelectedContacts.length });
       case 'tags': {
@@ -178,11 +224,17 @@ export function CustomerSegmentationModal({
 
         <div className="flex-1 min-h-0 flex flex-col space-y-4 px-3 sm:px-4 pb-2">
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            <TabsList className="grid w-full grid-cols-3 bg-muted/50">
+            <TabsList className={`grid w-full ${allShops ? 'grid-cols-4' : 'grid-cols-3'} bg-muted/50`}>
               <TabsTrigger value="all" className="flex items-center gap-2 text-sm">
                 <Users className="h-4 w-4" />
                 {t("segmentation.segmentationModal.tabs.all", "All Customers")}
               </TabsTrigger>
+              {allShops && (
+                <TabsTrigger value="shops" className="flex items-center gap-2 text-sm">
+                  <Store className="h-4 w-4" />
+                  {t("segmentation.segmentationModal.tabs.shops", "Shops")}
+                </TabsTrigger>
+              )}
               <TabsTrigger value="selected" className="flex items-center gap-2 text-sm">
                 <User className="h-4 w-4" />
                 {t("segmentation.segmentationModal.tabs.selected", "Select Customers")}
@@ -214,6 +266,100 @@ export function CustomerSegmentationModal({
               </div>
             </TabsContent>
 
+            {/* ─── SHOPS TAB ─── */}
+            {allShops && (
+              <TabsContent value="shops" className="flex-1 min-h-0 overflow-hidden mt-0 pt-4 px-1">
+                <div className="flex flex-col h-full space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <p className="text-xs text-muted-foreground">
+                      {tempSelectedShops.length === 0
+                        ? t("segmentation.segmentationModal.noShopsSelected", "Select which stores to include")
+                        : t("segmentation.segmentationModal.shopsSelectedSummary", {
+                            count: tempSelectedShops.length,
+                            total: allShops.length,
+                            contacts: tempSelectedShops.reduce((sum, id) => sum + (shopContactCounts[id] ?? 0), 0).toLocaleString(),
+                          })}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setTempSelectedShops(allShops.map(s => s.id))}
+                        disabled={tempSelectedShops.length === allShops.length}
+                      >
+                        {t("segmentation.segmentationModal.selectAll", "Select All")}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setTempSelectedShops([])}
+                        disabled={tempSelectedShops.length === 0}
+                      >
+                        {t("segmentation.segmentationModal.clearAll", "Clear All")}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto rounded-lg border bg-white/50 dark:bg-gray-900/30">
+                    {allShops.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <Store className="h-8 w-8 text-muted-foreground mb-3" />
+                        <p className="text-sm font-medium text-foreground mb-1">
+                          {t("segmentation.segmentationModal.noShops", "No active stores found")}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-border/50">
+                        {allShops.map((shop) => {
+                          const isSelected = tempSelectedShops.includes(shop.id);
+                          return (
+                            <div
+                              key={shop.id}
+                              className={`flex items-center gap-3 px-4 py-3 transition-colors cursor-pointer ${
+                                isSelected ? 'bg-amber-50/50 dark:bg-amber-900/10' : 'hover:bg-muted/50'
+                              }`}
+                              onClick={() =>
+                                setTempSelectedShops(prev =>
+                                  prev.includes(shop.id) ? prev.filter(id => id !== shop.id) : [...prev, shop.id]
+                                )
+                              }
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) =>
+                                  setTempSelectedShops(prev =>
+                                    checked
+                                      ? (prev.includes(shop.id) ? prev : [...prev, shop.id])
+                                      : prev.filter(id => id !== shop.id)
+                                  )
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                                className="cursor-pointer"
+                              />
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <Store className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <p className="text-sm font-medium text-foreground truncate">{shop.name}</p>
+                                <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
+                                  {shopContactCounts[shop.id] ?? 0} {(shopContactCounts[shop.id] ?? 0) === 1 ? t("segmentation.segmentationModal.customer", "contact") : t("segmentation.segmentationModal.customers", "contacts")}
+                                </span>
+                              </div>
+                              {isSelected && (
+                                <div className="p-0.5 bg-amber-500 dark:bg-amber-400 rounded-full flex-shrink-0">
+                                  <Check className="h-3 w-3 text-white dark:text-gray-900" />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            )}
+
             {/* ─── SELECT CUSTOMERS TAB ─── */}
             <TabsContent value="selected" className="flex-1 min-h-0 overflow-hidden mt-0 pt-4 px-1">
               <div className="flex flex-col h-full space-y-3">
@@ -236,13 +382,34 @@ export function CustomerSegmentationModal({
                       className="pl-9 h-9 text-sm"
                     />
                   </div>
-                  <div className="flex gap-2 w-full sm:w-auto">
+                  {allShops && allShops.length > 0 && (
+                    <Select value={shopFilter} onValueChange={setShopFilter}>
+                      <SelectTrigger className="w-full sm:w-[180px] h-9 text-sm">
+                        <Store className="h-3.5 w-3.5 mr-1.5 text-muted-foreground flex-shrink-0" />
+                        <SelectValue placeholder="Filter by shop" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t("segmentation.segmentationModal.allShops", "All Shops")}</SelectItem>
+                        {allShops.map((shop) => (
+                          <SelectItem key={shop.id} value={shop.id}>{shop.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <div className="flex gap-2 flex-shrink-0">
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-9 text-xs"
-                      onClick={() => setTempSelectedContacts(contacts.map(contact => contact.id))}
-                      disabled={tempSelectedContacts.length === contacts.length}
+                      onClick={() => {
+                        const visibleIds = filteredContacts.map(c => c.id);
+                        setTempSelectedContacts(prev => {
+                          const combined = new Set(prev);
+                          visibleIds.forEach(id => combined.add(id));
+                          return Array.from(combined);
+                        });
+                      }}
+                      disabled={filteredContacts.every(c => tempSelectedContacts.includes(c.id))}
                     >
                       {t("segmentation.segmentationModal.selectAll", "Select All")}
                     </Button>
@@ -250,8 +417,15 @@ export function CustomerSegmentationModal({
                       variant="outline"
                       size="sm"
                       className="h-9 text-xs"
-                      onClick={() => setTempSelectedContacts([])}
-                      disabled={tempSelectedContacts.length === 0}
+                      onClick={() => {
+                        if (shopFilter === "all" && !searchTerm) {
+                          setTempSelectedContacts([]);
+                        } else {
+                          const visibleIds = new Set(filteredContacts.map(c => c.id));
+                          setTempSelectedContacts(prev => prev.filter(id => !visibleIds.has(id)));
+                        }
+                      }}
+                      disabled={filteredContacts.every(c => !tempSelectedContacts.includes(c.id))}
                     >
                       {t("segmentation.segmentationModal.clearAll", "Clear All")}
                     </Button>
@@ -281,12 +455,18 @@ export function CustomerSegmentationModal({
                         {t("segmentation.segmentationModal.loadingContacts", "Loading contacts...")}
                       </p>
                     </div>
+                  ) : contactsError ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <p className="text-sm font-medium text-destructive mb-1">
+                        {t("segmentation.segmentationModal.contactsLoadError", "Failed to load contacts. Please close and try again.")}
+                      </p>
+                    </div>
                   ) : filteredContacts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center">
                       <Search className="h-8 w-8 text-muted-foreground mb-3" />
                       <p className="text-sm font-medium text-foreground mb-1">
-                        {searchTerm
-                          ? t("segmentation.segmentationModal.noSearchResults", "No customers found matching your search")
+                        {searchTerm || shopFilter !== "all"
+                          ? t("segmentation.segmentationModal.noSearchResults", "No customers found matching your filters")
                           : t("segmentation.segmentationModal.noCustomers", "No customers available")}
                       </p>
                     </div>
@@ -327,7 +507,15 @@ export function CustomerSegmentationModal({
                                 {contact.status}
                               </Badge>
                             </div>
-                            <p className="text-xs text-muted-foreground truncate mt-0.5">{contact.email}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <p className="text-xs text-muted-foreground truncate">{contact.email}</p>
+                              {allShops && contact.shopId && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50 dark:border-amber-800/30 text-amber-700 dark:text-amber-300 flex-shrink-0">
+                                  <Store className="h-2.5 w-2.5 mr-0.5" />
+                                  {allShops.find(s => s.id === contact.shopId)?.name || "Unknown"}
+                                </Badge>
+                              )}
+                            </div>
                             {contact.tags.length > 0 && (
                               <div className="flex gap-1 mt-1.5">
                                 {contact.tags.slice(0, 3).map((tag) => (

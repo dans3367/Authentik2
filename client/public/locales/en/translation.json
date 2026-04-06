@@ -2037,7 +2037,8 @@
       "allTypes": "All Types",
       "allCustomers": "All Customers",
       "selectedCustomers": "Selected Customers",
-      "tagBased": "Tag-based"
+      "tagBased": "Tag-based",
+      "crossStore": "Cross-Store"
     },
     "list": {
       "title": "Segment Lists",
@@ -2048,7 +2049,11 @@
       "noDescription": "No description",
       "contacts": "contacts",
       "selected": "Selected",
-      "tags": "Tags"
+      "tags": "Tags",
+      "shops": "stores",
+      "crossStoreBadge": "Cross-Store",
+      "allShopsTitle": "All Shops Segment Lists",
+      "shopTitle": "{{name}} Segment Lists"
     },
     "actions": {
       "edit": "Edit",
@@ -2104,6 +2109,7 @@
       "description": "Choose how to target your audience for this segment",
       "tabs": {
         "all": "All Customers",
+        "shops": "Shops",
         "selected": "Select Customers",
         "tags": "Select by Tags"
       },
@@ -2117,8 +2123,14 @@
       "selectedCount": "{{selected}} of {{total}} customers selected",
       "allSelected": "All contacts selected",
       "loadingContacts": "Loading contacts...",
-      "noSearchResults": "No customers found matching your search",
+      "noSearchResults": "No customers found matching your filters",
       "noCustomers": "No customers available",
+      "allShops": "All Shops",
+      "noShopsSelected": "Select which stores to include",
+      "noShops": "No active stores found",
+      "shopsSelectedSummary": "{{count}} of {{total}} store(s) selected — {{contacts}} total contacts",
+      "shopsSelected": "{{count}} store(s) selected",
+      "shopsSummaryFooter": "{{count}} store(s) — {{contacts}} contacts",
       "more": "more",
       "searchTags": "Search tags...",
       "refreshTags": "Refresh tag counts",

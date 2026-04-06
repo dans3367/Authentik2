@@ -8,19 +8,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth, useLogin, useRegister } from "@/hooks/useAuth";
-import { signIn } from "@/lib/betterAuthClient";
 import { loginSchema, registerSchema, forgotPasswordSchema } from "@shared/schema";
 import type { LoginCredentials, RegisterData, ForgotPasswordData } from "@shared/schema";
 import { calculatePasswordStrength, getPasswordStrengthText, getPasswordStrengthColor } from "@/lib/authUtils";
 import { Eye, EyeOff, Shield, CheckCircle, Mail, Lock, ArrowLeft, Loader2 } from "lucide-react";
-import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthView = "login" | "register" | "forgot" | "twoFactor";
 
 export default function AuthPage() {
-  const [, setLocation] = useLocation();
-
   // Derive initial view from URL hash so the tab persists across browser tab switches
   const getInitialView = (): AuthView => {
     const hash = window.location.hash.replace('#', '');
@@ -93,13 +89,6 @@ export default function AuthPage() {
   const isLoginLoading = loginMutation.isPending || false;
   const isRegisterLoading = false; // Will be fixed when TypeScript cache refreshes
 
-  // Remove immediate redirect - let ProtectedRoute handle 2FA check
-  // useEffect(() => {
-  //   if (isAuthenticated) {
-  //     setLocation("/");
-  //   }
-  // }, [isAuthenticated, setLocation]);
-
   // Handle login form submission - Use Better Auth's native flow with 2FA check
   const onLoginSubmit = async (data: LoginCredentials) => {
     try {
@@ -139,29 +128,22 @@ export default function AuthPage() {
         });
         setCurrentView("twoFactor");
       } else {
-        // No 2FA required - use Better Auth's native signin
-        console.log('🔍 [AuthPage] No 2FA required - using Better Auth signin');
-        
-        const result = await signIn.email({
-          email: data.email,
-          password: data.password,
-        });
-
-        if (result.error) {
-          throw new Error(result.error.message);
-        }
+        // No 2FA required - the server already set the session cookie in
+        // check-2fa-requirement, so no second signIn call is needed.
+        console.log('🔍 [AuthPage] No 2FA required - session established by server');
 
         // Show success toast
         toast({
           title: "Login Successful",
           description: "Welcome back! Redirecting to dashboard...",
         });
-        
-        // Better Auth will handle the session automatically
-        // Use router navigation instead of page reload
+
+        // Use full page reload to ensure the session cookie is properly recognized by Better Auth
+        // Client-side navigation (setLocation) doesn't work because Better Auth's internal state
+        // isn't updated from the manually-set cookie
         setTimeout(() => {
-          setLocation('/dashboard');
-        }, 500);
+          window.location.href = '/dashboard';
+        }, 300);
       }
     } catch (error: any) {
       console.error('Login error:', error);
@@ -294,7 +276,9 @@ export default function AuthPage() {
         credentials: 'include',
         body: JSON.stringify({ 
           token: data.token,
-          tempSessionToken: twoFactorData.tempSessionToken
+          tempSessionToken: twoFactorData.tempSessionToken,
+          email: twoFactorData.email,
+          password: twoFactorData.password,
         }),
       });
 
@@ -321,30 +305,20 @@ export default function AuthPage() {
         throw new Error('Invalid response format from server');
       }
       if (result.success && result.verified) {
-        // Step 2: 2FA verified - now use Better Auth's signin to create proper session
-        console.log('🔍 [AuthPage] 2FA verified - creating Better Auth session');
-        
-        const signinResult = await signIn.email({
-          email: twoFactorData.email,
-          password: twoFactorData.password,
-        });
+        console.log('🔍 [AuthPage] 2FA verified - session established by server');
 
-        if (signinResult.error) {
-          throw new Error(signinResult.error.message);
-        }
-        
         // Show success toast
         toast({
           title: "2FA Verified",
           description: "Two-factor authentication successful! Redirecting to dashboard...",
         });
-        
+
         setTwoFactorData(null);
         twoFactorForm.reset();
-        
-        // Use router navigation instead of page reload
+
+        // Use full page reload to ensure the session cookie is properly recognized by Better Auth
         setTimeout(() => {
-          setLocation('/dashboard');
+          window.location.href = '/dashboard';
         }, 500);
       } else {
         throw new Error('Invalid 2FA code');

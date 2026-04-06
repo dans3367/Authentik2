@@ -30,9 +30,7 @@ import {
   Calendar,
   Globe,
   Store,
-  Check,
 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -133,11 +131,10 @@ export default function SegmentationPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all_types");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isUniversalCreateModalOpen, setIsUniversalCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSegmentationModalOpen, setIsSegmentationModalOpen] = useState(false);
-  const [segmentationModalTarget, setSegmentationModalTarget] = useState<"create" | "universal" | "edit">("create");
+  const [segmentationModalTarget, setSegmentationModalTarget] = useState<"create" | "edit">("create");
   const [selectedList, setSelectedList] = useState<SegmentList | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -145,17 +142,8 @@ export default function SegmentationPage() {
     type: "all" as "all" | "selected" | "tags",
     selectedContactIds: [] as string[],
     selectedTagIds: [] as string[],
-  });
-  // Universal segment form
-  const [universalFormData, setUniversalFormData] = useState({
-    name: "",
-    description: "",
-    type: "all" as "all" | "selected" | "tags",
-    selectedContactIds: [] as string[],
-    selectedTagIds: [] as string[],
     selectedShopIds: [] as string[],
   });
-
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -191,17 +179,6 @@ export default function SegmentationPage() {
   });
   const allShops: ShopOption[] = (shopsData?.shops || []).filter((s: ShopOption) => s.status === 'active');
 
-  // Fetch contact counts per shop (for universal segment modal)
-  const { data: shopContactCountsData } = useQuery<{ counts: Record<string, number> }>({
-    queryKey: ["/api/segment-lists/shop-contact-counts"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/segment-lists/shop-contact-counts");
-      return res.json();
-    },
-    enabled: isUniversalCreateModalOpen,
-    staleTime: 30_000,
-  });
-  const shopContactCounts: Record<string, number> = shopContactCountsData?.counts || {};
 
   const lists: SegmentList[] = listsData?.lists || [];
   const stats: SegmentStats = statsData?.stats || {
@@ -225,7 +202,7 @@ export default function SegmentationPage() {
   // --- Mutations ---
 
   const createMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+    mutationFn: async (data: typeof formData & { isUniversal: boolean }) => {
       const response = await apiRequest("POST", "/api/segment-lists", data);
       return response.json();
     },
@@ -248,32 +225,8 @@ export default function SegmentationPage() {
     },
   });
 
-  const createUniversalMutation = useMutation({
-    mutationFn: async (data: typeof universalFormData & { isUniversal: boolean }) => {
-      const response = await apiRequest("POST", "/api/segment-lists", data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/segment-lists"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/segment-lists-stats"] });
-      toast({
-        title: t("segmentation.toasts.success"),
-        description: t("segmentation.toasts.crossStoreCreateSuccess", "Cross-store segment created successfully."),
-      });
-      setIsUniversalCreateModalOpen(false);
-      resetUniversalForm();
-    },
-    onError: (error: any) => {
-      toast({
-        title: t("segmentation.toasts.error"),
-        description: error.message || t("segmentation.toasts.createError"),
-        variant: "destructive",
-      });
-    },
-  });
-
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: string } & typeof formData) => {
+    mutationFn: async (data: { id: string } & typeof formData & { isUniversal: boolean }) => {
       const response = await apiRequest("PATCH", `/api/segment-lists/${data.id}`, data);
       return response.json();
     },
@@ -329,29 +282,14 @@ export default function SegmentationPage() {
       type: "all",
       selectedContactIds: [],
       selectedTagIds: [],
-    });
-    setSelectedList(null);
-  };
-
-  const resetUniversalForm = () => {
-    setUniversalFormData({
-      name: "",
-      description: "",
-      type: "all",
-      selectedContactIds: [],
-      selectedTagIds: [],
       selectedShopIds: [],
     });
+    setSelectedList(null);
   };
 
   const handleCreate = () => {
     resetForm();
     setIsCreateModalOpen(true);
-  };
-
-  const handleCreateUniversal = () => {
-    resetUniversalForm();
-    setIsUniversalCreateModalOpen(true);
   };
 
   const handleEdit = (list: SegmentList) => {
@@ -362,6 +300,7 @@ export default function SegmentationPage() {
       type: list.type,
       selectedContactIds: list.selectedContactIds,
       selectedTagIds: list.selectedTagIds,
+      selectedShopIds: list.selectedShopIds || [],
     });
     setIsEditModalOpen(true);
   };
@@ -372,25 +311,15 @@ export default function SegmentationPage() {
   };
 
   const handleDuplicate = async (list: SegmentList) => {
-    if (list.isUniversal) {
-      createUniversalMutation.mutate({
-        name: `${list.name} (Copy)`,
-        description: list.description || "",
-        type: list.type,
-        selectedContactIds: list.selectedContactIds,
-        selectedTagIds: list.selectedTagIds,
-        selectedShopIds: list.selectedShopIds || [],
-        isUniversal: true,
-      });
-    } else {
-      createMutation.mutate({
-        name: `${list.name} (Copy)`,
-        description: list.description || "",
-        type: list.type,
-        selectedContactIds: list.selectedContactIds,
-        selectedTagIds: list.selectedTagIds,
-      });
-    }
+    createMutation.mutate({
+      name: `${list.name} (Copy)`,
+      description: list.description || "",
+      type: list.type,
+      selectedContactIds: list.selectedContactIds,
+      selectedTagIds: list.selectedTagIds,
+      selectedShopIds: list.selectedShopIds || [],
+      isUniversal: list.selectedShopIds != null && list.selectedShopIds.length > 0,
+    });
   };
 
   const handleSubmitCreate = () => {
@@ -402,44 +331,7 @@ export default function SegmentationPage() {
       });
       return;
     }
-    createMutation.mutate(formData);
-  };
-
-  const handleSubmitUniversalCreate = () => {
-    if (!universalFormData.name.trim()) {
-      toast({
-        title: t("segmentation.toasts.error"),
-        description: t("segmentation.toasts.nameRequired"),
-        variant: "destructive",
-      });
-      return;
-    }
-    if (universalFormData.selectedShopIds.length === 0) {
-      toast({
-        title: t("segmentation.toasts.error"),
-        description: t("segmentation.toasts.shopsRequired", "Please select at least one store."),
-        variant: "destructive",
-      });
-      return;
-    }
-    createUniversalMutation.mutate({ ...universalFormData, isUniversal: true });
-  };
-
-  const handleUniversalShopToggle = (shopId: string) => {
-    setUniversalFormData((prev) => ({
-      ...prev,
-      selectedShopIds: prev.selectedShopIds.includes(shopId)
-        ? prev.selectedShopIds.filter((id) => id !== shopId)
-        : [...prev.selectedShopIds, shopId],
-    }));
-  };
-
-  const handleSelectAllShops = () => {
-    if (universalFormData.selectedShopIds.length === allShops.length) {
-      setUniversalFormData((prev) => ({ ...prev, selectedShopIds: [] }));
-    } else {
-      setUniversalFormData((prev) => ({ ...prev, selectedShopIds: allShops.map((s) => s.id) }));
-    }
+    createMutation.mutate({ ...formData, isUniversal: formData.selectedShopIds.length > 0 });
   };
 
   const handleSubmitEdit = () => {
@@ -452,30 +344,26 @@ export default function SegmentationPage() {
       return;
     }
     if (selectedList) {
-      updateMutation.mutate({ id: selectedList.id, ...formData });
+      updateMutation.mutate({ id: selectedList.id, ...formData, isUniversal: formData.selectedShopIds.length > 0 });
     }
   };
 
   const handleSegmentationSave = (data: {
-    recipientType: "all" | "selected" | "tags";
+    recipientType: "all" | "selected" | "tags" | "shops";
     selectedContactIds: string[];
     selectedTagIds: string[];
+    selectedShopIds: string[];
   }) => {
-    if (segmentationModalTarget === "universal") {
-      setUniversalFormData({
-        ...universalFormData,
-        type: data.recipientType,
-        selectedContactIds: data.selectedContactIds,
-        selectedTagIds: data.selectedTagIds,
-      });
-    } else {
-      setFormData({
-        ...formData,
-        type: data.recipientType,
-        selectedContactIds: data.selectedContactIds,
-        selectedTagIds: data.selectedTagIds,
-      });
-    }
+    // 'shops' is a UI-only value meaning "filter by store(s)".
+    // Store it as type 'all' in formData so it passes backend validation,
+    // but selectedShopIds carries the actual filter intent.
+    setFormData({
+      ...formData,
+      type: data.recipientType === "shops" ? "all" : data.recipientType,
+      selectedContactIds: data.selectedContactIds,
+      selectedTagIds: data.selectedTagIds,
+      selectedShopIds: data.selectedShopIds,
+    });
   };
 
   /** Get shop names for display on universal segment cards */
@@ -556,10 +444,6 @@ export default function SegmentationPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleCreateUniversal}>
-            <Globe className="h-4 w-4 mr-2" />
-            {t("segmentation.createCrossStore", "Create Cross-Store Segment")}
-          </Button>
           <Button onClick={handleCreate}>
             <Plus className="h-4 w-4 mr-2" />
             {t("segmentation.createSegment")}
@@ -627,7 +511,9 @@ export default function SegmentationPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <CardTitle className="text-base">
-                {t("segmentation.list.title")}
+                {selectedShopId
+                  ? t("segmentation.list.shopTitle", { name: allShops.find((s) => s.id === selectedShopId)?.name ?? "" }) || t("segmentation.list.title")
+                  : t("segmentation.list.allShopsTitle")}
               </CardTitle>
               <CardDescription className="mt-0.5">
                 {t(
@@ -857,28 +743,28 @@ export default function SegmentationPage() {
                 onClick={() => { setSegmentationModalTarget("create"); setIsSegmentationModalOpen(true); }}
               >
                 <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-                {formData.type === "all"
-                  ? t("segmentation.filters.allCustomers")
-                  : formData.type === "selected"
-                    ? t("segmentation.createModal.selectedCustomers", {
-                      count: formData.selectedContactIds.length,
-                    })
-                    : t("segmentation.createModal.selectedTags", {
-                      count: formData.selectedTagIds.length,
-                    })}
+                {formData.selectedShopIds.length > 0
+                  ? t("segmentation.segmentationModal.shopsSelected", { count: formData.selectedShopIds.length })
+                  : formData.type === "all"
+                    ? t("segmentation.filters.allCustomers")
+                    : formData.type === "selected"
+                      ? t("segmentation.createModal.selectedCustomers", { count: formData.selectedContactIds.length })
+                      : t("segmentation.createModal.selectedTags", { count: formData.selectedTagIds.length })}
               </Button>
 
               {/* Visual summary of selection */}
-              {formData.type !== "all" && (
+              {(formData.type !== "all" || formData.selectedShopIds.length > 0) && (
                 <div className="flex items-center gap-2 p-2.5 rounded-md bg-muted/50 border text-xs text-muted-foreground">
-                  {getTypeIcon(formData.type)}
+                  {formData.selectedShopIds.length > 0 ? <Store className="h-4 w-4" /> : getTypeIcon(formData.type)}
                   <span className="font-medium">
-                    {formData.type === "selected"
-                      ? `${formData.selectedContactIds.length} ${t("segmentation.list.contacts")}`
-                      : `${formData.selectedTagIds.length} ${t("segmentation.list.tags")}`}
+                    {formData.selectedShopIds.length > 0
+                      ? `${formData.selectedShopIds.length} ${t("segmentation.list.shops", "stores")}`
+                      : formData.type === "selected"
+                        ? `${formData.selectedContactIds.length} ${t("segmentation.list.contacts")}`
+                        : `${formData.selectedTagIds.length} ${t("segmentation.list.tags")}`}
                   </span>
-                  <Badge variant="secondary" className={`ml-auto text-[10px] ${getTypeBadgeClasses(formData.type)}`}>
-                    {getTypeLabel(formData.type)}
+                  <Badge variant="secondary" className={`ml-auto text-[10px] ${formData.selectedShopIds.length > 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" : getTypeBadgeClasses(formData.type)}`}>
+                    {formData.selectedShopIds.length > 0 ? t("segmentation.segmentationModal.tabs.shops", "Shops") : getTypeLabel(formData.type)}
                   </Badge>
                 </div>
               )}
@@ -949,28 +835,28 @@ export default function SegmentationPage() {
                 onClick={() => { setSegmentationModalTarget("edit"); setIsSegmentationModalOpen(true); }}
               >
                 <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-                {formData.type === "all"
-                  ? t("segmentation.filters.allCustomers")
-                  : formData.type === "selected"
-                    ? t("segmentation.createModal.selectedCustomers", {
-                      count: formData.selectedContactIds.length,
-                    })
-                    : t("segmentation.createModal.selectedTags", {
-                      count: formData.selectedTagIds.length,
-                    })}
+                {formData.selectedShopIds.length > 0
+                  ? t("segmentation.segmentationModal.shopsSelected", { count: formData.selectedShopIds.length })
+                  : formData.type === "all"
+                    ? t("segmentation.filters.allCustomers")
+                    : formData.type === "selected"
+                      ? t("segmentation.createModal.selectedCustomers", { count: formData.selectedContactIds.length })
+                      : t("segmentation.createModal.selectedTags", { count: formData.selectedTagIds.length })}
               </Button>
 
               {/* Visual summary of selection */}
-              {formData.type !== "all" && (
+              {(formData.type !== "all" || formData.selectedShopIds.length > 0) && (
                 <div className="flex items-center gap-2 p-2.5 rounded-md bg-muted/50 border text-xs text-muted-foreground">
-                  {getTypeIcon(formData.type)}
+                  {formData.selectedShopIds.length > 0 ? <Store className="h-4 w-4" /> : getTypeIcon(formData.type)}
                   <span className="font-medium">
-                    {formData.type === "selected"
-                      ? `${formData.selectedContactIds.length} ${t("segmentation.list.contacts")}`
-                      : `${formData.selectedTagIds.length} ${t("segmentation.list.tags")}`}
+                    {formData.selectedShopIds.length > 0
+                      ? `${formData.selectedShopIds.length} ${t("segmentation.list.shops", "stores")}`
+                      : formData.type === "selected"
+                        ? `${formData.selectedContactIds.length} ${t("segmentation.list.contacts")}`
+                        : `${formData.selectedTagIds.length} ${t("segmentation.list.tags")}`}
                   </span>
-                  <Badge variant="secondary" className={`ml-auto text-[10px] ${getTypeBadgeClasses(formData.type)}`}>
-                    {getTypeLabel(formData.type)}
+                  <Badge variant="secondary" className={`ml-auto text-[10px] ${formData.selectedShopIds.length > 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" : getTypeBadgeClasses(formData.type)}`}>
+                    {formData.selectedShopIds.length > 0 ? t("segmentation.segmentationModal.tabs.shops", "Shops") : getTypeLabel(formData.type)}
                   </Badge>
                 </div>
               )}
@@ -1038,167 +924,15 @@ export default function SegmentationPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ──────── UNIVERSAL CREATE DIALOG ──────── */}
-      <Dialog open={isUniversalCreateModalOpen} onOpenChange={setIsUniversalCreateModalOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="p-1.5 bg-amber-50 dark:bg-amber-900/20 rounded-md">
-                <Globe className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              </div>
-              {t("segmentation.crossStoreModal.title", "Create Cross-Store Segment")}
-            </DialogTitle>
-            <DialogDescription>
-              {t("segmentation.crossStoreModal.description", "Create a segment that spans multiple stores. Contacts from all selected stores will be included.")}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-5 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="universal-name">{t("segmentation.createModal.nameLabel")}</Label>
-              <Input
-                id="universal-name"
-                placeholder={t("segmentation.createModal.namePlaceholder")}
-                value={universalFormData.name}
-                onChange={(e) => setUniversalFormData({ ...universalFormData, name: e.target.value })}
-                autoFocus
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="universal-description">{t("segmentation.createModal.descriptionLabel")}</Label>
-              <Textarea
-                id="universal-description"
-                placeholder={t("segmentation.createModal.descriptionPlaceholder")}
-                value={universalFormData.description}
-                onChange={(e) => setUniversalFormData({ ...universalFormData, description: e.target.value })}
-                rows={2}
-              />
-            </div>
-
-            <Separator />
-
-            {/* Shop selection */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>{t("segmentation.crossStoreModal.selectShops", "Select Stores")}</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={handleSelectAllShops}
-                >
-                  {universalFormData.selectedShopIds.length === allShops.length
-                    ? t("segmentation.crossStoreModal.deselectAll", "Deselect All")
-                    : t("segmentation.crossStoreModal.selectAll", "Select All")}
-                </Button>
-              </div>
-
-              {allShops.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic py-2">
-                  {t("segmentation.crossStoreModal.noShops", "No active stores found.")}
-                </p>
-              ) : (
-                <div className="space-y-1 max-h-[200px] overflow-y-auto rounded-md border p-2">
-                  {allShops.map((shop) => {
-                    const isSelected = universalFormData.selectedShopIds.includes(shop.id);
-                    return (
-                      <label
-                        key={shop.id}
-                        className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
-                          isSelected
-                            ? "bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30"
-                            : "hover:bg-muted/50"
-                        }`}
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => handleUniversalShopToggle(shop.id)}
-                        />
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <Store className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          <span className="text-sm font-medium truncate">{shop.name}</span>
-                          <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
-                            {shopContactCounts[shop.id] ?? 0} {t("segmentation.list.contacts")}
-                          </span>
-                        </div>
-                        {isSelected && <Check className="h-4 w-4 text-amber-600 flex-shrink-0" />}
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-
-              {universalFormData.selectedShopIds.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {t("segmentation.crossStoreModal.shopsSelected", "{{count}} store(s) selected", { count: universalFormData.selectedShopIds.length })}
-                  {" — "}
-                  {universalFormData.selectedShopIds.reduce((sum, id) => sum + (shopContactCounts[id] ?? 0), 0).toLocaleString()}{" "}
-                  {t("segmentation.crossStoreModal.totalContacts", "total contacts")}
-                </p>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Segment criteria */}
-            <div className="space-y-2">
-              <Label>{t("segmentation.createModal.segmentCriteria")}</Label>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-start h-10 text-sm"
-                onClick={() => { setSegmentationModalTarget("universal"); setIsSegmentationModalOpen(true); }}
-              >
-                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-                {universalFormData.type === "all"
-                  ? t("segmentation.filters.allCustomers")
-                  : universalFormData.type === "selected"
-                    ? t("segmentation.createModal.selectedCustomers", {
-                      count: universalFormData.selectedContactIds.length,
-                    })
-                    : t("segmentation.createModal.selectedTags", {
-                      count: universalFormData.selectedTagIds.length,
-                    })}
-              </Button>
-
-              {universalFormData.type !== "all" && (
-                <div className="flex items-center gap-2 p-2.5 rounded-md bg-muted/50 border text-xs text-muted-foreground">
-                  {getTypeIcon(universalFormData.type)}
-                  <span className="font-medium">
-                    {universalFormData.type === "selected"
-                      ? `${universalFormData.selectedContactIds.length} ${t("segmentation.list.contacts")}`
-                      : `${universalFormData.selectedTagIds.length} ${t("segmentation.list.tags")}`}
-                  </span>
-                  <Badge variant="secondary" className={`ml-auto text-[10px] ${getTypeBadgeClasses(universalFormData.type)}`}>
-                    {getTypeLabel(universalFormData.type)}
-                  </Badge>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsUniversalCreateModalOpen(false)}>
-              {t("segmentation.createModal.cancel")}
-            </Button>
-            <Button onClick={handleSubmitUniversalCreate} disabled={createUniversalMutation.isPending}>
-              {createUniversalMutation.isPending
-                ? t("segmentation.createModal.creating")
-                : t("segmentation.crossStoreModal.create", "Create Cross-Store Segment")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Customer Segmentation Modal */}
       <CustomerSegmentationModal
         isOpen={isSegmentationModalOpen}
         onClose={() => setIsSegmentationModalOpen(false)}
-        recipientType={segmentationModalTarget === "universal" ? universalFormData.type : formData.type}
-        selectedContactIds={segmentationModalTarget === "universal" ? universalFormData.selectedContactIds : formData.selectedContactIds}
-        selectedTagIds={segmentationModalTarget === "universal" ? universalFormData.selectedTagIds : formData.selectedTagIds}
+        recipientType={formData.type}
+        selectedContactIds={formData.selectedContactIds}
+        selectedTagIds={formData.selectedTagIds}
+        selectedShopIds={formData.selectedShopIds}
+        allShops={allShops}
         onSave={handleSegmentationSave}
       />
     </div>

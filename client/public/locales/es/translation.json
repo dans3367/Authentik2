@@ -1978,7 +1978,8 @@
       "allTypes": "Todos los Tipos",
       "allCustomers": "Todos los Clientes",
       "selectedCustomers": "Clientes Seleccionados",
-      "tagBased": "Basado en Etiquetas"
+      "tagBased": "Basado en Etiquetas",
+      "crossStore": "Multi-Tienda"
     },
     "list": {
       "title": "Listas de Segmentos",
@@ -1989,7 +1990,11 @@
       "noDescription": "Sin descripción",
       "contacts": "contactos",
       "selected": "Seleccionados",
-      "tags": "Etiquetas"
+      "tags": "Etiquetas",
+      "shops": "tiendas",
+      "crossStoreBadge": "Multi-Tienda",
+      "allShopsTitle": "Listas de Segmentos de Todas las Tiendas",
+      "shopTitle": "Listas de Segmentos de {{name}}"
     },
     "actions": {
       "edit": "Editar",
@@ -2045,6 +2050,7 @@
       "description": "Elige cómo segmentar tu audiencia para este grupo",
       "tabs": {
         "all": "Todos los Clientes",
+        "shops": "Tiendas",
         "selected": "Seleccionar Clientes",
         "tags": "Seleccionar por Etiquetas"
       },
@@ -2058,8 +2064,14 @@
       "selectedCount": "{{selected}} de {{total}} clientes seleccionados",
       "allSelected": "Todos los contactos seleccionados",
       "loadingContacts": "Cargando contactos...",
-      "noSearchResults": "No se encontraron clientes con tu búsqueda",
+      "noSearchResults": "No se encontraron clientes con tus filtros",
       "noCustomers": "No hay clientes disponibles",
+      "allShops": "Todas las Tiendas",
+      "noShopsSelected": "Selecciona las tiendas a incluir",
+      "noShops": "No se encontraron tiendas activas",
+      "shopsSelectedSummary": "{{count}} de {{total}} tienda(s) seleccionada(s) — {{contacts}} contactos en total",
+      "shopsSelected": "{{count}} tienda(s) seleccionada(s)",
+      "shopsSummaryFooter": "{{count}} tienda(s) — {{contacts}} contactos",
       "more": "más",
       "searchTags": "Buscar etiquetas...",
       "refreshTags": "Actualizar conteo de etiquetas",
