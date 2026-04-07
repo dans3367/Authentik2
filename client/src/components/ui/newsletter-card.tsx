@@ -6,6 +6,14 @@ import { Newspaper, ArrowRight, Sparkles, Send, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { EditorPickerModal } from "@/components/EditorPickerModal";
 
+const PATTERN_STYLE = {
+  backgroundImage: `
+    linear-gradient(30deg, transparent 40%, rgba(255,255,255,0.1) 40%, rgba(255,255,255,0.1) 60%, transparent 60%),
+    linear-gradient(-30deg, transparent 40%, rgba(255,255,255,0.08) 40%, rgba(255,255,255,0.08) 60%, transparent 60%)
+  `,
+  backgroundSize: '60px 60px',
+} as const;
+
 export function NewsletterCard() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
@@ -18,19 +26,8 @@ export function NewsletterCard() {
   return (
     <>
       <Card className="h-full group relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-shadow duration-500 rounded-2xl">
-        {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 dark:from-blue-700 dark:via-indigo-700 dark:to-violet-800" />
-
-        {/* Geometric pattern overlay */}
-        <div className="absolute inset-0 opacity-[0.06]" style={{
-          backgroundImage: `
-            linear-gradient(30deg, transparent 40%, rgba(255,255,255,0.1) 40%, rgba(255,255,255,0.1) 60%, transparent 60%),
-            linear-gradient(-30deg, transparent 40%, rgba(255,255,255,0.08) 40%, rgba(255,255,255,0.08) 60%, transparent 60%)
-          `,
-          backgroundSize: '60px 60px',
-        }} />
-
-        {/* Floating orbs */}
+        <div className="absolute inset-0 opacity-[0.06]" style={PATTERN_STYLE} />
         <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white/[0.05] blur-3xl group-hover:scale-125 transition-transform duration-1000" />
         <div className="absolute -bottom-16 -left-16 w-48 h-48 rounded-full bg-violet-400/[0.08] blur-3xl" />
         <div className="absolute top-1/2 right-1/4 w-32 h-32 rounded-full bg-blue-300/[0.06] blur-2xl group-hover:translate-x-4 transition-transform duration-700" />
@@ -75,10 +72,8 @@ export function NewsletterCard() {
               </div>
             </div>
 
-            {/* Decorative illustration */}
             <div className="hidden lg:flex flex-col items-center justify-center">
               <div className="relative w-36 h-36 xl:w-44 xl:h-44">
-                {/* Stacked cards effect */}
                 <div className="absolute inset-0 rounded-2xl bg-white/[0.06] rotate-6 group-hover:rotate-12 transition-transform duration-500 border border-white/10" />
                 <div className="absolute inset-0 rounded-2xl bg-white/[0.04] -rotate-3 group-hover:rotate-0 transition-transform duration-500 border border-white/[0.06]" />
                 <div className="absolute inset-3 rounded-xl bg-white/[0.1] backdrop-blur-sm flex flex-col items-center justify-center gap-2.5 border border-white/[0.12]">

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -82,37 +82,31 @@ type NewsletterListItem = NewsletterWithUser & {
   webSlug?: string | null;
 };
 
-const getStatusBadge = (status: string, t: any) => {
-  const base = "gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border-0";
-  switch (status) {
-    case 'draft':
-      return <Badge variant="secondary" className={`${base} bg-amber-500/10 text-amber-700 dark:text-amber-400`}><FileText className="h-3 w-3" />{t('newsletter.status.draft')}</Badge>;
-    case 'ready_to_send':
-      return <Badge variant="secondary" className={`${base} bg-blue-500/10 text-blue-700 dark:text-blue-400`}><Send className="h-3 w-3" />{t('newsletter.status.readyToSend')}</Badge>;
-    case 'pending_review':
-      return <Badge variant="secondary" className={`${base} bg-orange-500/10 text-orange-700 dark:text-orange-400`}><ShieldCheck className="h-3 w-3" />{t('newsletter.status.pendingReview')}</Badge>;
-    case 'scheduled':
-      return <Badge variant="secondary" className={`${base} bg-violet-500/10 text-violet-700 dark:text-violet-400`}><Clock className="h-3 w-3" />{t('newsletter.status.scheduled')}</Badge>;
-    case 'sending':
-      return <Badge variant="secondary" className={`${base} bg-violet-500/10 text-violet-700 dark:text-violet-400`}><Send className="h-3 w-3 animate-pulse" />{t('newsletter.status.sending')}</Badge>;
-    case 'sent':
-      return <Badge variant="secondary" className={`${base} bg-emerald-500/10 text-emerald-700 dark:text-emerald-400`}><Send className="h-3 w-3" />{t('newsletter.status.sent')}</Badge>;
-    default:
-      return <Badge variant="secondary" className={base}>{status}</Badge>;
-  }
+const STATUS_STYLES: Record<string, { bg: string; text: string; accent: string; icon: typeof FileText; i18nKey: string; animateIcon?: boolean }> = {
+  draft:          { bg: 'bg-amber-500/10',   text: 'text-amber-700 dark:text-amber-400',   accent: 'bg-amber-500',   icon: FileText,    i18nKey: 'draft' },
+  ready_to_send:  { bg: 'bg-blue-500/10',    text: 'text-blue-700 dark:text-blue-400',     accent: 'bg-blue-500',    icon: Send,        i18nKey: 'readyToSend' },
+  pending_review: { bg: 'bg-orange-500/10',  text: 'text-orange-700 dark:text-orange-400', accent: 'bg-orange-500',  icon: ShieldCheck, i18nKey: 'pendingReview' },
+  scheduled:      { bg: 'bg-violet-500/10',  text: 'text-violet-700 dark:text-violet-400', accent: 'bg-violet-500',  icon: Clock,       i18nKey: 'scheduled' },
+  sending:        { bg: 'bg-violet-500/10',  text: 'text-violet-700 dark:text-violet-400', accent: 'bg-violet-500',  icon: Send,        i18nKey: 'sending', animateIcon: true },
+  sent:           { bg: 'bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400', accent: 'bg-emerald-500', icon: Send,      i18nKey: 'sent' },
 };
 
-const getStatusAccent = (status: string) => {
-  switch (status) {
-    case 'draft': return 'bg-amber-500';
-    case 'ready_to_send': return 'bg-blue-500';
-    case 'pending_review': return 'bg-orange-500';
-    case 'scheduled': return 'bg-violet-500';
-    case 'sending': return 'bg-violet-500';
-    case 'sent': return 'bg-emerald-500';
-    default: return 'bg-muted-foreground';
-  }
+const BADGE_BASE = "gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border-0";
+
+const getStatusBadge = (status: string, t: any) => {
+  const style = STATUS_STYLES[status];
+  if (!style) return <Badge variant="secondary" className={BADGE_BASE}>{status}</Badge>;
+  const Icon = style.icon;
+  return (
+    <Badge variant="secondary" className={`${BADGE_BASE} ${style.bg} ${style.text}`}>
+      <Icon className={`h-3 w-3${style.animateIcon ? ' animate-pulse' : ''}`} />
+      {t(`newsletter.status.${style.i18nKey}`)}
+    </Badge>
+  );
 };
+
+const getStatusAccent = (status: string) =>
+  STATUS_STYLES[status]?.accent ?? 'bg-muted-foreground';
 
 export default function NewsletterPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -168,10 +162,12 @@ export default function NewsletterPage() {
     cooldownTimer.current = setTimeout(() => setRefreshCooldown(false), 5000);
   }, [refreshCooldown, isLoading, refetch]);
 
+  useEffect(() => () => {
+    if (cooldownTimer.current) clearTimeout(cooldownTimer.current);
+  }, []);
+
   const reviewerEnabled = reviewerSettings?.enabled ?? false;
   const isCurrentUserDesignatedReviewer = reviewerSettings?.reviewerId === currentUserId;
-
-  // --- Mutations ---
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -307,23 +303,26 @@ export default function NewsletterPage() {
   const newsletters: NewsletterListItem[] = realtimeNewsletters || [];
 
   const filteredNewsletters = useMemo(() => {
-    return newsletters.filter((newsletter) => {
-      return searchQuery === "" ||
-        newsletter.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        newsletter.subject.toLowerCase().includes(searchQuery.toLowerCase());
-    });
+    if (!searchQuery) return newsletters;
+    const q = searchQuery.toLowerCase();
+    return newsletters.filter((n) =>
+      n.title.toLowerCase().includes(q) || n.subject.toLowerCase().includes(q)
+    );
   }, [newsletters, searchQuery]);
 
   const kanbanColumns = useMemo(() => {
-    const drafts = filteredNewsletters.filter(n => n.status === 'draft');
-    const readyToSend = filteredNewsletters.filter(n => ['ready_to_send', 'pending_review'].includes(n.status));
-    const scheduled = filteredNewsletters.filter(n => ['scheduled', 'sending'].includes(n.status));
-    const sent = filteredNewsletters.filter(n => n.status === 'sent');
+    const groups: Record<string, NewsletterListItem[]> = { drafts: [], ready: [], scheduled: [], sent: [] };
+    for (const n of filteredNewsletters) {
+      if (n.status === 'draft') groups.drafts.push(n);
+      else if (n.status === 'ready_to_send' || n.status === 'pending_review') groups.ready.push(n);
+      else if (n.status === 'scheduled' || n.status === 'sending') groups.scheduled.push(n);
+      else if (n.status === 'sent') groups.sent.push(n);
+    }
     return [
-      { key: 'drafts', title: t('newsletter.kanban.drafts', 'Drafts'), icon: FileText, dot: 'bg-amber-500', items: drafts },
-      { key: 'ready_to_send', title: t('newsletter.kanban.readyToSend', 'Ready to Send'), icon: Send, dot: 'bg-blue-500', items: readyToSend },
-      { key: 'scheduled', title: t('newsletter.kanban.scheduled', 'Scheduled'), icon: Clock, dot: 'bg-violet-500', items: scheduled },
-      { key: 'sent', title: t('newsletter.kanban.sent', 'Sent'), icon: Mail, dot: 'bg-emerald-500', items: sent },
+      { key: 'drafts', title: t('newsletter.kanban.drafts', 'Drafts'), icon: FileText, dot: STATUS_STYLES.draft.accent, items: groups.drafts },
+      { key: 'ready_to_send', title: t('newsletter.kanban.readyToSend', 'Ready to Send'), icon: Send, dot: STATUS_STYLES.ready_to_send.accent, items: groups.ready },
+      { key: 'scheduled', title: t('newsletter.kanban.scheduled', 'Scheduled'), icon: Clock, dot: STATUS_STYLES.scheduled.accent, items: groups.scheduled },
+      { key: 'sent', title: t('newsletter.kanban.sent', 'Sent'), icon: Mail, dot: STATUS_STYLES.sent.accent, items: groups.sent },
     ];
   }, [filteredNewsletters, t]);
 
@@ -354,7 +353,6 @@ export default function NewsletterPage() {
     });
   }, [previewNewsletter, emailDesign, parsedSocialLinks]);
 
-  // --- Error State ---
   if (error) {
     return (
       <div className="container mx-auto p-4 lg:p-6 flex items-center justify-center min-h-[50vh]">
@@ -374,7 +372,6 @@ export default function NewsletterPage() {
     );
   }
 
-  // --- Loading State ---
   if (isLoading) {
     return (
       <div className="container mx-auto p-4 lg:p-6 space-y-5">
@@ -399,7 +396,6 @@ export default function NewsletterPage() {
     );
   }
 
-  // --- Newsletter Card Renderer ---
   const renderNewsletterCard = (newsletter: NewsletterListItem) => {
     const openRate = (newsletter.recipientCount || 0) > 0
       ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
@@ -435,11 +431,9 @@ export default function NewsletterPage() {
           : setLocation(`/newsletters/${newsletter.id}`)
         }
       >
-        {/* Status accent bar */}
         <div className={`absolute top-0 left-0 right-0 h-0.5 ${getStatusAccent(newsletter.status)}`} />
 
         <div className="p-4 space-y-3">
-          {/* Status + Actions */}
           <div className="flex items-center justify-between">
             {getStatusBadge(newsletter.status, t)}
             <DropdownMenu>
@@ -458,14 +452,14 @@ export default function NewsletterPage() {
                   </DropdownMenuItem>
                 )}
                 {canCreate && (isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setLocation(`/newsletter/create/${newsletter.id}`); }} className="gap-2.5 rounded-lg cursor-pointer">
-                    <Pencil className="h-3.5 w-3.5" /><span className="text-sm">{t("newsletter.actions.edit")}</span>
-                  </DropdownMenuItem>
-                )}
-                {canCreate && (isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditRecipientsNewsletter(newsletter); }} data-testid={`button-edit-recipients-${newsletter.id}`} className="gap-2.5 rounded-lg cursor-pointer">
-                    <UserCog className="h-3.5 w-3.5" /><span className="text-sm">{t("newsletter.actions.editRecipients")}</span>
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setLocation(`/newsletter/create/${newsletter.id}`); }} className="gap-2.5 rounded-lg cursor-pointer">
+                      <Pencil className="h-3.5 w-3.5" /><span className="text-sm">{t("newsletter.actions.edit")}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditRecipientsNewsletter(newsletter); }} data-testid={`button-edit-recipients-${newsletter.id}`} className="gap-2.5 rounded-lg cursor-pointer">
+                      <UserCog className="h-3.5 w-3.5" /><span className="text-sm">{t("newsletter.actions.editRecipients")}</span>
+                    </DropdownMenuItem>
+                  </>
                 )}
                 {canSend && isReadyToSend && (
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deployMutation.mutate(newsletter.id); }} disabled={isDeploying} className="gap-2.5 rounded-lg cursor-pointer">
@@ -509,7 +503,6 @@ export default function NewsletterPage() {
             </DropdownMenu>
           </div>
 
-          {/* Shop tag */}
           {(newsletter as any).shop?.name && (
             <Badge variant="secondary" className="gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border-0 bg-violet-500/10 text-violet-600 dark:text-violet-400">
               <Store className="h-2.5 w-2.5" />
@@ -517,7 +510,6 @@ export default function NewsletterPage() {
             </Badge>
           )}
 
-          {/* Title + Subject */}
           <div>
             <h3 className="font-bold text-[15px] text-foreground leading-tight group-hover:text-primary transition-colors truncate">
               {newsletter.title}
@@ -538,7 +530,6 @@ export default function NewsletterPage() {
             </div>
           )}
 
-          {/* Author + Date */}
           <div className="pt-3 border-t border-border/30">
             <div className="flex items-center gap-2.5">
               <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
@@ -559,7 +550,6 @@ export default function NewsletterPage() {
             </div>
           </div>
 
-          {/* Bottom metrics */}
           {isSent ? (
             <div className="grid grid-cols-3 gap-1.5 pt-3 border-t border-border/30">
               <div className="text-center py-1.5 rounded-lg bg-muted/30">
@@ -604,7 +594,6 @@ export default function NewsletterPage() {
   return (
     <>
       <div className="container mx-auto p-4 lg:p-6 space-y-5 lg:space-y-6 overflow-y-auto">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 pt-1">
           <div className="space-y-1.5">
             <h1 className="text-2xl sm:text-3xl lg:text-[2rem] font-extrabold tracking-tight leading-none">
@@ -622,7 +611,6 @@ export default function NewsletterPage() {
           )}
         </div>
 
-        {/* Search and Refresh */}
         {newsletters.length > 0 && (
           <div className="flex items-center gap-3">
             <div className="relative flex-1 max-w-md">
@@ -655,7 +643,6 @@ export default function NewsletterPage() {
           </div>
         )}
 
-        {/* Kanban Board */}
         {newsletters.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-5">
@@ -688,7 +675,6 @@ export default function NewsletterPage() {
                 key={column.key}
                 className="flex flex-col rounded-2xl border border-border/40 bg-muted/10 dark:bg-muted/5 overflow-hidden"
               >
-                {/* Column Header */}
                 <div className="px-4 py-3 border-b border-border/30">
                   <div className="flex items-center gap-2.5">
                     <div className={`w-2 h-2 rounded-full ${column.dot}`} />
@@ -701,7 +687,6 @@ export default function NewsletterPage() {
                   </div>
                 </div>
 
-                {/* Column Body */}
                 <div className="flex-1 p-2.5 space-y-2.5 overflow-y-auto max-h-[calc(100vh-380px)] min-h-[200px]">
                   {column.items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-10 text-center">
@@ -719,7 +704,6 @@ export default function NewsletterPage() {
           </div>
         )}
 
-        {/* Archived Section */}
         {(newsletters.length > 0 || showArchived || archivedNewsletters.length > 0) && (
           <div className="mt-4">
             <button
@@ -825,7 +809,6 @@ export default function NewsletterPage() {
         )}
       </div>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
