@@ -11,7 +11,7 @@
  */
 
 import NodeCache from 'node-cache';
-import { logActivity } from './activityLogger';
+
 
 // Cached subset of user security fields — only the columns that
 // authenticateToken needs from the database.
@@ -107,19 +107,7 @@ export function invalidateUserSecurity(
     }
   }
 
-  // Fire-and-forget audit log — never blocks the caller.
-  if (metadata?.tenantId) {
-    logActivity({
-      tenantId: metadata.tenantId,
-      userId: metadata.performedBy ?? userId,
-      entityType: 'user',
-      entityId: userId,
-      activityType: 'updated',
-      description: `Security cache invalidated: ${reason}`,
-      metadata: { cacheEvent: 'invalidate', reason, hadCachedEntry: existed },
-      req: metadata.req,
-    }).catch(() => {});
-  }
+  // Cache invalidations are internal housekeeping — not worth an activity log entry.
 }
 
 /**

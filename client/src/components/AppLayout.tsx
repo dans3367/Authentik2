@@ -17,7 +17,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { PageTitleProvider, usePageTitle } from "@/contexts/PageTitleContext";
 import { Button } from "@/components/ui/button";
 import { ShopSelector } from "@/components/ShopSelector";
-import { Zap, UserPlus, Bell, ChevronRight, X } from "lucide-react";
+import { Zap, UserPlus, Bell, ChevronRight, X, Sun, Moon } from "lucide-react";
 import { Link } from "wouter";
 import {
   AlertDialog,
@@ -29,6 +29,40 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useTheme } from "@/contexts/ThemeContext";
+
+// Theme toggle button for the header
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+
+  const handleToggle = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    toggleTheme();
+    // Save preference to user profile silently (no toast, no cache invalidation)
+    fetch('/api/users/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ theme: newTheme }),
+    }).catch(() => {});
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={handleToggle}
+      title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+      data-testid="button-theme-toggle"
+    >
+      {theme === 'light' ? (
+        <Moon className="h-5 w-5 text-muted-foreground" />
+      ) : (
+        <Sun className="h-5 w-5 text-muted-foreground" />
+      )}
+    </Button>
+  );
+}
 
 // Header component that displays breadcrumbs or page title
 function AppHeader() {
@@ -143,6 +177,8 @@ function AppHeader() {
 
       {/* Action Icons */}
       <div className="flex items-center gap-2">
+        <ThemeToggle />
+
         <Button
           variant="ghost"
           size="icon"
@@ -190,6 +226,14 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { currentLanguage } = useLanguage();
   const { updateProfile } = useReduxUpdateProfile();
   const updateMenuPreferenceMutation = useUpdateMenuPreference();
+  const { setUserTheme } = useTheme();
+
+  // Sync theme from user profile on initial load
+  useEffect(() => {
+    if (isInitialized && user?.theme) {
+      setUserTheme(user.theme as 'light' | 'dark');
+    }
+  }, [isInitialized, user?.theme]);
 
   // Initialize sidebar open state from localStorage
   const [sidebarOpen, setSidebarOpen] = useState(() => {

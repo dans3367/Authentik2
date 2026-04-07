@@ -229,7 +229,7 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5002", 10);
   server.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port}`);
+    log(`Server is running on http://localhost:${port} (API + Frontend)`);
     startSessionCleanupWorker();
     startAppointmentAutoReminderWorker();
   });

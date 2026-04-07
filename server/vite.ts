@@ -27,6 +27,12 @@ export async function setupVite(app: Express, server: Server) {
     configFile: false,
     customLogger: {
       ...viteLogger,
+      info: (msg, options) => {
+        // Suppress misleading "Frontend is available at" messages from Vite
+        // since the frontend is served through Express in middleware mode
+        if (msg.includes('localhost:5173') || msg.includes('available at')) return;
+        viteLogger.info(msg, options);
+      },
       error: (msg, options) => {
         viteLogger.error(msg, options);
         process.exit(1);

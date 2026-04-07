@@ -48,7 +48,7 @@ export function NewsletterCard() {
               <Button
                 onClick={handleCreateNewsletter}
                 size="lg"
-                className="bg-white text-indigo-700 font-bold shadow-xl shadow-black/10 group/btn px-6 text-base"
+                className="bg-white text-indigo-700 hover:bg-gray-100 dark:bg-white dark:text-indigo-700 dark:hover:bg-gray-100 font-bold shadow-xl shadow-black/10 group/btn px-6 text-base"
                 data-testid="button-create-newsletter"
               >
                 <Newspaper className="w-5 h-5 mr-2" />

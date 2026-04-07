@@ -395,6 +395,24 @@ export const themes: Record<string, ThemeStyles> = {
     background: 'bg-[#060f1f]'
   },
 
+  'art-deco': {
+    id: 'art-deco',
+    name: 'Art Deco',
+    container: 'min-h-screen py-8',
+    card: 'bg-[#0c1525]/95 backdrop-blur-sm rounded-none shadow-2xl border-2 border-[#c9a84c] shadow-[#c9a84c]/10 ring-1 ring-[#c9a84c]/20 ring-offset-4 ring-offset-[#0c1525]',
+    header: 'p-8 border-b-2 border-[#c9a84c]/60',
+    title: 'text-3xl font-serif font-bold text-[#c9a84c] uppercase tracking-[0.3em]',
+    description: 'text-[#8a9bb8] mt-3 font-serif italic tracking-wide',
+    label: 'text-xs font-serif font-semibold text-[#c9a84c]/80 uppercase tracking-[0.25em]',
+    input: 'w-full px-4 py-3 bg-[#0f1a2e] border-2 border-[#c9a84c]/40 rounded-none font-serif text-[#d4c5a0] placeholder-[#3d4f6b] transition-all duration-200 focus:border-[#c9a84c] focus:outline-none focus:shadow-[inset_0_0_12px_rgba(201,168,76,0.08),0_0_8px_rgba(201,168,76,0.15)]',
+    textarea: 'w-full px-4 py-3 bg-[#0f1a2e] border-2 border-[#c9a84c]/40 rounded-none font-serif text-[#d4c5a0] placeholder-[#3d4f6b] transition-all duration-200 focus:border-[#c9a84c] focus:outline-none focus:shadow-[inset_0_0_12px_rgba(201,168,76,0.08),0_0_8px_rgba(201,168,76,0.15)] resize-none',
+    select: 'w-full px-4 py-3 bg-[#0f1a2e] border-2 border-[#c9a84c]/40 rounded-none font-serif text-[#d4c5a0] transition-all duration-200 focus:border-[#c9a84c] focus:outline-none',
+    radio: 'h-4 w-4 text-[#c9a84c] focus:ring-[#c9a84c] border-[#c9a84c]/50',
+    checkbox: 'h-4 w-4 text-[#c9a84c] focus:ring-[#c9a84c] border-[#c9a84c]/50',
+    button: 'w-full bg-[#c9a84c] hover:bg-[#d4b85c] text-[#0c1525] font-serif font-bold py-4 px-8 rounded-none uppercase tracking-[0.2em] border-2 border-[#c9a84c] transition-all duration-200 transform hover:shadow-[0_0_24px_rgba(201,168,76,0.3)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
+    background: 'bg-gradient-to-b from-[#060d18] via-[#0c1525] to-[#101c32]'
+  },
+
   'newspaper': {
     id: 'newspaper',
     name: 'Newspaper',

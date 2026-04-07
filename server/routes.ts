@@ -116,16 +116,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/ai", aiRoutes);
   app.use("/api/suppression", suppressionManagementRoutes);
   // Handle Stripe checkout success redirect
-  app.get("/", (req, res) => {
+  app.get("/", (req, res, next) => {
     const { checkout_success, session_id } = req.query;
-    
+
     if (checkout_success === 'true' && session_id) {
-      // Redirect to frontend with success parameters
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      res.redirect(`${frontendUrl}/?checkout_success=true&session_id=${session_id}`);
+      // Redirect to frontend dashboard with success parameters
+      res.redirect(`/dashboard?checkout_success=true&session_id=${session_id}`);
     } else {
-      // Serve the frontend (or handle as needed)
-      res.send('Server is running. Frontend is available at ' + (process.env.FRONTEND_URL || 'http://localhost:5173'));
+      // Let Vite (dev) or serveStatic (prod) handle serving the frontend
+      next();
     }
   });
 

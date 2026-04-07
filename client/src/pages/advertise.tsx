@@ -375,10 +375,10 @@ export default function AdvertisePage() {
       <div className="container mx-auto p-4 lg:p-6">
         <Card className="w-full max-w-md mx-auto">
           <CardHeader>
-            <CardTitle className="text-red-600">{t("advertise.error.title")}</CardTitle>
+            <CardTitle className="text-red-600 dark:text-red-400">{t("advertise.error.title")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               {error instanceof Error ? error.message : t("advertise.error.loadFailed")}
             </p>
             <Button onClick={() => refetch()}>{t("advertise.error.tryAgain")}</Button>
@@ -930,16 +930,16 @@ export default function AdvertisePage() {
           <div className="flex-1 overflow-y-auto">
             <div className="mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl">
               <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full">
-                <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
+                <div className="border-b bg-gray-50 dark:bg-gray-800 p-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                   <div className="flex gap-2 mb-1">
                     <span className="font-semibold text-right w-16">{t("advertise.previewDialog.subject")}</span>
-                    <span className="text-gray-900 font-semibold truncate">
+                    <span className="text-gray-900 dark:text-gray-100 font-semibold truncate">
                       {previewItem?.subject || previewItem?.title || t("advertise.previewDialog.noSubject")}
                     </span>
                   </div>
                   <div className="flex gap-2">
                     <span className="font-semibold text-right w-16">{t("advertise.previewDialog.status")}</span>
-                    <span className="text-gray-900 capitalize">{(() => {
+                    <span className="text-gray-900 dark:text-gray-100 capitalize">{(() => {
                       const s = previewItem?.status || "draft";
                       const keyMap: Record<string, string> = {
                         ready_to_send: "readyToSend",

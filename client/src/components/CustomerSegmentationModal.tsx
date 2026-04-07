@@ -500,12 +500,6 @@ export function CustomerSegmentationModal({
                                   ? `${contact.firstName} ${contact.lastName}`
                                   : contact.email}
                               </p>
-                              <Badge
-                                variant={contact.status === 'active' ? 'default' : 'secondary'}
-                                className="text-[10px] px-1.5 py-0"
-                              >
-                                {contact.status}
-                              </Badge>
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <p className="text-xs text-muted-foreground truncate">{contact.email}</p>

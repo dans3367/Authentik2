@@ -12,6 +12,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { setGlobalNavigate } from "@/lib/authErrorHandler";
 import { lazy, Suspense, useEffect, useState, Component, ReactNode } from "react";
 import { useAuthErrorHandler, setGlobalAuthErrorHandler } from "@/hooks/useAuthErrorHandler";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 // Initialize Convex client for real-time newsletter tracking
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
@@ -486,25 +487,27 @@ function AppWithProviders({ children }: { children: ReactNode }) {
 function App() {
   return (
     <ErrorBoundary>
-      <Provider store={store}>
-        <PersistGate
-          loading={
-            <div className="min-h-screen flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-          }
-          persistor={persistor}
-        >
-          <QueryClientProvider client={queryClient}>
-            <AppWithProviders>
-              <TooltipProvider>
-                <Toaster />
-                <Router />
-              </TooltipProvider>
-            </AppWithProviders>
-          </QueryClientProvider>
-        </PersistGate>
-      </Provider>
+      <ThemeProvider>
+        <Provider store={store}>
+          <PersistGate
+            loading={
+              <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            }
+            persistor={persistor}
+          >
+            <QueryClientProvider client={queryClient}>
+              <AppWithProviders>
+                <TooltipProvider>
+                  <Toaster />
+                  <Router />
+                </TooltipProvider>
+              </AppWithProviders>
+            </QueryClientProvider>
+          </PersistGate>
+        </Provider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }
