@@ -14,3 +14,4 @@ See individual files for each category:
 - [Forms & Templates](./04-forms-templates.md)
 - [Analytics & Reporting](./05-analytics.md)
 - [UI / UX Improvements](./06-ui-ux.md)
+- [Customer Support & Ticketing](./08-customer-support.md)

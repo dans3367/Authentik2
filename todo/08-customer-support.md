@@ -1,0 +1,27 @@
+# Customer Support & Ticketing
+
+- [ ] Create customer support page with submission form
+  - Picture/screenshot upload field (integrate with R2 or similar storage)
+  - Subject line, description/message body, priority selector (low/medium/high)
+  - Contact email (pre-filled if logged in)
+  - Category selector (billing, technical, account, general)
+  - Form validation for all required fields
+- [ ] Implement support ticket system backend
+  - Tickets table: id, userId, tenantId, subject, description, category, priority, status (open/in-progress/resolved/closed), attachments, timestamps
+  - Ticket messages/replies table for threaded conversation between user and CS rep
+  - API endpoints: create ticket, list user tickets, get ticket detail, post reply, close/reopen ticket
+- [ ] Build ticket conversation UI
+  - Chat-style threaded view showing messages between user and CS rep
+  - Distinguish user vs rep messages visually
+  - Timestamps and read indicators
+  - Ability to attach images/files to replies
+- [ ] Ticket management for CS reps (admin side)
+  - Dashboard showing all open/in-progress tickets with filters and search
+  - Assign tickets to reps
+  - Reply to tickets, update status, add internal notes
+  - Close/resolve tickets with resolution summary
+- [ ] User-facing ticket management
+  - List of user's own tickets with status indicators
+  - Ability to view conversation history
+  - Ability to close own tickets
+  - Email notifications on ticket updates

@@ -36,7 +36,7 @@ function getInitials(contact: Contact): string {
 }
 
 const avatarColors = [
-  "from-pink-400 to-rose-500",
+  "from-rose-400 to-pink-500",
   "from-violet-400 to-purple-500",
   "from-blue-400 to-indigo-500",
   "from-teal-400 to-cyan-500",
@@ -69,14 +69,11 @@ export function UpcomingBirthdaysCard() {
       today.setHours(0, 0, 0, 0);
       const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
       thisYearBirthday.setHours(0, 0, 0, 0);
-      const nextBirthday =
-        thisYearBirthday < today
-          ? new Date(today.getFullYear() + 1, month - 1, day)
-          : thisYearBirthday;
+      const nextBirthday = thisYearBirthday < today
+        ? new Date(today.getFullYear() + 1, month - 1, day)
+        : thisYearBirthday;
       nextBirthday.setHours(0, 0, 0, 0);
-      const daysUntilBirthday = Math.ceil(
-        (nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-      );
+      const daysUntilBirthday = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       return daysUntilBirthday >= 0 && daysUntilBirthday <= 30;
     })
     .sort((a, b) => {
@@ -86,22 +83,18 @@ export function UpcomingBirthdaysCard() {
         today.setHours(0, 0, 0, 0);
         const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
         thisYearBirthday.setHours(0, 0, 0, 0);
-        const nextBirthday =
-          thisYearBirthday < today
-            ? new Date(today.getFullYear() + 1, month - 1, day)
-            : thisYearBirthday;
+        const nextBirthday = thisYearBirthday < today
+          ? new Date(today.getFullYear() + 1, month - 1, day)
+          : thisYearBirthday;
         nextBirthday.setHours(0, 0, 0, 0);
-        return Math.ceil(
-          (nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        return Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       };
       return getDaysUntil(a.birthday!) - getDaysUntil(b.birthday!);
     })
-    .slice(0, 5);
+    .slice(0, 6);
 
   const getContactName = (contact: Contact) => {
-    if (contact.firstName && contact.lastName)
-      return `${contact.firstName} ${contact.lastName}`;
+    if (contact.firstName && contact.lastName) return `${contact.firstName} ${contact.lastName}`;
     if (contact.firstName) return contact.firstName;
     if (contact.lastName) return contact.lastName;
     return contact.email;
@@ -109,16 +102,16 @@ export function UpcomingBirthdaysCard() {
 
   if (isLoading) {
     return (
-      <Card className="h-full">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
+      <Card className="h-full rounded-2xl border-border/50">
+        <CardHeader className="pb-2 px-5 pt-5">
+          <CardTitle className="text-base font-bold flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-pink-500/10 flex items-center justify-center">
               <CakeIcon className="h-4 w-4 text-pink-500" />
             </div>
             {t("dashboard.birthdays.title")}
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="px-5 pb-5 pt-4">
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-6 w-6 border-2 border-pink-200 border-t-pink-500" />
           </div>
@@ -128,11 +121,11 @@ export function UpcomingBirthdaysCard() {
   }
 
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-3">
+    <Card className="h-full rounded-2xl border-border/50">
+      <CardHeader className="pb-2 px-5 pt-5">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-lg font-bold flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
+          <CardTitle className="text-base font-bold flex items-center gap-2.5 tracking-tight">
+            <div className="w-8 h-8 rounded-xl bg-pink-500/10 flex items-center justify-center">
               <CakeIcon className="h-4 w-4 text-pink-500" />
             </div>
             {t("dashboard.birthdays.title")}
@@ -141,25 +134,25 @@ export function UpcomingBirthdaysCard() {
             variant="ghost"
             size="sm"
             onClick={() => setLocation("/birthdays")}
-            className="text-xs rounded-full text-muted-foreground hover:text-primary"
+            className="text-[10px] font-semibold rounded-lg text-muted-foreground/60 hover:text-primary h-7 px-2"
             data-testid="button-view-all-birthdays"
           >
             {t("dashboard.birthdays.viewAll")}
-            <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+            <ChevronRight className="h-3 w-3 ml-0.5" />
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="pt-2">
+      <CardContent className="px-5 pb-5 pt-2">
         {upcomingBirthdays.length === 0 ? (
-          <div className="text-center py-10 space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center mx-auto">
-              <Gift className="h-7 w-7 text-pink-400" />
+          <div className="text-center py-8 space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-pink-500/5 flex items-center justify-center mx-auto">
+              <Gift className="h-6 w-6 text-pink-400/60" />
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground mb-1">
+              <p className="text-sm font-semibold text-foreground/80 mb-0.5">
                 {t("dashboard.birthdays.noBirthdaysTitle")}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground/60">
                 {t("dashboard.birthdays.noBirthdaysDesc")}
               </p>
             </div>
@@ -167,119 +160,100 @@ export function UpcomingBirthdaysCard() {
               variant="outline"
               size="sm"
               onClick={() => setLocation("/birthdays")}
-              className="text-xs rounded-full mt-2"
+              className="text-xs rounded-lg mt-2"
             >
               {t("dashboard.birthdays.manage")}
             </Button>
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-              <span className="font-medium">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground/50 px-0.5">
+              <span className="font-semibold uppercase tracking-[0.1em]">
                 {t("dashboard.birthdays.upcoming", { count: upcomingBirthdays.length })}
               </span>
               <span>{t("dashboard.birthdays.next30Days")}</span>
             </div>
-            <div className="space-y-2">
+
+            {/* Grid layout for birthdays */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {upcomingBirthdays.map((contact, index) => {
                 const getDaysUntil = (birthday: string) => {
                   const [, month, day] = birthday.split("-").map(Number);
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
-                  const thisYearBirthday = new Date(
-                    today.getFullYear(),
-                    month - 1,
-                    day
-                  );
+                  const thisYearBirthday = new Date(today.getFullYear(), month - 1, day);
                   thisYearBirthday.setHours(0, 0, 0, 0);
-                  const nextBirthday =
-                    thisYearBirthday < today
-                      ? new Date(today.getFullYear() + 1, month - 1, day)
-                      : thisYearBirthday;
+                  const nextBirthday = thisYearBirthday < today
+                    ? new Date(today.getFullYear() + 1, month - 1, day)
+                    : thisYearBirthday;
                   nextBirthday.setHours(0, 0, 0, 0);
-                  return Math.ceil(
-                    (nextBirthday.getTime() - today.getTime()) /
-                    (1000 * 60 * 60 * 24)
-                  );
+                  return Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                 };
-                const daysUntil = contact.birthday
-                  ? getDaysUntil(contact.birthday)
-                  : 0;
+                const daysUntil = contact.birthday ? getDaysUntil(contact.birthday) : 0;
                 const isToday = daysUntil === 0;
 
                 return (
                   <div
                     key={contact.id}
-                    onClick={() =>
-                      setLocation(`/email-contacts/view/${contact.id}`)
-                    }
-                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 ${isToday
-                        ? "bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20 border border-pink-200/50 dark:border-pink-500/20 hover:shadow-md"
-                        : "bg-muted/30 hover:bg-muted/60"
-                      }`}
+                    onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
+                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                      isToday
+                        ? "bg-gradient-to-r from-pink-500/[0.06] to-rose-500/[0.04] dark:from-pink-500/10 dark:to-rose-500/[0.06] border border-pink-200/40 dark:border-pink-500/15 hover:shadow-md"
+                        : "hover:bg-muted/40 border border-transparent"
+                    }`}
                   >
-                    {/* Avatar with initials */}
+                    {/* Avatar */}
                     <div
-                      className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarColors[index % avatarColors.length]
-                        } flex items-center justify-center flex-shrink-0 shadow-sm`}
+                      className={`w-9 h-9 rounded-xl bg-gradient-to-br ${avatarColors[index % avatarColors.length]} flex items-center justify-center flex-shrink-0 shadow-sm`}
                     >
-                      <span className="text-white text-sm font-bold">
+                      <span className="text-white text-xs font-bold">
                         {getInitials(contact)}
                       </span>
                     </div>
 
-                    {/* Name & Date */}
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-sm text-foreground truncate">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-semibold text-sm text-foreground/90 truncate leading-tight">
                           {getContactName(contact)}
                         </p>
-                        {isToday && (
-                          <PartyPopper className="w-3.5 h-3.5 text-pink-500 flex-shrink-0" />
-                        )}
+                        {isToday && <PartyPopper className="w-3 h-3 text-pink-500 flex-shrink-0" />}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {contact.birthday &&
-                          (() => {
-                            const [, month, day] = contact.birthday
-                              .split("-")
-                              .map(Number);
-                            const displayDate = new Date(2000, month - 1, day);
-                            const dateStr = displayDate.toLocaleDateString(
-                              undefined,
-                              {
-                                month: "short",
-                                day: "numeric",
-                              }
-                            );
-                            const dayText = isToday
-                              ? t("dashboard.birthdays.today")
-                              : daysUntil === 1
-                                ? t("dashboard.birthdays.tomorrow")
-                                : t("dashboard.birthdays.inDays", { count: daysUntil });
-                            return `${dateStr} • ${dayText}`;
-                          })()}
+                      <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+                        {contact.birthday && (() => {
+                          const [, month, day] = contact.birthday.split("-").map(Number);
+                          const displayDate = new Date(2000, month - 1, day);
+                          const dateStr = displayDate.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+                          const dayText = isToday
+                            ? t("dashboard.birthdays.today")
+                            : daysUntil === 1
+                              ? t("dashboard.birthdays.tomorrow")
+                              : t("dashboard.birthdays.inDays", { count: daysUntil });
+                          return `${dateStr} · ${dayText}`;
+                        })()}
                       </p>
                     </div>
 
-                    {/* Status indicator */}
+                    {/* Status */}
                     {contact.birthdayUnsubscribedAt ? (
                       <span title={t("dashboard.birthdays.unsubscribedTitle")}>
-                        <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                        <AlertTriangle className="h-3.5 w-3.5 text-orange-500/70 flex-shrink-0" />
                       </span>
                     ) : contact.birthdayEmailEnabled ? (
-                      <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                      <CheckCircle className="h-3.5 w-3.5 text-emerald-500/70 flex-shrink-0" />
                     ) : (
-                      <XCircle className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />
-                    )}                  </div>
+                      <XCircle className="h-3.5 w-3.5 text-muted-foreground/30 flex-shrink-0" />
+                    )}
+                  </div>
                 );
               })}
             </div>
+
             <Button
               variant="outline"
               size="sm"
               onClick={() => setLocation("/birthdays")}
-              className="w-full mt-2 rounded-lg text-xs"
+              className="w-full mt-1 rounded-xl text-xs font-semibold border-dashed border-border/60 hover:bg-muted/30"
             >
               {t("dashboard.birthdays.manageBirthdaySettings")}
             </Button>
