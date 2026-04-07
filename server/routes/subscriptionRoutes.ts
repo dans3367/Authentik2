@@ -817,8 +817,8 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requirePermi
             ...(previousStripeSubscriptionId && { previousStripeSubscriptionId }),
           },
         },
-        success_url: `${process.env.FRONTEND_URL || 'https://web.zendwise.work'}/subscribe?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL || 'https://web.zendwise.work'}/subscribe?canceled=true`,
+        success_url: `${process.env.BASE_URL || 'https://web.zendwise.work'}/subscribe?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.BASE_URL || 'https://web.zendwise.work'}/subscribe?canceled=true`,
         metadata: {
           tenantId,
           userId: req.user.id,
@@ -1190,8 +1190,8 @@ subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, r
         customer: stripeCustomerId,
         mode: 'setup',
         payment_method_types: ['card'],
-        success_url: `${frontendUrl}/select-plan?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${frontendUrl}/select-plan?canceled=true`,
+        success_url: `${process.env.BASE_URL || 'https://web.zendwise.work'}/select-plan?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.BASE_URL || 'https://web.zendwise.work'}/select-plan?canceled=true`,
         metadata: sessionMetadata,
       });
 
@@ -1211,8 +1211,8 @@ subscriptionRoutes.post("/setup-checkout", authenticateToken, async (req: any, r
             quantity: 1,
           },
         ],
-        success_url: `${frontendUrl}/select-plan?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${frontendUrl}/select-plan?canceled=true`,
+        success_url: `${process.env.BASE_URL || 'https://web.zendwise.work'}/select-plan?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.BASE_URL || 'https://web.zendwise.work'}/select-plan?canceled=true`,
         metadata: sessionMetadata,
         subscription_data: {
           metadata: sessionMetadata,

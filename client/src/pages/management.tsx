@@ -8,8 +8,7 @@ import ShopsPage from "@/pages/shops";
 import ManagementTags from "@/pages/management-tags";
 import ManagementEmailDesign from "@/pages/management-email-design";
 import ManagementBlogDesign from "@/pages/management-blog-design";
-import ManagementNewsletterReviewer from "@/pages/management-newsletter-reviewer";
-import ManagementNewsletterSendConfirmation from "@/pages/management-newsletter-send-confirmation";
+import ManagementReviewAndSend from "@/pages/management-review-and-send";
 import ManagementCustomFields from "@/pages/management-custom-fields";
 import ManagementBulkImport from "@/pages/management-bulk-import";
 import ManagementActivityLogs from "@/pages/management-activity-logs";
@@ -56,8 +55,7 @@ export default function ManagementPage() {
             <TabsTrigger value="tags">{t('management.tabs.tags')}</TabsTrigger>
             <TabsTrigger value="email-design">{t('management.tabs.emailDesign')}</TabsTrigger>
             <TabsTrigger value="blog-design">{t('management.tabs.blogDesign', 'Blog Design')}</TabsTrigger>
-            <TabsTrigger value="newsletter-reviewer">{t('management.tabs.newsletterReviewer', 'Reviewer')}</TabsTrigger>
-            <TabsTrigger value="send-confirmation">{t('management.tabs.sendConfirmation', 'Send Confirmation')}</TabsTrigger>
+            <TabsTrigger value="review-and-send">{t('management.tabs.reviewAndSend', 'Review & Send')}</TabsTrigger>
             <TabsTrigger value="custom-fields">{t('management.tabs.customFields', 'Custom Fields')}</TabsTrigger>
             <TabsTrigger value="bulk-import">{t('management.tabs.bulkImport', 'Bulk Import')}</TabsTrigger>
             <TabsTrigger value="activity-logs">{t('management.tabs.activityLogs', 'Activity Logs')}</TabsTrigger>
@@ -84,11 +82,8 @@ export default function ManagementPage() {
             <TabsContent value="blog-design">
               <ManagementBlogDesign />
             </TabsContent>
-            <TabsContent value="newsletter-reviewer">
-              <ManagementNewsletterReviewer />
-            </TabsContent>
-            <TabsContent value="send-confirmation">
-              <ManagementNewsletterSendConfirmation />
+            <TabsContent value="review-and-send">
+              <ManagementReviewAndSend />
             </TabsContent>
             <TabsContent value="custom-fields">
               <ManagementCustomFields />

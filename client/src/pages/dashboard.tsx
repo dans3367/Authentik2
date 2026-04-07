@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useLocation } from "wouter";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
@@ -27,6 +27,7 @@ import {
   CalendarCheck,
   ChevronDown,
   Plus,
+  CheckCircle2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDashboardHighlights } from "@/hooks/useStats";
@@ -55,6 +56,17 @@ export default function Dashboard() {
   const { t, i18n } = useTranslation();
   const greeting = getGreeting(t);
   const { data: highlights, isLoading: highlightsLoading } = useDashboardHighlights();
+  const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false);
+
+  // Check for checkout success in URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('checkout_success') === 'true') {
+      setShowCheckoutSuccess(true);
+      // Clean up the URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   useSetBreadcrumbs([{ label: t("sidebar.dashboard", "Dashboard"), icon: LayoutDashboard }]);
 
@@ -202,6 +214,31 @@ export default function Dashboard() {
             </DropdownMenu>
           </div>
         </div>
+
+        {/* Checkout Success Notification */}
+        {showCheckoutSuccess && (
+          <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl p-4 flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-green-800 dark:text-green-200">
+                Payment Successful!
+              </h3>
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                Your subscription has been activated. You're all set to start using the platform.
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCheckoutSuccess(false)}
+              className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
+            >
+              ×
+            </Button>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {statCards.map((stat, index) => (
