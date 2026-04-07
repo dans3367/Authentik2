@@ -241,6 +241,7 @@ export function ThemedFormRenderer({ element, themeStyles, onChange, onReset }: 
       case 'rate-scale':
         return (
           <RateScale
+            name={element.name}
             disabled={(element as FormElement).disabled}
             min={(element as FormElement).validation?.min || 1}
             max={(element as FormElement).validation?.max || 10}

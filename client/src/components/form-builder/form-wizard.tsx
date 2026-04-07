@@ -224,28 +224,28 @@ const [, setLocation] = useLocation();
 
   if (wizardState.isComplete) {
     return (
-      <div className="min-h-screen flex flex-col items-center py-12 bg-neutral-50 overflow-y-auto">
-        <div className="w-full max-w-2xl bg-white p-8 rounded-xl shadow-sm border border-slate-200">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+      <div className="min-h-screen flex flex-col items-center justify-center py-12 bg-stone-50 dark:bg-neutral-950 overflow-y-auto">
+        <div className="w-full max-w-2xl bg-white dark:bg-neutral-900 p-10 rounded-2xl shadow-lg border border-stone-200 dark:border-neutral-800">
+          <div className="text-center mb-10">
+            <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-amber-500/20">
               <Check className="w-8 h-8 text-white" />
             </div>
-            <h2 className="text-3xl font-bold text-slate-800 mb-4">
-              {editMode ? 'Form Updated Successfully!' : 'Form Saved Successfully!'}
+            <h2 className="text-3xl font-bold text-stone-900 dark:text-stone-100 mb-3 tracking-tight">
+              {editMode ? 'Form Updated' : 'Form Created'}
             </h2>
-            <p className="text-lg text-slate-600">
-              {editMode 
-                ? `Your form has been updated and is ready to receive responses.`
-                : `Your form has been created and saved.`
+            <p className="text-base text-stone-500 dark:text-stone-400">
+              {editMode
+                ? `Your form is updated and ready to receive responses.`
+                : `Your form has been saved and is ready to go.`
               }
             </p>
           </div>
 
           {createdFormData && (
-            <div className="border-t border-slate-200 pt-8 mb-8">
+            <div className="border-t border-stone-200 dark:border-neutral-800 pt-8 mb-8">
               <div className="text-center mb-6">
-                <h3 className="text-xl font-semibold text-slate-800">Share Your Form</h3>
-                <p className="text-slate-600 mt-2">
+                <h3 className="text-lg font-semibold text-stone-800 dark:text-stone-200">Share Your Form</h3>
+                <p className="text-stone-500 dark:text-stone-400 mt-1 text-sm">
                   Use the QR code below or share the direct URL to collect responses
                 </p>
               </div>
@@ -253,17 +253,17 @@ const [, setLocation] = useLocation();
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8 border-t border-slate-200">
-            <Button 
-              variant="outline" 
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-8 border-t border-stone-200 dark:border-neutral-800">
+            <Button
+              variant="outline"
               onClick={() => setLocation('/forms')}
-              className="px-8 py-6 text-lg"
+              className="px-8 py-5 text-base border-stone-300 dark:border-neutral-700 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-neutral-800 rounded-xl"
             >
               Return to Forms
             </Button>
-            <Button 
+            <Button
               onClick={resetWizard}
-              className="px-8 py-6 text-lg"
+              className="px-8 py-5 text-base bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl shadow-md shadow-amber-500/20"
             >
               Create Another Form
             </Button>
@@ -274,56 +274,74 @@ const [, setLocation] = useLocation();
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-neutral-50">
+    <div className="min-h-screen flex flex-col bg-stone-50 dark:bg-neutral-950">
       {/* Header with Progress */}
-      <header className="bg-white/95 backdrop-blur-lg border-b border-slate-200/60 h-16 flex items-center justify-between px-6 shadow-sm pt-[40px] pb-[40px]">
+      <header className="bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl border-b border-stone-200/80 dark:border-neutral-800/80 flex items-center justify-between px-6 py-4 sticky top-0 z-40">
         <div className="flex items-center space-x-6">
           {/* Progress Steps */}
-          <div className="hidden lg:flex items-center space-x-4">
+          <div className="hidden lg:flex items-center space-x-1">
             {[
               { step: 1, title: t('formBuilder.wizard.build', 'Build'), key: 'build' },
               { step: 2, title: t('formBuilder.wizard.style', 'Style'), key: 'style' },
               { step: 3, title: t('formBuilder.wizard.preview', 'Preview'), key: 'preview' }
-            ].map((item, index) => (
+            ].map((item, index) => {
+              const isActive = wizardState.currentStep === item.key;
+              const isCompleted = getStepNumber() > item.step;
+              return (
               <div key={item.key} className="flex items-center">
                 {index > 0 && (
-                  <div className="w-8 h-0.5 bg-slate-200 mr-4">
-                    <div 
-                      className={`h-full transition-all duration-300 ${
-                        getStepNumber() > item.step ? 'bg-blue-500 w-full' : 'bg-transparent w-0'
+                  <div className="w-12 h-px bg-stone-200 dark:bg-neutral-700 mx-1 relative overflow-hidden">
+                    <div
+                      className={`absolute inset-y-0 left-0 bg-amber-500 transition-all duration-500 ease-out ${
+                        isCompleted || isActive ? 'w-full' : 'w-0'
                       }`}
                     />
                   </div>
                 )}
-                <div className="flex items-center space-x-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                    wizardState.currentStep === item.key
-                      ? 'bg-blue-500 text-white'
-                      : getStepNumber() > item.step
-                      ? 'bg-green-500 text-white'
-                      : 'bg-slate-200 text-slate-600'
+                <button
+                  className={`flex items-center space-x-2.5 px-3.5 py-2 rounded-lg transition-all duration-200 ${
+                    isActive
+                      ? 'bg-amber-50 dark:bg-amber-500/10'
+                      : 'hover:bg-stone-50 dark:hover:bg-neutral-800'
+                  }`}
+                  onClick={() => {
+                    // Only allow going back to completed steps
+                    if (isCompleted) {
+                      if (item.key === 'build') { previousStep(); if (getStepNumber() > 2) previousStep(); }
+                      if (item.key === 'style' && getStepNumber() > 2) previousStep();
+                    }
+                  }}
+                >
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-semibold transition-all duration-200 ${
+                    isActive
+                      ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-sm shadow-amber-500/30'
+                      : isCompleted
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-stone-200 dark:bg-neutral-700 text-stone-500 dark:text-neutral-400'
                   }`}>
-                    {getStepNumber() > item.step ? (
-                      <Check className="w-4 h-4" />
+                    {isCompleted ? (
+                      <Check className="w-3.5 h-3.5" />
                     ) : (
                       item.step
                     )}
                   </div>
-                  <span className={`text-sm font-medium ${
-                    wizardState.currentStep === item.key
-                      ? 'text-slate-800'
-                      : 'text-slate-500'
+                  <span className={`text-sm font-medium tracking-tight ${
+                    isActive
+                      ? 'text-amber-700 dark:text-amber-400'
+                      : isCompleted
+                      ? 'text-stone-700 dark:text-stone-300'
+                      : 'text-stone-400 dark:text-neutral-500'
                   }`}>
                     {item.title}
                   </span>
-                </div>
+                </button>
               </div>
-            ))}
+            )})}
           </div>
         </div>
 
         <div className="flex items-center space-x-4">
-<div className="text-sm text-slate-600">
+          <div className="text-xs font-medium text-stone-400 dark:text-neutral-500 tracking-wide uppercase">
             {t('formBuilder.wizard.stepOf', { current: getStepNumber(), total: 3, defaultValue: `Step ${getStepNumber()} of 3` })}
           </div>
         </div>
@@ -369,30 +387,30 @@ const [, setLocation] = useLocation();
       {/* Spacer for fixed footer */}
       <div className="h-[72px]" />
       {/* Navigation Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-950 border-t border-slate-200 dark:border-gray-800 px-6 py-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
-        <div className="flex items-center justify-between">
+      <footer className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl border-t border-stone-200/80 dark:border-neutral-800/80 px-6 py-3.5">
+        <div className="flex items-center justify-between max-w-[1800px] mx-auto">
           <div>
             {wizardState.currentStep !== 'build' && (
-              <Button variant="outline" onClick={handlePreviousStep} className="flex items-center space-x-2">
+              <Button variant="outline" onClick={handlePreviousStep} className="flex items-center space-x-2 border-stone-300 dark:border-neutral-700 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-neutral-800 rounded-lg">
                 <ArrowLeft className="w-4 h-4" />
-<span>{t('formBuilder.wizard.previous', 'Previous')}</span>
+                <span>{t('formBuilder.wizard.previous', 'Previous')}</span>
               </Button>
             )}
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-4">
             {wizardState.currentStep === 'build' && (
-              <div className="text-sm text-slate-600 dark:text-slate-400">
-{canProceedToStyle ? 
+              <div className="text-sm text-stone-500 dark:text-neutral-400">
+                {canProceedToStyle ?
                   `${wizardState.formData.elements.length} element${wizardState.formData.elements.length !== 1 ? 's' : ''} ${t('formBuilder.wizard.added','added')}` :
                   t('formBuilder.wizard.buildHint', 'Add at least one Email component to continue')
                 }
               </div>
             )}
-            
+
             {wizardState.currentStep === 'style' && (
-              <div className="text-sm text-slate-600 dark:text-slate-400">
-{canProceedToPreview ? 
+              <div className="text-sm text-stone-500 dark:text-neutral-400">
+                {canProceedToPreview ?
                 `${wizardState.selectedTheme?.name} ${t('formBuilder.wizard.themeSelected','theme selected')}` :
                 t('formBuilder.wizard.styleHint', 'Select a theme to continue')
                 }
@@ -406,9 +424,9 @@ const [, setLocation] = useLocation();
                   (wizardState.currentStep === 'build' && !canProceedToStyle) ||
                   (wizardState.currentStep === 'style' && !canProceedToPreview)
                 }
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:from-stone-300 disabled:to-stone-300 dark:disabled:from-neutral-700 dark:disabled:to-neutral-700 text-white disabled:text-stone-500 dark:disabled:text-neutral-500 rounded-lg px-5 py-2.5 shadow-sm shadow-amber-500/20 disabled:shadow-none transition-all duration-200"
               >
-<span>{t('formBuilder.wizard.next', 'Next')}</span>
+                <span>{t('formBuilder.wizard.next', 'Next')}</span>
                 <ArrowRight className="w-4 h-4" />
               </Button>
             )}

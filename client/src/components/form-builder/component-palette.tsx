@@ -126,26 +126,25 @@ export function ComponentPalette({ onAddElement }: ComponentPaletteProps) {
   const isMobile = window.innerWidth < 1024; // lg breakpoint
 
   return (
-    <aside className="w-80 lg:w-80 bg-gradient-to-b from-slate-50 to-white border-r border-slate-200/60 shadow-sm relative z-10 h-full flex flex-col">
-      <div className="p-4 lg:p-6 flex-1 overflow-y-auto">
-        <div className="mb-6">
-          <h2 className="text-lg font-bold text-slate-800 mb-1">{t('formBuilder.palette.header', 'Form Components')}</h2>
-          <p className="text-sm text-slate-500">{t('formBuilder.palette.subheader', 'Drag & drop to build your form')}</p>
+    <aside className="w-72 lg:w-72 bg-white dark:bg-neutral-900 border-r border-stone-200/80 dark:border-neutral-800/80 relative z-10 h-full flex flex-col">
+      <div className="p-4 lg:p-5 flex-1 overflow-y-auto">
+        <div className="mb-5">
+          <h2 className="text-sm font-semibold text-stone-800 dark:text-stone-200 tracking-tight">{t('formBuilder.palette.header', 'Form Components')}</h2>
+          <p className="text-xs text-stone-400 dark:text-neutral-500 mt-0.5">{t('formBuilder.palette.subheader', 'Drag & drop to build your form')}</p>
         </div>
-        
+
         {categories.map((category) => {
           const items = paletteItems.filter(item => item.category === category);
-          
+
           return (
-            <div key={category} className="mb-8">
-              <div className="flex items-center mb-4">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+            <div key={category} className="mb-6">
+              <div className="flex items-center mb-3">
+                <h3 className="text-[10px] font-semibold text-stone-400 dark:text-neutral-500 uppercase tracking-widest">
                   {t(`formBuilder.palette.categories.${category}`, categoryLabels[category])}
                 </h3>
-                <div className="flex-1 h-px bg-gradient-to-r from-slate-200 to-transparent ml-3"></div>
+                <div className="flex-1 h-px bg-stone-100 dark:bg-neutral-800 ml-3"></div>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-1.5">
                 {items.map((item) => {
                   const localizedItem = {
                     ...item,
@@ -165,11 +164,11 @@ export function ComponentPalette({ onAddElement }: ComponentPaletteProps) {
             </div>
           );
         })}
-        
-        <div className="mt-12 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-          <div className="text-xs text-blue-600 font-medium mb-1">💡 {t('formBuilder.proTipTitle', 'Pro tip')}</div>
-          <div className="text-xs text-blue-700">
-            {isMobile 
+
+        <div className="mt-8 p-3.5 bg-amber-50/60 dark:bg-amber-500/5 rounded-xl border border-amber-100/80 dark:border-amber-500/10">
+          <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mb-0.5 uppercase tracking-wide">{t('formBuilder.proTipTitle', 'Pro tip')}</div>
+          <div className="text-xs text-amber-700/80 dark:text-amber-400/60 leading-relaxed">
+            {isMobile
               ? t('formBuilder.proTipMobile', 'Click to add instantly, or drag for precise placement')
               : t('formBuilder.proTipDesktop', 'Drag components for precise placement with blue line indicators')}
           </div>

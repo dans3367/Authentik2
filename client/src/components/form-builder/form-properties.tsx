@@ -216,7 +216,7 @@ export function FormProperties({
   };
 
   return (
-    <Card className="w-80 border-l border-neutral-200">
+    <Card className="w-72 border-l border-stone-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900 shadow-none rounded-none">
       <AlertDialog open={isWarningOpen} onOpenChange={setIsWarningOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -234,8 +234,8 @@ export function FormProperties({
 
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer hover:bg-neutral-50 transition-colors">
-            <CardTitle className="text-base flex items-center justify-between">
+          <CardHeader className="cursor-pointer hover:bg-stone-50 dark:hover:bg-neutral-800/50 transition-colors py-3 px-4">
+            <CardTitle className="text-sm font-semibold text-stone-800 dark:text-stone-200 flex items-center justify-between tracking-tight">
               {t('formBuilder.properties.title', 'Form Properties')}
               <svg
                 className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -274,35 +274,35 @@ export function FormProperties({
                 <button
                   type="button"
                   onClick={() => handleCategoryClick('intake')}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all duration-200 ${category === 'intake'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
-                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50'
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-lg border transition-all duration-150 ${category === 'intake'
+                    ? 'border-amber-400 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                    : 'border-stone-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-stone-500 dark:text-neutral-400 hover:border-stone-300 dark:hover:border-neutral-600'
                     }`}
                 >
-                  <ClipboardList className="w-5 h-5" />
-                  <span className="text-xs font-medium">{t('formBuilder.properties.intakeForms', 'Intake')}</span>
+                  <ClipboardList className="w-4 h-4" />
+                  <span className="text-[11px] font-medium">{t('formBuilder.properties.intakeForms', 'Intake')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleCategoryClick('survey')}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all duration-200 ${category === 'survey'
-                    ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm'
-                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50'
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-lg border transition-all duration-150 ${category === 'survey'
+                    ? 'border-amber-400 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                    : 'border-stone-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-stone-500 dark:text-neutral-400 hover:border-stone-300 dark:hover:border-neutral-600'
                     }`}
                 >
-                  <FileQuestion className="w-5 h-5" />
-                  <span className="text-xs font-medium">{t('formBuilder.properties.surveyForms', 'Survey')}</span>
+                  <FileQuestion className="w-4 h-4" />
+                  <span className="text-[11px] font-medium">{t('formBuilder.properties.surveyForms', 'Survey')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleCategoryClick('email-signup')}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all duration-200 ${category === 'email-signup'
-                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
-                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50'
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-lg border transition-all duration-150 ${category === 'email-signup'
+                    ? 'border-amber-400 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                    : 'border-stone-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-stone-500 dark:text-neutral-400 hover:border-stone-300 dark:hover:border-neutral-600'
                     }`}
                 >
-                  <Mail className="w-5 h-5" />
-                  <span className="text-xs font-medium">{t('formBuilder.properties.emailSignupForms', 'Email Signup')}</span>
+                  <Mail className="w-4 h-4" />
+                  <span className="text-[11px] font-medium">{t('formBuilder.properties.emailSignupForms', 'Email Signup')}</span>
                 </button>
               </div>
               <p className="text-[10px] text-neutral-400 mt-1">

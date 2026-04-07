@@ -404,13 +404,15 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
 
           {/* Helper text when no element is selected */}
           {!selectedElement && (
-            <div className="w-80 p-6 border-l border-neutral-200 bg-neutral-50 flex-1 flex items-center justify-center">
-              <div className="text-center text-neutral-500">
-                <svg className="w-12 h-12 mx-auto mb-3 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.122 2.122" />
-                </svg>
-                <p className="text-sm font-medium mb-1">Select an element</p>
-                <p className="text-xs">Click on any form element to edit its properties</p>
+            <div className="w-72 p-5 border-l border-stone-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900 flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-10 h-10 bg-stone-100 dark:bg-neutral-800 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-4 h-4 text-stone-400 dark:text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.122 2.122" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-stone-600 dark:text-stone-300 mb-0.5">Select an element</p>
+                <p className="text-xs text-stone-400 dark:text-neutral-500">Click on any form element to edit its properties</p>
               </div>
             </div>
           )}
@@ -418,10 +420,10 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
 
         {/* Mobile Floating Add Button (hidden for email-signup) */}
         {!previewMode && !isEmailSignup && (
-          <div className="lg:hidden fixed bottom-6 left-6 z-50">
+          <div className="lg:hidden fixed bottom-20 left-6 z-50">
             <Button
               size="lg"
-              className="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
+              className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 shadow-lg shadow-amber-500/25 hover:shadow-xl transition-all duration-200"
               onClick={() => setShowMobileAdd(true)}
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -495,14 +497,14 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
         {/* Drag Overlay - shows ghost for both new palette items and reordering */}
         <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
           {draggedType && (
-            <div className="p-4 bg-white border-2 border-blue-400 rounded-xl shadow-2xl opacity-90 pointer-events-none max-w-xs">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+            <div className="px-4 py-3 bg-white dark:bg-neutral-800 border-2 border-amber-400 rounded-lg shadow-xl shadow-amber-500/10 opacity-95 pointer-events-none max-w-xs">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-7 h-7 bg-amber-100 dark:bg-amber-500/20 rounded-md flex items-center justify-center">
+                  <svg className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <div className="text-sm font-medium text-blue-700">
+                <div className="text-sm font-medium text-stone-700 dark:text-stone-200">
                   {draggedType.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                 </div>
               </div>
@@ -512,8 +514,8 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
             const el = elements.find(e => e.id === draggedElementId);
             if (!el) return null;
             return (
-              <div className="p-4 bg-white border-2 border-indigo-400 rounded-xl shadow-2xl opacity-90 pointer-events-none max-w-md">
-                <div className="text-sm font-medium text-indigo-700 truncate">
+              <div className="px-4 py-3 bg-white dark:bg-neutral-800 border-2 border-amber-400 rounded-lg shadow-xl shadow-amber-500/10 opacity-95 pointer-events-none max-w-md">
+                <div className="text-sm font-medium text-stone-700 dark:text-stone-200 truncate">
                   {el.label || el.type.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                 </div>
               </div>

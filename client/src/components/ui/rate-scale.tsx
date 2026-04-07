@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
 interface RateScaleProps {
@@ -10,26 +10,40 @@ interface RateScaleProps {
   disabled?: boolean;
   labels?: string[];
   variant?: 'numbers' | 'stars' | 'faces';
+  name?: string;
 }
 
 export function RateScale({
   min = 1,
   max = 10,
-  value = 1,
+  value,
   onChange,
   className,
   disabled = false,
   labels = [],
-  variant = 'numbers'
+  variant = 'numbers',
+  name
 }: RateScaleProps) {
   // Ensure values are within valid range (1-10)
   const safeMin = Math.max(1, Math.min(10, min));
   const safeMax = Math.max(safeMin, Math.min(10, max));
-  const safeValue = Math.max(safeMin, Math.min(safeMax, value));
+
+  // Internal state for uncontrolled usage
+  const [internalValue, setInternalValue] = useState<number | null>(value ?? null);
+
+  // Sync with external value prop when it changes
+  useEffect(() => {
+    if (value !== undefined) {
+      setInternalValue(value);
+    }
+  }, [value]);
+
+  const currentValue = internalValue;
 
   const handleRating = (rating: number) => {
-    if (!disabled && onChange) {
-      onChange(rating);
+    if (!disabled) {
+      setInternalValue(rating);
+      onChange?.(rating);
     }
   };
 
@@ -48,7 +62,7 @@ export function RateScale({
   };
 
   const getButtonClasses = (rating: number) => {
-    const isActive = rating <= safeValue;
+    const isActive = currentValue !== null && rating <= currentValue;
     
     switch (variant) {
       case 'stars':
@@ -78,6 +92,7 @@ export function RateScale({
 
   return (
     <div className={cn("flex items-center space-x-2", className)}>
+      {name && <input type="hidden" name={name} value={currentValue ?? ''} />}
       {Array.from({ length: safeMax - safeMin + 1 }, (_, i) => {
         const rating = safeMin + i;
         return (

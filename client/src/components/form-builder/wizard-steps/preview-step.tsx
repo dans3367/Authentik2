@@ -472,15 +472,15 @@ export function PreviewStep({
   return (
     <div className="flex flex-col">
       {/* Header */}
-      <div className="bg-white/95 backdrop-blur-sm border-b border-slate-200/60 px-6 py-5 shadow-sm">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+      <div className="bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm border-b border-stone-200/60 dark:border-neutral-800/60 px-6 py-4">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">Preview & Save</h2>
-            <p className="text-slate-600">Review your form and save it when ready</p>
+            <h2 className="text-xl font-semibold text-stone-800 dark:text-stone-200 mb-0.5 tracking-tight">Preview & Save</h2>
+            <p className="text-sm text-stone-400 dark:text-neutral-500">Review your form and save it when ready</p>
           </div>
           <div className="flex items-center space-x-3">
             {selectedTheme && (
-              <div className="mr-2">
+              <div className="mr-1">
                 <ColorCustomizer
                   theme={selectedTheme}
                   onColorsChange={onCustomizeColors}
@@ -488,10 +488,10 @@ export function PreviewStep({
                 />
               </div>
             )}
-            <Button 
-              onClick={onSave} 
+            <Button
+              onClick={onSave}
               disabled={isSaving}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center space-x-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 text-white rounded-lg px-5 shadow-sm shadow-amber-500/20"
             >
               {isSaving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -625,12 +625,12 @@ export function PreviewStep({
 
       {/* Theme info */}
       {selectedTheme && (
-        <div className="bg-white border-t border-slate-200 px-6 py-4">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className={`w-4 h-4 rounded ${selectedTheme.preview}`}></div>
-              <span className="text-sm text-slate-600">
-                Using <strong>{selectedTheme.name}</strong> theme
+        <div className="bg-white/90 dark:bg-neutral-900/90 border-t border-stone-200/60 dark:border-neutral-800/60 px-6 py-3">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className={`w-3 h-3 rounded ${selectedTheme.preview}`}></div>
+              <span className="text-xs text-stone-500 dark:text-neutral-400">
+                Using <strong className="text-stone-700 dark:text-stone-300">{selectedTheme.name}</strong> theme
               </span>
             </div>
           </div>
