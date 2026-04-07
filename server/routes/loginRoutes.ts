@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { betterAuthUser, betterAuthSession, betterAuthVerification, temp2faSessions } from '@shared/schema';
+import { betterAuthUser, betterAuthSession, betterAuthAccount, betterAuthVerification, temp2faSessions } from '@shared/schema';
 import { eq, and, sql, lt, not } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 import { z } from 'zod';
@@ -416,6 +416,8 @@ setInterval(async () => {
 }, 5 * 60 * 1000);
 
 // Check if user requires 2FA verification before login
+// Verifies credentials WITHOUT creating a Better Auth session to avoid orphaned
+// sessions. Uses better-auth/crypto to check the password hash directly.
 loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -424,64 +426,53 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    // Step 1: Validate credentials using Better Auth (but don't create full session)
-    let loginResult;
-    try {
-      loginResult = await auth.api.signInEmail({
-        body: { email, password },
-        headers: req.headers as any
-      });
-    } catch (authError: any) {
-      console.error('❌ [2FA Check] Better Auth error:', authError);
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+    const normalizedEmail = String(email).toLowerCase().trim();
+
+    // Step 1: Look up user and their credential account directly — no session created
+    const userRecord = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.email, normalizedEmail)
+    });
+
+    if (!userRecord) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    // Check if authentication was successful
-    if (!loginResult || !loginResult.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+    // Fetch the credential account that holds the password hash
+    const [credentialAccount] = await db.select()
+      .from(betterAuthAccount)
+      .where(and(
+        eq(betterAuthAccount.userId, userRecord.id),
+        eq(betterAuthAccount.providerId, 'credential')
+      ))
+      .limit(1);
+
+    if (!credentialAccount?.password) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    const user = loginResult.user;
-    console.log(`🔍 [2FA Check] Credentials valid for user: ${user.email}`);
+    // Verify password using Better Auth's native scrypt hash — no session side-effects
+    const { verifyPassword } = await import('better-auth/crypto');
+    const passwordValid = await verifyPassword({
+      password,
+      hash: credentialAccount.password,
+    });
 
-    // Get user record to check 2FA status
-    let userRecord;
-    try {
-      userRecord = await db.query.betterAuthUser.findFirst({
-        where: eq(betterAuthUser.id, user.id)
-      });
-
-      if (!userRecord) {
-        return res.status(500).json({
-          success: false,
-          message: 'User record not found'
-        });
-      }
-    } catch (error) {
-      console.error('❌ [2FA Check] Error getting user record:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to get user information'
-      });
+    if (!passwordValid) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    // Check if user has 2FA enabled
+    // Check active status
+    if (!userRecord.isActive) {
+      return res.status(401).json({ success: false, message: 'Account is disabled' });
+    }
+
+    console.log(`🔍 [2FA Check] Credentials valid for user: ${userRecord.email}`);
+
+    // Step 2: Check if user has 2FA enabled
     if (!userRecord.twoFactorEnabled || !userRecord.twoFactorSecret) {
       // No 2FA — create the browser session through Better Auth itself so the
       // client receives the exact cookies Better Auth expects.
       console.log(`✅ [2FA Check] No 2FA required for user ${userRecord.email}`);
-
-      if (loginResult.token) {
-        await db.delete(betterAuthSession)
-          .where(eq(betterAuthSession.token, loginResult.token))
-          .catch(err => console.warn('⚠️ [2FA Check] Could not clean up pre-check session:', err));
-      }
 
       await completeBrowserSignIn(req, res, email, password);
       console.log('✅ [2FA Check] Better Auth cookies forwarded for non-2FA user');
@@ -493,15 +484,7 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
       });
     }
 
-    // 2FA required — clean up the pre-check session since the user must complete
-    // 2FA before getting a real session. A temp session is created below instead.
-    if (loginResult.token) {
-      await db.delete(betterAuthSession)
-        .where(eq(betterAuthSession.token, loginResult.token))
-        .catch(err => console.warn('⚠️ [2FA Check] Could not clean up pre-check session:', err));
-    }
-
-    // Create temporary session for verification
+    // Step 3: 2FA required — create temporary session (no Better Auth session involved)
     console.log(`🔐 [2FA Check] 2FA required for user ${userRecord.email}`);
 
     const sessionToken = `temp_${userRecord.id}_${Date.now()}_${randomBytes(16).toString('base64url')}`;
@@ -546,10 +529,14 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
   }
 });
 
-// New 2FA verification endpoint that follows the flow in the image
+// 2FA verification endpoint — completes login after TOTP validation.
+// Credentials were already verified in check-2fa-requirement; the temp session
+// token proves that. We create the session directly here instead of
+// re-authenticating with email/password (which would be a security risk if the
+// temp token were leaked).
 loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
   try {
-    const { token, tempSessionToken, email, password } = req.body;
+    const { token, tempSessionToken } = req.body;
 
     if (!token) {
       return res.status(400).json({
@@ -560,12 +547,6 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
     if (!tempSessionToken) {
       return res.status(400).json({
         message: 'Temporary session token is required'
-      });
-    }
-
-    if (!email || !password) {
-      return res.status(400).json({
-        message: 'Email and password are required to complete sign-in'
       });
     }
 
@@ -620,13 +601,6 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
       });
     }
 
-    if (user.email.toLowerCase() !== String(email).toLowerCase().trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Login session does not match verification request'
-      });
-    }
-
     // Step 3: Verify the 2FA token
     const isValidToken = authenticator.verify({
       token,
@@ -639,21 +613,38 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
       });
     }
 
-    // Step 4: 2FA verification successful - delete temp session and create a
-    // normal browser session through Better Auth so all auth cookies line up.
+    // Step 4: 2FA verification successful — delete temp session and create a
+    // real session directly. Credentials were already verified during
+    // check-2fa-requirement so no re-authentication is needed.
     await db.delete(temp2faSessions)
       .where(eq(temp2faSessions.id, tempSession.id));
 
-    try {
-      await completeBrowserSignIn(req, res, email, password);
-      console.log('✅ [2FA] Better Auth cookies forwarded after verification');
-    } catch (sessionError) {
-      console.error('❌ [2FA] Failed to create Better Auth session:', sessionError);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to create session after 2FA verification. Please try logging in again.'
-      });
-    }
+    // Create session directly (same approach as verify-email)
+    const sessionId = `session_${Date.now()}_${randomBytes(12).toString('base64url')}`;
+    const newSessionToken = `${sessionId}_token_${randomBytes(18).toString('base64url')}`;
+    const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    await db.insert(betterAuthSession).values({
+      id: sessionId,
+      userId: user.id,
+      token: newSessionToken,
+      expiresAt: sessionExpiresAt,
+      ipAddress: req.ip || req.connection.remoteAddress || null,
+      userAgent: req.get('User-Agent') || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    // Set the session cookie
+    res.cookie('better-auth.session_token', newSessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/'
+    });
+
+    console.log('✅ [2FA] Session created directly after verification for user:', user.id);
 
     // Update last login time
     await db.update(betterAuthUser)
@@ -1040,10 +1031,14 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const { newEmail } = req.body;
+    const { newEmail, password } = req.body;
 
     if (!newEmail || typeof newEmail !== 'string') {
       return res.status(400).json({ message: 'A valid new email address is required' });
+    }
+
+    if (!password || typeof password !== 'string') {
+      return res.status(400).json({ message: 'Password is required to change your email' });
     }
 
     // Basic email format validation
@@ -1072,6 +1067,29 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Verify password before allowing email change
+    const [credentialAccount] = await db.select()
+      .from(betterAuthAccount)
+      .where(and(
+        eq(betterAuthAccount.userId, userId),
+        eq(betterAuthAccount.providerId, 'credential')
+      ))
+      .limit(1);
+
+    if (!credentialAccount?.password) {
+      return res.status(400).json({ message: 'Password verification failed' });
+    }
+
+    const { verifyPassword } = await import('better-auth/crypto');
+    const passwordValid = await verifyPassword({
+      password,
+      hash: credentialAccount.password,
+    });
+
+    if (!passwordValid) {
+      return res.status(401).json({ message: 'Incorrect password' });
     }
 
     // Only allow if user is NOT yet verified

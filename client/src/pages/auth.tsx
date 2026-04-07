@@ -73,8 +73,6 @@ export default function AuthPage() {
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [rememberMe, setRememberMe] = useState(false);
   const [twoFactorData, setTwoFactorData] = useState<{
-    email: string;
-    password: string;
     tempSessionToken: string;
   } | null>(null);
   const [is2FAVerifying, setIs2FAVerifying] = useState(false);
@@ -122,8 +120,6 @@ export default function AuthPage() {
       if (check2FAResult.requires2FA) {
         // User has 2FA enabled - show 2FA dialog but don't login yet
         setTwoFactorData({
-          email: data.email,
-          password: data.password,
           tempSessionToken: check2FAResult.tempSessionToken
         });
         setCurrentView("twoFactor");
@@ -274,11 +270,9 @@ export default function AuthPage() {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           token: data.token,
           tempSessionToken: twoFactorData.tempSessionToken,
-          email: twoFactorData.email,
-          password: twoFactorData.password,
         }),
       });
 

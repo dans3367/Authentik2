@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Mail, Loader2, Clock, CheckCircle, Pencil, X } from "lucide-react";
+import { Mail, Loader2, Clock, CheckCircle, Pencil, X, Lock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,6 +21,7 @@ export default function PendingVerificationPage() {
   // Change email state
   const [isChangingEmail, setIsChangingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
   const [emailError, setEmailError] = useState("");
 
@@ -148,6 +149,11 @@ export default function PendingVerificationPage() {
       return;
     }
 
+    if (!confirmPassword) {
+      setEmailError("Please enter your password to confirm this change");
+      return;
+    }
+
     // Basic client-side email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newEmail.trim())) {
@@ -166,6 +172,7 @@ export default function PendingVerificationPage() {
     try {
       const response = await apiRequest("POST", "/api/auth/change-email-unverified", {
         newEmail: newEmail.trim(),
+        password: confirmPassword,
       });
 
       const data = await response.json();
@@ -177,6 +184,7 @@ export default function PendingVerificationPage() {
         });
         setIsChangingEmail(false);
         setNewEmail("");
+        setConfirmPassword("");
         // Refresh session data to show the new email
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         await queryClient.invalidateQueries({ queryKey: ["better-auth"] });
@@ -231,6 +239,7 @@ export default function PendingVerificationPage() {
                   onClick={() => {
                     setIsChangingEmail(false);
                     setNewEmail("");
+                    setConfirmPassword("");
                     setEmailError("");
                   }}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -255,12 +264,31 @@ export default function PendingVerificationPage() {
                 disabled={isSubmittingEmail}
                 className={emailError ? "border-red-400 focus-visible:ring-red-400" : ""}
               />
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="password"
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (emailError) setEmailError("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !isSubmittingEmail) {
+                      handleChangeEmail();
+                    }
+                  }}
+                  disabled={isSubmittingEmail}
+                  className={`pl-9 ${emailError ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+                />
+              </div>
               {emailError && (
                 <p className="text-xs text-red-500">{emailError}</p>
               )}
               <Button
                 onClick={handleChangeEmail}
-                disabled={isSubmittingEmail || !newEmail.trim()}
+                disabled={isSubmittingEmail || !newEmail.trim() || !confirmPassword}
                 className="w-full"
                 size="sm"
               >
