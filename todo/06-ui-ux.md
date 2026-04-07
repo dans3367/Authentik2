@@ -11,4 +11,5 @@
   - Appointments, Contacts, Segmenation, Analytics
   - Management, User Profile
   - Puck editor - Newsletter editor
-  - PUck editor - Advertise editor
+  - Puck editor - Advertise editor
+  - Form Add and edit pages
