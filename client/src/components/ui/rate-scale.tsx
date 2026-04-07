@@ -11,6 +11,7 @@ interface RateScaleProps {
   labels?: string[];
   variant?: 'numbers' | 'stars' | 'faces';
   name?: string;
+  required?: boolean;
 }
 
 export function RateScale({
@@ -22,7 +23,8 @@ export function RateScale({
   disabled = false,
   labels = [],
   variant = 'numbers',
-  name
+  name,
+  required = false
 }: RateScaleProps) {
   // Ensure values are within valid range (1-10)
   const safeMin = Math.max(1, Math.min(10, min));
@@ -92,7 +94,18 @@ export function RateScale({
 
   return (
     <div className={cn("flex items-center space-x-2", className)}>
-      {name && <input type="hidden" name={name} value={currentValue ?? ''} />}
+      {name && (
+        <input
+          type="text"
+          name={name}
+          value={currentValue ?? ''}
+          required={required}
+          onChange={() => {}}
+          aria-hidden="true"
+          tabIndex={-1}
+          style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}
+        />
+      )}
       {Array.from({ length: safeMax - safeMin + 1 }, (_, i) => {
         const rating = safeMin + i;
         return (

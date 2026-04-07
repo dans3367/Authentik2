@@ -3,6 +3,7 @@ import { useRoute } from 'wouter';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useBotDetection } from '@/hooks/useBotDetection';
 import TurnstileWidget from '@/components/TurnstileWidget';
+import { RateScale } from '@/components/ui/rate-scale';
 
 // ─── Theme System ────────────────────────────────────────────────────────────
 
@@ -430,6 +431,15 @@ interface FormElement {
   required?: boolean;
   placeholder?: string;
   options?: string[];
+  disabled?: boolean;
+  rateVariant?: 'numbers' | 'stars' | 'faces';
+  validation?: {
+    min?: number;
+    max?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+  };
 }
 
 interface FormData {
@@ -460,6 +470,7 @@ const PublicFormPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [theme, setTheme] = useState<ThemeStyles | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState<string | null>(null);
@@ -614,11 +625,40 @@ const PublicFormPage: React.FC = () => {
 
   const handleInputChange = (elementId: string, value: any) => {
     setFormValues(prev => ({ ...prev, [elementId]: value }));
+    // Clear error for this field when user provides a value
+    const baseId = elementId.replace(/_first$|_last$/, '');
+    if (fieldErrors[baseId]) {
+      setFieldErrors(prev => {
+        const next = { ...prev };
+        delete next[baseId];
+        return next;
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form) return;
+
+    // Validate required fields
+    const errors: Record<string, string> = {};
+    for (const element of form.formData.elements || []) {
+      if (!element.required) continue;
+      const val = formValues[element.id];
+      const isEmpty = val === undefined || val === null || val === '';
+      if (element.type === 'full-name') {
+        if (!formValues[`${element.id}_first`] || !formValues[`${element.id}_last`]) {
+          errors[element.id] = 'This field is required';
+        }
+      } else if (isEmpty) {
+        errors[element.id] = 'This field is required';
+      }
+    }
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+    setFieldErrors({});
 
     // Client-side bot detection: if suspicious and Turnstile is available, require challenge
     if (turnstileSiteKey && botDetection.isSuspicious && !turnstileToken) {
@@ -659,6 +699,11 @@ const PublicFormPage: React.FC = () => {
     }
   };
 
+  const renderFieldError = (id: string) => {
+    if (!fieldErrors[id]) return null;
+    return <p className="text-sm text-red-500 mt-1">{fieldErrors[id]}</p>;
+  };
+
   const renderFormElement = (element: FormElement) => {
     const { id, type, label, required, placeholder, options } = element;
 
@@ -683,6 +728,7 @@ const PublicFormPage: React.FC = () => {
               onChange={(e) => handleInputChange(id, e.target.value)}
               className={theme?.input || 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'}
             />
+            {renderFieldError(id)}
           </div>
         );
 
@@ -700,6 +746,7 @@ const PublicFormPage: React.FC = () => {
               lastNamePlaceholder="Last Name"
               theme={theme}
             />
+            {renderFieldError(id)}
           </div>
         );
 
@@ -719,6 +766,7 @@ const PublicFormPage: React.FC = () => {
               onChange={(e) => handleInputChange(id, e.target.value)}
               className={theme?.input || 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'}
             />
+            {renderFieldError(id)}
           </div>
         );
 
@@ -737,6 +785,7 @@ const PublicFormPage: React.FC = () => {
               className={theme?.textarea || 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none'}
               rows={4}
             />
+            {renderFieldError(id)}
           </div>
         );
 
@@ -758,6 +807,7 @@ const PublicFormPage: React.FC = () => {
                 <option key={index} value={option}>{option}</option>
               ))}
             </select>
+            {renderFieldError(id)}
           </div>
         );
 
@@ -786,6 +836,7 @@ const PublicFormPage: React.FC = () => {
                 </div>
               ))}
             </div>
+            {renderFieldError(id)}
           </div>
         );
 
@@ -805,6 +856,28 @@ const PublicFormPage: React.FC = () => {
                 {label} {required && <span className="text-red-500">*</span>}
               </label>
             </div>
+            {renderFieldError(id)}
+          </div>
+        );
+
+      case 'rate-scale':
+        return (
+          <div key={id} className="space-y-2">
+            <label className={theme?.label || 'text-sm font-medium text-gray-700'}>
+              {label} {required && <span className="text-red-500">*</span>}
+            </label>
+            <RateScale
+              name={id}
+              min={element.validation?.min || 1}
+              max={element.validation?.max || 10}
+              variant={element.rateVariant || 'numbers'}
+              disabled={element.disabled}
+              required={required}
+              value={formValues[id] !== undefined ? Number(formValues[id]) : undefined}
+              onChange={(value) => handleInputChange(id, value)}
+              className="justify-start"
+            />
+            {renderFieldError(id)}
           </div>
         );
 

@@ -243,6 +243,7 @@ export function ThemedFormRenderer({ element, themeStyles, onChange, onReset }: 
           <RateScale
             name={element.name}
             disabled={(element as FormElement).disabled}
+            required={element.required}
             min={(element as FormElement).validation?.min || 1}
             max={(element as FormElement).validation?.max || 10}
             variant={(element as FormElement).rateVariant || "numbers"}

@@ -26,6 +26,7 @@ interface Form {
   formData: string;
   theme: string;
   tags?: string[];
+  shopId?: string | null;
   isActive: boolean;
   responseCount: number;
   createdAt: string;
@@ -212,6 +213,24 @@ export default function Forms2() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
+  // Fetch shops for name lookup
+  const { data: shopsData } = useQuery({
+    queryKey: ['/api/shops', { limit: 100 }],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/shops?limit=100');
+      return response.json();
+    },
+    enabled: isAuthenticated && isInitialized,
+    staleTime: 60000,
+  });
+
+  const shopsMap = new Map<string, string>();
+  if (shopsData?.shops) {
+    for (const shop of shopsData.shops) {
+      shopsMap.set(shop.id, shop.name);
+    }
+  }
+
   // Fetch forms data (x-shop-id header automatically injected by queryClient)
   const { data: formsData, isLoading: formsLoading, error: formsError, refetch } = useQuery({
     queryKey: ['/api/forms', selectedShopId],
@@ -220,8 +239,8 @@ export default function Forms2() {
       const data = await response.json();
       return data;
     },
-    enabled: isAuthenticated && isInitialized, // Wait for both authentication and initialization
-    staleTime: 30000, // Cache for 30 seconds
+    enabled: isAuthenticated && isInitialized,
+    staleTime: 30000,
   });
 
   const forms: Form[] = formsData?.forms || [];
@@ -405,7 +424,7 @@ export default function Forms2() {
           <CardTitle className="text-gray-900 dark:text-gray-100 text-lg font-semibold">
             {form.title}
           </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {themeData.name}
             </span>
@@ -415,6 +434,11 @@ export default function Forms2() {
               }`}>
               {form.isActive ? 'Active' : 'Inactive'}
             </span>
+            {form.shopId && shopsMap.get(form.shopId) && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200/60 dark:border-amber-700/40">
+                {shopsMap.get(form.shopId)}
+              </span>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-3 pt-0">
