@@ -64,7 +64,7 @@ export const ThemeCard = React.memo(function ThemeCard({
       type="button"
       onClick={() => onCardClick(themeId)}
       disabled={disabled}
-      className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+      className="relative rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
     >
       <div className="relative h-40 rounded-lg overflow-hidden">
         <img
@@ -87,7 +87,7 @@ export const ThemeCard = React.memo(function ThemeCard({
         </div>
       </div>
       <div className="mt-2">
-        <span className="text-sm font-medium text-gray-900">{theme.name}</span>
+        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{theme.name}</span>
       </div>
     </button>
   );

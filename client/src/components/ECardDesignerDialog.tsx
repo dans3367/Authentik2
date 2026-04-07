@@ -1011,7 +1011,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
           {isCustomCardMode && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div className="space-y-2">
-                <label htmlFor="cardName" className="text-sm font-medium text-gray-700">
+                <label htmlFor="cardName" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {t('ecards.designer.cardName')} <span className="text-red-500">*</span>
                 </label>
                 <Input
@@ -1023,7 +1023,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                 />
               </div>
               <div className="space-y-2">
-                <label htmlFor="sendDate" className="text-sm font-medium text-gray-700">
+                <label htmlFor="sendDate" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {t('ecards.designer.sendDate')} <span className="text-red-500">*</span>
                 </label>
                 <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
@@ -1057,10 +1057,10 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                     />
                   </PopoverContent>
                 </Popover>
-                <p className="text-xs text-gray-500">{t('ecards.designer.sendDateHint')}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('ecards.designer.sendDateHint')}</p>
               </div>
               <div className="space-y-2">
-                <label htmlFor="occasionType" className="text-sm font-medium text-gray-700">
+                <label htmlFor="occasionType" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {t('ecards.designer.occasionType')} <span className="text-red-500">*</span>
                 </label>
                 <Input
@@ -1083,7 +1083,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                   <option value="Thanksgiving" />
                   <option value="Halloween" />
                 </datalist>
-                <p className="text-xs text-gray-500">{t('ecards.designer.occasionTypeHint')}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('ecards.designer.occasionTypeHint')}</p>
               </div>
             </div>
           )}
@@ -1328,13 +1328,13 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="space-y-2 sm:space-y-3">
-                            <div className="text-xs sm:text-sm font-medium text-gray-700">{t('ecards.designer.emojiMenuTitle')}</div>
+                            <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">{t('ecards.designer.emojiMenuTitle')}</div>
                             <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
                               {birthdayEmojis.map((emoji, index) => (
                                 <button
                                   key={index}
                                   onClick={() => insertEmoji(emoji)}
-                                  className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
+                                  className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-center"
                                   title={t('ecards.designer.insertEmoji', { emoji })}
                                 >
                                   {emoji}
@@ -1375,7 +1375,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                   <div className="mt-2">
                     <div className="text-xs text-gray-500">{t('ecards.designer.emojisDetected', { count: emojiCount })}</div>
                     {emojiCount > 1 && (
-                      <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
+                      <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2 dark:text-orange-300 dark:bg-orange-900/20 dark:border-orange-800">
                         <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
                         <span>
                           <strong>{t('ecards.designer.warningLabel')}</strong> {t('ecards.designer.emojiWarning')}
@@ -1661,13 +1661,13 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div className="space-y-2 sm:space-y-3">
-                              <div className="text-xs sm:text-sm font-medium text-gray-700">{t('ecards.designer.emojiMenuTitle')}</div>
+                              <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">{t('ecards.designer.emojiMenuTitle')}</div>
                               <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
                                 {birthdayEmojis.map((emoji, index) => (
                                   <button
                                     key={index}
                                     onClick={() => insertEmoji(emoji)}
-                                    className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
+                                    className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-center"
                                     title={t('ecards.designer.insertEmoji', { emoji })}
                                   >
                                     {emoji}
@@ -1696,7 +1696,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                     <div className="mt-2">
                       <div className="text-xs text-gray-500">{t('ecards.designer.emojisDetected', { count: emojiCount })}</div>
                       {emojiCount > 1 && (
-                        <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
+                        <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2 dark:text-orange-300 dark:bg-orange-900/20 dark:border-orange-800">
                           <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
                           <span>
                             <strong>{t('ecards.designer.warningLabel')}</strong> {t('ecards.designer.emojiWarning')}
@@ -1865,12 +1865,12 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
 
                 {/* Search Results Summary */}
                 {hasSearched && !loading && totalResults > 0 && (
-                  <div className="flex items-center justify-between text-sm text-gray-600">
+                  <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
                     <span>
                       {t('ecards.designer.showingResults', { count: unsplashImages.length, total: totalResults.toLocaleString(), query: searchQuery })}
                     </span>
                     {currentPage < totalPages && (
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
                         {t('ecards.designer.pageOf', { current: currentPage, total: totalPages })}
                       </span>
                     )}
@@ -1901,7 +1901,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                     {currentPage < totalPages && (
                       <div className="flex flex-col items-center gap-2">
                         {loadingMore ? (
-                          <div className="flex items-center gap-2 text-gray-600">
+                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
                             <span className="text-sm">{t('ecards.designer.loadingMoreImages')}</span>
                           </div>
@@ -1923,7 +1923,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                         )}
 
                         {/* Progress indicator */}
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
                           {t('ecards.designer.loadedImages', { count: unsplashImages.length, total: totalResults.toLocaleString() })}
                         </div>
                       </div>
@@ -1936,7 +1936,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                     <div className="space-y-2">
                       <p className="text-sm sm:text-base">{t('ecards.designer.noImagesFound', { query: searchQuery })}</p>
                       {!import.meta.env.VITE_ACCESS_KEY && (
-                        <div className="text-xs sm:text-sm text-orange-600 bg-orange-50 p-3 rounded-md mx-auto max-w-md">
+                        <div className="text-xs sm:text-sm text-orange-600 bg-orange-50 p-3 rounded-md mx-auto max-w-md dark:text-orange-400 dark:bg-orange-900/20">
                           <p className="font-medium">{t('ecards.designer.unsplashNotConfigured')}</p>
                           <p>{t('ecards.designer.addAccessKey')}</p>
                           <p>{t('ecards.designer.showingDemoImages')}</p>

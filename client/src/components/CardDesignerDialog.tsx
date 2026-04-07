@@ -1060,7 +1060,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
           {initialThemeId && initialThemeId.startsWith('custom-') && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div className="space-y-2">
-                <label htmlFor="cardName" className="text-sm font-medium text-gray-700">
+                <label htmlFor="cardName" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Card Name <span className="text-red-500">*</span>
                 </label>
                 <Input
@@ -1072,7 +1072,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                 />
               </div>
               <div className="space-y-2">
-                <label htmlFor="sendDate" className="text-sm font-medium text-gray-700">
+                <label htmlFor="sendDate" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Send Date <span className="text-red-500">*</span>
                 </label>
                 <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
@@ -1106,10 +1106,10 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     />
                   </PopoverContent>
                 </Popover>
-                <p className="text-xs text-gray-500">The card will be sent on this date</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">The card will be sent on this date</p>
               </div>
               <div className="space-y-2">
-                <label htmlFor="occasionType" className="text-sm font-medium text-gray-700">
+                <label htmlFor="occasionType" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Occasion Type <span className="text-red-500">*</span>
                 </label>
                 <Input
@@ -1132,7 +1132,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                   <option value="Thanksgiving" />
                   <option value="Halloween" />
                 </datalist>
-                <p className="text-xs text-gray-500">Type of holiday or occasion</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Type of holiday or occasion</p>
               </div>
             </div>
           )}
@@ -1372,13 +1372,13 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="space-y-2 sm:space-y-3">
-                            <div className="text-xs sm:text-sm font-medium text-gray-700">Birthday Emojis</div>
+                            <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Birthday Emojis</div>
                             <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
                               {birthdayEmojis.map((emoji, index) => (
                                 <button
                                   key={index}
                                   onClick={() => insertEmoji(emoji)}
-                                  className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
+                                  className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-center"
                                   title={`Insert ${emoji}`}
                                 >
                                   {emoji}
@@ -1418,7 +1418,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                   <div className="mt-2">
                     <div className="text-xs text-gray-500">Emojis detected in message: {emojiCount}</div>
                     {emojiCount > 1 && (
-                      <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
+                      <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2 dark:text-orange-300 dark:bg-orange-900/20 dark:border-orange-800">
                         <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
                         <span>
                           <strong>Warning:</strong> More than one emoji could affect email delivery to inbox and place your mail under Promotions or Spam.
@@ -1699,13 +1699,13 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div className="space-y-2 sm:space-y-3">
-                              <div className="text-xs sm:text-sm font-medium text-gray-700">Birthday Emojis</div>
+                              <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Birthday Emojis</div>
                               <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
                                 {birthdayEmojis.map((emoji, index) => (
                                   <button
                                     key={index}
                                     onClick={() => insertEmoji(emoji)}
-                                    className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
+                                    className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-center"
                                     title={`Insert ${emoji}`}
                                   >
                                     {emoji}
@@ -1733,7 +1733,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     <div className="mt-2">
                       <div className="text-xs text-gray-500">Emojis detected in message: {emojiCount}</div>
                       {emojiCount > 1 && (
-                        <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2">
+                        <div className="mt-2 flex items-start gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 rounded p-2 dark:text-orange-300 dark:bg-orange-900/20 dark:border-orange-800">
                           <AlertTriangle className="h-4 w-4 mt-0.5 text-orange-700" />
                           <span>
                             <strong>Warning:</strong> More than one emoji could affect email delivery to inbox and place your mail under Promotions or Spam.
@@ -1906,12 +1906,12 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
 
                 {/* Search Results Summary */}
                 {hasSearched && !loading && totalResults > 0 && (
-                  <div className="flex items-center justify-between text-sm text-gray-600">
+                  <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
                     <span>
                       Showing {unsplashImages.length} of {totalResults.toLocaleString()} results for "{searchQuery}"
                     </span>
                     {currentPage < totalPages && (
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
                         Page {currentPage} of {totalPages}
                       </span>
                     )}
@@ -1942,7 +1942,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     {currentPage < totalPages && (
                       <div className="flex flex-col items-center gap-2">
                         {loadingMore ? (
-                          <div className="flex items-center gap-2 text-gray-600">
+                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
                             <span className="text-sm">Loading more images...</span>
                           </div>
@@ -1959,7 +1959,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                         )}
 
                         {/* Progress indicator */}
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
                           Loaded {unsplashImages.length} of {totalResults.toLocaleString()} images
                         </div>
                       </div>
@@ -1972,7 +1972,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                     <div className="space-y-2">
                       <p className="text-sm sm:text-base">No images found for "{searchQuery}". Try a different search term.</p>
                       {!import.meta.env.VITE_ACCESS_KEY && (
-                        <div className="text-xs sm:text-sm text-orange-600 bg-orange-50 p-3 rounded-md mx-auto max-w-md">
+                        <div className="text-xs sm:text-sm text-orange-600 bg-orange-50 p-3 rounded-md mx-auto max-w-md dark:text-orange-400 dark:bg-orange-900/20">
                           <p className="font-medium">Unsplash API not configured</p>
                           <p>Add VITE_ACCESS_KEY to your .env file to enable image search.</p>
                           <p>Showing demo images instead.</p>
@@ -2033,13 +2033,13 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
           </div>
           <div className="px-4 pb-4 sm:px-6 sm:pb-6 flex justify-center overflow-auto flex-1 min-h-0">
             <div
-              className="border rounded-lg shadow-inner bg-gray-100 transition-all duration-300"
+              className="border rounded-lg shadow-inner bg-gray-100 transition-all duration-300 dark:bg-gray-800 dark:border-gray-700"
               style={{
                 width: previewMode === "mobile" ? '375px' : '100%',
                 maxWidth: previewMode === "mobile" ? '375px' : '800px',
               }}
             >
-              <div className="bg-gray-200 px-3 py-2 flex items-center gap-2 text-xs text-gray-500 border-b">
+              <div className="bg-gray-200 px-3 py-2 flex items-center gap-2 text-xs text-gray-500 border-b dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600">
                 <div className="flex gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
                   <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
@@ -2049,7 +2049,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                   Birthday Card — {title || 'Happy Birthday!'}
                 </div>
               </div>
-              <div className="bg-white px-3 py-2 border-b text-xs text-gray-600 space-y-0.5">
+              <div className="bg-white px-3 py-2 border-b text-xs text-gray-600 space-y-0.5 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600">
                 <div><span className="font-medium text-gray-500">From:</span> {senderName || 'Your Business'}</div>
                 <div><span className="font-medium text-gray-500">To:</span> {customerInfo?.firstName || 'John'} {customerInfo?.lastName || 'Doe'}</div>
                 <div><span className="font-medium text-gray-500">Subject:</span> {title || 'Happy Birthday!'}</div>

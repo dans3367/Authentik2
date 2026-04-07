@@ -1045,11 +1045,11 @@ export function BirthdayCardsContent() {
 
   const getStatusColor = (status: Contact['status']) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'unsubscribed': return 'bg-gray-100 text-gray-800';
-      case 'bounced': return 'bg-red-100 text-red-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      case 'unsubscribed': return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      case 'bounced': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }
   };
 
@@ -1091,7 +1091,7 @@ export function BirthdayCardsContent() {
     <div key={currentLanguage} className="min-h-screen overflow-x-hidden">
       <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-6 sm:space-y-8">
         {/* Greeting Header Card */}
-        <Card className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <Card className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
           <CardContent className="p-4 sm:p-6 lg:p-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
               <div className="space-y-4 sm:space-y-6 lg:space-y-8 pr-0 sm:pr-4 lg:pr-6 xl:pr-12 lg:col-span-8">
@@ -1100,20 +1100,20 @@ export function BirthdayCardsContent() {
                     <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl">🎉</span>
                     <h1
                       tabIndex={-1}
-                      className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
+                      className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 dark:text-white leading-tight tracking-tight break-words"
                     >
                       {t('cards.hero.celebrate') || 'Celebrate Their Special'}
                     </h1>
                   </div>
                   <h1
                     tabIndex={-1}
-                    className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
+                    className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 dark:text-white leading-tight tracking-tight break-words"
                   >
                     {t('cards.hero.dayWith') || 'Day With a Thoughtful'}
                   </h1>
                   <h1
                     tabIndex={-1}
-                    className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight break-words"
+                    className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 dark:text-white leading-tight tracking-tight break-words"
                   >
                     {t('cards.hero.card') || 'Birthday e-Card!'}
                   </h1>
@@ -1229,7 +1229,7 @@ export function BirthdayCardsContent() {
                           setDesignerOpen(true);
                         }}
                         disabled={updateSettingsMutation.isPending}
-                        className={`relative rounded-xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${isSelected ? 'ring-2 ring-blue-600 border-blue-600' : 'border-gray-200 hover:border-gray-300'}`}
+                        className={`relative rounded-xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${isSelected ? 'ring-2 ring-blue-600 border-blue-600' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}
                       >
                         <div className="relative h-40 rounded-lg overflow-hidden">
                           {/* Default theme with header image */}
@@ -1298,7 +1298,7 @@ export function BirthdayCardsContent() {
                             } else {
                               return (
                                 <>
-                                  <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50" />
+                                  <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 dark:from-purple-950 dark:via-indigo-950 dark:to-blue-950" />
                                   <span className="absolute left-3 top-3 text-2xl opacity-70">✨</span>
                                 </>
                               );
@@ -1345,9 +1345,9 @@ export function BirthdayCardsContent() {
                           </div>
                         </div>
                         <div className="mt-2 flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-900">{tpl.name}</span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{tpl.name}</span>
                           {isSelected && (
-                            <span className="text-xs font-semibold text-blue-600">Selected</span>
+                            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">Selected</span>
                           )}
                         </div>
                       </button>
@@ -1757,7 +1757,7 @@ export function BirthdayCardsContent() {
             </CardHeader>
             <CardContent className="p-0">
               {/* Search and Filter Controls */}
-              <div className="flex items-center gap-4 p-6 border-b">
+              <div className="flex items-center gap-4 p-6 border-b dark:border-gray-700">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
@@ -1910,7 +1910,7 @@ export function BirthdayCardsContent() {
                               <button
                                 type="button"
                                 onClick={() => openBirthdayModal(contact.id)}
-                                className="flex items-center gap-2 text-left hover:bg-gray-50 p-1 rounded transition-colors"
+                                className="flex items-center gap-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 p-1 rounded transition-colors"
                               >
                                 <CakeIcon className="h-4 w-4 text-pink-500" />
                                 <span className="text-sm">{(() => {
@@ -1924,7 +1924,7 @@ export function BirthdayCardsContent() {
                               <button
                                 type="button"
                                 onClick={() => openBirthdayModal(contact.id)}
-                                className="text-gray-400 text-sm underline underline-offset-2 hover:text-gray-600"
+                                className="text-gray-400 text-sm underline underline-offset-2 hover:text-gray-600 dark:hover:text-gray-300"
                               >
                                 {t('birthdays.table.notSet')}
                               </button>
@@ -1935,7 +1935,7 @@ export function BirthdayCardsContent() {
                           <TableCell>
                             {contact.birthday ? (
                               contact.birthdayUnsubscribedAt ? (
-                                <Badge className="bg-orange-100 text-orange-800">
+                                <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
                                   unsubscribed
                                 </Badge>
                               ) : (
@@ -1985,7 +1985,7 @@ export function BirthdayCardsContent() {
                   {t('birthdays.test.title')}
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                  <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
                     {t('birthdays.test.testMode')}
                   </Badge>
                   <Badge variant="secondary">
@@ -2230,25 +2230,25 @@ export function BirthdayCardsContent() {
                 {/* Customer Basic Info */}
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Name</Label>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Name</Label>
                     <p className="text-sm font-medium">{selectedCustomer.firstName || selectedCustomer.lastName ? `${selectedCustomer.firstName || ''} ${selectedCustomer.lastName || ''}`.trim() : 'No name provided'}</p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Email</Label>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email</Label>
                     <p className="text-sm">{selectedCustomer.email}</p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Status</Label>
-                    <Badge className={`${selectedCustomer.status === 'active' ? 'bg-green-100 text-green-800' :
-                      selectedCustomer.status === 'unsubscribed' ? 'bg-red-100 text-red-800' :
-                        selectedCustomer.status === 'bounced' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'}`}>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</Label>
+                    <Badge className={`${selectedCustomer.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                      selectedCustomer.status === 'unsubscribed' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                        selectedCustomer.status === 'bounced' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                          'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
                       {selectedCustomer.status}
                     </Badge>
                   </div>
                   {selectedCustomer.birthday && (
                     <div>
-                      <Label className="text-sm font-medium text-gray-700">Birthday</Label>
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Birthday</Label>
                       <div className="flex items-center gap-2">
                         <CakeIcon className="h-4 w-4 text-pink-500" />
                         <span className="text-sm">{(() => {
@@ -2261,10 +2261,10 @@ export function BirthdayCardsContent() {
                     </div>
                   )}
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Birthday Email Status</Label>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Birthday Email Status</Label>
                     {selectedCustomer.birthdayUnsubscribedAt ? (
                       <div className="space-y-1">
-                        <Badge className="bg-orange-100 text-orange-800">
+                        <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
                           Unsubscribed from Birthday Emails
                         </Badge>
                         <p className="text-xs text-gray-500 mt-1">
@@ -2272,7 +2272,7 @@ export function BirthdayCardsContent() {
                         </p>
                       </div>
                     ) : selectedCustomer.birthday ? (
-                      <Badge className="bg-green-100 text-green-800">
+                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                         Subscribed to Birthday Emails
                       </Badge>
                     ) : (
@@ -2285,13 +2285,13 @@ export function BirthdayCardsContent() {
 
                 {/* Activity Stats */}
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium text-gray-700">Email Activity</Label>
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email Activity</Label>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                       <p className="text-2xl font-bold text-blue-600">{selectedCustomer.emailsSent}</p>
                       <p className="text-xs text-blue-600">Emails Sent</p>
                     </div>
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                       <p className="text-2xl font-bold text-green-600">{selectedCustomer.emailsOpened}</p>
                       <p className="text-xs text-green-600">Emails Opened</p>
                     </div>
@@ -2301,7 +2301,7 @@ export function BirthdayCardsContent() {
                 {/* Tags */}
                 {selectedCustomer.tags && selectedCustomer.tags.length > 0 && (
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">Tags</Label>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</Label>
                     <div className="flex flex-wrap gap-1">
                       {selectedCustomer.tags.map((tag) => (
                         <Badge key={tag.id} variant="outline" style={{ backgroundColor: tag.color + '20', borderColor: tag.color, color: tag.color }}>
@@ -2315,13 +2315,13 @@ export function BirthdayCardsContent() {
                 {/* Dates */}
                 <div className="space-y-2">
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Added Date</Label>
-                    <p className="text-sm text-gray-600">{new Date(selectedCustomer.addedDate).toLocaleDateString()}</p>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Added Date</Label>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{new Date(selectedCustomer.addedDate).toLocaleDateString()}</p>
                   </div>
                   {selectedCustomer.lastActivity && (
                     <div>
-                      <Label className="text-sm font-medium text-gray-700">Last Activity</Label>
-                      <p className="text-sm text-gray-600">{new Date(selectedCustomer.lastActivity).toLocaleDateString()}</p>
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Last Activity</Label>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{new Date(selectedCustomer.lastActivity).toLocaleDateString()}</p>
                     </div>
                   )}
                 </div>

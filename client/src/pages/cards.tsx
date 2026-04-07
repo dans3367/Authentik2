@@ -87,15 +87,15 @@ export default function CardsPage() {
             </div>
             
             {/* Segmented Control */}
-            <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 shadow-sm">
+            <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-1 shadow-sm">
               <Button
                 variant={cardType === "birthday" ? "default" : "ghost"}
                 onClick={() => handleCardTypeChange("birthday")}
                 className={`
                   flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all
-                  ${cardType === "birthday" 
-                    ? "bg-white text-gray-900 shadow-sm" 
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                  ${cardType === "birthday"
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
                   }
                 `}
               >
@@ -107,9 +107,9 @@ export default function CardsPage() {
                 onClick={() => handleCardTypeChange("ecard")}
                 className={`
                   flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all
-                  ${cardType === "ecard" 
-                    ? "bg-white text-gray-900 shadow-sm" 
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                  ${cardType === "ecard"
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
                   }
                 `}
               >

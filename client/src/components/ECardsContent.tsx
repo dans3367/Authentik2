@@ -1509,10 +1509,10 @@ export function ECardsContent() {
                     </div>
 
                     {customCards.filter(c => c.active !== false).length === 0 ? (
-                      <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
+                      <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 dark:border-gray-600 dark:bg-gray-800">
                         <Palette className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-600 font-medium mb-1">{t('ecards.cards.noCustomCards')}</p>
-                        <p className="text-sm text-gray-500 mb-4">{t('ecards.cards.noCustomCardsDescription')}</p>
+                        <p className="text-gray-600 font-medium mb-1 dark:text-gray-300">{t('ecards.cards.noCustomCards')}</p>
+                        <p className="text-sm text-gray-500 mb-4 dark:text-gray-400">{t('ecards.cards.noCustomCardsDescription')}</p>
                         <Button
                           onClick={() => {
                             const newCardId = `custom-${Date.now()}`;
@@ -1533,9 +1533,9 @@ export function ECardsContent() {
                           return (
                             <div
                               key={card.id}
-                              className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 transition-colors"
+                              className="relative rounded-xl border border-gray-200 hover:border-gray-300 p-3 transition-colors dark:border-gray-700 dark:hover:border-gray-600"
                             >
-                              <div className="relative h-40 rounded-lg overflow-hidden bg-gray-100">
+                              <div className="relative h-40 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
                                 {card.data.imageUrl ? (
                                   <>
                                     <img
@@ -1568,14 +1568,14 @@ export function ECardsContent() {
                               </div>
                               <div className="mt-2 space-y-1">
                                 <div>
-                                  <span className="text-sm font-medium text-gray-900 truncate">{card.name}</span>
+                                  <span className="text-sm font-medium text-gray-900 truncate dark:text-gray-100">{card.name}</span>
                                 </div>
                                 {card.occasionType && (
-                                  <div className="text-xs text-gray-600 font-medium">
+                                  <div className="text-xs text-gray-600 font-medium dark:text-gray-400">
                                     🎉 {card.occasionType}
                                   </div>
                                 )}
-                                <div className="text-xs text-gray-500">
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
                                   📅 {t('ecards.cards.sendsOn')} {new Date(card.sendDate).toLocaleDateString()}
                                 </div>
                               </div>
@@ -1642,19 +1642,19 @@ export function ECardsContent() {
                   <div className="mt-8">
                     <Label className="text-lg font-semibold">{t('ecards.cards.inactiveCustom')}</Label>
                     {customCards.filter(card => card.active === false).length === 0 ? (
-                      <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 mt-4">
+                      <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 mt-4 dark:border-gray-600 dark:bg-gray-800">
                         <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-600 font-medium mb-1">{t('ecards.cards.noInactiveCards')}</p>
-                        <p className="text-sm text-gray-500">{t('ecards.cards.noInactiveCardsDescription')}</p>
+                        <p className="text-gray-600 font-medium mb-1 dark:text-gray-300">{t('ecards.cards.noInactiveCards')}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{t('ecards.cards.noInactiveCardsDescription')}</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4">
                         {customCards.filter(card => card.active === false).map((card) => (
                           <div
                             key={card.id}
-                            className="relative rounded-xl border p-3 border-gray-200 hover:border-gray-300 opacity-60"
+                            className="relative rounded-xl border p-3 border-gray-200 hover:border-gray-300 opacity-60 dark:border-gray-700 dark:hover:border-gray-600"
                           >
-                            <div className="relative h-40 rounded-lg overflow-hidden bg-gray-100">
+                            <div className="relative h-40 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
                               {card.data.imageUrl ? (
                                 <>
                                   <img
@@ -1687,7 +1687,7 @@ export function ECardsContent() {
                             </div>
                             <div className="mt-2 space-y-1">
                               <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-gray-900 truncate">{card.name}</span>
+                                <span className="text-sm font-medium text-gray-900 truncate dark:text-gray-100">{card.name}</span>
                                 <span className="text-xs font-semibold text-gray-500">Inactive</span>
                               </div>
                               {card.occasionType && (
@@ -2182,25 +2182,25 @@ export function ECardsContent() {
                 {/* Customer Basic Info */}
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Name</Label>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Name</Label>
                     <p className="text-sm font-medium">{selectedCustomer.firstName || selectedCustomer.lastName ? `${selectedCustomer.firstName || ''} ${selectedCustomer.lastName || ''}`.trim() : 'No name provided'}</p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Email</Label>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email</Label>
                     <p className="text-sm">{selectedCustomer.email}</p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Status</Label>
-                    <Badge className={`${selectedCustomer.status === 'active' ? 'bg-green-100 text-green-800' :
-                      selectedCustomer.status === 'unsubscribed' ? 'bg-red-100 text-red-800' :
-                        selectedCustomer.status === 'bounced' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'}`}>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</Label>
+                    <Badge className={`${selectedCustomer.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                      selectedCustomer.status === 'unsubscribed' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                        selectedCustomer.status === 'bounced' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                          'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
                       {selectedCustomer.status}
                     </Badge>
                   </div>
                   {selectedCustomer.birthday && (
                     <div>
-                      <Label className="text-sm font-medium text-gray-700">Special Date</Label>
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Special Date</Label>
                       <div className="flex items-center gap-2">
                         <CakeIcon className="h-4 w-4 text-pink-500" />
                         <span className="text-sm">{(() => {
@@ -2213,10 +2213,10 @@ export function ECardsContent() {
                     </div>
                   )}
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">E-Card Email Status</Label>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">E-Card Email Status</Label>
                     {selectedCustomer.birthdayUnsubscribedAt ? (
                       <div className="space-y-1">
-                        <Badge className="bg-orange-100 text-orange-800">
+                        <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
                           Unsubscribed from E-Card Emails
                         </Badge>
                         <p className="text-xs text-gray-500 mt-1">
@@ -2224,7 +2224,7 @@ export function ECardsContent() {
                         </p>
                       </div>
                     ) : selectedCustomer.birthday ? (
-                      <Badge className="bg-green-100 text-green-800">
+                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                         Subscribed to E-Card Emails
                       </Badge>
                     ) : (
@@ -2237,13 +2237,13 @@ export function ECardsContent() {
 
                 {/* Activity Stats */}
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium text-gray-700">Email Activity</Label>
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email Activity</Label>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <div className="text-center p-3 bg-blue-50 rounded-lg dark:bg-blue-900/20">
                       <p className="text-2xl font-bold text-blue-600">{selectedCustomer.emailsSent}</p>
                       <p className="text-xs text-blue-600">Emails Sent</p>
                     </div>
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <div className="text-center p-3 bg-green-50 rounded-lg dark:bg-green-900/20">
                       <p className="text-2xl font-bold text-green-600">{selectedCustomer.emailsOpened}</p>
                       <p className="text-xs text-green-600">Emails Opened</p>
                     </div>
@@ -2253,7 +2253,7 @@ export function ECardsContent() {
                 {/* Tags */}
                 {selectedCustomer.tags && selectedCustomer.tags.length > 0 && (
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">Tags</Label>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</Label>
                     <div className="flex flex-wrap gap-1">
                       {selectedCustomer.tags.map((tag) => (
                         <Badge key={tag.id} variant="outline" style={{ backgroundColor: tag.color + '20', borderColor: tag.color, color: tag.color }}>
@@ -2267,13 +2267,13 @@ export function ECardsContent() {
                 {/* Dates */}
                 <div className="space-y-2">
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Added Date</Label>
-                    <p className="text-sm text-gray-600">{new Date(selectedCustomer.addedDate).toLocaleDateString()}</p>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Added Date</Label>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{new Date(selectedCustomer.addedDate).toLocaleDateString()}</p>
                   </div>
                   {selectedCustomer.lastActivity && (
                     <div>
-                      <Label className="text-sm font-medium text-gray-700">Last Activity</Label>
-                      <p className="text-sm text-gray-600">{new Date(selectedCustomer.lastActivity).toLocaleDateString()}</p>
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Last Activity</Label>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{new Date(selectedCustomer.lastActivity).toLocaleDateString()}</p>
                     </div>
                   )}
                 </div>
