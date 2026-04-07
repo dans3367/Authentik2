@@ -11,7 +11,7 @@ import { useAppSelector } from '@/store';
 import { useLocation } from 'wouter';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface FormWizardProps {
@@ -39,6 +39,7 @@ const [, setLocation] = useLocation();
   const { t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
   const [createdFormData, setCreatedFormData] = useState<{ id: string; title: string } | null>(null);
+  const scrollPositions = useRef<Record<string, number>>({});
 
   // Redirect unauthenticated users immediately
   if (hasInitialized && !isAuthenticated) {
@@ -73,6 +74,23 @@ const [, setLocation] = useLocation();
 
   const canProceedToStyle = wizardState.formData.elements.some(element => element.type === 'email-input');
   const canProceedToPreview = wizardState.selectedTheme !== null;
+
+  const handleNextStep = () => {
+    scrollPositions.current[wizardState.currentStep] = window.scrollY;
+    nextStep();
+  };
+
+  const handlePreviousStep = () => {
+    scrollPositions.current[wizardState.currentStep] = window.scrollY;
+    previousStep();
+  };
+
+  useEffect(() => {
+    const saved = scrollPositions.current[wizardState.currentStep];
+    if (saved !== undefined) {
+      requestAnimationFrame(() => window.scrollTo(0, saved));
+    }
+  }, [wizardState.currentStep]);
 
   const handleSave = async () => {
     if (!wizardState.selectedTheme) {
@@ -346,12 +364,14 @@ const [, setLocation] = useLocation();
           />
         )}
       </div>
+      {/* Spacer for fixed footer */}
+      <div className="h-[72px]" />
       {/* Navigation Footer */}
-      <footer className="bg-white dark:bg-gray-950 border-t border-slate-200 dark:border-gray-800 px-6 py-4">
+      <footer className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-950 border-t border-slate-200 dark:border-gray-800 px-6 py-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
         <div className="flex items-center justify-between">
           <div>
             {wizardState.currentStep !== 'build' && (
-              <Button variant="outline" onClick={previousStep} className="flex items-center space-x-2">
+              <Button variant="outline" onClick={handlePreviousStep} className="flex items-center space-x-2">
                 <ArrowLeft className="w-4 h-4" />
 <span>{t('formBuilder.wizard.previous', 'Previous')}</span>
               </Button>
@@ -378,8 +398,8 @@ const [, setLocation] = useLocation();
             )}
 
             {wizardState.currentStep !== 'preview' && (
-              <Button 
-                onClick={nextStep}
+              <Button
+                onClick={handleNextStep}
                 disabled={
                   (wizardState.currentStep === 'build' && !canProceedToStyle) ||
                   (wizardState.currentStep === 'style' && !canProceedToPreview)

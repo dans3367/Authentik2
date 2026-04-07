@@ -121,7 +121,6 @@ export const formValidation = [
       "playful",
       "professional",
       "gradient",
-      "glassmorphism",
       "neon",
       "vintage",
       "cyberpunk",

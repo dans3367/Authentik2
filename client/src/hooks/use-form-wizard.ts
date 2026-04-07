@@ -55,31 +55,6 @@ export const defaultThemes: FormTheme[] = [
     }
   },
   {
-    id: 'glassmorphism',
-    name: 'Glassmorphism',
-    description: 'Frosted glass effects with translucent layers and subtle blurs',
-    preview: 'bg-gradient-to-br from-white/40 to-white/10 backdrop-blur-xl border border-white/20 shadow-lg',
-    styles: {
-      container: 'max-w-2xl mx-auto p-10 bg-white/20 backdrop-blur-2xl border border-white/20 rounded-2xl shadow-2xl shadow-black/10 relative overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-tr before:from-white/20 before:to-transparent before:opacity-40 before:pointer-events-none',
-      header: 'text-4xl font-semibold bg-gradient-to-r from-white to-sky-200/90 bg-clip-text text-transparent mb-8 tracking-tight drop-shadow-sm',
-      field: 'mb-6',
-      label: 'block text-sm font-medium text-white/80 mb-2 tracking-wide',
-      input: 'w-full px-4 py-3 h-12 bg-white/15 border border-white/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-300/60 focus:border-transparent transition-all duration-300 text-white placeholder-white/60 backdrop-blur-md shadow-inner shadow-black/10',
-      button: 'w-full relative bg-gradient-to-r from-white/80 to-sky-200/70 text-slate-900 py-3 px-6 rounded-2xl hover:from-white hover:to-sky-200 transition-all duration-300 font-semibold shadow-lg shadow-black/10 before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/30 before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity before:duration-500 before:rounded-2xl',
-      background: 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900',
-      booleanSwitch: {
-        track: 'border border-white/30 data-[state=unchecked]:bg-white/20 data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-white/80 data-[state=checked]:to-sky-200/80',
-        thumb: 'data-[state=unchecked]:bg-white/60 data-[state=checked]:bg-white shadow-md',
-        activeLabel: 'text-white/90 font-medium',
-        inactiveLabel: 'text-white/60'
-      },
-      progressBar: {
-        container: 'w-full bg-white/20 rounded-2xl h-3 mb-8 border border-white/30 backdrop-blur-sm overflow-hidden',
-        fill: 'bg-gradient-to-r from-white to-sky-200 h-3 rounded-2xl transition-all duration-700 ease-out shadow-sm'
-      }
-    }
-  },
-  {
     id: 'professional',
     name: 'Professional',
     description: 'Corporate design with precise spacing and structured layout',
@@ -578,6 +553,56 @@ export const defaultThemes: FormTheme[] = [
       progressBar: {
         container: 'w-full bg-stone-100 rounded-full h-[3px] mb-8',
         fill: 'bg-gradient-to-r from-rose-300 via-amber-200 to-rose-300 h-[3px] rounded-full transition-all duration-700 ease-out'
+      }
+    }
+  },
+  {
+    id: 'art-deco',
+    name: 'Art Deco',
+    description: 'Gatsby-era geometric elegance with gold accents on dark navy, serif typography, and structured borders',
+    preview: 'bg-gradient-to-b from-[#060d18] via-[#0c1525] to-[#101c32] border-2 border-[#c9a84c]',
+    styles: {
+      container: 'max-w-2xl mx-auto p-10 bg-[#0c1525]/95 backdrop-blur-sm border-2 border-[#c9a84c] shadow-2xl shadow-[#c9a84c]/10 ring-1 ring-[#c9a84c]/20 ring-offset-4 ring-offset-[#0c1525]',
+      header: 'text-3xl font-serif font-bold text-[#c9a84c] mb-8 uppercase tracking-[0.3em]',
+      field: 'mb-7',
+      label: 'block text-xs font-serif font-semibold text-[#c9a84c]/80 mb-2.5 uppercase tracking-[0.25em]',
+      input: 'w-full px-4 py-3 h-12 bg-[#0f1a2e] border-2 border-[#c9a84c]/40 font-serif text-[#d4c5a0] placeholder-[#3d4f6b] transition-all duration-200 focus:outline-none focus:border-[#c9a84c] focus:shadow-[inset_0_0_12px_rgba(201,168,76,0.08),0_0_8px_rgba(201,168,76,0.15)]',
+      button: 'w-full bg-[#c9a84c] hover:bg-[#d4b85c] text-[#0c1525] font-serif font-bold py-4 px-8 uppercase tracking-[0.2em] border-2 border-[#c9a84c] transition-all duration-200 hover:shadow-[0_0_24px_rgba(201,168,76,0.3)] active:scale-[0.98]',
+      background: 'bg-gradient-to-b from-[#060d18] via-[#0c1525] to-[#101c32]',
+      booleanSwitch: {
+        track: 'border-2 data-[state=unchecked]:bg-[#0f1a2e] data-[state=unchecked]:border-[#c9a84c]/40 data-[state=checked]:bg-[#c9a84c] data-[state=checked]:border-[#c9a84c]',
+        thumb: 'data-[state=unchecked]:bg-[#3d4f6b] data-[state=checked]:bg-[#0c1525] shadow-md',
+        activeLabel: 'text-[#c9a84c] font-serif font-semibold text-sm',
+        inactiveLabel: 'text-[#3d4f6b] font-serif text-sm'
+      },
+      progressBar: {
+        container: 'w-full bg-[#0f1a2e] border border-[#c9a84c]/30 h-2 mb-8',
+        fill: 'bg-gradient-to-r from-[#c9a84c] to-[#d4b85c] h-full transition-all duration-500 ease-out'
+      }
+    }
+  },
+  {
+    id: 'vapor',
+    name: 'Vapor',
+    description: 'Retrofuturistic vaporwave with hot pink, cyan, and purple on a deep violet-black canvas',
+    preview: 'bg-gradient-to-br from-[#0d0221] via-[#1a0a2e] to-[#150530] border border-[#ff2d95]/40',
+    styles: {
+      container: 'max-w-2xl mx-auto p-8 bg-[#1a0a2e]/95 backdrop-blur-sm border border-[#ff2d95]/40 rounded-lg shadow-2xl shadow-[#ff2d95]/10',
+      header: 'text-3xl font-bold bg-gradient-to-r from-[#ff2d95] via-[#ff71ce] to-[#01cdfe] bg-clip-text text-transparent mb-8 tracking-wider',
+      field: 'mb-7',
+      label: 'block text-xs font-semibold text-[#01cdfe] mb-2.5 uppercase tracking-[0.2em]',
+      input: 'w-full px-4 py-3 h-12 bg-[#120826] border border-[#b967ff]/40 rounded-lg text-[#ff71ce] placeholder-[#4a2068] transition-all duration-200 focus:outline-none focus:border-[#01cdfe] focus:shadow-[0_0_12px_rgba(1,205,254,0.2),inset_0_0_8px_rgba(255,45,149,0.05)]',
+      button: 'w-full bg-gradient-to-r from-[#ff2d95] via-[#b967ff] to-[#01cdfe] hover:from-[#ff71ce] hover:via-[#c77dff] hover:to-[#05d9e8] text-white font-bold py-4 px-6 rounded-lg tracking-wider transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-[#ff2d95]/20',
+      background: 'bg-gradient-to-br from-[#0d0221] via-[#1a0a2e] to-[#150530]',
+      booleanSwitch: {
+        track: 'border border-[#b967ff]/40 data-[state=unchecked]:bg-[#120826] data-[state=unchecked]:border-[#b967ff]/40 data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-[#ff2d95] data-[state=checked]:to-[#01cdfe] data-[state=checked]:border-[#ff2d95]',
+        thumb: 'data-[state=unchecked]:bg-[#4a2068] data-[state=checked]:bg-white shadow-md',
+        activeLabel: 'text-[#ff71ce] font-semibold text-sm',
+        inactiveLabel: 'text-[#4a2068] text-sm'
+      },
+      progressBar: {
+        container: 'w-full bg-[#120826] border border-[#b967ff]/30 rounded-lg h-2 mb-8',
+        fill: 'bg-gradient-to-r from-[#ff2d95] via-[#b967ff] to-[#01cdfe] h-full rounded-lg transition-all duration-500 ease-out'
       }
     }
   }

@@ -89,23 +89,6 @@ export const themes: Record<string, ThemeStyles> = {
     background: 'bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900'
   },
 
-  'glassmorphism': {
-    id: 'glassmorphism',
-    name: 'Glassmorphism',
-    container: 'min-h-screen py-8',
-    card: 'bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20',
-    header: 'p-6 border-b border-white/20',
-    title: 'text-2xl font-semibold text-white tracking-wide',
-    description: 'text-white/80 mt-2',
-    label: 'text-sm font-medium text-white/90',
-    input: 'w-full px-4 py-3 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl text-white placeholder-white/50 transition-all duration-200 focus:border-white/50 focus:ring-2 focus:ring-white/20 focus:outline-none shadow-inner shadow-black/10',
-    textarea: 'w-full px-4 py-3 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl text-white placeholder-white/50 transition-all duration-200 focus:border-white/50 focus:ring-2 focus:ring-white/20 focus:outline-none shadow-inner shadow-black/10 resize-none',
-    select: 'w-full px-4 py-3 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl text-white transition-all duration-200 focus:border-white/50 focus:ring-2 focus:ring-white/20 focus:outline-none',
-    radio: 'h-4 w-4 text-white focus:ring-white/50 border-white/50',
-    checkbox: 'h-4 w-4 text-white focus:ring-white/50 border-white/50 rounded',
-    button: 'w-full bg-white/20 backdrop-blur-xl hover:bg-white/30 text-white font-semibold py-4 px-6 rounded-2xl border border-white/30 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
-    background: 'bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500'
-  },
 
   'professional': {
     id: 'professional',
@@ -411,6 +394,24 @@ export const themes: Record<string, ThemeStyles> = {
     checkbox: 'h-4 w-4 text-[#c9a84c] focus:ring-[#c9a84c] border-[#c9a84c]/50',
     button: 'w-full bg-[#c9a84c] hover:bg-[#d4b85c] text-[#0c1525] font-serif font-bold py-4 px-8 rounded-none uppercase tracking-[0.2em] border-2 border-[#c9a84c] transition-all duration-200 transform hover:shadow-[0_0_24px_rgba(201,168,76,0.3)] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
     background: 'bg-gradient-to-b from-[#060d18] via-[#0c1525] to-[#101c32]'
+  },
+
+  'vapor': {
+    id: 'vapor',
+    name: 'Vapor',
+    container: 'min-h-screen py-8',
+    card: 'bg-[#1a0a2e]/95 backdrop-blur-sm rounded-lg shadow-2xl border border-[#ff2d95]/40 shadow-[#ff2d95]/10',
+    header: 'p-6 border-b border-[#ff2d95]/30',
+    title: 'text-2xl font-bold bg-gradient-to-r from-[#ff2d95] via-[#ff71ce] to-[#01cdfe] bg-clip-text text-transparent tracking-wider',
+    description: 'text-[#b967ff]/70 mt-2 tracking-wide',
+    label: 'text-xs font-semibold text-[#01cdfe] uppercase tracking-[0.2em]',
+    input: 'w-full px-4 py-3 bg-[#120826] border border-[#b967ff]/40 rounded-lg text-[#ff71ce] placeholder-[#4a2068] transition-all duration-200 focus:border-[#01cdfe] focus:outline-none focus:shadow-[0_0_12px_rgba(1,205,254,0.2),inset_0_0_8px_rgba(255,45,149,0.05)]',
+    textarea: 'w-full px-4 py-3 bg-[#120826] border border-[#b967ff]/40 rounded-lg text-[#ff71ce] placeholder-[#4a2068] transition-all duration-200 focus:border-[#01cdfe] focus:outline-none focus:shadow-[0_0_12px_rgba(1,205,254,0.2),inset_0_0_8px_rgba(255,45,149,0.05)] resize-none',
+    select: 'w-full px-4 py-3 bg-[#120826] border border-[#b967ff]/40 rounded-lg text-[#ff71ce] transition-all duration-200 focus:border-[#01cdfe] focus:outline-none',
+    radio: 'h-4 w-4 text-[#ff2d95] focus:ring-[#ff2d95] border-[#b967ff]/50',
+    checkbox: 'h-4 w-4 text-[#ff2d95] focus:ring-[#ff2d95] border-[#b967ff]/50 rounded',
+    button: 'w-full bg-gradient-to-r from-[#ff2d95] via-[#b967ff] to-[#01cdfe] hover:from-[#ff71ce] hover:via-[#c77dff] hover:to-[#05d9e8] text-white font-bold py-4 px-6 rounded-lg tracking-wider transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-[#ff2d95]/20 hover:shadow-xl hover:shadow-[#ff2d95]/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
+    background: 'bg-gradient-to-br from-[#0d0221] via-[#1a0a2e] to-[#150530]'
   },
 
   'newspaper': {

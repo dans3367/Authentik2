@@ -228,20 +228,6 @@ export function extractThemeColors(theme: FormTheme): CustomColors {
       containerShadow = 'large';
       progressBar = '#F97316';
       break;
-    case 'glassmorphism':
-      text = '#FFFFFF';
-      header = '#FFFFFF';
-      button = '#FFFFFF';
-      background = '#1E293B';
-      font = 'sans';
-      label = '#E2E8F0';
-      inputBackground = 'rgba(255,255,255,0.15)';
-      inputBorder = 'rgba(255,255,255,0.3)';
-      inputText = '#FFFFFF';
-      borderRadius = 'full';
-      containerShadow = 'large';
-      progressBar = '#FFFFFF';
-      break;
     case 'monospace-terminal':
       text = '#4ADE80';
       header = '#4ADE80';

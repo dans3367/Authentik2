@@ -93,23 +93,6 @@ const themes: Record<string, ThemeStyles> = {
     button: 'w-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-purple-900 font-semibold py-4 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
     background: 'bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900'
   },
-  'glassmorphism': {
-    id: 'glassmorphism',
-    name: 'Glassmorphism',
-    container: 'min-h-screen py-8',
-    card: 'bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20',
-    header: 'p-6 border-b border-white/20',
-    title: 'text-2xl font-semibold text-white tracking-wide',
-    description: 'text-white/80 mt-2',
-    label: 'text-sm font-medium text-white/90',
-    input: 'w-full px-4 py-3 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl text-white placeholder-white/50 transition-all duration-200 focus:border-white/50 focus:ring-2 focus:ring-white/20 focus:outline-none shadow-inner shadow-black/10',
-    textarea: 'w-full px-4 py-3 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl text-white placeholder-white/50 transition-all duration-200 focus:border-white/50 focus:ring-2 focus:ring-white/20 focus:outline-none shadow-inner shadow-black/10 resize-none',
-    select: 'w-full px-4 py-3 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl text-white transition-all duration-200 focus:border-white/50 focus:ring-2 focus:ring-white/20 focus:outline-none',
-    radio: 'h-4 w-4 text-white focus:ring-white/50 border-white/50',
-    checkbox: 'h-4 w-4 text-white focus:ring-white/50 border-white/50 rounded',
-    button: 'w-full bg-white/20 backdrop-blur-xl hover:bg-white/30 text-white font-semibold py-4 px-6 rounded-2xl border border-white/30 transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
-    background: 'bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500'
-  },
   'professional': {
     id: 'professional',
     name: 'Professional',

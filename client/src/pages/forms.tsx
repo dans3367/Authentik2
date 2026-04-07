@@ -37,7 +37,6 @@ const getThemePreview = (themeId: string): string => {
   const themePreviewMap: Record<string, string> = {
     'minimal': 'bg-white border border-gray-200 shadow-sm',
     'modern': 'bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500',
-    'glassmorphism': 'bg-gradient-to-br from-white/40 to-white/10 backdrop-blur-xl border border-white/20 shadow-lg',
     'professional': 'bg-gray-50 border-l-4 border-blue-600 shadow-sm',
     'playful': 'bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400',
     'elegant': 'bg-gradient-to-r from-gray-900 to-gray-700 border border-yellow-400/20',
@@ -78,12 +77,6 @@ const getThemePreviewContent = (themeId: string) => {
       return (
         <div className="text-yellow-400 font-light text-sm tracking-widest font-serif">
           LUXURY DESIGN
-        </div>
-      );
-    case 'glassmorphism':
-      return (
-        <div className="text-white/90 font-semibold text-sm tracking-wide">
-          Glassmorphism
         </div>
       );
     case 'retro':

@@ -543,7 +543,7 @@ export function FormPreviewModal({ isOpen, onClose, form, formSettings = {} }: F
           >
             <form 
               id="form-preview-form"
-              className={`${themeStyles.container} ${selectedTheme.id === 'glassmorphism' ? 'glassmorphism-override' : ''} ${selectedTheme.customColors ? 'custom-theme-wrapper-modal' : ''}`}
+              className={`${themeStyles.container} ${selectedTheme.customColors ? 'custom-theme-wrapper-modal' : ''}`}
               style={selectedTheme.customColors ? formStyle : {}}
               onSubmit={(e) => e.preventDefault()}
             >

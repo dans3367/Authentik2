@@ -38,18 +38,7 @@ export function ThemedFormRenderer({ element, themeStyles, onChange, onReset }: 
   const renderFormControl = () => {
     const baseInputClasses = themeStyles.input;
     
-    // Special handling for glassmorphism theme to force transparency
-    const isGlassmorphism = themeStyles.input.includes('glassmorphism-input');
-    
-    const forceTransparentStyle: React.CSSProperties = isGlassmorphism ? {
-      background: 'transparent',
-      backgroundColor: 'transparent',
-      backgroundImage: 'none',
-      opacity: '1',
-      WebkitAppearance: 'none',
-      MozAppearance: 'none',
-      appearance: 'none'
-    } : {};
+    const forceTransparentStyle: React.CSSProperties = {};
     
     switch (element.type) {
       case 'text-input':

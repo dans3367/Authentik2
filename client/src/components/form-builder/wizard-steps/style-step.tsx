@@ -57,11 +57,6 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           LUXURY DESIGN
                         </div>
                       )}
-                      {theme.id === 'glassmorphism' && (
-                        <div className="text-white/90 font-semibold text-lg tracking-wide">
-                          Glassmorphism
-                        </div>
-                      )}
                       {theme.id === 'retro' && (
                         <div className="text-white font-black text-lg tracking-wider transform -skew-x-12 uppercase">
                           80S STYLE
@@ -127,7 +122,17 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           MINIMAL
                         </div>
                       )}
-                      {!['neon', 'nature', 'luxury', 'retro', 'cosmic', 'brutalist', 'pastel-dream', 'ocean-breeze', 'sunset-warmth', 'monospace-terminal', 'silk', 'professional', 'neo-modern', 'minimal', 'modern-bold', 'glassmorphism', 'aurora'].includes(theme.id) && (
+                      {theme.id === 'art-deco' && (
+                        <div className="text-[#c9a84c] font-serif font-bold text-lg uppercase tracking-[0.3em]">
+                          ART DECO
+                        </div>
+                      )}
+                      {theme.id === 'vapor' && (
+                        <div className="font-bold text-lg tracking-wider bg-gradient-to-r from-[#ff2d95] via-[#ff71ce] to-[#01cdfe] bg-clip-text text-transparent">
+                          VAPOR
+                        </div>
+                      )}
+                      {!['neon', 'nature', 'luxury', 'retro', 'cosmic', 'brutalist', 'pastel-dream', 'ocean-breeze', 'sunset-warmth', 'monospace-terminal', 'silk', 'professional', 'neo-modern', 'minimal', 'modern-bold', 'aurora', 'art-deco', 'vapor'].includes(theme.id) && (
                         <>
                           <div className="text-white font-semibold opacity-90 text-lg">{theme.name}</div>
                           <div className="text-white text-sm opacity-60 mt-1">Theme Preview</div>
@@ -150,7 +155,6 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           theme.id === 'nature' ? 'bg-white border-2 border-green-300 rounded-2xl' :
                           theme.id === 'luxury' ? 'bg-purple-800/50 border border-yellow-400 text-white' :
                           theme.id === 'retro' ? 'bg-yellow-50 border-3 border-orange-400' :
-                          theme.id === 'glassmorphism' ? 'bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl text-white shadow-inner shadow-black/10' :
                           theme.id === 'elegant' ? 'bg-gray-800 border border-gray-600 text-white rounded-lg' :
                           theme.id === 'playful' ? 'bg-pink-50 border-3 border-pink-300 rounded-2xl' :
                           theme.id === 'modern' ? 'bg-white/80 border-2 border-gray-200 rounded-xl backdrop-blur-sm' :
@@ -162,9 +166,11 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           theme.id === 'modern-bold' ? 'bg-gradient-to-r from-white to-gray-50 border-3 border-orange-500/30 text-gray-900 font-semibold rounded-2xl shadow-lg' :
                           theme.id === 'ocean-breeze' ? 'bg-white/70 border-2 border-cyan-200 rounded-2xl backdrop-blur-sm' :
                           theme.id === 'sunset-warmth' ? 'bg-white/80 border-2 border-amber-200 rounded-xl' :
+                          theme.id === 'art-deco' ? 'bg-[#0f1a2e] border-2 border-[#c9a84c]/40 text-[#d4c5a0] font-serif' :
+                          theme.id === 'vapor' ? 'bg-[#120826] border border-[#b967ff]/40 rounded-lg text-[#ff71ce]' :
                           'bg-white border border-gray-300 rounded-lg'
                         }`}>
-                          <div className={theme.id === 'neon' || theme.id === 'luxury' || theme.id === 'elegant' || theme.id === 'glassmorphism' || theme.id === 'cosmic' || theme.id === 'neo-modern' ? 'text-gray-300' : theme.id === 'brutalist' || theme.id === 'modern-bold' ? 'text-black' : 'text-slate-400'}>
+                          <div className={theme.id === 'neon' || theme.id === 'luxury' || theme.id === 'elegant' || theme.id === 'cosmic' || theme.id === 'neo-modern' || theme.id === 'art-deco' || theme.id === 'vapor' ? 'text-gray-300' : theme.id === 'brutalist' || theme.id === 'modern-bold' ? 'text-black' : 'text-slate-400'}>
                             Enter your name
                           </div>
                         </div>
@@ -176,7 +182,6 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           theme.id === 'nature' ? 'bg-white border-2 border-emerald-300 rounded-2xl' :
                           theme.id === 'luxury' ? 'bg-purple-800/50 border border-yellow-400 text-white' :
                           theme.id === 'retro' ? 'bg-yellow-50 border-3 border-pink-400' :
-                          theme.id === 'glassmorphism' ? 'bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl text-white shadow-inner shadow-black/10' :
                           theme.id === 'elegant' ? 'bg-gray-800 border border-gray-600 text-white rounded-lg' :
                           theme.id === 'playful' ? 'bg-pink-50 border-3 border-purple-300 rounded-2xl' :
                           theme.id === 'modern' ? 'bg-white/80 border-2 border-gray-200 rounded-xl backdrop-blur-sm' :
@@ -188,9 +193,11 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                           theme.id === 'modern-bold' ? 'bg-gradient-to-r from-white to-gray-50 border-3 border-orange-500/30 text-gray-900 font-semibold rounded-2xl shadow-lg' :
                           theme.id === 'ocean-breeze' ? 'bg-white/70 border-2 border-cyan-200 rounded-2xl backdrop-blur-sm' :
                           theme.id === 'sunset-warmth' ? 'bg-white/80 border-2 border-amber-200 rounded-xl' :
+                          theme.id === 'art-deco' ? 'bg-[#0f1a2e] border-2 border-[#c9a84c]/40 text-[#d4c5a0] font-serif' :
+                          theme.id === 'vapor' ? 'bg-[#120826] border border-[#b967ff]/40 rounded-lg text-[#ff71ce]' :
                           'bg-white border border-gray-300 rounded-lg'
                         }`}>
-                          <div className={theme.id === 'neon' || theme.id === 'luxury' || theme.id === 'elegant' || theme.id === 'glassmorphism' || theme.id === 'cosmic' || theme.id === 'neo-modern' ? 'text-gray-300' : theme.id === 'brutalist' || theme.id === 'modern-bold' ? 'text-black' : 'text-slate-400'}>
+                          <div className={theme.id === 'neon' || theme.id === 'luxury' || theme.id === 'elegant' || theme.id === 'cosmic' || theme.id === 'neo-modern' || theme.id === 'art-deco' || theme.id === 'vapor' ? 'text-gray-300' : theme.id === 'brutalist' || theme.id === 'modern-bold' ? 'text-black' : 'text-slate-400'}>
                             Enter your email
                           </div>
                         </div>
@@ -212,6 +219,8 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                         theme.id === 'modern-bold' ? 'bg-gradient-to-r from-orange-500 via-red-500 to-purple-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl border-2 border-white/20' :
                         theme.id === 'ocean-breeze' ? 'bg-gradient-to-r from-cyan-500 via-teal-500 to-blue-600 text-white rounded-2xl' :
                         theme.id === 'sunset-warmth' ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white rounded-xl' :
+                        theme.id === 'art-deco' ? 'bg-[#c9a84c] text-[#0c1525] font-serif font-bold uppercase tracking-[0.2em] border-2 border-[#c9a84c]' :
+                        theme.id === 'vapor' ? 'bg-gradient-to-r from-[#ff2d95] via-[#b967ff] to-[#01cdfe] text-white font-bold tracking-wider rounded-lg' :
                         'bg-gray-900 text-white rounded-lg'
                       }`}>
                         Submit

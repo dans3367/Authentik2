@@ -510,7 +510,7 @@ export function PreviewStep({
         style={selectedTheme.customColors ? pageStyle : {}}
       >
         <div 
-          className={`${themeStyles.container} ${selectedTheme.id === 'glassmorphism' ? 'glassmorphism-override' : ''} ${selectedTheme.customColors ? 'custom-theme-wrapper' : ''}`}
+          className={`${themeStyles.container} ${selectedTheme.customColors ? 'custom-theme-wrapper' : ''}`}
           style={selectedTheme.customColors ? {
             ...formStyle,
             borderRadius: selectedTheme.customColors.borderRadius === 'none' ? '0px' :
