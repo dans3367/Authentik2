@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { db } from '../db';
 import { sql, eq, or } from 'drizzle-orm';
 import { betterAuthUser, subscriptionPlans, forms, formResponses, companies, subscriptions, subscriptionPlanRelations, tenants, shopLimitEvents, shops } from '@shared/schema';
@@ -83,8 +84,11 @@ async function provisionTenantForUser(userId: string): Promise<string> {
 
     console.log(`🔧 [Provision] Creating tenant+company for user: ${maskEmail(userRecord.email)}`);
 
-    // Get company name from pending signups store
-    const pendingCompanyName = (global as any).pendingCompanyNames?.[userRecord.email.toLowerCase()];
+    // Get company name from pending signups store (HMAC-keyed Map)
+    const hmacKey = process.env.BETTER_AUTH_SECRET || '';
+    const pendingStoreKey = crypto.createHmac('sha256', hmacKey).update(userRecord.email.toLowerCase()).digest('hex');
+    const pendingEntry = (global as any).pendingCompanyNames?.get?.(pendingStoreKey);
+    const pendingCompanyName = pendingEntry && pendingEntry.expiresAt > Date.now() ? pendingEntry.name : undefined;
     const companyName = pendingCompanyName || (userRecord.name ? `${userRecord.name}'s Organization` : 'My Organization');
 
     // Generate a unique slug
@@ -157,9 +161,7 @@ async function provisionTenantForUser(userId: string): Promise<string> {
     }
 
     // Clean up pending company name
-    if ((global as any).pendingCompanyNames?.[userRecord.email.toLowerCase()]) {
-      delete (global as any).pendingCompanyNames[userRecord.email.toLowerCase()];
-    }
+    (global as any).pendingCompanyNames?.delete?.(pendingStoreKey);
 
     console.log(`✅ [Provision] Tenant ${truncateId(newTenant.id)} + company ${truncateId(newCompany.id)} + default shop created for ${maskEmail(userRecord.email)}`);
     return newTenant.id;

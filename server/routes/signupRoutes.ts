@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { db } from '../db';
 import { betterAuthUser } from '@shared/schema';
 import { eq } from 'drizzle-orm';
@@ -7,15 +8,37 @@ import { sanitizeString } from '../utils/sanitization';
 
 // Extend global type for pendingCompanyNames
 declare global {
-  var pendingCompanyNames: Record<string, string> | undefined;
+  var pendingCompanyNames: Map<string, { name: string; expiresAt: number }> | undefined;
 }
 
 export const signupRoutes = Router();
 
+// HMAC key for pending company name store — derived from auth secret so
+// the raw email is never used as a map key (prevents enumeration if memory
+// is ever leaked).  Falls back to a random per-process key.
+const PENDING_HMAC_KEY = process.env.BETTER_AUTH_SECRET || crypto.randomBytes(32).toString('hex');
+
+function pendingKey(email: string): string {
+  return crypto.createHmac('sha256', PENDING_HMAC_KEY).update(email.toLowerCase()).digest('hex');
+}
+
+// Lazy-init + cleanup helper
+function getPendingStore(): Map<string, { name: string; expiresAt: number }> {
+  if (!global.pendingCompanyNames) {
+    global.pendingCompanyNames = new Map();
+  }
+  // Purge expired entries on each access (cheap at ≤50 entries)
+  const now = Date.now();
+  for (const [k, v] of global.pendingCompanyNames) {
+    if (v.expiresAt <= now) global.pendingCompanyNames.delete(k);
+  }
+  return global.pendingCompanyNames;
+}
+
 // Rate limiter for store-company-name endpoint to prevent abuse
 const storeCompanyNameLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 requests per IP per 15 minutes
+  max: 5, // 5 requests per IP per 15 minutes (tightened from 10)
   message: { message: 'Too many requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -42,28 +65,16 @@ signupRoutes.post("/store-company-name", storeCompanyNameLimiter, async (req, re
       return res.status(400).json({ message: 'Company name too long' });
     }
 
-    // Limit total pending entries to prevent memory DoS
-    global.pendingCompanyNames = global.pendingCompanyNames || {};
-    const pendingCount = Object.keys(global.pendingCompanyNames).length;
-    if (pendingCount >= 500) {
-      // Evict oldest entries (those closest to expiry) to make room
-      const keys = Object.keys(global.pendingCompanyNames);
-      const toRemove = keys.slice(0, Math.max(1, Math.floor(keys.length * 0.1)));
-      for (const key of toRemove) {
-        delete global.pendingCompanyNames[key];
-      }
+    const store = getPendingStore();
+
+    // Reject when store is full instead of evicting (prevents flush attacks)
+    if (store.size >= 50) {
+      return res.status(503).json({ message: 'Service temporarily busy, please try again in a few minutes' });
     }
 
-    const normalizedKey = email.toLowerCase();
+    const key = pendingKey(email);
     const sanitizedName = sanitizeString(companyName) || companyName.trim();
-    global.pendingCompanyNames[normalizedKey] = sanitizedName;
-
-    // Clean up after 5 minutes to prevent memory leaks
-    setTimeout(() => {
-      if (global.pendingCompanyNames && global.pendingCompanyNames[normalizedKey]) {
-        delete global.pendingCompanyNames[normalizedKey];
-      }
-    }, 5 * 60 * 1000);
+    store.set(key, { name: sanitizedName, expiresAt: Date.now() + 5 * 60 * 1000 });
 
     res.json({ message: 'Company name stored successfully' });
   } catch (error) {

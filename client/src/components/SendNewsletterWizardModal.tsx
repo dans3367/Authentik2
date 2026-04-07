@@ -138,6 +138,17 @@ export function SendNewsletterWizardModal({
     enabled: isOpen && selectionMode === "custom" && customRecipientType === "tags",
   });
 
+  const { data: contactStatsData } = useQuery<{ stats: { activeContacts: number } }>({
+    queryKey: ["/api/email-contacts", { shopId, statsOnly: true }],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/email-contacts?statsOnly=true${contactsShopParam}`);
+      return response.json();
+    },
+    enabled: isOpen,
+  });
+
+  const activeContactCount = contactStatsData?.stats?.activeContacts ?? null;
+
   const { data: reviewerSettings } = useQuery<{ enabled: boolean; reviewerId: string | null; reviewer: any }>({
     queryKey: ['/api/newsletters/reviewer-settings'],
     queryFn: async () => {
@@ -481,14 +492,29 @@ export function SendNewsletterWizardModal({
 
   const canContinue = () => {
     if (selectionMode === "segment_list") {
-      return !!selectedSegmentListId;
+      if (!selectedSegmentListId) return false;
+      const selectedList = segmentLists.find((l) => l.id === selectedSegmentListId);
+      return selectedList ? (selectedList.contactCount || 0) > 0 : false;
     }
     if (selectionMode === "custom") {
-      if (customRecipientType === "all") return true;
+      if (customRecipientType === "all") return activeContactCount !== null && activeContactCount > 0;
       if (customRecipientType === "selected") return selectedContactIds.length > 0;
       if (customRecipientType === "tags") return selectedTagIds.length > 0;
     }
     return false;
+  };
+
+  const getNoContactsWarning = (): string | null => {
+    if (selectionMode === "segment_list" && selectedSegmentListId) {
+      const selectedList = segmentLists.find((l) => l.id === selectedSegmentListId);
+      if (selectedList && (selectedList.contactCount || 0) === 0) {
+        return t("newsletter.sendWizard.noContactsInList", "This segment list has no contacts. Add contacts to the list before sending.");
+      }
+    }
+    if (selectionMode === "custom" && customRecipientType === "all" && activeContactCount === 0) {
+      return t("newsletter.sendWizard.noActiveContacts", "You have no active contacts. Add contacts before sending.");
+    }
+    return null;
   };
 
   const getRecipientSummary = () => {
@@ -691,8 +717,10 @@ export function SendNewsletterWizardModal({
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                                       {list.type === "all" ? t("newsletter.sendWizard.allCustomers", "All Customers") : list.type === "selected" ? t("newsletter.sendWizard.selected", "Selected") : t("newsletter.sendWizard.byTags", "By Tags")}
                                     </Badge>
-                                    <span className="text-[11px] text-muted-foreground">
-                                      {list.contactCount || 0} {t("newsletter.sendWizard.recipients", "recipients")}
+                                    <span className={`text-[11px] ${(list.contactCount || 0) === 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                                      {(list.contactCount || 0) === 0
+                                        ? t("newsletter.sendWizard.noRecipients", "No recipients")
+                                        : `${list.contactCount || 0} ${t("newsletter.sendWizard.recipients", "recipients")}`}
                                     </span>
                                   </div>
                                 </div>
@@ -757,13 +785,30 @@ export function SendNewsletterWizardModal({
 
                   {customRecipientType === "all" && (
                     <div className="flex flex-col items-center justify-center py-8">
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-full mb-3">
-                        <Users className="h-8 w-8 text-blue-500 dark:text-blue-400" />
+                      <div className={`p-3 rounded-full mb-3 ${activeContactCount === 0 ? "bg-amber-50 dark:bg-amber-900/20" : "bg-blue-50 dark:bg-blue-900/20"}`}>
+                        {activeContactCount === 0 ? (
+                          <AlertTriangle className="h-8 w-8 text-amber-500 dark:text-amber-400" />
+                        ) : (
+                          <Users className="h-8 w-8 text-blue-500 dark:text-blue-400" />
+                        )}
                       </div>
-                      <p className="text-sm font-medium text-foreground">{t("newsletter.sendWizard.sendToAllCustomers", "Send to All Customers")}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {`Your ${itemLabel.toLowerCase()} will be sent to all active customers`}
-                      </p>
+                      {activeContactCount === 0 ? (
+                        <>
+                          <p className="text-sm font-medium text-foreground">{t("newsletter.sendWizard.noActiveContactsTitle", "No Active Contacts")}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {t("newsletter.sendWizard.noActiveContactsDesc", "Add contacts before you can send this newsletter.")}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-medium text-foreground">{t("newsletter.sendWizard.sendToAllCustomers", "Send to All Customers")}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {activeContactCount !== null
+                              ? t("newsletter.sendWizard.sendToAllWithCount", "Your {{item}} will be sent to all {{count}} active customers", { item: itemLabel.toLowerCase(), count: activeContactCount })
+                              : `Your ${itemLabel.toLowerCase()} will be sent to all active customers`}
+                          </p>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -913,12 +958,17 @@ export function SendNewsletterWizardModal({
 
             <DialogFooter className="flex-row items-center justify-between gap-4 sm:justify-between flex-shrink-0">
               <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
-                {canContinue() && (
+                {canContinue() ? (
                   <>
                     <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
                     <span className="truncate">{getRecipientSummary()}</span>
                   </>
-                )}
+                ) : getNoContactsWarning() ? (
+                  <>
+                    <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                    <span className="truncate text-amber-600 dark:text-amber-400">{getNoContactsWarning()}</span>
+                  </>
+                ) : null}
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <Button variant="outline" onClick={onClose} data-testid="button-cancel-wizard">

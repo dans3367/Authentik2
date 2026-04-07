@@ -137,23 +137,20 @@ loginRoutes.post('/resend-verification', async (req, res) => {
 
     console.log('📧 [Resend Verification] Request for email:', normalizedEmail);
 
+    // Constant-time response: all code paths must take roughly the same
+    // duration to prevent timing side-channels that reveal account existence.
+    const MINIMUM_RESPONSE_MS = 200;
+    const startTime = Date.now();
+
     // Find user by email
     const user = await db.query.betterAuthUser.findFirst({
       where: eq(betterAuthUser.email, normalizedEmail)
     });
 
-    // Always return success to prevent email enumeration
-    // But only send email if user exists and is not verified
-    if (user) {
-      if (user.emailVerified) {
-        console.log('ℹ️ [Resend Verification] User already verified:', normalizedEmail);
-        // Return identical response to prevent account enumeration
-        return res.json({
-          message: 'Verification email sent successfully',
-          success: true
-        });
-      }
-
+    // Only send email if user exists and is NOT yet verified.
+    // All other paths (no user, already verified) do nothing but still
+    // return the same shaped response after the same delay.
+    if (user && !user.emailVerified) {
       // Generate new verification token (JWT)
       const secret = getAuthSecret();
       const verificationToken = jwt.sign(
@@ -209,20 +206,26 @@ loginRoutes.post('/resend-verification', async (req, res) => {
         resetAt: currentData?.resetAt || resetAt,
         nextAllowedAt: nextAllowedAt
       });
-
-      return res.json({
-        message: 'Verification email sent successfully',
-        success: true,
-        nextAllowedAt: new Date(nextAllowedAt).toISOString()
-      });
+    } else if (user) {
+      console.log('ℹ️ [Resend Verification] User already verified:', normalizedEmail);
     } else {
       console.log('⚠️ [Resend Verification] User not found:', normalizedEmail);
-      // Return success anyway to prevent email enumeration
-      return res.json({
-        message: 'Verification email sent successfully',
-        success: true
-      });
     }
+
+    // Enforce minimum response time so all paths (no user, verified,
+    // unverified) are indistinguishable by timing.
+    const elapsed = Date.now() - startTime;
+    if (elapsed < MINIMUM_RESPONSE_MS) {
+      await new Promise(resolve => setTimeout(resolve, MINIMUM_RESPONSE_MS - elapsed));
+    }
+
+    // Identical response shape for every path — no extra fields that
+    // leak state (e.g. nextAllowedAt was previously only on the
+    // "unverified" path).
+    return res.json({
+      message: 'Verification email sent successfully',
+      success: true
+    });
 
   } catch (error) {
     console.error('❌ [Resend Verification] Error:', error);

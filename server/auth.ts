@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, APIError } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
 import { db } from "./db";
@@ -164,10 +164,27 @@ const authInstance = betterAuth({
       },
     },
   },
-  // Hooks — post-signup: parse name into firstName/lastName only.
+  // Hooks — pre-signup: enforce password complexity; post-signup: parse name.
   // Tenant + company creation is DEFERRED until Stripe payment is confirmed
   // (handled by confirm-checkout and the checkout.session.completed webhook).
   hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      const path = ctx.path || "";
+      // Enforce password complexity on sign-up (Better Auth only checks length)
+      if (path.includes("sign-up") && ctx.body?.password) {
+        const pw: string = ctx.body.password;
+        const errors: string[] = [];
+        if (!/[A-Z]/.test(pw)) errors.push("one uppercase letter");
+        if (!/[a-z]/.test(pw)) errors.push("one lowercase letter");
+        if (!/[0-9]/.test(pw)) errors.push("one number");
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(pw)) errors.push("one special character");
+        if (errors.length > 0) {
+          throw new APIError("BAD_REQUEST", {
+            message: `Password must contain at least ${errors.join(", ")}`,
+          });
+        }
+      }
+    }),
     after: createAuthMiddleware(async (ctx) => {
       try {
         const path = ctx.path || "";

@@ -7,8 +7,8 @@ export const emailValidation = body("email")
   .withMessage("Invalid email format");
 
 export const passwordValidation = body("password")
-  .isLength({ min: 8 })
-  .withMessage("Password must be at least 8 characters long")
+  .isLength({ min: 10 })
+  .withMessage("Password must be at least 10 characters long")
   .matches(/[A-Z]/)
   .withMessage("Password must contain at least one uppercase letter")
   .matches(/[a-z]/)
