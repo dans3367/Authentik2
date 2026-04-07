@@ -173,7 +173,7 @@ export default function ManageContactTagsModal({
           </div>
 
           {creating && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end border rounded-md p-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end border dark:border-neutral-700 rounded-md p-3">
               <div className="sm:col-span-2">
                 <Label className="text-xs">Name</Label>
                 <Input
@@ -192,8 +192,8 @@ export default function ManageContactTagsModal({
                       aria-label={`Choose color ${c}`}
                       onClick={() => setNewTagColor(c)}
                       className={`h-6 w-6 rounded-full transition-all hover:scale-110 ${
-                        newTagColor === c 
-                          ? "ring-2 ring-offset-1 ring-primary shadow-md" 
+                        newTagColor === c
+                          ? "ring-2 ring-offset-1 ring-offset-white dark:ring-offset-neutral-900 ring-primary shadow-md"
                           : "hover:shadow-sm"
                       }`}
                       style={{ backgroundColor: c }}
@@ -222,17 +222,17 @@ export default function ManageContactTagsModal({
             </div>
           )}
 
-          <div className="max-h-80 overflow-auto border rounded-md">
+          <div className="max-h-80 overflow-auto border dark:border-neutral-700 rounded-md">
             {tagsLoading ? (
               <div className="p-4 text-sm text-muted-foreground">Loading tags...</div>
             ) : !tags || tags.length === 0 ? (
               <div className="p-4 text-sm text-muted-foreground">No tags available</div>
             ) : (
-              <div className="divide-y">
+              <div className="divide-y dark:divide-neutral-700">
                 {tags.map((tag) => (
                   <label
                     key={tag.id}
-                    className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/30"
+                    className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/30 dark:hover:bg-neutral-800/50"
                   >
                     <Checkbox
                       checked={selected.includes(tag.id)}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,8 @@ const engagementByHour = [
 export default function EmailAnalytics() {
   const [dateRange, setDateRange] = useState("last7days");
   const [campaignFilter, setCampaignFilter] = useState("all");
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   const MetricCard = ({ 
     title, 
@@ -106,21 +109,21 @@ export default function EmailAnalytics() {
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">{title}</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
             <div className="flex items-center mt-2">
               {changeType === "increase" ? (
                 <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
               ) : (
                 <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
               )}
-              <span className={`text-sm ${changeType === "increase" ? "text-green-600" : "text-red-600"}`}>
+              <span className={`text-sm ${changeType === "increase" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                 {change} from last period
               </span>
             </div>
           </div>
-          <div className="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
-            <Icon className="w-6 h-6 text-blue-600" />
+          <div className="h-12 w-12 bg-blue-50 dark:bg-blue-950/30 rounded-lg flex items-center justify-center">
+            <Icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
         </div>
       </CardContent>
@@ -214,33 +217,40 @@ export default function EmailAnalytics() {
         <CardContent>
           <ResponsiveContainer width="100%" height={350}>
             <AreaChart data={emailPerformanceData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#e5e7eb"} />
+              <XAxis dataKey="date" stroke={isDark ? "#9ca3af" : "#6b7280"} />
+              <YAxis stroke={isDark ? "#9ca3af" : "#6b7280"} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: isDark ? "#1f2937" : "#fff",
+                  border: `1px solid ${isDark ? "#374151" : "#e5e7eb"}`,
+                  borderRadius: "8px",
+                  color: isDark ? "#f3f4f6" : "#111827",
+                }}
+              />
               <Legend />
-              <Area 
-                type="monotone" 
-                dataKey="sent" 
+              <Area
+                type="monotone"
+                dataKey="sent"
                 stackId="1"
-                stroke="#3b82f6" 
-                fill="#dbeafe" 
+                stroke="#3b82f6"
+                fill={isDark ? "rgba(59,130,246,0.2)" : "#dbeafe"}
                 name="Emails Sent"
               />
-              <Area 
-                type="monotone" 
-                dataKey="opened" 
+              <Area
+                type="monotone"
+                dataKey="opened"
                 stackId="2"
-                stroke="#10b981" 
-                fill="#d1fae5" 
+                stroke="#10b981"
+                fill={isDark ? "rgba(16,185,129,0.2)" : "#d1fae5"}
                 name="Emails Opened"
               />
-              <Area 
-                type="monotone" 
-                dataKey="clicked" 
+              <Area
+                type="monotone"
+                dataKey="clicked"
                 stackId="3"
-                stroke="#f59e0b" 
-                fill="#fed7aa" 
+                stroke="#f59e0b"
+                fill={isDark ? "rgba(245,158,11,0.2)" : "#fed7aa"}
                 name="Links Clicked"
               />
             </AreaChart>
@@ -271,7 +281,14 @@ export default function EmailAnalytics() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: isDark ? "#1f2937" : "#fff",
+                    border: `1px solid ${isDark ? "#374151" : "#e5e7eb"}`,
+                    borderRadius: "8px",
+                    color: isDark ? "#f3f4f6" : "#111827",
+                  }}
+                />
               </RechartsPieChart>
             </ResponsiveContainer>
             <div className="mt-4 space-y-2">
@@ -282,7 +299,7 @@ export default function EmailAnalytics() {
                       className="w-3 h-3 rounded-full" 
                       style={{ backgroundColor: device.color }}
                     />
-                    <span className="text-sm text-gray-600">{device.name}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{device.name}</span>
                   </div>
                   <span className="text-sm font-medium">{device.value}%</span>
                 </div>
@@ -299,16 +316,23 @@ export default function EmailAnalytics() {
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={engagementByHour}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="hour" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#e5e7eb"} />
+                <XAxis dataKey="hour" stroke={isDark ? "#9ca3af" : "#6b7280"} />
+                <YAxis stroke={isDark ? "#9ca3af" : "#6b7280"} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: isDark ? "#1f2937" : "#fff",
+                    border: `1px solid ${isDark ? "#374151" : "#e5e7eb"}`,
+                    borderRadius: "8px",
+                    color: isDark ? "#f3f4f6" : "#111827",
+                  }}
+                />
                 <Bar dataKey="opens" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
             <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-blue-600" />
+                <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <p className="text-sm text-blue-800 dark:text-blue-200">
                   <strong>Peak engagement:</strong> 2PM - 5PM (your timezone)
                 </p>
@@ -328,7 +352,7 @@ export default function EmailAnalytics() {
             {topCampaigns.map((campaign, index) => (
               <div
                 key={index}
-                className="p-4 border rounded-lg hover:border-blue-200 dark:hover:border-blue-800 transition-colors"
+                className="p-4 border dark:border-neutral-700 rounded-lg hover:border-blue-200 dark:hover:border-blue-800 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
@@ -342,15 +366,15 @@ export default function EmailAnalytics() {
                       </div>
                       <div>
                         <p className="text-gray-500">Open Rate</p>
-                        <p className="font-medium text-green-600">{campaign.openRate}%</p>
+                        <p className="font-medium text-green-600 dark:text-green-400">{campaign.openRate}%</p>
                       </div>
                       <div>
                         <p className="text-gray-500">Click Rate</p>
-                        <p className="font-medium text-blue-600">{campaign.clickRate}%</p>
+                        <p className="font-medium text-blue-600 dark:text-blue-400">{campaign.clickRate}%</p>
                       </div>
                       <div>
                         <p className="text-gray-500">Revenue</p>
-                        <p className="font-medium text-purple-600">{campaign.revenue}</p>
+                        <p className="font-medium text-purple-600 dark:text-purple-400">{campaign.revenue}</p>
                       </div>
                     </div>
                   </div>
@@ -405,20 +429,20 @@ export default function EmailAnalytics() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm">New Subscribers</span>
-                <span className="font-medium text-green-600">+342</span>
+                <span className="font-medium text-green-600 dark:text-green-400">+342</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm">Unsubscribes</span>
-                <span className="font-medium text-red-600">-48</span>
+                <span className="font-medium text-red-600 dark:text-red-400">-48</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm">Net Growth</span>
-                <span className="font-medium text-blue-600">+294</span>
+                <span className="font-medium text-blue-600 dark:text-blue-400">+294</span>
               </div>
-              <div className="pt-2 border-t">
+              <div className="pt-2 border-t dark:border-neutral-700">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Growth Rate</span>
-                  <Badge className="bg-green-100 text-green-700">+8.7%</Badge>
+                  <Badge className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">+8.7%</Badge>
                 </div>
               </div>
             </div>
@@ -436,7 +460,7 @@ export default function EmailAnalytics() {
                   <span className="text-sm">Open Rate Goal</span>
                   <span className="text-sm font-medium">58.3% / 60%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 dark:bg-neutral-700 rounded-full h-2">
                   <div className="bg-blue-600 h-2 rounded-full" style={{ width: "97.2%" }} />
                 </div>
               </div>
@@ -445,7 +469,7 @@ export default function EmailAnalytics() {
                   <span className="text-sm">Click Rate Goal</span>
                   <span className="text-sm font-medium">21.7% / 20%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 dark:bg-neutral-700 rounded-full h-2">
                   <div className="bg-green-600 h-2 rounded-full" style={{ width: "100%" }} />
                 </div>
               </div>
@@ -454,7 +478,7 @@ export default function EmailAnalytics() {
                   <span className="text-sm">Revenue Goal</span>
                   <span className="text-sm font-medium">$42.5k / $50k</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 dark:bg-neutral-700 rounded-full h-2">
                   <div className="bg-purple-600 h-2 rounded-full" style={{ width: "85%" }} />
                 </div>
               </div>

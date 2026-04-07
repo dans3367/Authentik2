@@ -331,7 +331,7 @@ export default function ViewContact() {
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             The contact you're looking for doesn't exist or you don't have permission to view it.
           </p>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Contact ID: {id}
           </p>
           <Button
@@ -829,7 +829,7 @@ export default function ViewContact() {
                               href={cf.value.startsWith('http') ? cf.value : `https://${cf.value}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-sm text-blue-600 hover:underline flex items-center gap-1 break-all"
+                              className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 break-all"
                             >
                               {cf.value}
                               <ExternalLink className="w-3 h-3 flex-shrink-0" />
@@ -868,13 +868,13 @@ export default function ViewContact() {
                 <div className="flex items-center gap-2 mt-1">
                   {contact.consentGiven ? (
                     <>
-                      <CheckCircle2 className="w-4 h-4 text-green-600" />
-                      <span className="text-green-600 font-medium">Yes</span>
+                      <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-green-600 dark:text-green-400 font-medium">Yes</span>
                     </>
                   ) : (
                     <>
-                      <XCircle className="w-4 h-4 text-red-600" />
-                      <span className="text-red-600 font-medium">No</span>
+                      <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      <span className="text-red-600 dark:text-red-400 font-medium">No</span>
                     </>
                   )}
                 </div>
@@ -955,7 +955,7 @@ export default function ViewContact() {
               />
               <Button
                 variant="outline"
-                className="w-full justify-start text-red-600 hover:text-red-700"
+                className="w-full justify-start text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                 onClick={handleDeleteContact}
                 disabled={deleteContactMutation.isPending}
               >

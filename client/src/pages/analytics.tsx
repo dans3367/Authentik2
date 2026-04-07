@@ -45,6 +45,7 @@ import {
   Cell,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface AnalyticsItem {
   id: string;
@@ -187,6 +188,8 @@ export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState<"all" | "newsletter" | "form" | "promotion">("all");
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   // Fetch available items
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
@@ -390,7 +393,7 @@ export default function AnalyticsPage() {
                       "flex-1 text-xs py-1.5 px-2 rounded-md transition-all font-medium capitalize",
                       activeTab === tab
                         ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                     )}
                   >
                     {tab === "all" ? "All" : tab === "newsletter" ? "Newsletters" : tab === "form" ? "Forms" : "Promos"}
@@ -572,21 +575,23 @@ export default function AnalyticsPage() {
                   <CardContent>
                     <ResponsiveContainer width="100%" height={320}>
                       <AreaChart data={analyticsData.timeline.map((d) => ({ ...d, date: formatShortDate(d.date) }))}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="date" stroke="#6b7280" fontSize={12} />
-                        <YAxis stroke="#6b7280" fontSize={12} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#e5e7eb"} />
+                        <XAxis dataKey="date" stroke={isDark ? "#9ca3af" : "#6b7280"} fontSize={12} />
+                        <YAxis stroke={isDark ? "#9ca3af" : "#6b7280"} fontSize={12} />
                         <Tooltip
                           contentStyle={{
                             borderRadius: "8px",
-                            border: "1px solid #e5e7eb",
+                            border: `1px solid ${isDark ? "#374151" : "#e5e7eb"}`,
                             boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
+                            backgroundColor: isDark ? "#1f2937" : "#fff",
+                            color: isDark ? "#f3f4f6" : "#111827",
                           }}
                         />
                         <Legend />
-                        <Area type="monotone" dataKey="sent" stroke="#3b82f6" fill="#dbeafe" name="Sent" />
-                        <Area type="monotone" dataKey="delivered" stroke="#10b981" fill="#d1fae5" name="Delivered" />
-                        <Area type="monotone" dataKey="opened" stroke="#f59e0b" fill="#fef3c7" name="Opened" />
-                        <Area type="monotone" dataKey="clicked" stroke="#8b5cf6" fill="#ede9fe" name="Clicked" />
+                        <Area type="monotone" dataKey="sent" stroke="#3b82f6" fill={isDark ? "rgba(59,130,246,0.2)" : "#dbeafe"} name="Sent" />
+                        <Area type="monotone" dataKey="delivered" stroke="#10b981" fill={isDark ? "rgba(16,185,129,0.2)" : "#d1fae5"} name="Delivered" />
+                        <Area type="monotone" dataKey="opened" stroke="#f59e0b" fill={isDark ? "rgba(245,158,11,0.2)" : "#fef3c7"} name="Opened" />
+                        <Area type="monotone" dataKey="clicked" stroke="#8b5cf6" fill={isDark ? "rgba(139,92,246,0.2)" : "#ede9fe"} name="Clicked" />
                       </AreaChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -616,13 +621,15 @@ export default function AnalyticsPage() {
                               Bounced: n.bounced,
                             }))}
                           >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                            <XAxis dataKey="name" stroke="#6b7280" fontSize={11} />
-                            <YAxis stroke="#6b7280" fontSize={12} />
+                            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#e5e7eb"} />
+                            <XAxis dataKey="name" stroke={isDark ? "#9ca3af" : "#6b7280"} fontSize={11} />
+                            <YAxis stroke={isDark ? "#9ca3af" : "#6b7280"} fontSize={12} />
                             <Tooltip
                               contentStyle={{
                                 borderRadius: "8px",
-                                border: "1px solid #e5e7eb",
+                                border: `1px solid ${isDark ? "#374151" : "#e5e7eb"}`,
+                                backgroundColor: isDark ? "#1f2937" : "#fff",
+                                color: isDark ? "#f3f4f6" : "#111827",
                               }}
                             />
                             <Legend />
@@ -639,7 +646,7 @@ export default function AnalyticsPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b text-left">
+                          <tr className="border-b dark:border-neutral-700 text-left">
                             <th className="pb-2 font-medium text-gray-600 dark:text-gray-400">Newsletter</th>
                             <th className="pb-2 font-medium text-gray-600 dark:text-gray-400 text-right">Sent</th>
                             <th className="pb-2 font-medium text-gray-600 dark:text-gray-400 text-right">Delivered</th>
@@ -650,7 +657,7 @@ export default function AnalyticsPage() {
                             <th className="pb-2 font-medium text-gray-600 dark:text-gray-400 text-right">Bounced</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y dark:divide-neutral-700">
                           {analyticsData.newsletters.perNewsletter.map((nl) => (
                             <tr key={nl.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                               <td className="py-2.5">
@@ -705,10 +712,10 @@ export default function AnalyticsPage() {
                               "Total Responses": f.totalResponses,
                             }))}
                           >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                            <XAxis dataKey="name" stroke="#6b7280" fontSize={11} />
-                            <YAxis stroke="#6b7280" fontSize={12} />
-                            <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb" }} />
+                            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#e5e7eb"} />
+                            <XAxis dataKey="name" stroke={isDark ? "#9ca3af" : "#6b7280"} fontSize={11} />
+                            <YAxis stroke={isDark ? "#9ca3af" : "#6b7280"} fontSize={12} />
+                            <Tooltip contentStyle={{ borderRadius: "8px", border: `1px solid ${isDark ? "#374151" : "#e5e7eb"}`, backgroundColor: isDark ? "#1f2937" : "#fff", color: isDark ? "#f3f4f6" : "#111827" }} />
                             <Legend />
                             <Bar dataKey="Responses (Range)" fill="#10b981" radius={[4, 4, 0, 0]} />
                             <Bar dataKey="Total Responses" fill="#94a3b8" radius={[4, 4, 0, 0]} />
@@ -721,7 +728,7 @@ export default function AnalyticsPage() {
                       {analyticsData.forms.perForm.map((form) => (
                         <div
                           key={form.id}
-                          className="flex items-center justify-between p-3 rounded-lg border hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors"
+                          className="flex items-center justify-between p-3 rounded-lg border dark:border-neutral-700 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors"
                         >
                           <div className="flex items-center gap-3">
                             <div className="h-9 w-9 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
@@ -734,7 +741,7 @@ export default function AnalyticsPage() {
                           </div>
                           <div className="flex items-center gap-6 text-sm">
                             <div className="text-right">
-                              <p className="font-semibold text-emerald-600">{form.responsesInRange}</p>
+                              <p className="font-semibold text-emerald-600 dark:text-emerald-400">{form.responsesInRange}</p>
                               <p className="text-[10px] text-muted-foreground">In range</p>
                             </div>
                             <div className="text-right">
@@ -762,7 +769,7 @@ export default function AnalyticsPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b text-left">
+                          <tr className="border-b dark:border-neutral-700 text-left">
                             <th className="pb-2 font-medium text-gray-600 dark:text-gray-400">Promotion</th>
                             <th className="pb-2 font-medium text-gray-600 dark:text-gray-400 text-right">Used</th>
                             <th className="pb-2 font-medium text-gray-600 dark:text-gray-400 text-right">Sent</th>
@@ -772,7 +779,7 @@ export default function AnalyticsPage() {
                             <th className="pb-2 font-medium text-gray-600 dark:text-gray-400 text-right">Bounced</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y dark:divide-neutral-700">
                           {analyticsData.promotions.perPromotion.map((p) => (
                             <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                               <td className="py-2.5">
@@ -825,7 +832,14 @@ export default function AnalyticsPage() {
                               <Cell key={`cell-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: isDark ? "#1f2937" : "#fff",
+                              border: `1px solid ${isDark ? "#374151" : "#e5e7eb"}`,
+                              borderRadius: "8px",
+                              color: isDark ? "#f3f4f6" : "#111827",
+                            }}
+                          />
                         </RechartsPieChart>
                       </ResponsiveContainer>
                     </div>

@@ -221,7 +221,7 @@ export function ReminderScheduleDialog({
                 value={scheduleData.customMinutesBefore || ''}
                 onChange={(e) => handleCustomMinutesChange(parseInt(e.target.value))}
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                 {t('reminders.scheduleReminder.customMinutesHelp')}
               </p>
             </div>
@@ -242,7 +242,7 @@ export function ReminderScheduleDialog({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
               The reminder will be sent at the scheduled time in this timezone
             </p>
           </div>

@@ -98,7 +98,7 @@ export function AppointmentCard({
               </div>
             </div>
             {isPending ? (
-              <Badge className="bg-blue-100 text-blue-800">
+              <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
                 <Loader2 className="h-3 w-3 animate-spin mr-1" />
                 Saving...
               </Badge>
@@ -112,22 +112,22 @@ export function AppointmentCard({
           {/* Appointment details */}
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-              <Calendar className="h-4 w-4 text-gray-500" />
+              <Calendar className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               <span>{formatDateTime(appointment.appointmentDate)}</span>
             </div>
             <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-              <Timer className="h-4 w-4 text-gray-500" />
+              <Timer className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               <span>{appointment.duration} {t('reminders.appointments.minutes')}</span>
             </div>
             {appointment.location && (
               <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <MapPin className="h-4 w-4 text-gray-500" />
+                <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span>{appointment.location}</span>
               </div>
             )}
             {appointment.shop?.name && (
               <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <Building2 className="h-4 w-4 text-gray-500" />
+                <Building2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 <span>{appointment.shop.name}</span>
               </div>
             )}
@@ -135,22 +135,22 @@ export function AppointmentCard({
             {/* Reminder status */}
             <div className="flex items-center gap-2">
               {(isPending || isPendingReminder) ? (
-                <div className="flex items-center gap-1 text-blue-600">
+                <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span className="text-sm">Loading...</span>
                 </div>
               ) : hasSentReminder ? (
-                <div className="flex items-center gap-1 text-green-600">
+                <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
                   <CheckCircle className="h-4 w-4" />
                   <span className="text-sm">{t('reminders.reminderHistory.sent')}</span>
                 </div>
               ) : hasPendingReminder ? (
-                <div className="flex items-center gap-1 text-blue-600">
+                <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
                   <Clock className="h-4 w-4" />
                   <span className="text-sm">Scheduled</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1 text-gray-400">
+                <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500">
                   <Clock className="h-4 w-4" />
                   <span className="text-sm">{t('reminders.reminderHistory.notSet')}</span>
                 </div>
@@ -159,7 +159,7 @@ export function AppointmentCard({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 pt-2 border-t">
+          <div className="flex items-center gap-2 pt-2 border-t dark:border-neutral-700">
             <Button
               variant="outline"
               size="sm"
@@ -210,7 +210,7 @@ export function AppointmentCard({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className="text-red-600"
+                  className="text-red-600 dark:text-red-400"
                   onClick={(e) => {
                     e.stopPropagation();
                     onDelete();

@@ -703,13 +703,13 @@ export default function CustomerViewPage() {
                 <div className="flex items-center gap-2 mt-1">
                   {contact.consentGiven ? (
                     <>
-                      <CheckCircle2 className="w-4 h-4 text-green-600" />
-                      <span className="text-sm text-green-600 font-medium">Yes</span>
+                      <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="text-sm text-green-600 dark:text-green-400 font-medium">Yes</span>
                     </>
                   ) : (
                     <>
-                      <XCircle className="w-4 h-4 text-red-600" />
-                      <span className="text-sm text-red-600 font-medium">No</span>
+                      <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      <span className="text-sm text-red-600 dark:text-red-400 font-medium">No</span>
                     </>
                   )}
                 </div>
@@ -765,7 +765,7 @@ export default function CustomerViewPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full justify-start text-red-600 hover:text-red-700"
+                className="w-full justify-start text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                 onClick={handleDeleteContact}
                 disabled={deleteContactMutation.isPending}
               >

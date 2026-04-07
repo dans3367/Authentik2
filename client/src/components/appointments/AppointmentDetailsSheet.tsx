@@ -514,7 +514,7 @@ export function AppointmentDetailsSheet({
                   {/* Notes list */}
                   {notesLoading ? (
                     <div className="flex items-center justify-center py-4">
-                      <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                      <Loader2 className="h-5 w-5 animate-spin text-gray-400 dark:text-gray-500" />
                     </div>
                   ) : notes && notes.length > 0 ? (
                     <div className="space-y-3">
@@ -580,7 +580,7 @@ export function AppointmentDetailsSheet({
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                    className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-500 dark:hover:bg-red-950/30"
                                     onClick={() => onDeleteNote(note.id)}
                                     disabled={isDeletingNote}
                                   >

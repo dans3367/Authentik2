@@ -293,14 +293,14 @@ export default function EmailContacts() {
 
   const getStatusBadge = (status: Contact["status"]) => {
     const statusConfig = {
-      active: { color: "bg-green-100 text-green-700", icon: CheckCircle2, label: t('emailContacts.statusBadges.active') },
-      unsubscribed: { color: "bg-gray-100 text-gray-700", icon: XCircle, label: t('emailContacts.statusBadges.unsubscribed') },
-      bounced: { color: "bg-red-100 text-red-700", icon: AlertCircle, label: t('emailContacts.statusBadges.bounced') },
-      pending: { color: "bg-yellow-100 text-yellow-700", icon: AlertCircle, label: t('emailContacts.statusBadges.pending') },
+      active: { color: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400", icon: CheckCircle2, label: t('emailContacts.statusBadges.active') },
+      unsubscribed: { color: "bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-gray-300", icon: XCircle, label: t('emailContacts.statusBadges.unsubscribed') },
+      bounced: { color: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400", icon: AlertCircle, label: t('emailContacts.statusBadges.bounced') },
+      pending: { color: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400", icon: AlertCircle, label: t('emailContacts.statusBadges.pending') },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] ?? {
-      color: "bg-slate-100 text-slate-700",
+      color: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
       icon: AlertCircle,
       label: status ? String(status) : t('common.unknown', 'Unknown'),
     };
@@ -401,7 +401,7 @@ export default function EmailContacts() {
       <div className="p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="flex flex-col items-center gap-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
             <span className="text-gray-600 dark:text-gray-400">{t('emailContacts.loading')}</span>
           </div>
         </div>
@@ -418,7 +418,7 @@ export default function EmailContacts() {
           <Card>
             <CardContent className="py-12">
               <div className="flex flex-col items-center gap-3 text-center">
-                <ShieldAlert className="h-12 w-12 text-orange-500" />
+                <ShieldAlert className="h-12 w-12 text-orange-500 dark:text-orange-400" />
                 <h2 className="text-xl font-semibold">{t('common.permissionDenied', 'Permission Denied')}</h2>
                 <p className="text-muted-foreground text-sm max-w-md">
                   {t('common.permissionDeniedDescription', 'You do not have permission to view this section. Contact your administrator to request access.')}
@@ -433,7 +433,7 @@ export default function EmailContacts() {
       <div className="p-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">{t('emailContacts.errorLoading')}</h1>
-          <p className="text-gray-600 mb-4">
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
             {t('emailContacts.errorLoadingDescription')}
           </p>
           <Button
@@ -536,7 +536,7 @@ export default function EmailContacts() {
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
               {t('emailContacts.stats.totalContacts')}
             </CardTitle>
-            <Users className="h-4 w-4 text-gray-400" />
+            <Users className="h-4 w-4 text-gray-400 dark:text-gray-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -553,7 +553,7 @@ export default function EmailContacts() {
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
               {t('emailContacts.stats.activeSubscribers')}
             </CardTitle>
-            <UserCheck className="h-4 w-4 text-gray-400" />
+            <UserCheck className="h-4 w-4 text-gray-400 dark:text-gray-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -570,7 +570,7 @@ export default function EmailContacts() {
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
               {t('emailContacts.stats.lists')}
             </CardTitle>
-            <Tag className="h-4 w-4 text-gray-400" />
+            <Tag className="h-4 w-4 text-gray-400 dark:text-gray-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -587,7 +587,7 @@ export default function EmailContacts() {
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
               {t('emailContacts.stats.avgEngagement')}
             </CardTitle>
-            <Mail className="h-4 w-4 text-gray-400" />
+            <Mail className="h-4 w-4 text-gray-400 dark:text-gray-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -643,7 +643,7 @@ export default function EmailContacts() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-red-600 flex-1 sm:flex-none"
+                      className="text-red-600 dark:text-red-400 flex-1 sm:flex-none"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -666,7 +666,7 @@ export default function EmailContacts() {
             {isFetching && (
               <div className="absolute right-4 top-4 z-10">
                 <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-sm">
-                  <div className="animate-spin rounded-full h-3 w-3 border border-blue-600 border-t-transparent"></div>
+                  <div className="animate-spin rounded-full h-3 w-3 border border-blue-600 dark:border-blue-400 border-t-transparent"></div>
                   {t('emailContacts.empty.searching')}
                 </div>
               </div>
@@ -751,7 +751,7 @@ export default function EmailContacts() {
                                 <p
                                   className={`text-sm hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${contact.id.startsWith('temp-')
                                       ? 'text-green-600 dark:text-green-500 cursor-default'
-                                      : 'text-gray-500 cursor-pointer'
+                                      : 'text-gray-500 dark:text-gray-400 cursor-pointer'
                                     }`}
                                   onClick={() => !contact.id.startsWith('temp-') && setSelectedContactId(contact.id)}
                                   data-testid={`text-contact-email-table-${contact.id}`}
@@ -783,7 +783,7 @@ export default function EmailContacts() {
                               <p className="font-medium">
                                 {getEngagementRate(contact.emailsSent, contact.emailsOpened)}% {t('emailContacts.table.openRate')}
                               </p>
-                              <p className="text-gray-500">
+                              <p className="text-gray-500 dark:text-gray-400">
                                 {contact.emailsOpened}/{contact.emailsSent} {t('emailContacts.table.emails')}
                               </p>
                             </div>
@@ -792,7 +792,7 @@ export default function EmailContacts() {
                             <div className="text-sm">
                               <p>{formatDate(contact.addedDate)}</p>
                               {contact.lastActivity && (
-                                <p className="text-gray-500">
+                                <p className="text-gray-500 dark:text-gray-400">
                                   {t('emailContacts.table.active')} {formatDate(contact.lastActivity)}
                                 </p>
                               )}
@@ -938,7 +938,7 @@ export default function EmailContacts() {
                                 <p
                                   className={`text-sm truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${contact.id.startsWith('temp-')
                                       ? 'text-green-600 dark:text-green-500 cursor-default'
-                                      : 'text-gray-500 cursor-pointer'
+                                      : 'text-gray-500 dark:text-gray-400 cursor-pointer'
                                     }`}
                                   onClick={() => !contact.id.startsWith('temp-') && setSelectedContactId(contact.id)}
                                   data-testid={`text-contact-email-card-${contact.id}`}
@@ -1038,7 +1038,7 @@ export default function EmailContacts() {
                                 <p className="font-medium" data-testid={`text-engagement-rate-card-${contact.id}`}>
                                   {getEngagementRate(contact.emailsSent, contact.emailsOpened)}% {t('emailContacts.table.openRate')}
                                 </p>
-                                <p className="text-gray-500" data-testid={`text-email-stats-card-${contact.id}`}>
+                                <p className="text-gray-500 dark:text-gray-400" data-testid={`text-email-stats-card-${contact.id}`}>
                                   {contact.emailsOpened}/{contact.emailsSent} {t('emailContacts.table.emails')}
                                 </p>
                               </div>
@@ -1050,7 +1050,7 @@ export default function EmailContacts() {
                               <div className="text-sm">
                                 <p data-testid={`text-added-date-card-${contact.id}`}>{formatDate(contact.addedDate)}</p>
                                 {contact.lastActivity && (
-                                  <p className="text-gray-500" data-testid={`text-last-activity-card-${contact.id}`}>
+                                  <p className="text-gray-500 dark:text-gray-400" data-testid={`text-last-activity-card-${contact.id}`}>
                                     {t('emailContacts.table.active')} {formatDate(contact.lastActivity)}
                                   </p>
                                 )}
@@ -1102,7 +1102,7 @@ export default function EmailContacts() {
                   .map((item) => {
                     if (typeof item === 'string') {
                       return (
-                        <span key={item} className="px-1 text-sm text-gray-400">
+                        <span key={item} className="px-1 text-sm text-gray-400 dark:text-gray-500">
                           &hellip;
                         </span>
                       );

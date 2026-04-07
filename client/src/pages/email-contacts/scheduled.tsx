@@ -136,7 +136,7 @@ export default function ScheduledEmailsTimelinePage() {
         )}
         {error && (
           <Card>
-            <CardContent className="text-red-600 p-6">Failed to load scheduled emails.</CardContent>
+            <CardContent className="text-red-600 dark:text-red-400 p-6">Failed to load scheduled emails.</CardContent>
           </Card>
         )}
 
@@ -149,7 +149,7 @@ export default function ScheduledEmailsTimelinePage() {
           </CardHeader>
           <CardContent>
             {scheduled.length === 0 ? (
-              <div className="text-center text-gray-500 py-10">
+              <div className="text-center text-gray-500 dark:text-gray-400 py-10">
                 No scheduled emails for this contact.
               </div>
             ) : (
@@ -170,15 +170,15 @@ export default function ScheduledEmailsTimelinePage() {
                             <Badge variant="secondary">{item.status === 'retrying' ? 'Scheduled' : item.status}</Badge>
                           </div>
                           <div className="mt-2 font-medium truncate">{item.subject}</div>
-                          <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                          <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1">
                             <Mail className="h-4 w-4" /> to {item.to?.[0] || "(unknown)"}
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <div className="text-xs text-gray-500 whitespace-nowrap">Created {new Date(item.createdAt).toLocaleString()}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Created {new Date(item.createdAt).toLocaleString()}</div>
                           <div className="flex items-center gap-2">
                             <Button variant="outline" size="sm" onClick={() => openEdit(item)}>Edit</Button>
-                            <Button variant="outline" size="sm" className="text-red-600" onClick={() => setDeleteOpen(item.id)}>Delete</Button>
+                            <Button variant="outline" size="sm" className="text-red-600 dark:text-red-400" onClick={() => setDeleteOpen(item.id)}>Delete</Button>
                           </div>
                         </div>
                       </div>

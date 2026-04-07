@@ -491,7 +491,7 @@ export default function ScheduleContactEmailPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 The email will be sent at the scheduled time in this timezone
               </p>
             </div>
@@ -526,19 +526,19 @@ export default function ScheduleContactEmailPage() {
               <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full">
 
                 {/* Simulated email header */}
-                <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
+                <div className="border-b bg-gray-50 dark:bg-neutral-800 p-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                   <div className="flex gap-2 mb-1">
                     <span className="font-semibold text-right w-14">To:</span>
-                    <span className="text-gray-900">{contact?.email}</span>
+                    <span className="text-gray-900 dark:text-white">{contact?.email}</span>
                   </div>
                   <div className="flex gap-2">
                     <span className="font-semibold text-right w-14">Subject:</span>
-                    <span className="text-gray-900 font-bold">{subject || "(no subject)"}</span>
+                    <span className="text-gray-900 dark:text-white font-bold">{subject || "(no subject)"}</span>
                   </div>
                   {date && (
                     <div className="flex gap-2 mt-1">
                       <span className="font-semibold text-right w-14">Scheduled:</span>
-                      <span className="text-gray-900">
+                      <span className="text-gray-900 dark:text-white">
                         {`${date} ${time || "00:00"} (${timezone || Intl.DateTimeFormat().resolvedOptions().timeZone})`}
                       </span>
                     </div>

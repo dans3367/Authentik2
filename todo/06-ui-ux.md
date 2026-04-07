@@ -8,7 +8,7 @@
   - Implement toggle at the top right of the app. Save preference to user profile.
   - Dashboard, Newsletter, Advertise
   - Promotions, Forms, Templates, eCards
-  - Appointments, Contacts, Segmenation, Analytics
+  - ~~Appointments, Contacts, Segmentation, Analytics~~ ✅
   - Management, User Profile
   - Puck editor - Newsletter editor
   - Puck editor - Advertise editor

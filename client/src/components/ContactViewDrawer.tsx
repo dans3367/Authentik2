@@ -284,7 +284,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
         {isLoading ? (
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="flex flex-col items-center gap-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
               <span className="ml-4 text-gray-600 dark:text-gray-400">{t('contactDrawer.loading')}</span>
             </div>
           </div>
@@ -433,7 +433,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                         <div>
                           <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.contactInfo.shop', 'Shop')}</label>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <Store className="h-3.5 w-3.5 text-gray-400" />
+                            <Store className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
                             <p className="text-gray-900 dark:text-white text-sm">{contact.shopName}</p>
                           </div>
                         </div>
@@ -564,14 +564,14 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                         <BarChart3 className="w-5 h-5" />
                         {t('contactDrawer.engagement.title')}
                         {statsLoading && (
-                          <div className="ml-2 animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                          <div className="ml-2 animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 dark:border-blue-400"></div>
                         )}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       {statsLoading ? (
                         <div className="flex items-center justify-center py-6">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 dark:border-blue-400"></div>
                           <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">{t('contactDrawer.engagement.loadingStats')}</span>
                         </div>
                       ) : engagementStats ? (
@@ -719,13 +719,13 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                         <div className="flex items-center gap-2 mt-1">
                           {contact.consentGiven ? (
                             <>
-                              <CheckCircle2 className="w-4 h-4 text-green-600" />
-                              <span className="text-sm text-green-600 font-medium">{t('contactDrawer.consent.yes')}</span>
+                              <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                              <span className="text-sm text-green-600 dark:text-green-400 font-medium">{t('contactDrawer.consent.yes')}</span>
                             </>
                           ) : (
                             <>
-                              <XCircle className="w-4 h-4 text-red-600" />
-                              <span className="text-sm text-red-600 font-medium">{t('contactDrawer.consent.no')}</span>
+                              <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                              <span className="text-sm text-red-600 dark:text-red-400 font-medium">{t('contactDrawer.consent.no')}</span>
                             </>
                           )}
                         </div>
@@ -822,7 +822,7 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full justify-start text-red-600 hover:text-red-700"
+                        className="w-full justify-start text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                         onClick={handleDeleteContact}
                         disabled={deleteContactMutation.isPending}
                       >

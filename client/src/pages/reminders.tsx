@@ -1009,7 +1009,7 @@ export default function RemindersPage() {
     const isPending = pendingAppointmentIds.has(appointment.id) || pendingReminderAppointmentIds.has(appointment.id);
     if (isPending) {
       return (
-        <div className="flex items-center gap-1 text-blue-600">
+        <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span className="text-sm">Loading...</span>
         </div>
@@ -1019,9 +1019,9 @@ export default function RemindersPage() {
     const hasSent = appointmentReminders.some(r => r.status === 'sent') || appointment.reminderSent;
     const hasPending = appointmentReminders.some(r => r.status === 'pending');
 
-    if (hasSent) return <div className="flex items-center gap-1 text-green-600"><CheckCircle className="h-4 w-4" /><span className="text-sm">{t('reminders.reminderHistory.sent')}</span></div>;
-    if (hasPending) return <div className="flex items-center gap-1 text-blue-600"><Clock className="h-4 w-4" /><span className="text-sm">Scheduled</span></div>;
-    return <div className="flex items-center gap-1 text-gray-400"><Clock className="h-4 w-4" /><span className="text-sm">{t('reminders.reminderHistory.notSet')}</span></div>;
+    if (hasSent) return <div className="flex items-center gap-1 text-green-600 dark:text-green-400"><CheckCircle className="h-4 w-4" /><span className="text-sm">{t('reminders.reminderHistory.sent')}</span></div>;
+    if (hasPending) return <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400"><Clock className="h-4 w-4" /><span className="text-sm">Scheduled</span></div>;
+    return <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500"><Clock className="h-4 w-4" /><span className="text-sm">{t('reminders.reminderHistory.notSet')}</span></div>;
   };
 
   // ─── Date Range Filter Component ──────────────────────────────────────────
@@ -1048,7 +1048,7 @@ export default function RemindersPage() {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-3" align="start" sideOffset={5} avoidCollisions={true}>
-        <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b">
+        <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b dark:border-neutral-700">
           {presets.map((preset, i) => (
             <Button key={i} variant="outline" size="sm" onClick={preset.onClick} className="text-xs">{preset.label}</Button>
           ))}
@@ -1076,7 +1076,7 @@ export default function RemindersPage() {
           </div>
         </div>
         {(from || to) && (
-          <div className="mt-4 pt-4 border-t">
+          <div className="mt-4 pt-4 border-t dark:border-neutral-700">
             <Button variant="outline" size="sm" onClick={() => { setFrom(undefined); setTo(undefined); setIsOpen(false); }} className="w-full">
               <XCircle className="h-4 w-4 mr-2" />
               {t('reminders.appointments.clearDates')}
@@ -1096,7 +1096,7 @@ export default function RemindersPage() {
   ) => {
     if (total <= 0) return null;
     return (
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 border-t">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 border-t dark:border-neutral-700">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>Showing {start + 1}-{Math.min(end, total)} of {total}</span>
           <span className="hidden sm:inline">•</span>
@@ -1147,26 +1147,26 @@ export default function RemindersPage() {
         <TableCell>
           <div>
             <p className="font-medium">{getCustomerName(appointment.customer)}</p>
-            <p className="text-sm text-gray-500">{appointment.customer?.email}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{appointment.customer?.email}</p>
           </div>
         </TableCell>
         <TableCell>
           <div>
             <p className="font-medium">{appointment.title}</p>
             {appointment.location && (
-              <p className="text-sm text-gray-500 flex items-center gap-1"><MapPin className="h-3 w-3" />{appointment.location}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1"><MapPin className="h-3 w-3" />{appointment.location}</p>
             )}
           </div>
         </TableCell>
         <TableCell>
           <div>
             <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
-            <p className="text-sm text-gray-500 flex items-center gap-1"><Timer className="h-3 w-3" />{appointment.duration} {t('reminders.appointments.minutes')}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1"><Timer className="h-3 w-3" />{appointment.duration} {t('reminders.appointments.minutes')}</p>
           </div>
         </TableCell>
         <TableCell>
           {isPending ? (
-            <Badge className="bg-blue-100 text-blue-800"><Loader2 className="h-3 w-3 animate-spin mr-1" />Saving...</Badge>
+            <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"><Loader2 className="h-3 w-3 animate-spin mr-1" />Saving...</Badge>
           ) : (
             <Badge className={getStatusColor(appointment.status)}>
               {t(STATUS_TRANSLATION_KEYS[appointment.status] || appointment.status)}
@@ -1194,7 +1194,7 @@ export default function RemindersPage() {
                   <Clock className="h-4 w-4 mr-2" />{t('reminders.actions.scheduleReminder')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
+                <DropdownMenuItem className="text-red-600 dark:text-red-400" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
                   <Trash2 className="h-4 w-4 mr-2" />Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -1239,8 +1239,8 @@ export default function RemindersPage() {
           </div>
 
           {/* Appointments Table with Tabs */}
-          <Card className="order-1 shadow-sm">
-            <CardHeader className="border-b">
+          <Card className="order-1 shadow-sm dark:shadow-neutral-900/50">
+            <CardHeader className="border-b dark:border-neutral-700">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <CardTitle className="flex items-center gap-2 text-xl">
                   <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-900/20">
@@ -1285,7 +1285,7 @@ export default function RemindersPage() {
             </CardHeader>
 
             <Tabs value={appointmentsTab} onValueChange={(v) => setAppointmentsTab(v as "upcoming" | "past")} className="w-full">
-              <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+              <div className="flex items-center justify-between p-4 border-b dark:border-neutral-700 bg-muted/30">
                 <TabsList className="bg-background">
                   <TabsTrigger value="upcoming" className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />Scheduled
@@ -1299,7 +1299,7 @@ export default function RemindersPage() {
               {/* ─── Upcoming Tab ─────────────────────────────────────────── */}
               <TabsContent value="upcoming" className="mt-0">
                 {/* Search and Filter Controls */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-4 lg:p-6 border-b bg-gray-50 dark:bg-gray-900/50">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-4 lg:p-6 border-b dark:border-neutral-700 bg-gray-50 dark:bg-gray-900/50">
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
@@ -1353,7 +1353,7 @@ export default function RemindersPage() {
                 <div className="min-h-[400px]">
                   {appointmentsLoading ? (
                     <div className="flex items-center justify-center py-12 min-h-[400px]">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300 dark:border-gray-600"></div>
                     </div>
                   ) : appointments.length === 0 ? (
                     <div className="text-center py-16 min-h-[400px] flex flex-col items-center justify-center space-y-4">
@@ -1456,7 +1456,7 @@ export default function RemindersPage() {
 
               {/* ─── Past Tab ─────────────────────────────────────────────── */}
               <TabsContent value="past" className="mt-0">
-                <div className="flex items-center gap-4 p-6 border-b">
+                <div className="flex items-center gap-4 p-6 border-b dark:border-neutral-700">
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input placeholder="Search past appointments..." value={pastSearchQuery} onChange={(e) => setPastSearchQuery(e.target.value)} className="pl-10 pr-10" />
@@ -1487,7 +1487,7 @@ export default function RemindersPage() {
                 <div className="min-h-[400px]">
                   {(appointmentsLoading || pastSearchQuery !== debouncedPastSearchQuery) ? (
                     <div className="flex items-center justify-center py-12 min-h-[400px]">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300 dark:border-gray-600"></div>
                     </div>
                   ) : pastAppointments.length === 0 ? (
                     <div className="text-center py-16 min-h-[400px] flex flex-col items-center justify-center space-y-4">
@@ -1528,18 +1528,18 @@ export default function RemindersPage() {
                             {pastAppointments.map((appointment) => (
                               <TableRow key={appointment.id} onClick={() => handleViewAppointment(appointment)} className="cursor-pointer hover:bg-muted/30 transition-colors border-b border-gray-100 dark:border-gray-800">
                                 <TableCell>
-                                  <div><p className="font-medium">{getCustomerName(appointment.customer)}</p><p className="text-sm text-gray-500">{appointment.customer?.email}</p></div>
+                                  <div><p className="font-medium">{getCustomerName(appointment.customer)}</p><p className="text-sm text-gray-500 dark:text-gray-400">{appointment.customer?.email}</p></div>
                                 </TableCell>
                                 <TableCell>
                                   <div>
                                     <p className="font-medium">{appointment.title}</p>
-                                    {appointment.location && <p className="text-sm text-gray-500 flex items-center gap-1"><MapPin className="h-3 w-3" />{appointment.location}</p>}
+                                    {appointment.location && <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1"><MapPin className="h-3 w-3" />{appointment.location}</p>}
                                   </div>
                                 </TableCell>
                                 <TableCell>
                                   <div>
                                     <p className="font-medium">{formatDateTime(appointment.appointmentDate)}</p>
-                                    <p className="text-sm text-gray-500 flex items-center gap-1"><Timer className="h-3 w-3" />{appointment.duration} {t('reminders.appointments.minutes')}</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1"><Timer className="h-3 w-3" />{appointment.duration} {t('reminders.appointments.minutes')}</p>
                                   </div>
                                 </TableCell>
                                 <TableCell>
@@ -1628,7 +1628,7 @@ export default function RemindersPage() {
         <Dialog open={pastDateConfirmModalOpen} onOpenChange={setPastDateConfirmModalOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <DialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="h-5 w-5" />Past Date Warning
               </DialogTitle>
               <DialogDescription>

@@ -113,7 +113,7 @@ function getTypeBorderAccent(type: string, isUniversal?: boolean) {
     case "tags":
       return "border-l-purple-500";
     default:
-      return "border-l-gray-400";
+      return "border-l-gray-400 dark:border-l-gray-600";
   }
 }
 
@@ -458,7 +458,7 @@ export default function SegmentationPage() {
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
               {t("segmentation.stats.totalSegments")}
             </CardTitle>
-            <Target className="h-4 w-4 text-gray-400" />
+            <Target className="h-4 w-4 text-gray-400 dark:text-gray-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -475,7 +475,7 @@ export default function SegmentationPage() {
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
               {t("segmentation.stats.totalContacts")}
             </CardTitle>
-            <Users className="h-4 w-4 text-gray-400" />
+            <Users className="h-4 w-4 text-gray-400 dark:text-gray-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -492,7 +492,7 @@ export default function SegmentationPage() {
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
               {t("segmentation.stats.avgSegmentSize")}
             </CardTitle>
-            <BarChart3 className="h-4 w-4 text-gray-400" />
+            <BarChart3 className="h-4 w-4 text-gray-400 dark:text-gray-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -587,7 +587,7 @@ export default function SegmentationPage() {
                   key={list.id}
                   className={`group relative rounded-lg border border-l-4 ${getTypeBorderAccent(
                     list.type, list.isUniversal
-                  )} bg-white/50 dark:bg-gray-800/30 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200`}
+                  )} bg-white dark:bg-neutral-900 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200`}
                 >
                   <div className="p-5 space-y-3">
                     {/* Header with name and type */}

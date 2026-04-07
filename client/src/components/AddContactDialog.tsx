@@ -407,7 +407,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
             />
 
             {/* Address Fields */}
-            <div className="space-y-4 border-t pt-4">
+            <div className="space-y-4 border-t dark:border-neutral-700 pt-4">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Address Information (Optional)</h3>
               
               <FormField
@@ -527,7 +527,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
 
             {/* Custom Fields */}
             {customFieldDefs.length > 0 && (
-              <div className="space-y-4 border-t pt-4">
+              <div className="space-y-4 border-t dark:border-neutral-700 pt-4">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                   <Settings2 className="w-4 h-4" />
                   Custom Fields
@@ -539,7 +539,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
                     <div key={cf.id} className={`space-y-1.5${mask === 'multi_line' ? ' md:col-span-2' : ''}`}>
                       <Label>
                         {cf.label}
-                        {cf.isRequired && <span className="text-red-500 ml-1">*</span>}
+                        {cf.isRequired && <span className="text-red-500 dark:text-red-400 ml-1">*</span>}
                       </Label>
                       {cf.fieldType === 'text' && mask === 'multi_line' && (
                         <Textarea
@@ -683,7 +683,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
                       >
                         {list.name}
                         {list.description && (
-                          <span className="text-gray-500 ml-2">- {list.description}</span>
+                          <span className="text-gray-500 dark:text-gray-400 ml-2">- {list.description}</span>
                         )}
                       </Label>
                     </div>
@@ -723,12 +723,12 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
             )}
 
             {/* Consent Disclosure */}
-            <div className="border-t pt-4">
+            <div className="border-t dark:border-neutral-700 pt-4">
               <FormField
                 control={form.control}
                 name="consentGiven"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-blue-50 dark:bg-blue-950/20">
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border dark:border-neutral-700 p-4 bg-blue-50 dark:bg-blue-950/20">
                     <FormControl>
                       <Checkbox
                         checked={field.value}
@@ -761,7 +761,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
               <Button
                 type="submit"
                 disabled={createContactMutation.isPending}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
               >
                 {createContactMutation.isPending ? (
                   <>

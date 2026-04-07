@@ -349,8 +349,8 @@ export function AppointmentEditDialog({
 
           {reminderData.reminderTiming === 'custom' && (
             <div>
-              <Label className={errors.customMinutesBefore ? "text-red-500" : ""}>
-                {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500">*</span>
+              <Label className={errors.customMinutesBefore ? "text-red-500 dark:text-red-400" : ""}>
+                {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500 dark:text-red-400">*</span>
               </Label>
               <Input
                 type="number"
@@ -365,9 +365,9 @@ export function AppointmentEditDialog({
                   }));
                   setErrors(prev => ({ ...prev, customMinutesBefore: false }));
                 }}
-                className={`focus-visible:ring-0 ${errors.customMinutesBefore ? 'border-red-500' : ''}`}
+                className={`focus-visible:ring-0 ${errors.customMinutesBefore ? 'border-red-500 dark:border-red-400' : ''}`}
               />
-              <p className="text-xs text-gray-500 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
             </div>
           )}
 
@@ -386,7 +386,7 @@ export function AppointmentEditDialog({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               The reminder will be sent at the scheduled time in this timezone
             </p>
           </div>

@@ -201,8 +201,8 @@ export function AppointmentFormDialog({
       </DialogHeader>
       <div className="space-y-4 overflow-y-auto flex-1">
         <div>
-          <Label className={errors.customerId ? "text-red-500" : ""}>
-            {t('reminders.appointments.customer')} <span className="text-red-500">*</span>
+          <Label className={errors.customerId ? "text-red-500 dark:text-red-400" : ""}>
+            {t('reminders.appointments.customer')} <span className="text-red-500 dark:text-red-400">*</span>
           </Label>
           <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
             <PopoverTrigger asChild>
@@ -213,7 +213,7 @@ export function AppointmentFormDialog({
                 className={cn(
                   "w-full justify-between font-normal",
                   !appointmentData.customerId && "text-muted-foreground",
-                  errors.customerId && "border-red-500"
+                  errors.customerId && "border-red-500 dark:border-red-400"
                 )}
               >
                 {selectedCustomer
@@ -272,8 +272,8 @@ export function AppointmentFormDialog({
         </div>
 
         <div>
-          <Label className={errors.title ? "text-red-500" : ""}>
-            {t('reminders.appointments.title')} <span className="text-red-500">*</span>
+          <Label className={errors.title ? "text-red-500 dark:text-red-400" : ""}>
+            {t('reminders.appointments.title')} <span className="text-red-500 dark:text-red-400">*</span>
           </Label>
           <Input
             value={appointmentData.title}
@@ -282,7 +282,7 @@ export function AppointmentFormDialog({
               setErrors(prev => ({ ...prev, title: false }));
             }}
             placeholder={t('reminders.appointments.titlePlaceholder')}
-            className={`focus-visible:ring-0 ${errors.title ? 'border-red-500' : ''}`}
+            className={`focus-visible:ring-0 ${errors.title ? 'border-red-500 dark:border-red-400' : ''}`}
           />
         </div>
 
@@ -516,8 +516,8 @@ export function AppointmentFormDialog({
 
             {reminderData.reminderTiming === 'custom' && (
               <div>
-                <Label className={errors.customMinutesBefore ? "text-red-500" : ""}>
-                  {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500">*</span>
+                <Label className={errors.customMinutesBefore ? "text-red-500 dark:text-red-400" : ""}>
+                  {t('reminders.scheduleReminder.customMinutesLabel')} <span className="text-red-500 dark:text-red-400">*</span>
                 </Label>
                 <Input
                   type="number"
@@ -532,9 +532,9 @@ export function AppointmentFormDialog({
                     }));
                     setErrors(prev => ({ ...prev, customMinutesBefore: false }));
                   }}
-                  className={`focus-visible:ring-0 ${errors.customMinutesBefore ? 'border-red-500' : ''}`}
+                  className={`focus-visible:ring-0 ${errors.customMinutesBefore ? 'border-red-500 dark:border-red-400' : ''}`}
                 />
-                <p className="text-xs text-gray-500 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('reminders.scheduleReminder.customMinutesHelp')}</p>
               </div>
             )}
 
@@ -553,7 +553,7 @@ export function AppointmentFormDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 The reminder will be sent at the scheduled time in this timezone
               </p>
             </div>
