@@ -431,6 +431,23 @@ export const themes: Record<string, ThemeStyles> = {
     button: 'w-full bg-stone-800 hover:bg-stone-900 text-stone-50 font-serif font-bold py-3 px-6 rounded-none border-2 border-stone-800 uppercase tracking-wider transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
     background: 'bg-stone-100'
   }
+  'custom': {
+    id: 'custom',
+    name: 'Custom',
+    container: 'min-h-screen py-8',
+    card: 'bg-white rounded-xl shadow-lg border border-gray-200',
+    header: 'p-6 border-b border-gray-200',
+    title: 'text-2xl font-semibold text-gray-900',
+    description: 'text-gray-600 mt-2',
+    label: 'text-sm font-medium text-gray-700',
+    input: 'w-full px-4 py-3 bg-white border border-gray-300 rounded-lg transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none',
+    textarea: 'w-full px-4 py-3 bg-white border border-gray-300 rounded-lg transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none resize-none',
+    select: 'w-full px-4 py-3 bg-white border border-gray-300 rounded-lg transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none',
+    radio: 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300',
+    checkbox: 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded',
+    button: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
+    background: 'bg-gray-50'
+  }
 };
 
 export function getTheme(themeId: string): ThemeStyles {

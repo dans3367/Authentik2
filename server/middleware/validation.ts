@@ -127,6 +127,7 @@ export const formValidation = [
       "pastel",
       "brutalist",
       "material",
+      "custom",
     ]),
 ];
 

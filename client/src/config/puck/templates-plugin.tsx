@@ -4,6 +4,7 @@ import { usePuck, Render } from "@puckeditor/core";
 import type { Plugin } from "@puckeditor/core";
 import { newsletterTemplates, type NewsletterTemplate } from "./templates";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useTheme } from "@/contexts/ThemeContext";
 
 /**
  * Full-screen preview overlay for a template.
@@ -20,6 +21,8 @@ function TemplatePreviewModal({
 }) {
   const { config } = usePuck();
   const { t } = useLanguage();
+  const { theme } = useTheme();
+  const dk = theme === 'dark';
 
   // Close on Escape & prevent body scroll while open
   useEffect(() => {
@@ -58,9 +61,10 @@ function TemplatePreviewModal({
           width: "640px",
           maxWidth: "100%",
           maxHeight: "100%",
-          background: "#fff",
+          background: dk ? "hsl(215, 25%, 12%)" : "#fff",
           borderRadius: "12px",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          boxShadow: dk ? "0 8px 32px rgba(0,0,0,0.5)" : "0 8px 32px rgba(0,0,0,0.2)",
+          border: dk ? "1px solid hsl(215, 20%, 22%)" : "none",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -78,7 +82,7 @@ function TemplatePreviewModal({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontWeight: 600, fontSize: "16px", color: "#111827" }}>
+            <span style={{ fontWeight: 600, fontSize: "16px", color: dk ? "#e5e7eb" : "#111827" }}>
               {t(`puckEditor.templates.items.${template.id}.name`, template.name)}
             </span>
             <span
@@ -87,8 +91,12 @@ function TemplatePreviewModal({
                 fontWeight: 500,
                 padding: "2px 8px",
                 borderRadius: "4px",
-                background: template.category === "product" ? "#fef3c7" : "#dbeafe",
-                color: template.category === "product" ? "#92400e" : "#1e40af",
+                background: template.category === "product"
+                  ? dk ? "hsl(40, 50%, 20%)" : "#fef3c7"
+                  : dk ? "hsl(215, 40%, 20%)" : "#dbeafe",
+                color: template.category === "product"
+                  ? dk ? "#fbbf24" : "#92400e"
+                  : dk ? "#93c5fd" : "#1e40af",
                 textTransform: "capitalize",
               }}
             >
@@ -108,12 +116,12 @@ function TemplatePreviewModal({
               border: "none",
               borderRadius: "6px",
               cursor: "pointer",
-              color: "#6b7280",
+              color: dk ? "#9ca3af" : "#6b7280",
               fontSize: "18px",
               lineHeight: 1,
               flexShrink: 0,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#f3f4f6")}
+            onMouseEnter={(e) => (e.currentTarget.style.background = dk ? "hsl(215, 20%, 18%)" : "#f3f4f6")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
           >
             &#x2715;
@@ -126,7 +134,7 @@ function TemplatePreviewModal({
             padding: "0 20px 12px",
             fontSize: "13px",
             lineHeight: "1.4",
-            color: "#6b7280",
+            color: dk ? "#9ca3af" : "#6b7280",
             flexShrink: 0,
           }}
         >
@@ -140,9 +148,9 @@ function TemplatePreviewModal({
             overflowY: "auto",
             overflowX: "hidden",
             WebkitOverflowScrolling: "touch",
-            borderTop: "1px solid #e5e7eb",
-            borderBottom: "1px solid #e5e7eb",
-            background: "#f9fafb",
+            borderTop: dk ? "1px solid hsl(215, 20%, 22%)" : "1px solid #e5e7eb",
+            borderBottom: dk ? "1px solid hsl(215, 20%, 22%)" : "1px solid #e5e7eb",
+            background: dk ? "hsl(215, 20%, 8%)" : "#f9fafb",
             padding: "24px 20px",
           }}
         >
@@ -150,9 +158,9 @@ function TemplatePreviewModal({
             style={{
               maxWidth: "580px",
               margin: "0 auto",
-              background: "#fff",
+              background: dk ? "hsl(215, 20%, 14%)" : "#fff",
               borderRadius: "6px",
-              border: "1px solid #e5e7eb",
+              border: dk ? "1px solid hsl(215, 20%, 22%)" : "1px solid #e5e7eb",
               padding: "20px",
             }}
           >
@@ -176,9 +184,9 @@ function TemplatePreviewModal({
               padding: "8px 20px",
               fontSize: "13px",
               fontWeight: 500,
-              color: "#374151",
-              background: "#fff",
-              border: "1px solid #d1d5db",
+              color: dk ? "#d1d5db" : "#374151",
+              background: dk ? "hsl(215, 20%, 16%)" : "#fff",
+              border: dk ? "1px solid hsl(215, 20%, 25%)" : "1px solid #d1d5db",
               borderRadius: "6px",
               cursor: "pointer",
             }}
@@ -213,6 +221,8 @@ function TemplatePreviewModal({
 function TemplatesPanel() {
   const { dispatch } = usePuck();
   const { t } = useLanguage();
+  const { theme } = useTheme();
+  const dk = theme === 'dark';
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<NewsletterTemplate | null>(null);
   const [filter, setFilter] = useState<"all" | "newsletter" | "product">("all");
@@ -358,8 +368,8 @@ function TemplatesPanel() {
                       padding: "6px 0",
                       fontSize: "12px",
                       fontWeight: 500,
-                      color: "#374151",
-                      background: "#f3f4f6",
+                      color: dk ? "#d1d5db" : "#374151",
+                      background: dk ? "hsl(215, 20%, 18%)" : "#f3f4f6",
                       border: "none",
                       borderRadius: "4px",
                       cursor: "pointer",
@@ -377,9 +387,9 @@ function TemplatesPanel() {
                       padding: "6px 0",
                       fontSize: "12px",
                       fontWeight: 500,
-                      color: "#4b5563",
-                      background: "#f9fafb",
-                      border: "1px solid #d1d5db",
+                      color: dk ? "#d1d5db" : "#4b5563",
+                      background: dk ? "hsl(215, 20%, 16%)" : "#f9fafb",
+                      border: dk ? "1px solid hsl(215, 20%, 25%)" : "1px solid #d1d5db",
                       borderRadius: "4px",
                       cursor: "pointer",
                     }}
@@ -393,9 +403,9 @@ function TemplatesPanel() {
                       padding: "6px 0",
                       fontSize: "12px",
                       fontWeight: 500,
-                      color: "#2563eb",
-                      background: "#eff6ff",
-                      border: "1px solid #bfdbfe",
+                      color: dk ? "#93c5fd" : "#2563eb",
+                      background: dk ? "hsl(215, 30%, 18%)" : "#eff6ff",
+                      border: dk ? "1px solid hsl(215, 40%, 30%)" : "1px solid #bfdbfe",
                       borderRadius: "4px",
                       cursor: "pointer",
                     }}

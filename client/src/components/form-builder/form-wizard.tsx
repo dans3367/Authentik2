@@ -343,10 +343,12 @@ const [, setLocation] = useLocation();
         )}
         
         {wizardState.currentStep === 'style' && (
-          <StyleStep 
-            themes={themes} 
+          <StyleStep
+            themes={themes}
             selectedTheme={wizardState.selectedTheme}
             onSelectTheme={selectTheme}
+            onCustomizeColors={customizeThemeColors}
+            onResetColors={resetThemeColors}
           />
         )}
         

@@ -605,6 +605,31 @@ export const defaultThemes: FormTheme[] = [
         fill: 'bg-gradient-to-r from-[#ff2d95] via-[#b967ff] to-[#01cdfe] h-full rounded-lg transition-all duration-500 ease-out'
       }
     }
+  },
+  {
+    id: 'custom',
+    name: 'Custom',
+    description: 'Design your own theme — pick every color, font, and detail from scratch',
+    preview: 'bg-gradient-to-br from-slate-100 via-white to-slate-100 border-2 border-dashed border-slate-300',
+    styles: {
+      container: 'max-w-2xl mx-auto p-8 bg-white border border-gray-200 rounded-xl shadow-lg',
+      header: 'text-3xl font-semibold text-gray-900 mb-8',
+      field: 'mb-6',
+      label: 'block text-sm font-medium text-gray-700 mb-2',
+      input: 'w-full px-4 py-3 h-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white',
+      button: 'w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg',
+      background: 'bg-gray-50',
+      booleanSwitch: {
+        track: 'border-2 data-[state=unchecked]:bg-gray-200 data-[state=unchecked]:border-gray-400 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500',
+        thumb: 'data-[state=unchecked]:bg-gray-500 data-[state=checked]:bg-white shadow-md',
+        activeLabel: 'text-gray-900 font-medium',
+        inactiveLabel: 'text-gray-500'
+      },
+      progressBar: {
+        container: 'w-full bg-gray-200 rounded-lg h-2 mb-6',
+        fill: 'bg-blue-500 h-2 rounded-lg transition-all duration-500 ease-out'
+      }
+    }
   }
 ];
 

@@ -20,6 +20,7 @@ import { useLocation, useParams } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -389,6 +390,8 @@ export default function NewsletterCreatePage() {
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { t, currentLanguage } = useLanguage();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const queryClient = useQueryClient();
 
   // Stable key for the Puck editor — locked at mount time so auto-save
@@ -850,9 +853,9 @@ export default function NewsletterCreatePage() {
             onClick={() => setViewport("mobile")}
             style={{
               padding: "8px",
-              background: viewport === "mobile" ? "#2563eb" : "#fff",
-              color: viewport === "mobile" ? "#fff" : "#000",
-              border: "1px solid #e5e7eb",
+              background: viewport === "mobile" ? "#2563eb" : isDark ? "hsl(215, 20%, 16%)" : "#fff",
+              color: viewport === "mobile" ? "#fff" : isDark ? "#d1d5db" : "#000",
+              border: isDark ? "1px solid hsl(215, 20%, 25%)" : "1px solid #e5e7eb",
               borderRadius: "4px",
               cursor: "pointer",
               display: "flex",
@@ -869,9 +872,9 @@ export default function NewsletterCreatePage() {
             onClick={() => setViewport("desktop")}
             style={{
               padding: "8px",
-              background: viewport === "desktop" ? "#2563eb" : "#fff",
-              color: viewport === "desktop" ? "#fff" : "#000",
-              border: "1px solid #e5e7eb",
+              background: viewport === "desktop" ? "#2563eb" : isDark ? "hsl(215, 20%, 16%)" : "#fff",
+              color: viewport === "desktop" ? "#fff" : isDark ? "#d1d5db" : "#000",
+              border: isDark ? "1px solid hsl(215, 20%, 25%)" : "1px solid #e5e7eb",
               borderRadius: "4px",
               cursor: "pointer",
               display: "flex",
@@ -891,9 +894,9 @@ export default function NewsletterCreatePage() {
             disabled={zoom <= 25}
             style={{
               padding: "8px",
-              background: "#fff",
-              color: zoom <= 25 ? "#9ca3af" : "#000",
-              border: "1px solid #e5e7eb",
+              background: isDark ? "hsl(215, 20%, 16%)" : "#fff",
+              color: zoom <= 25 ? "#9ca3af" : isDark ? "#d1d5db" : "#000",
+              border: isDark ? "1px solid hsl(215, 20%, 25%)" : "1px solid #e5e7eb",
               borderRadius: "4px",
               cursor: zoom <= 25 ? "not-allowed" : "pointer",
               display: "flex",
@@ -909,9 +912,9 @@ export default function NewsletterCreatePage() {
             onClick={handleZoomReset}
             style={{
               padding: "8px 12px",
-              background: "#fff",
-              color: "#000",
-              border: "1px solid #e5e7eb",
+              background: isDark ? "hsl(215, 20%, 16%)" : "#fff",
+              color: isDark ? "#d1d5db" : "#000",
+              border: isDark ? "1px solid hsl(215, 20%, 25%)" : "1px solid #e5e7eb",
               borderRadius: "4px",
               cursor: "pointer",
               fontSize: "12px",
@@ -928,9 +931,9 @@ export default function NewsletterCreatePage() {
             disabled={zoom >= 100}
             style={{
               padding: "8px",
-              background: "#fff",
-              color: zoom >= 100 ? "#9ca3af" : "#000",
-              border: "1px solid #e5e7eb",
+              background: isDark ? "hsl(215, 20%, 16%)" : "#fff",
+              color: zoom >= 100 ? "#9ca3af" : isDark ? "#d1d5db" : "#000",
+              border: isDark ? "1px solid hsl(215, 20%, 25%)" : "1px solid #e5e7eb",
               borderRadius: "4px",
               cursor: zoom >= 100 ? "not-allowed" : "pointer",
               display: "flex",
@@ -1044,7 +1047,7 @@ export default function NewsletterCreatePage() {
         </button>
       </>
     ),
-  }), [emailDesign, viewport, zoom, handleZoomIn, handleZoomOut, handleZoomReset, t]);
+  }), [emailDesign, viewport, zoom, handleZoomIn, handleZoomOut, handleZoomReset, t, isDark]);
 
   const puckPlugins = useMemo(() => [
     ...(_blocksPlugin ? [{ ..._blocksPlugin(), label: t("puckEditor.sidebar.blocks", { defaultValue: "Blocks" }) }] : []),
@@ -1087,8 +1090,8 @@ export default function NewsletterCreatePage() {
             alignItems: "center",
             height: "40px",
             padding: "0 12px",
-            borderBottom: "1px solid #e5e7eb",
-            background: "#fff",
+            borderBottom: isDark ? "1px solid hsl(215, 20%, 22%)" : "1px solid #e5e7eb",
+            background: isDark ? "hsl(215, 25%, 10%)" : "#fff",
             flexShrink: 0,
             justifyContent: "flex-end",
           }}>
@@ -1112,12 +1115,12 @@ export default function NewsletterCreatePage() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#6b7280",
+                color: isDark ? "#9ca3af" : "#6b7280",
               }}
               title="Close editor"
               data-testid="button-close"
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = '#111827'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#6b7280'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = isDark ? 'hsl(215, 20%, 18%)' : '#f3f4f6'; e.currentTarget.style.color = isDark ? '#e5e7eb' : '#111827'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDark ? '#9ca3af' : '#6b7280'; }}
             >
               <X size={18} />
             </button>

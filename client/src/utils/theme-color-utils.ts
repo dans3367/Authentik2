@@ -32,6 +32,20 @@ export function extractThemeColors(theme: FormTheme): CustomColors {
 
   // Extract colors based on theme ID patterns
   switch (theme.id) {
+    case 'custom':
+      text = '#1F2937';
+      header = '#111827';
+      button = '#3B82F6';
+      background = '#F9FAFB';
+      font = 'sans';
+      label = '#374151';
+      inputBackground = '#FFFFFF';
+      inputBorder = '#D1D5DB';
+      inputText = '#1F2937';
+      borderRadius = 'medium';
+      containerShadow = 'large';
+      progressBar = '#3B82F6';
+      break;
     case 'minimal':
       text = '#1F2937';
       header = '#111827';

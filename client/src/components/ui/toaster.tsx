@@ -1,5 +1,6 @@
 import { Toaster as SonnerToaster, toast } from "sonner"
 import { useEffect } from "react"
+import { useTheme } from "@/contexts/ThemeContext"
 
 function ClickToDismiss() {
   useEffect(() => {
@@ -17,11 +18,13 @@ function ClickToDismiss() {
 }
 
 export function Toaster() {
+  const { theme } = useTheme();
   return (
     <>
       <ClickToDismiss />
       <SonnerToaster
         position="top-center"
+        theme={theme}
         style={{ zIndex: 2147483647 }}
         toastOptions={{
           duration: 4000,

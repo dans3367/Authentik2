@@ -228,9 +228,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   const updateMenuPreferenceMutation = useUpdateMenuPreference();
   const { setUserTheme } = useTheme();
 
-  // Sync theme from user profile on initial load
+  // Sync theme from user profile only once per browser session
   useEffect(() => {
-    if (isInitialized && user?.theme) {
+    if (isInitialized && user?.theme && !sessionStorage.getItem('theme-synced')) {
+      sessionStorage.setItem('theme-synced', '1');
       setUserTheme(user.theme as 'light' | 'dark');
     }
   }, [isInitialized, user?.theme]);

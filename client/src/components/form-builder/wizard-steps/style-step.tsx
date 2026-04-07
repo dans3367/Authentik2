@@ -1,14 +1,21 @@
-import { FormTheme } from '@/types/form-builder';
+import { FormTheme, CustomColors } from '@/types/form-builder';
 import { Button } from '@/components/ui/button';
-import { Check } from 'lucide-react';
+import { Check, Palette } from 'lucide-react';
+import { ColorCustomizer } from '@/components/form-builder/color-customizer';
 
 interface StyleStepProps {
   themes: FormTheme[];
   selectedTheme: FormTheme | null;
   onSelectTheme: (theme: FormTheme) => void;
+  onCustomizeColors?: (colors: CustomColors) => void;
+  onResetColors?: () => void;
 }
 
-export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepProps) {
+export function StyleStep({ themes, selectedTheme, onSelectTheme, onCustomizeColors, onResetColors }: StyleStepProps) {
+  const customTheme = themes.find(t => t.id === 'custom');
+  const otherThemes = themes.filter(t => t.id !== 'custom');
+  const isCustomSelected = selectedTheme?.id === 'custom';
+
   return (
     <div className="flex flex-col bg-neutral-50">
       <div className="bg-white/95 backdrop-blur-sm border-b border-slate-200/60 px-6 py-5 shadow-sm">
@@ -20,8 +27,78 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
 
       <div className="p-6">
         <div className="max-w-4xl mx-auto">
+          {/* Custom Theme Card - Full Width at Top */}
+          {customTheme && (
+            <div className="mb-6">
+              <div
+                className={`relative group cursor-pointer transition-all duration-200 ${
+                  isCustomSelected
+                    ? 'ring-2 ring-blue-500 ring-offset-2'
+                    : 'hover:shadow-lg'
+                }`}
+                onClick={() => onSelectTheme(customTheme)}
+              >
+                <div className="bg-white rounded-xl shadow-md overflow-hidden border border-slate-200">
+                  <div className="flex items-center justify-between p-6 border-b border-dashed border-slate-200 bg-gradient-to-r from-slate-50 via-white to-slate-50">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
+                        <Palette className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-800">Custom Theme</h3>
+                        <p className="text-sm text-slate-500">Design your own — pick every color, font, and detail</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {isCustomSelected && onCustomizeColors && onResetColors && (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <ColorCustomizer
+                            theme={selectedTheme!}
+                            onColorsChange={onCustomizeColors}
+                            onResetColors={onResetColors}
+                          />
+                        </div>
+                      )}
+                      {isCustomSelected && (
+                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                          <Check className="w-5 h-5 text-white" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {isCustomSelected && selectedTheme?.customColors && (
+                    <div className="px-6 py-4 bg-slate-50/50">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Active colors:</span>
+                        {[
+                          { label: 'Background', color: selectedTheme.customColors.background },
+                          { label: 'Header', color: selectedTheme.customColors.header },
+                          { label: 'Text', color: selectedTheme.customColors.text },
+                          { label: 'Button', color: selectedTheme.customColors.button },
+                          { label: 'Label', color: selectedTheme.customColors.label },
+                          { label: 'Input BG', color: selectedTheme.customColors.inputBackground },
+                          { label: 'Input Border', color: selectedTheme.customColors.inputBorder },
+                          { label: 'Input Text', color: selectedTheme.customColors.inputText },
+                        ].filter(s => s.color).map((swatch) => (
+                          <div key={swatch.label} className="flex items-center gap-1.5">
+                            <div
+                              className="w-5 h-5 rounded border border-slate-200 shadow-sm"
+                              style={{ backgroundColor: swatch.color }}
+                            />
+                            <span className="text-xs text-slate-600">{swatch.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Preset Themes Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {themes.map((theme) => (
+            {otherThemes.map((theme) => (
               <div
                 key={theme.id}
                 className={`relative group cursor-pointer transition-all duration-200 ${
@@ -39,7 +116,7 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                         <Check className="w-5 h-5 text-green-600" />
                       </div>
                     )}
-                    
+
                     {/* Theme-specific preview content */}
                     <div className="text-center px-4">
                       {theme.id === 'neon' && (
@@ -145,7 +222,7 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                   <div className="p-6">
                     <h3 className="text-lg font-semibold text-slate-800 mb-2">{theme.name}</h3>
                     <p className="text-sm text-slate-600 mb-4">{theme.description}</p>
-                    
+
                     {/* Enhanced sample form preview */}
                     <div className="space-y-3 p-4 bg-slate-50 rounded-lg border overflow-hidden">
                       <div className="space-y-1">
@@ -207,7 +284,7 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme }: StyleStepPro
                         theme.id === 'nature' ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl' :
                         theme.id === 'luxury' ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-purple-900 rounded-lg' :
                         theme.id === 'retro' ? 'bg-gradient-to-r from-orange-500 to-pink-500 text-white' :
-              
+
                         theme.id === 'elegant' ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-lg' :
                         theme.id === 'playful' ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-2xl' :
                         theme.id === 'modern' ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl' :
