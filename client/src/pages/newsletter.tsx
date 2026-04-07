@@ -41,6 +41,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,21 +83,34 @@ type NewsletterListItem = NewsletterWithUser & {
 };
 
 const getStatusBadge = (status: string, t: any) => {
+  const base = "gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border-0";
   switch (status) {
     case 'draft':
-      return <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800"><FileText className="h-3 w-3 mr-1" />{t('newsletter.status.draft')}</Badge>;
+      return <Badge variant="secondary" className={`${base} bg-amber-500/10 text-amber-700 dark:text-amber-400`}><FileText className="h-3 w-3" />{t('newsletter.status.draft')}</Badge>;
     case 'ready_to_send':
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"><Send className="h-3 w-3 mr-1" />{t('newsletter.status.readyToSend')}</Badge>;
+      return <Badge variant="secondary" className={`${base} bg-blue-500/10 text-blue-700 dark:text-blue-400`}><Send className="h-3 w-3" />{t('newsletter.status.readyToSend')}</Badge>;
     case 'pending_review':
-      return <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800"><ShieldCheck className="h-3 w-3 mr-1" />{t('newsletter.status.pendingReview')}</Badge>;
+      return <Badge variant="secondary" className={`${base} bg-orange-500/10 text-orange-700 dark:text-orange-400`}><ShieldCheck className="h-3 w-3" />{t('newsletter.status.pendingReview')}</Badge>;
     case 'scheduled':
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"><Clock className="h-3 w-3 mr-1" />{t('newsletter.status.scheduled')}</Badge>;
+      return <Badge variant="secondary" className={`${base} bg-violet-500/10 text-violet-700 dark:text-violet-400`}><Clock className="h-3 w-3" />{t('newsletter.status.scheduled')}</Badge>;
     case 'sending':
-      return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800"><Send className="h-3 w-3 mr-1 animate-pulse" />{t('newsletter.status.sending')}</Badge>;
+      return <Badge variant="secondary" className={`${base} bg-violet-500/10 text-violet-700 dark:text-violet-400`}><Send className="h-3 w-3 animate-pulse" />{t('newsletter.status.sending')}</Badge>;
     case 'sent':
-      return <Badge variant="default" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"><Send className="h-3 w-3 mr-1" />{t('newsletter.status.sent')}</Badge>;
+      return <Badge variant="secondary" className={`${base} bg-emerald-500/10 text-emerald-700 dark:text-emerald-400`}><Send className="h-3 w-3" />{t('newsletter.status.sent')}</Badge>;
     default:
-      return <Badge variant="secondary">{status}</Badge>;
+      return <Badge variant="secondary" className={base}>{status}</Badge>;
+  }
+};
+
+const getStatusAccent = (status: string) => {
+  switch (status) {
+    case 'draft': return 'bg-amber-500';
+    case 'ready_to_send': return 'bg-blue-500';
+    case 'pending_review': return 'bg-orange-500';
+    case 'scheduled': return 'bg-violet-500';
+    case 'sending': return 'bg-violet-500';
+    case 'sent': return 'bg-emerald-500';
+    default: return 'bg-muted-foreground';
   }
 };
 
@@ -128,7 +142,6 @@ export default function NewsletterPage() {
     { label: t("newsletter.breadcrumbNewsletters", "Email Newsletters"), icon: Mail }
   ]);
 
-  // Single aggregate query replaces 4 parallel calls (newsletters, archived, reviewer settings, email design)
   const { data: pageData, isLoading, error, refetch } = useQuery({
     queryKey: ['/api/newsletters/page-data', { emailType: 'newsletter', shopId: selectedShopId }],
     queryFn: async () => {
@@ -158,12 +171,13 @@ export default function NewsletterPage() {
   const reviewerEnabled = reviewerSettings?.enabled ?? false;
   const isCurrentUserDesignatedReviewer = reviewerSettings?.reviewerId === currentUserId;
 
+  // --- Mutations ---
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest('DELETE', `/api/newsletters/${id}`);
     },
     onSuccess: (_data, id) => {
-      // Remove from aggregate cache immediately so the card disappears before refetch
       queryClient.setQueryData(
         ['/api/newsletters/page-data', { emailType: 'newsletter', shopId: selectedShopId }],
         (old: any) => old ? {
@@ -188,22 +202,14 @@ export default function NewsletterPage() {
     },
     onSuccess: (data: any, variables: string) => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      toast({
-        title: t("newsletter.toast.deployed"),
-        description: data.message || t("newsletter.toast.deployedDesc")
-      });
+      toast({ title: t("newsletter.toast.deployed"), description: data.message || t("newsletter.toast.deployedDesc") });
       setLocation(`/newsletters/${data.newsletterId || data.id || variables}`);
     },
     onError: (error: any) => {
-      toast({
-        title: t("newsletter.toast.deployFailed"),
-        description: error.message || t("newsletter.toast.deployFailedDesc"),
-        variant: "destructive"
-      });
+      toast({ title: t("newsletter.toast.deployFailed"), description: error.message || t("newsletter.toast.deployFailedDesc"), variant: "destructive" });
     },
   });
 
-  // Cancel schedule mutation
   const cancelScheduleMutation = useMutation({
     mutationFn: async (id: string) => {
       const response = await apiRequest('POST', `/api/newsletters/${id}/cancel-schedule`);
@@ -211,21 +217,13 @@ export default function NewsletterPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      toast({
-        title: t("newsletter.toast.scheduleCancelled"),
-        description: t("newsletter.toast.scheduleCancelledDesc")
-      });
+      toast({ title: t("newsletter.toast.scheduleCancelled"), description: t("newsletter.toast.scheduleCancelledDesc") });
     },
     onError: (error: any) => {
-      toast({
-        title: t("newsletter.toast.cancelFailed"),
-        description: error.message || t("newsletter.toast.cancelFailedDesc"),
-        variant: "destructive"
-      });
+      toast({ title: t("newsletter.toast.cancelFailed"), description: error.message || t("newsletter.toast.cancelFailedDesc"), variant: "destructive" });
     },
   });
 
-  // Submit for review mutation
   const submitForReviewMutation = useMutation({
     mutationFn: async (id: string) => {
       const response = await apiRequest('POST', `/api/newsletters/${id}/submit-for-review`);
@@ -233,21 +231,13 @@ export default function NewsletterPage() {
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      toast({
-        title: t("newsletter.toast.submittedForReview"),
-        description: data.message || t("newsletter.toast.submittedForReviewDesc")
-      });
+      toast({ title: t("newsletter.toast.submittedForReview"), description: data.message || t("newsletter.toast.submittedForReviewDesc") });
     },
     onError: (error: any) => {
-      toast({
-        title: t("newsletter.toast.submissionFailed"),
-        description: error.message || t("newsletter.toast.submissionFailedDesc"),
-        variant: "destructive"
-      });
+      toast({ title: t("newsletter.toast.submissionFailed"), description: error.message || t("newsletter.toast.submissionFailedDesc"), variant: "destructive" });
     },
   });
 
-  // Recall to draft mutation
   const recallToDraftMutation = useMutation({
     mutationFn: async (id: string) => {
       const response = await apiRequest('POST', `/api/newsletters/${id}/recall-review`);
@@ -255,21 +245,13 @@ export default function NewsletterPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
-      toast({
-        title: t("newsletter.toast.recalledToDraft", "Recalled to Draft"),
-        description: t("newsletter.toast.recalledToDraftDesc", "Newsletter has been recalled from review and returned to draft."),
-      });
+      toast({ title: t("newsletter.toast.recalledToDraft", "Recalled to Draft"), description: t("newsletter.toast.recalledToDraftDesc", "Newsletter has been recalled from review and returned to draft.") });
     },
     onError: (error: any) => {
-      toast({
-        title: t("newsletter.toast.recallFailed", "Recall Failed"),
-        description: error.message || t("newsletter.toast.recallFailedDesc", "Failed to recall newsletter from review."),
-        variant: "destructive",
-      });
+      toast({ title: t("newsletter.toast.recallFailed", "Recall Failed"), description: error.message || t("newsletter.toast.recallFailedDesc", "Failed to recall newsletter from review."), variant: "destructive" });
     },
   });
 
-  // Archive mutation
   const archiveMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest('POST', `/api/newsletters/${id}/archive`);
@@ -283,7 +265,6 @@ export default function NewsletterPage() {
     },
   });
 
-  // Unarchive mutation
   const unarchiveMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest('POST', `/api/newsletters/${id}/unarchive`);
@@ -297,10 +278,7 @@ export default function NewsletterPage() {
     },
   });
 
-  // Archived newsletters come from the aggregate query
   const archivedNewslettersData = pageData?.archivedNewsletters;
-
-  // Layer Convex real-time data on top of archived TanStack Query data
   const { newsletters: realtimeArchivedNewsletters } = useRealtimeNewsletters(archivedNewslettersData, tenantId, selectedShopId, true, "newsletter");
   const archivedNewsletters: NewsletterListItem[] = realtimeArchivedNewsletters || [];
 
@@ -321,15 +299,10 @@ export default function NewsletterPage() {
       toast({ title: t("newsletter.toast.recipientsUpdated"), description: t("newsletter.toast.recipientsUpdatedDesc") });
       setEditRecipientsNewsletter(null);
     } catch (error: any) {
-      toast({
-        title: t("newsletter.toast.error"),
-        description: error.message || t("newsletter.toast.recipientsError"),
-        variant: "destructive",
-      });
+      toast({ title: t("newsletter.toast.error"), description: error.message || t("newsletter.toast.recipientsError"), variant: "destructive" });
     }
   };
 
-  // Layer Convex real-time data on top of TanStack Query data for instant kanban updates
   const { newsletters: realtimeNewsletters } = useRealtimeNewsletters(newslettersData, tenantId, selectedShopId, false, "newsletter");
   const newsletters: NewsletterListItem[] = realtimeNewsletters || [];
 
@@ -347,76 +320,24 @@ export default function NewsletterPage() {
     const scheduled = filteredNewsletters.filter(n => ['scheduled', 'sending'].includes(n.status));
     const sent = filteredNewsletters.filter(n => n.status === 'sent');
     return [
-      {
-        key: 'drafts',
-        title: t('newsletter.kanban.drafts', 'Drafts'),
-        icon: FileText,
-        color: 'amber',
-        borderColor: 'border-amber-300 dark:border-amber-700',
-        bgHeader: 'bg-amber-50 dark:bg-amber-950/40',
-        textColor: 'text-amber-700 dark:text-amber-300',
-        badgeBg: 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300',
-        accentBar: 'bg-amber-400',
-        items: drafts,
-      },
-      {
-        key: 'ready_to_send',
-        title: t('newsletter.kanban.readyToSend', 'Ready to Send'),
-        icon: Send,
-        color: 'blue',
-        borderColor: 'border-blue-300 dark:border-blue-700',
-        bgHeader: 'bg-blue-50 dark:bg-blue-950/40',
-        textColor: 'text-blue-700 dark:text-blue-300',
-        badgeBg: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
-        accentBar: 'bg-blue-400',
-        items: readyToSend,
-      },
-      {
-        key: 'scheduled',
-        title: t('newsletter.kanban.scheduled', 'Scheduled'),
-        icon: Clock,
-        color: 'purple',
-        borderColor: 'border-purple-300 dark:border-purple-700',
-        bgHeader: 'bg-purple-50 dark:bg-purple-950/40',
-        textColor: 'text-purple-700 dark:text-purple-300',
-        badgeBg: 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300',
-        accentBar: 'bg-purple-400',
-        items: scheduled,
-      },
-      {
-        key: 'sent',
-        title: t('newsletter.kanban.sent', 'Sent'),
-        icon: Mail,
-        color: 'green',
-        borderColor: 'border-green-300 dark:border-green-700',
-        bgHeader: 'bg-green-50 dark:bg-green-950/40',
-        textColor: 'text-green-700 dark:text-green-300',
-        badgeBg: 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300',
-        accentBar: 'bg-green-400',
-        items: sent,
-      },
+      { key: 'drafts', title: t('newsletter.kanban.drafts', 'Drafts'), icon: FileText, dot: 'bg-amber-500', items: drafts },
+      { key: 'ready_to_send', title: t('newsletter.kanban.readyToSend', 'Ready to Send'), icon: Send, dot: 'bg-blue-500', items: readyToSend },
+      { key: 'scheduled', title: t('newsletter.kanban.scheduled', 'Scheduled'), icon: Clock, dot: 'bg-violet-500', items: scheduled },
+      { key: 'sent', title: t('newsletter.kanban.sent', 'Sent'), icon: Mail, dot: 'bg-emerald-500', items: sent },
     ];
   }, [filteredNewsletters, t]);
-
 
   const parsedSocialLinks = useMemo(() => {
     const raw = emailDesign?.socialLinks;
     if (!raw) return undefined;
     if (typeof raw === "string") {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return undefined;
-      }
+      try { return JSON.parse(raw); } catch { return undefined; }
     }
     return raw;
   }, [emailDesign]);
 
   const wrappedPreviewHtml = useMemo(() => {
-    if (!previewNewsletter) {
-      return "";
-    }
-
+    if (!previewNewsletter) return "";
     return wrapInEmailPreview(previewNewsletter.content || "", {
       companyName: emailDesign?.companyName || "",
       headerMode: emailDesign?.headerMode,
@@ -433,82 +354,290 @@ export default function NewsletterPage() {
     });
   }, [previewNewsletter, emailDesign, parsedSocialLinks]);
 
+  // --- Error State ---
   if (error) {
     return (
-      <div className="container mx-auto p-4 lg:p-6">
-        <Card className="w-full max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle className="text-red-600 dark:text-red-400">{t("newsletter.error.title")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+      <div className="container mx-auto p-4 lg:p-6 flex items-center justify-center min-h-[50vh]">
+        <div className="text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto">
+            <XCircle className="h-7 w-7 text-red-500/60" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold mb-1">{t("newsletter.error.title")}</h3>
+            <p className="text-sm text-muted-foreground/60 max-w-sm">
               {error instanceof Error ? error.message : t("newsletter.error.loadFailed")}
             </p>
-            <Button onClick={() => refetch()}>{t("newsletter.error.tryAgain")}</Button>
-          </CardContent>
-        </Card>
+          </div>
+          <Button onClick={() => refetch()} className="rounded-xl">{t("newsletter.error.tryAgain")}</Button>
+        </div>
       </div>
     );
   }
 
+  // --- Loading State ---
   if (isLoading) {
     return (
-      <div className="container mx-auto p-4 lg:p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <Skeleton className="h-8 w-48 mb-2" />
-            <Skeleton className="h-5 w-72" />
+      <div className="container mx-auto p-4 lg:p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-52" />
+            <Skeleton className="h-4 w-72" />
           </div>
-          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-10 w-40 rounded-xl" />
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-64 rounded-xl" />
+        <Skeleton className="h-10 w-full max-w-md rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="space-y-3">
+              <Skeleton className="h-10 rounded-xl" />
+              <Skeleton className="h-48 rounded-2xl" />
+              <Skeleton className="h-48 rounded-2xl" />
+            </div>
           ))}
         </div>
       </div>
     );
   }
 
+  // --- Newsletter Card Renderer ---
+  const renderNewsletterCard = (newsletter: NewsletterListItem) => {
+    const openRate = (newsletter.recipientCount || 0) > 0
+      ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
+      : "0";
+    const isDraft = newsletter.status === 'draft';
+    const isSent = newsletter.status === 'sent';
+    const isReadyToSend = newsletter.status === 'ready_to_send';
+    const isPendingReview = newsletter.status === 'pending_review';
+    const isScheduled = newsletter.status === 'scheduled';
+    const isCurrentUserReviewer = newsletter.reviewerId === currentUserId;
+    const tenantSlug = (newsletter as any)?.tenant?.slug;
+    const articlePreviewUrl = tenantSlug ? `/n/preview/${tenantSlug}/${newsletter.id}` : null;
+    const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
+    const isDeploying = deployMutation.isPending && deployMutation.variables === newsletter.id;
+    const isSubmittingForReview = submitForReviewMutation.isPending && submitForReviewMutation.variables === newsletter.id;
+    const isCancellingSchedule = cancelScheduleMutation.isPending && cancelScheduleMutation.variables === newsletter.id;
+
+    if (isDeleting) {
+      return (
+        <div key={newsletter.id} className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/40 bg-muted/20 animate-pulse py-10">
+          <Loader2 className="h-5 w-5 text-primary animate-spin mb-2" />
+          <p className="text-[11px] text-muted-foreground/50 font-medium">{t("newsletter.card.deleting")}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={newsletter.id}
+        className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card hover:shadow-lg hover:shadow-black/[0.03] dark:hover:shadow-black/20 hover:border-border/80 transition-all duration-300 cursor-pointer"
+        onClick={() => (isDraft || isReadyToSend)
+          ? setLocation(`/newsletter/create/${newsletter.id}`)
+          : setLocation(`/newsletters/${newsletter.id}`)
+        }
+      >
+        {/* Status accent bar */}
+        <div className={`absolute top-0 left-0 right-0 h-0.5 ${getStatusAccent(newsletter.status)}`} />
+
+        <div className="p-4 space-y-3">
+          {/* Status + Actions */}
+          <div className="flex items-center justify-between">
+            {getStatusBadge(newsletter.status, t)}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg text-muted-foreground/40 hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <MoreVertical className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 rounded-xl p-1.5" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewNewsletter(newsletter); }} className="gap-2.5 rounded-lg cursor-pointer">
+                  <Eye className="h-3.5 w-3.5" /><span className="text-sm">{t("newsletter.actions.preview")}</span>
+                </DropdownMenuItem>
+                {articlePreviewUrl && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); window.open(articlePreviewUrl, '_blank', 'noopener,noreferrer'); }} className="gap-2.5 rounded-lg cursor-pointer">
+                    <ExternalLink className="h-3.5 w-3.5" /><span className="text-sm">Preview article on blog</span>
+                  </DropdownMenuItem>
+                )}
+                {canCreate && (isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setLocation(`/newsletter/create/${newsletter.id}`); }} className="gap-2.5 rounded-lg cursor-pointer">
+                    <Pencil className="h-3.5 w-3.5" /><span className="text-sm">{t("newsletter.actions.edit")}</span>
+                  </DropdownMenuItem>
+                )}
+                {canCreate && (isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditRecipientsNewsletter(newsletter); }} data-testid={`button-edit-recipients-${newsletter.id}`} className="gap-2.5 rounded-lg cursor-pointer">
+                    <UserCog className="h-3.5 w-3.5" /><span className="text-sm">{t("newsletter.actions.editRecipients")}</span>
+                  </DropdownMenuItem>
+                )}
+                {canSend && isReadyToSend && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deployMutation.mutate(newsletter.id); }} disabled={isDeploying} className="gap-2.5 rounded-lg cursor-pointer">
+                    <Send className="h-3.5 w-3.5" /><span className="text-sm">{isDeploying ? t("newsletter.actions.sending") : t("newsletter.actions.sendNow")}</span>
+                  </DropdownMenuItem>
+                )}
+                {canSend && isScheduled && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); cancelScheduleMutation.mutate(newsletter.id); }} disabled={isCancellingSchedule} className="gap-2.5 rounded-lg cursor-pointer text-orange-600 focus:text-orange-600">
+                    <CalendarClock className="h-3.5 w-3.5" /><span className="text-sm">{isCancellingSchedule ? t("newsletter.actions.cancelling") : t("newsletter.actions.cancelSchedule")}</span>
+                  </DropdownMenuItem>
+                )}
+                {(canCreate || canSend) && reviewerEnabled && isReadyToSend && !isPendingReview && !isCurrentUserDesignatedReviewer && newsletter.reviewStatus !== 'approved' && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); submitForReviewMutation.mutate(newsletter.id); }} disabled={isSubmittingForReview} className="gap-2.5 rounded-lg cursor-pointer">
+                    <ClipboardCheck className="h-3.5 w-3.5" /><span className="text-sm">{isSubmittingForReview ? t("newsletter.actions.submitting") : t("newsletter.actions.submitForReview")}</span>
+                  </DropdownMenuItem>
+                )}
+                {isPendingReview && isCurrentUserReviewer && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setLocation(`/newsletters/${newsletter.id}`); }} className="gap-2.5 rounded-lg cursor-pointer">
+                    <ShieldCheck className="h-3.5 w-3.5" /><span className="text-sm">{t("newsletter.actions.reviewNewsletter")}</span>
+                  </DropdownMenuItem>
+                )}
+                {(canCreate || canSend) && isPendingReview && !isCurrentUserReviewer && (newsletter.userId === currentUserId || ['Owner', 'Administrator'].includes((user as any)?.role)) && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); recallToDraftMutation.mutate(newsletter.id); }} disabled={recallToDraftMutation.isPending && recallToDraftMutation.variables === newsletter.id} className="gap-2.5 rounded-lg cursor-pointer text-orange-600 focus:text-orange-600">
+                    <Undo2 className="h-3.5 w-3.5" /><span className="text-sm">{recallToDraftMutation.isPending && recallToDraftMutation.variables === newsletter.id ? t("newsletter.actions.recalling", "Recalling...") : t("newsletter.actions.recallToDraft", "Recall to Draft")}</span>
+                  </DropdownMenuItem>
+                )}
+                {canCreate && isSent && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); archiveMutation.mutate(newsletter.id); }} disabled={archiveMutation.isPending && archiveMutation.variables === newsletter.id} className="gap-2.5 rounded-lg cursor-pointer">
+                    <Archive className="h-3.5 w-3.5" /><span className="text-sm">{archiveMutation.isPending && archiveMutation.variables === newsletter.id ? t("newsletter.actions.archiving", "Archiving...") : t("newsletter.actions.archive", "Archive")}</span>
+                  </DropdownMenuItem>
+                )}
+                {canCreate && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="gap-2.5 rounded-lg cursor-pointer text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteId(newsletter.id); }}>
+                      <Trash2 className="h-3.5 w-3.5" /><span className="text-sm">{t("newsletter.actions.delete")}</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Shop tag */}
+          {(newsletter as any).shop?.name && (
+            <Badge variant="secondary" className="gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border-0 bg-violet-500/10 text-violet-600 dark:text-violet-400">
+              <Store className="h-2.5 w-2.5" />
+              {(newsletter as any).shop.name}
+            </Badge>
+          )}
+
+          {/* Title + Subject */}
+          <div>
+            <h3 className="font-bold text-[15px] text-foreground leading-tight group-hover:text-primary transition-colors truncate">
+              {newsletter.title}
+            </h3>
+            <p className="text-xs text-muted-foreground/50 line-clamp-1 mt-0.5">
+              {newsletter.subject}
+            </p>
+          </div>
+
+          {/* Rejection notice */}
+          {newsletter.reviewStatus === 'rejected' && newsletter.reviewNotes && (
+            <div className="flex items-start gap-2 rounded-xl bg-red-500/[0.06] dark:bg-red-500/10 border border-red-500/10 px-3 py-2">
+              <XCircle className="h-3.5 w-3.5 text-red-500/70 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold text-red-700 dark:text-red-400">{t("newsletter.card.rejected", "Rejected by reviewer")}</p>
+                <p className="text-[11px] text-red-600/60 dark:text-red-400/50 line-clamp-2 mt-0.5">{newsletter.reviewNotes}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Author + Date */}
+          <div className="pt-3 border-t border-border/30">
+            <div className="flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                {(newsletter.user?.firstName?.[0] || '')}{(newsletter.user?.lastName?.[0] || '')}
+              </div>
+              <div className="flex flex-col overflow-hidden">
+                <span className="text-xs font-semibold text-foreground/80 truncate">
+                  {newsletter.user?.firstName || ''} {newsletter.user?.lastName || ''}
+                </span>
+                <span className="text-[10px] text-muted-foreground/40 truncate">
+                  {newsletter.sentAt
+                    ? formatDistanceToNow(new Date(newsletter.sentAt), { addSuffix: true, ...dateFnsLocale })
+                    : newsletter.createdAt
+                      ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true, ...dateFnsLocale })
+                      : ''}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom metrics */}
+          {isSent ? (
+            <div className="grid grid-cols-3 gap-1.5 pt-3 border-t border-border/30">
+              <div className="text-center py-1.5 rounded-lg bg-muted/30">
+                <div className="flex items-center justify-center gap-1">
+                  <Users className="h-3 w-3 text-blue-500/70" />
+                  <span className="text-xs font-bold">{(newsletter.recipientCount || 0).toLocaleString()}</span>
+                </div>
+                <p className="text-[9px] text-muted-foreground/40 mt-0.5">{t("newsletter.metrics.sent")}</p>
+              </div>
+              <div className="text-center py-1.5 rounded-lg bg-muted/30">
+                <div className="flex items-center justify-center gap-1">
+                  <Eye className="h-3 w-3 text-emerald-500/70" />
+                  <span className="text-xs font-bold">{newsletter.opens || 0}</span>
+                </div>
+                <p className="text-[9px] text-muted-foreground/40 mt-0.5">{t("newsletter.metrics.opened", { rate: openRate })}</p>
+              </div>
+              <div className="text-center py-1.5 rounded-lg bg-muted/30">
+                <div className="flex items-center justify-center gap-1">
+                  <MousePointer className="h-3 w-3 text-violet-500/70" />
+                  <span className="text-xs font-bold">{newsletter.clickCount || 0}</span>
+                </div>
+                <p className="text-[9px] text-muted-foreground/40 mt-0.5">{t("newsletter.metrics.clicks")}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="pt-3 border-t border-border/30">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/40">
+                <Calendar className="h-3 w-3 shrink-0" />
+                {newsletter.status === 'scheduled' && newsletter.scheduledAt ? (
+                  <span className="truncate">{t("newsletter.card.scheduledFor", { date: t("newsletter.card.dateTimeAt", { date: format(new Date(newsletter.scheduledAt), 'MMM d, yyyy', { locale: currentLanguage === 'es' ? esLocale : undefined }), time: format(new Date(newsletter.scheduledAt), 'h:mm a', { locale: currentLanguage === 'es' ? esLocale : undefined }) }) })}</span>
+                ) : (
+                  <span className="truncate">{newsletter.updatedAt ? t("newsletter.card.lastEdited", { time: formatDistanceToNow(new Date(newsletter.updatedAt), { addSuffix: true, ...dateFnsLocale }) }) : t("newsletter.card.lastEditedRecently")}</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
-      <div className="container mx-auto p-4 lg:p-6 space-y-6 lg:space-y-8">
+      <div className="container mx-auto p-4 lg:p-6 space-y-5 lg:space-y-6 overflow-y-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 pt-1">
+          <div className="space-y-1.5">
+            <h1 className="text-2xl sm:text-3xl lg:text-[2rem] font-extrabold tracking-tight leading-none">
               {t("newsletter.title")}
             </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-sm text-muted-foreground/80 max-w-md">
               {t("newsletter.subtitle")}
             </p>
           </div>
           {canCreate && (
-            <Button onClick={() => setShowEditorPicker(true)} className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={() => setShowEditorPicker(true)} className="rounded-xl shadow-sm gap-2 h-10 px-5">
+              <Plus className="h-4 w-4" />
               {t("newsletter.createNew", "Create Newsletter")}
             </Button>
           )}
         </div>
 
-
         {/* Search and Refresh */}
         {newsletters.length > 0 && (
-          <div className="flex items-center justify-between">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+              <Input
                 type="text"
                 placeholder={t("newsletter.searchPlaceholder", "Search newsletters...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                className="pl-10 h-10 rounded-xl border-border/50 bg-card text-sm"
               />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               {lastRefreshed && (
-                <span className="text-xs text-gray-400 dark:text-gray-500">
+                <span className="text-[10px] text-muted-foreground/40 hidden sm:block">
                   {t("newsletter.lastUpdated", "Updated")} {format(lastRefreshed, currentLanguage === 'es' ? 'h:mm:ss a' : 'h:mm:ss a', { locale: currentLanguage === 'es' ? esLocale : undefined })}
                 </span>
               )}
@@ -518,7 +647,7 @@ export default function NewsletterPage() {
                 onClick={handleRefresh}
                 disabled={isLoading || refreshCooldown}
                 title={t("newsletter.refresh", "Refresh newsletters")}
-                className="rounded-xl h-[42px] w-[42px] border-gray-200 dark:border-gray-700"
+                className="rounded-xl h-10 w-10 border-border/50"
               >
                 <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               </Button>
@@ -528,359 +657,61 @@ export default function NewsletterPage() {
 
         {/* Kanban Board */}
         {newsletters.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Mail className="h-8 w-8 text-gray-400" />
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-5">
+              <Mail className="h-8 w-8 text-primary/50" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              {t("newsletter.noNewslettersYet")}
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-sm mx-auto">
-              {t("newsletter.noNewslettersDesc")}
-            </p>
+            <h3 className="text-lg font-bold mb-1">{t("newsletter.noNewslettersYet")}</h3>
+            <p className="text-sm text-muted-foreground/60 mb-6 max-w-sm">{t("newsletter.noNewslettersDesc")}</p>
             {canCreate && (
-              <Button onClick={() => setShowEditorPicker(true)} className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="h-4 w-4 mr-2" />
+              <Button onClick={() => setShowEditorPicker(true)} className="rounded-xl gap-2">
+                <Plus className="h-4 w-4" />
                 {t("newsletter.createFirst")}
               </Button>
             )}
           </div>
         ) : filteredNewsletters.length === 0 ? (
-          <div className="text-center py-16">
-            <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              {t("newsletter.noNewslettersFound")}
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              {t("newsletter.noNewslettersFoundDesc")}
-            </p>
-            <Button variant="outline" onClick={() => setSearchQuery("")}>
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
+              <Search className="h-6 w-6 text-muted-foreground/40" />
+            </div>
+            <p className="text-sm font-semibold text-foreground/80 mb-0.5">{t("newsletter.noNewslettersFound")}</p>
+            <p className="text-xs text-muted-foreground/60 mb-4">{t("newsletter.noNewslettersFoundDesc")}</p>
+            <Button variant="outline" onClick={() => setSearchQuery("")} className="rounded-xl">
               {t("newsletter.clearFilters")}
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {kanbanColumns.map((column) => (
               <div
                 key={column.key}
-                className="flex flex-col rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/40 overflow-hidden"
+                className="flex flex-col rounded-2xl border border-border/40 bg-muted/10 dark:bg-muted/5 overflow-hidden"
               >
                 {/* Column Header */}
-                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <div className="px-4 py-3 border-b border-border/30">
                   <div className="flex items-center gap-2.5">
-                    <div className={`w-2.5 h-2.5 rounded-full ${column.accentBar}`} />
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <div className={`w-2 h-2 rounded-full ${column.dot}`} />
+                    <h3 className="text-xs font-bold text-foreground/80 uppercase tracking-wider">
                       {column.title}
                     </h3>
-                    <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                    <span className="text-[10px] font-bold text-muted-foreground/40 bg-muted/60 px-1.5 py-0.5 rounded-md ml-auto">
                       {column.items.length}
                     </span>
                   </div>
                 </div>
 
                 {/* Column Body */}
-                <div className="flex-1 p-3 space-y-3 overflow-y-auto max-h-[calc(100vh-380px)] min-h-[200px]">
+                <div className="flex-1 p-2.5 space-y-2.5 overflow-y-auto max-h-[calc(100vh-380px)] min-h-[200px]">
                   {column.items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-10 text-center">
-                      <column.icon className="h-5 w-5 text-gray-300 dark:text-gray-600 mb-2" />
-                      <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+                      <column.icon className="h-5 w-5 text-muted-foreground/20 mb-2" />
+                      <p className="text-[10px] text-muted-foreground/30 font-medium">
                         {t('newsletter.kanban.empty', 'No newsletters here')}
                       </p>
                     </div>
                   ) : (
-                    column.items.map((newsletter) => {
-                      const openRate = (newsletter.recipientCount || 0) > 0
-                        ? ((newsletter.opens || 0) / (newsletter.recipientCount || 1) * 100).toFixed(1)
-                        : "0";
-                      const isDraft = newsletter.status === 'draft';
-                      const isSent = newsletter.status === 'sent';
-                      const isReadyToSend = newsletter.status === 'ready_to_send';
-                      const isPendingReview = newsletter.status === 'pending_review';
-                      const isScheduled = newsletter.status === 'scheduled';
-                      const isCurrentUserReviewer = newsletter.reviewerId === currentUserId;
-                      const tenantSlug = (newsletter as any)?.tenant?.slug;
-                      const articlePreviewUrl = tenantSlug ? `/n/preview/${tenantSlug}/${newsletter.id}` : null;
-
-                      const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
-                      const isDeploying = deployMutation.isPending && deployMutation.variables === newsletter.id;
-                      const isSubmittingForReview = submitForReviewMutation.isPending && submitForReviewMutation.variables === newsletter.id;
-                      const isCancellingSchedule = cancelScheduleMutation.isPending && cancelScheduleMutation.variables === newsletter.id;
-
-                      if (isDeleting) {
-                        return (
-                          <Card key={newsletter.id} className="flex flex-col items-center justify-center border-dashed border-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 animate-pulse py-8">
-                            <Loader2 className="h-6 w-6 text-blue-500 animate-spin mb-3" />
-                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("newsletter.card.deleting")}</p>
-                          </Card>
-                        );
-                      }
-
-                      return (
-                        <Card
-                          key={newsletter.id}
-                          className={`group relative rounded-xl hover:shadow-md transition-all duration-200 overflow-hidden cursor-pointer bg-white dark:bg-gray-800 border-t-[3px] ${newsletter.status === 'sent' ? 'border-t-green-500' :
-                            newsletter.status === 'ready_to_send' ? 'border-t-blue-500' :
-                              newsletter.status === 'pending_review' ? 'border-t-orange-500' :
-                                newsletter.status === 'scheduled' ? 'border-t-purple-500' :
-                                  newsletter.status === 'sending' ? 'border-t-purple-500' :
-                                    'border-t-amber-400'
-                            } border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600`}
-                          onClick={() => (isDraft || isReadyToSend)
-                            ? setLocation(`/newsletter/create/${newsletter.id}`)
-                            : setLocation(`/newsletters/${newsletter.id}`)
-                          }
-                        >
-                          <CardContent className="p-5">
-                            <div className="space-y-4">
-                              {/* Row 1: Status badge + kebab menu */}
-                              <div className="flex items-center justify-between">
-                                {getStatusBadge(newsletter.status, t)}
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" aria-label="Newsletter actions" className="h-8 w-8 text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200">
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                    <DropdownMenuItem
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setPreviewNewsletter(newsletter);
-                                      }}
-                                    >
-                                      <Eye className="h-4 w-4 mr-2" />
-                                      {t("newsletter.actions.preview")}
-                                    </DropdownMenuItem>
-                                    {articlePreviewUrl && (
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          window.open(articlePreviewUrl, '_blank', 'noopener,noreferrer');
-                                        }}
-                                      >
-                                        <ExternalLink className="h-4 w-4 mr-2" />
-                                        Preview article on blog
-                                      </DropdownMenuItem>
-                                    )}
-                                    {canCreate && (isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setLocation(`/newsletter/create/${newsletter.id}`);
-                                        }}
-                                      >
-                                        <Pencil className="h-4 w-4 mr-2" />
-                                        {t("newsletter.actions.edit")}
-                                      </DropdownMenuItem>
-                                    )}
-                                    {canCreate && (isDraft || isReadyToSend) && newsletter.reviewStatus !== 'approved' && (
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditRecipientsNewsletter(newsletter);
-                                        }}
-                                        data-testid={`button-edit-recipients-${newsletter.id}`}
-                                      >
-                                        <UserCog className="h-4 w-4 mr-2" />
-                                        {t("newsletter.actions.editRecipients")}
-                                      </DropdownMenuItem>
-                                    )}
-                                    {canSend && isReadyToSend && (
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          deployMutation.mutate(newsletter.id);
-                                        }}
-                                        disabled={isDeploying}
-                                      >
-                                        <Send className="h-4 w-4 mr-2" />
-                                        {isDeploying ? t("newsletter.actions.sending") : t("newsletter.actions.sendNow")}
-                                      </DropdownMenuItem>
-                                    )}
-                                    {canSend && isScheduled && (
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          cancelScheduleMutation.mutate(newsletter.id);
-                                        }}
-                                        disabled={isCancellingSchedule}
-                                        className="text-orange-600 focus:text-orange-600 focus:bg-orange-50 dark:focus:bg-orange-950/50"
-                                      >
-                                        <CalendarClock className="h-4 w-4 mr-2" />
-                                        {isCancellingSchedule ? t("newsletter.actions.cancelling") : t("newsletter.actions.cancelSchedule")}
-                                      </DropdownMenuItem>
-                                    )}
-                                    {(canCreate || canSend) && reviewerEnabled && isReadyToSend && !isPendingReview && !isCurrentUserDesignatedReviewer && newsletter.reviewStatus !== 'approved' && (
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          submitForReviewMutation.mutate(newsletter.id);
-                                        }}
-                                        disabled={isSubmittingForReview}
-                                      >
-                                        <ClipboardCheck className="h-4 w-4 mr-2" />
-                                        {isSubmittingForReview ? t("newsletter.actions.submitting") : t("newsletter.actions.submitForReview")}
-                                      </DropdownMenuItem>
-                                    )}
-                                    {isPendingReview && isCurrentUserReviewer && (
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setLocation(`/newsletters/${newsletter.id}`);
-                                        }}
-                                      >
-                                        <ShieldCheck className="h-4 w-4 mr-2" />
-                                        {t("newsletter.actions.reviewNewsletter")}
-                                      </DropdownMenuItem>
-                                    )}
-                                    {(canCreate || canSend) && isPendingReview && !isCurrentUserReviewer && (newsletter.userId === currentUserId || ['Owner', 'Administrator'].includes((user as any)?.role)) && (
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          recallToDraftMutation.mutate(newsletter.id);
-                                        }}
-                                        disabled={recallToDraftMutation.isPending && recallToDraftMutation.variables === newsletter.id}
-                                        className="text-orange-600 focus:text-orange-600 focus:bg-orange-50 dark:focus:bg-orange-950/50"
-                                      >
-                                        <Undo2 className="h-4 w-4 mr-2" />
-                                        {recallToDraftMutation.isPending && recallToDraftMutation.variables === newsletter.id
-                                          ? t("newsletter.actions.recalling", "Recalling...")
-                                          : t("newsletter.actions.recallToDraft", "Recall to Draft")}
-                                      </DropdownMenuItem>
-                                    )}
-                                    {canCreate && isSent && (
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          archiveMutation.mutate(newsletter.id);
-                                        }}
-                                        disabled={archiveMutation.isPending && archiveMutation.variables === newsletter.id}
-                                      >
-                                        <Archive className="h-4 w-4 mr-2" />
-                                        {archiveMutation.isPending && archiveMutation.variables === newsletter.id
-                                          ? t("newsletter.actions.archiving", "Archiving...")
-                                          : t("newsletter.actions.archive", "Archive")}
-                                      </DropdownMenuItem>
-                                    )}
-                                    {canCreate && (
-                                      <>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                          className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setDeleteId(newsletter.id);
-                                          }}
-                                        >
-                                          <Trash2 className="h-4 w-4 mr-2" />
-                                          {t("newsletter.actions.delete")}
-                                        </DropdownMenuItem>
-                                      </>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-
-                              {/* Shop tag */}
-                              {(newsletter as any).shop?.name && (
-                                <div className="flex items-center gap-1.5">
-                                  <Badge variant="outline" className="text-[10px] font-medium px-2 py-0.5 bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800">
-                                    <Store className="h-3 w-3 mr-1" />
-                                    {(newsletter as any).shop.name}
-                                  </Badge>
-                                </div>
-                              )}
-
-                              {/* Row 2: Title + Subject */}
-                              <div>
-                                <h3 className="font-bold text-gray-900 dark:text-gray-100 text-base leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
-                                  {newsletter.title}
-                                </h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">
-                                  {newsletter.subject}
-                                </p>
-                              </div>
-
-                              {/* Rejection notice */}
-                              {newsletter.reviewStatus === 'rejected' && newsletter.reviewNotes && (
-                                <div className="flex items-start gap-2 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40 px-3 py-2">
-                                  <XCircle className="h-3.5 w-3.5 text-red-500 dark:text-red-400 mt-0.5 shrink-0" />
-                                  <div className="min-w-0">
-                                    <p className="text-[11px] font-semibold text-red-700 dark:text-red-300">{t("newsletter.card.rejected", "Rejected by reviewer")}</p>
-                                    <p className="text-[11px] text-red-600/80 dark:text-red-400/70 line-clamp-2 mt-0.5">{newsletter.reviewNotes}</p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Row 4: Author + Date (with top divider) */}
-                              <div className="pt-3 border-t border-gray-100 dark:border-gray-700/50">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-sm">
-                                    {(newsletter.user?.firstName?.[0] || '')}{(newsletter.user?.lastName?.[0] || '')}
-                                  </div>
-                                  <div className="flex flex-col overflow-hidden">
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-                                      {newsletter.user?.firstName || ''} {newsletter.user?.lastName || ''}
-                                    </span>
-                                    <span className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">
-                                      {newsletter.sentAt
-                                        ? formatDistanceToNow(new Date(newsletter.sentAt), { addSuffix: true, ...dateFnsLocale })
-                                        : newsletter.createdAt
-                                          ? formatDistanceToNow(new Date(newsletter.createdAt), { addSuffix: true, ...dateFnsLocale })
-                                          : ''}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Row 5: Bottom info (with top divider) */}
-                              {isSent ? (
-                                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100 dark:border-gray-700/50">
-                                  <div className="text-center">
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Users className="h-3 w-3 text-blue-500" />
-                                      <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
-                                        {(newsletter.recipientCount || 0).toLocaleString()}
-                                      </span>
-                                    </div>
-                                    <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.sent")}</p>
-                                  </div>
-                                  <div className="text-center">
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Eye className="h-3 w-3 text-green-500" />
-                                      <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
-                                        {newsletter.opens || 0}
-                                      </span>
-                                    </div>
-                                    <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.opened", { rate: openRate })}</p>
-                                  </div>
-                                  <div className="text-center">
-                                    <div className="flex items-center justify-center gap-1">
-                                      <MousePointer className="h-3 w-3 text-purple-500" />
-                                      <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
-                                        {newsletter.clickCount || 0}
-                                      </span>
-                                    </div>
-                                    <p className="text-[9px] text-gray-500 dark:text-gray-400 mt-0.5">{t("newsletter.metrics.clicks")}</p>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="pt-3 border-t border-gray-100 dark:border-gray-700/50">
-                                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                    <Calendar className="h-3.5 w-3.5 shrink-0" />
-                                    {newsletter.status === 'scheduled' && newsletter.scheduledAt ? (
-                                      <span className="truncate">{t("newsletter.card.scheduledFor", { date: t("newsletter.card.dateTimeAt", { date: format(new Date(newsletter.scheduledAt), 'MMM d, yyyy', { locale: currentLanguage === 'es' ? esLocale : undefined }), time: format(new Date(newsletter.scheduledAt), 'h:mm a', { locale: currentLanguage === 'es' ? esLocale : undefined }) }) })}</span>
-                                    ) : (
-                                      <span className="truncate">{newsletter.updatedAt ? t("newsletter.card.lastEdited", { time: formatDistanceToNow(new Date(newsletter.updatedAt), { addSuffix: true, ...dateFnsLocale }) }) : t("newsletter.card.lastEditedRecently")}</span>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })
+                    column.items.map((newsletter) => renderNewsletterCard(newsletter))
                   )}
                 </div>
               </div>
@@ -888,48 +719,44 @@ export default function NewsletterPage() {
           </div>
         )}
 
-        {/* Archived Newsletters Section */}
+        {/* Archived Section */}
         {(newsletters.length > 0 || showArchived || archivedNewsletters.length > 0) && (
-          <div className="mt-8">
+          <div className="mt-4">
             <button
               onClick={() => setShowArchived(!showArchived)}
-              className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors group"
+              className="flex items-center gap-2 text-xs font-semibold text-muted-foreground/50 hover:text-foreground/70 transition-colors group"
             >
-              {showArchived ? (
-                <ChevronDown className="h-4 w-4 transition-transform" />
-              ) : (
-                <ChevronRight className="h-4 w-4 transition-transform" />
-              )}
-              <Archive className="h-4 w-4" />
+              {showArchived ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              <Archive className="h-3.5 w-3.5" />
               <span>{showArchived ? t('newsletter.archived.hideArchived', 'Hide Archived') : t('newsletter.archived.showArchived', 'Show Archived')}</span>
-              {showArchived && archivedNewsletters.length > 0 && (
-                <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">
+              {archivedNewsletters.length > 0 && (
+                <span className="text-[10px] font-bold bg-muted/60 text-muted-foreground/40 px-1.5 py-0.5 rounded-md">
                   {archivedNewsletters.length}
                 </span>
               )}
             </button>
 
             {showArchived && (
-              <div className="mt-4">
+              <div className="mt-3">
                 {archivedNewsletters.length === 0 ? (
-                  <div className="text-center py-10 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50/50 dark:bg-gray-900/30">
-                    <Archive className="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                    <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                  <div className="text-center py-10 border-2 border-dashed border-border/30 rounded-2xl bg-muted/5">
+                    <Archive className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
+                    <h4 className="text-sm font-semibold text-muted-foreground/40 mb-0.5">
                       {t('newsletter.archived.empty', 'No archived newsletters')}
                     </h4>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 max-w-xs mx-auto">
+                    <p className="text-[11px] text-muted-foreground/30 max-w-xs mx-auto">
                       {t('newsletter.archived.emptyDesc', 'Newsletters you archive from the Sent column will appear here.')}
                     </p>
                   </div>
                 ) : (
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-800">
-                    <div className="px-5 py-3 bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700">
+                  <div className="border border-border/40 rounded-2xl overflow-hidden bg-card">
+                    <div className="px-5 py-3 border-b border-border/30">
                       <div className="flex items-center gap-2">
-                        <Archive className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        <Archive className="h-3.5 w-3.5 text-muted-foreground/40" />
+                        <h3 className="text-xs font-bold text-foreground/70 uppercase tracking-wider">
                           {t('newsletter.archived.title', 'Archived Newsletters')}
                         </h3>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                        <span className="text-[10px] text-muted-foreground/30 ml-1">
                           — {t('newsletter.archived.subtitle', 'Sent newsletters that have been archived')}
                         </span>
                       </div>
@@ -937,87 +764,49 @@ export default function NewsletterPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-gray-100 dark:border-gray-700/50">
-                            <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              {t('newsletter.archived.name', 'Name')}
-                            </th>
-                            <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              {t('newsletter.archived.subject', 'Subject')}
-                            </th>
-                            <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              {t('newsletter.archived.sentDate', 'Sent Date')}
-                            </th>
-                            <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              {t('newsletter.archived.recipients', 'Recipients')}
-                            </th>
-                            <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              {t('newsletter.archived.archivedDate', 'Archived Date')}
-                            </th>
-                            <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              {t('newsletter.archived.actions', 'Actions')}
-                            </th>
+                          <tr className="border-b border-border/20">
+                            <th className="text-left px-5 py-3 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.1em]">{t('newsletter.archived.name', 'Name')}</th>
+                            <th className="text-left px-5 py-3 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.1em]">{t('newsletter.archived.subject', 'Subject')}</th>
+                            <th className="text-left px-5 py-3 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.1em]">{t('newsletter.archived.sentDate', 'Sent Date')}</th>
+                            <th className="text-center px-5 py-3 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.1em]">{t('newsletter.archived.recipients', 'Recipients')}</th>
+                            <th className="text-left px-5 py-3 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.1em]">{t('newsletter.archived.archivedDate', 'Archived Date')}</th>
+                            <th className="text-right px-5 py-3 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-[0.1em]">{t('newsletter.archived.actions', 'Actions')}</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                        <tbody className="divide-y divide-border/20">
                           {archivedNewsletters.map((newsletter) => (
                             <tr
                               key={newsletter.id}
-                              className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors cursor-pointer"
+                              className="hover:bg-muted/20 transition-colors cursor-pointer"
                               onClick={() => setLocation(`/newsletters/${newsletter.id}`)}
                             >
                               <td className="px-5 py-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
                                     {(newsletter.user?.firstName?.[0] || '')}{(newsletter.user?.lastName?.[0] || '')}
                                   </div>
-                                  <span className="font-medium text-gray-900 dark:text-gray-100 truncate max-w-[200px]">
-                                    {newsletter.title}
-                                  </span>
+                                  <span className="font-semibold text-foreground/80 truncate max-w-[200px] text-sm">{newsletter.title}</span>
                                 </div>
                               </td>
-                              <td className="px-5 py-3 text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
-                                {newsletter.subject}
-                              </td>
-                              <td className="px-5 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                                {newsletter.sentAt
-                                  ? format(new Date(newsletter.sentAt), 'MMM d, yyyy', { locale: currentLanguage === 'es' ? esLocale : undefined })
-                                  : '—'}
+                              <td className="px-5 py-3 text-muted-foreground/50 truncate max-w-[200px] text-sm">{newsletter.subject}</td>
+                              <td className="px-5 py-3 text-muted-foreground/50 whitespace-nowrap text-sm">
+                                {newsletter.sentAt ? format(new Date(newsletter.sentAt), 'MMM d, yyyy', { locale: currentLanguage === 'es' ? esLocale : undefined }) : '—'}
                               </td>
                               <td className="px-5 py-3 text-center">
-                                <span className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                                  <Users className="h-3 w-3" />
-                                  {(newsletter.recipientCount || 0).toLocaleString()}
+                                <span className="inline-flex items-center gap-1 text-sm text-muted-foreground/50">
+                                  <Users className="h-3 w-3" />{(newsletter.recipientCount || 0).toLocaleString()}
                                 </span>
                               </td>
-                              <td className="px-5 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                                {(newsletter as any).archivedAt
-                                  ? formatDistanceToNow(new Date((newsletter as any).archivedAt), { addSuffix: true, ...dateFnsLocale })
-                                  : '—'}
+                              <td className="px-5 py-3 text-muted-foreground/50 whitespace-nowrap text-sm">
+                                {(newsletter as any).archivedAt ? formatDistanceToNow(new Date((newsletter as any).archivedAt), { addSuffix: true, ...dateFnsLocale }) : '—'}
                               </td>
                               <td className="px-5 py-3 text-right">
                                 <div className="flex items-center justify-end gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 px-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setPreviewNewsletter(newsletter);
-                                    }}
-                                  >
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg text-muted-foreground/40 hover:text-primary" onClick={(e) => { e.stopPropagation(); setPreviewNewsletter(newsletter); }}>
                                     <Eye className="h-3.5 w-3.5" />
                                   </Button>
                                   {canCreate && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 px-2 text-gray-500 hover:text-green-600 dark:text-gray-400 dark:hover:text-green-400"
-                                      disabled={unarchiveMutation.isPending && unarchiveMutation.variables === newsletter.id}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        unarchiveMutation.mutate(newsletter.id);
-                                      }}
-                                    >
+                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-lg text-muted-foreground/40 hover:text-emerald-600" disabled={unarchiveMutation.isPending && unarchiveMutation.variables === newsletter.id} onClick={(e) => { e.stopPropagation(); unarchiveMutation.mutate(newsletter.id); }}>
                                       <ArchiveRestore className="h-3.5 w-3.5" />
                                     </Button>
                                   )}
@@ -1036,25 +825,18 @@ export default function NewsletterPage() {
         )}
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>{t("newsletter.deleteDialog.title")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("newsletter.deleteDialog.description")}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t("newsletter.deleteDialog.description")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("newsletter.deleteDialog.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-xl">{t("newsletter.deleteDialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => {
-                if (deleteId) {
-                  deleteMutation.mutate(deleteId);
-                  setDeleteId(null);
-                }
-              }}
+              className="bg-red-600 hover:bg-red-700 rounded-xl"
+              onClick={() => { if (deleteId) { deleteMutation.mutate(deleteId); setDeleteId(null); } }}
             >
               {t("newsletter.deleteDialog.confirm")}
             </AlertDialogAction>
@@ -1076,41 +858,33 @@ export default function NewsletterPage() {
       />
 
       <Dialog open={!!previewNewsletter} onOpenChange={(open) => !open && setPreviewNewsletter(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
+            <DialogTitle className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Eye className="h-4 w-4 text-primary" />
+              </div>
               {t("newsletter.previewDialog.title")}
             </DialogTitle>
-            <DialogDescription>
-              {t("newsletter.previewDialog.description")}
-            </DialogDescription>
+            <DialogDescription>{t("newsletter.previewDialog.description")}</DialogDescription>
           </DialogHeader>
-
           <div className="flex-1 overflow-y-auto">
-            <div className="mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl">
-              <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full">
-                <div className="border-b bg-gray-50 dark:bg-gray-800 p-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+            <div className="mx-auto p-4 sm:p-6 bg-muted/30 rounded-xl">
+              <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded-xl overflow-hidden max-w-[600px] w-full">
+                <div className="border-b border-border/20 bg-muted/20 p-4 text-xs text-muted-foreground">
                   <div className="flex gap-2 mb-1">
-                    <span className="font-semibold text-right w-16">{t("newsletter.previewDialog.subject")}</span>
-                    <span className="text-gray-900 dark:text-gray-100 font-semibold truncate">
-                      {previewNewsletter?.subject || previewNewsletter?.title || t("newsletter.previewDialog.noSubject")}
-                    </span>
+                    <span className="font-bold text-right w-16">{t("newsletter.previewDialog.subject")}</span>
+                    <span className="text-foreground font-semibold truncate">{previewNewsletter?.subject || previewNewsletter?.title || t("newsletter.previewDialog.noSubject")}</span>
                   </div>
                   <div className="flex gap-2">
-                    <span className="font-semibold text-right w-16">{t("newsletter.previewDialog.status")}</span>
-                    <span className="text-gray-900 dark:text-gray-100 capitalize">{(() => {
+                    <span className="font-bold text-right w-16">{t("newsletter.previewDialog.status")}</span>
+                    <span className="text-foreground capitalize">{(() => {
                       const s = previewNewsletter?.status || 'draft';
-                      const keyMap: Record<string, string> = {
-                        ready_to_send: 'readyToSend',
-                        pending_review: 'pendingReview',
-                      };
-                      const i18nKey = `newsletter.status.${keyMap[s] ?? s}`;
-                      return t(i18nKey, s);
+                      const keyMap: Record<string, string> = { ready_to_send: 'readyToSend', pending_review: 'pendingReview' };
+                      return t(`newsletter.status.${keyMap[s] ?? s}`, s);
                     })()}</span>
                   </div>
                 </div>
-
                 <iframe
                   srcDoc={wrappedPreviewHtml}
                   title="Newsletter content preview"
