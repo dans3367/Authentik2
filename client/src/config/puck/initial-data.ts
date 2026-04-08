@@ -1,4 +1,4 @@
-import { UserData } from "./types";
+import type { UserData } from "./puck-shared";
 
 export const initialData: UserData = {
   content: [],

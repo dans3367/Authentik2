@@ -1,16 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
-// Lazy load editors to avoid loading both bundles
-const LazyPuck = lazy(() => import("@puckeditor/core").then(m => ({ default: m.Puck })));
-let _blocksPlugin: any = null;
-let _outlinePlugin: any = null;
-import("@puckeditor/core").then(m => { _blocksPlugin = m.blocksPlugin; _outlinePlugin = m.outlinePlugin; });
+import type { UserData } from "@/config/puck/puck-shared";
+// Lazy load editor implementations to avoid loading both bundles
+const LazyClassicPuckEditor = lazy(() => import("@/components/puck/ClassicPuckEditor"));
 const LazyNotionEditor = lazy(() => import("@/components/NotionLikeEditor"));
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createConfig, initialData } from "@/config/puck";
-import { UserData } from "@/config/puck/types";
-import { rootFieldErrors } from "@/config/puck/root";
-import { templatesPlugin } from "@/config/puck/templates-plugin";
-import { usePreviewColors } from "@/components/puck/PreviewWrapper";
+import { initialData } from "@/config/puck/initial-data";
+import { rootFieldErrors } from "@/config/puck/root-field-errors";
 import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X, Rocket, Eye } from "lucide-react";
 import { SendPreviewDialog } from "@/components/SendPreviewDialog";
 import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
@@ -134,209 +129,6 @@ function SaveDraftButton({
  * Preview wrapper that reads root colors via usePuck selector.
  * Only re-renders when colors change — isolates color updates from the blocks panel.
  */
-function PuckEmailPreview({
-  children,
-  emailDesign,
-  viewport,
-  zoom,
-}: {
-  children: React.ReactNode;
-  emailDesign: any;
-  viewport: "mobile" | "desktop";
-  zoom: number;
-}) {
-  const { bodyBg, contentBg, footerTextColor } = usePreviewColors();
-
-  const primaryColor = emailDesign?.primaryColor || '#3B82F6';
-  const companyName = emailDesign?.companyName || '';
-  const logoUrl = emailDesign?.logoUrl;
-  const headerText = emailDesign?.headerText;
-  const footerText = emailDesign?.footerText || '';
-  const socialLinks = emailDesign?.socialLinks;
-  const fontFamily = emailDesign?.fontFamily || 'Arial, Helvetica, sans-serif';
-  const logoSizeMap: Record<string, string> = { small: '64px', medium: '96px', large: '128px', xlarge: '160px' };
-  const logoHeight = logoSizeMap[emailDesign?.logoSize || 'medium'] || '48px';
-  const showName = (emailDesign?.showCompanyName ?? 'true') === 'true';
-  const headerMode = emailDesign?.headerMode || 'logo';
-  const bannerUrl = emailDesign?.bannerUrl;
-  const useBanner = headerMode === 'banner' && !!bannerUrl;
-  const logoAlign = (emailDesign?.logoAlignment || 'center') as 'left' | 'center' | 'right';
-  const logoML = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? 'auto' : '0';
-  const logoMR = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? '0' : 'auto';
-  const viewportWidths: Record<string, string> = { mobile: "360px", desktop: "100%" };
-
-  return (
-    <div style={{
-      width: "100%",
-      minHeight: "100%",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "stretch",
-      padding: viewport !== "desktop" ? "20px" : "0",
-      background: bodyBg,
-      overflow: "auto",
-    }}>
-      <div style={{
-        width: viewport === "desktop" ? "100%" : viewportWidths[viewport],
-        maxWidth: viewport === "desktop" ? "620px" : viewportWidths[viewport],
-        boxShadow: "0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)",
-        background: contentBg,
-        transform: `scale(${zoom / 100})`,
-        transformOrigin: "top center",
-        transition: "transform 0.2s ease-out",
-        margin: "0 auto",
-        fontFamily,
-        display: "flex",
-        flexDirection: "column" as const,
-      }}>
-        {/* Branded email header from master email design */}
-        {useBanner ? (
-          <>
-            <img
-              src={bannerUrl}
-              alt={companyName}
-              style={{ display: "block", width: "100%", height: "auto", border: 0 }}
-            />
-            {(showName && companyName || headerText) && (
-              <div style={{
-                padding: "16px 24px",
-                textAlign: "center",
-                backgroundColor: primaryColor,
-                color: "#ffffff",
-              }}>
-                {companyName && showName && (
-                  <h1 style={{
-                    margin: "0 0 4px 0",
-                    fontSize: "24px",
-                    fontWeight: "bold",
-                    letterSpacing: "-0.025em",
-                    color: "#ffffff",
-                    fontFamily,
-                  }}>
-                    {companyName}
-                  </h1>
-                )}
-                {headerText && (
-                  <p style={{
-                    margin: "0 auto",
-                    fontSize: "16px",
-                    opacity: 0.95,
-                    maxWidth: "400px",
-                    lineHeight: "1.5",
-                    color: "#ffffff",
-                  }}>
-                    {headerText}
-                  </p>
-                )}
-              </div>
-            )}
-          </>
-        ) : (
-          <div style={{
-            padding: "40px 24px",
-            textAlign: logoAlign,
-            backgroundColor: primaryColor,
-            color: "#ffffff",
-          }}>
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt={companyName}
-                style={{ height: logoHeight, width: "auto", objectFit: "contain", display: "block", margin: `0 ${logoMR} 20px ${logoML}` }}
-              />
-            ) : (companyName && showName) ? (
-              <div style={{
-                height: "48px",
-                width: "48px",
-                backgroundColor: "rgba(255,255,255,0.2)",
-                borderRadius: "50%",
-                margin: `0 ${logoMR} 16px ${logoML}`,
-                lineHeight: "48px",
-                fontSize: "20px",
-                fontWeight: "bold",
-                color: "#ffffff",
-                textAlign: "center",
-              }}>
-                {companyName.charAt(0)}
-              </div>
-            ) : null}
-            {companyName && showName && (
-              <h1 style={{
-                margin: "0 0 10px 0",
-                fontSize: "24px",
-                fontWeight: "bold",
-                letterSpacing: "-0.025em",
-                color: "#ffffff",
-                fontFamily,
-              }}>
-                {companyName}
-              </h1>
-            )}
-            {headerText && (
-              <p style={{
-                margin: `0 ${logoMR} 0 ${logoML}`,
-                fontSize: "16px",
-                opacity: 0.95,
-                maxWidth: "400px",
-                lineHeight: "1.5",
-                color: "#ffffff",
-              }}>
-                {headerText}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Puck editor content */}
-        <table width="100%" cellPadding={0} cellSpacing={0} role="presentation" style={{ borderCollapse: "collapse" as const, border: "none", flex: 1 }}>
-          <tbody>
-            <tr>
-              <td style={{ padding: 0, fontSize: "16px", lineHeight: "1.625", color: "#334155", verticalAlign: "top" }}>
-                {children}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* Branded email footer from master email design */}
-        <div style={{
-          backgroundColor: contentBg,
-          padding: "32px",
-          textAlign: "center",
-          borderTop: "1px solid #e2e8f0",
-          color: footerTextColor,
-          marginTop: "auto",
-        }}>
-          {socialLinks && (socialLinks.facebook || socialLinks.twitter || socialLinks.instagram || socialLinks.linkedin) && (
-            <div style={{ marginBottom: "24px" }}>
-              {[
-                socialLinks.facebook && "Facebook",
-                socialLinks.twitter && "Twitter",
-                socialLinks.instagram && "Instagram",
-                socialLinks.linkedin && "LinkedIn",
-              ].filter(Boolean).map((name, i, arr) => (
-                <span key={name} style={{ color: footerTextColor, fontSize: "13px", fontWeight: 500 }}>
-                  {name}{i < arr.length - 1 ? " | " : ""}
-                </span>
-              ))}
-            </div>
-          )}
-          {footerText && (
-            <p style={{ margin: "0 0 16px 0", fontSize: "12px", lineHeight: "1.5", color: footerTextColor }}>
-              {footerText}
-            </p>
-          )}
-          {companyName && showName && (
-            <div style={{ fontSize: "12px", lineHeight: "1.5", color: footerTextColor, opacity: 0.7 }}>
-              <p style={{ margin: 0 }}>Sent via {companyName}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function NewsletterCreatePage() {
   const params = useParams<{ id?: string }>();
   const editId = params?.id;
@@ -389,7 +181,7 @@ export default function NewsletterCreatePage() {
   }, []);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const { t, currentLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const queryClient = useQueryClient();
@@ -430,9 +222,6 @@ export default function NewsletterCreatePage() {
 
   // State for notion editor HTML content
   const [notionHtmlContent, setNotionHtmlContent] = useState<string>("");
-  // Build translated Puck config — rebuilds when language changes (only needed for classic)
-  const translatedConfig = useMemo(() => createConfig(t), [t, currentLanguage]);
-
   // dataRef is updated directly in handleDataChange and handlePublish
 
   // Load existing newsletter when editing
@@ -819,241 +608,6 @@ export default function NewsletterCreatePage() {
   const handleZoomReset = useCallback(() => {
     setZoom(100);
   }, []);
-
-  const iframeConfig = useMemo(() => ({ enabled: false }), []);
-
-  // Refs for volatile save-state so puckOverrides stays referentially stable
-  const justSavedRef = useRef(justSaved);
-  justSavedRef.current = justSaved;
-  const isSavingRef = useRef(isSaving);
-  isSavingRef.current = isSaving;
-  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
-  hasUnsavedChangesRef.current = hasUnsavedChanges;
-  const handleSaveDraftRef = useRef(handleSaveDraft);
-  handleSaveDraftRef.current = handleSaveDraft;
-
-  const puckOverrides = useMemo(() => ({
-    preview: ({ children }: { children: React.ReactNode }) => (
-      <PuckEmailPreview emailDesign={emailDesign} viewport={viewport} zoom={zoom}>
-        {children}
-      </PuckEmailPreview>
-    ),
-    headerActions: ({ children }: { children: React.ReactNode }) => (
-      <>
-        <div style={{ display: "flex", marginRight: "auto", alignItems: "center", minWidth: 0, flex: 1 }}>
-          <SaveStatusIndicator
-            justSavedRef={justSavedRef}
-            isSavingRef={isSavingRef}
-            hasUnsavedChangesRef={hasUnsavedChangesRef}
-            t={t}
-          />
-        </div>
-        <div style={{ display: "flex", gap: "4px", marginRight: "8px" }}>
-          <button
-            onClick={() => setViewport("mobile")}
-            style={{
-              padding: "8px",
-              background: viewport === "mobile" ? "#2563eb" : isDark ? "hsl(215, 20%, 16%)" : "#fff",
-              color: viewport === "mobile" ? "#fff" : isDark ? "#d1d5db" : "#000",
-              border: isDark ? "1px solid hsl(215, 20%, 25%)" : "1px solid #e5e7eb",
-              borderRadius: "4px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-            title={t("newsletter.create.mobileView", "Mobile view")}
-            data-testid="viewport-mobile"
-          >
-            <Smartphone size={16} />
-            <span style={{ fontSize: "12px" }}>360px</span>
-          </button>
-          <button
-            onClick={() => setViewport("desktop")}
-            style={{
-              padding: "8px",
-              background: viewport === "desktop" ? "#2563eb" : isDark ? "hsl(215, 20%, 16%)" : "#fff",
-              color: viewport === "desktop" ? "#fff" : isDark ? "#d1d5db" : "#000",
-              border: isDark ? "1px solid hsl(215, 20%, 25%)" : "1px solid #e5e7eb",
-              borderRadius: "4px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-            title={t("newsletter.create.desktopView", "Desktop view")}
-            data-testid="viewport-desktop"
-          >
-            <Monitor size={16} />
-            <span style={{ fontSize: "12px" }}>{t("newsletter.create.full", "Full")}</span>
-          </button>
-        </div>
-        <div style={{ display: "flex", gap: "4px", marginRight: "8px", alignItems: "center" }}>
-          <button
-            onClick={handleZoomOut}
-            disabled={zoom <= 25}
-            style={{
-              padding: "8px",
-              background: isDark ? "hsl(215, 20%, 16%)" : "#fff",
-              color: zoom <= 25 ? "#9ca3af" : isDark ? "#d1d5db" : "#000",
-              border: isDark ? "1px solid hsl(215, 20%, 25%)" : "1px solid #e5e7eb",
-              borderRadius: "4px",
-              cursor: zoom <= 25 ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-            title={t("newsletter.create.zoomOut", "Zoom out")}
-            data-testid="zoom-out"
-          >
-            <ZoomOut size={16} />
-          </button>
-          <button
-            onClick={handleZoomReset}
-            style={{
-              padding: "8px 12px",
-              background: isDark ? "hsl(215, 20%, 16%)" : "#fff",
-              color: isDark ? "#d1d5db" : "#000",
-              border: isDark ? "1px solid hsl(215, 20%, 25%)" : "1px solid #e5e7eb",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontSize: "12px",
-              fontWeight: 500,
-              minWidth: "60px",
-            }}
-            title={t("newsletter.create.resetZoom", "Reset zoom")}
-            data-testid="zoom-reset"
-          >
-            {zoom}%
-          </button>
-          <button
-            onClick={handleZoomIn}
-            disabled={zoom >= 100}
-            style={{
-              padding: "8px",
-              background: isDark ? "hsl(215, 20%, 16%)" : "#fff",
-              color: zoom >= 100 ? "#9ca3af" : isDark ? "#d1d5db" : "#000",
-              border: isDark ? "1px solid hsl(215, 20%, 25%)" : "1px solid #e5e7eb",
-              borderRadius: "4px",
-              cursor: zoom >= 100 ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-            title={t("newsletter.create.zoomIn", "Zoom in")}
-            data-testid="zoom-in"
-          >
-            <ZoomIn size={16} />
-          </button>
-        </div>
-        <button
-          onClick={() => setPreviewOpen(true)}
-          style={{
-            padding: "4px 12px",
-            marginRight: "8px",
-            background: "#7c3aed",
-            color: "white",
-            border: "1px solid #7c3aed",
-            borderRadius: "4px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            fontSize: "12px",
-            fontWeight: 500,
-            height: "32px",
-            boxSizing: "border-box",
-            whiteSpace: "nowrap",
-          }}
-          data-testid="button-send-preview"
-        >
-          <Mail size={16} />
-          {t("newsletter.create.sendPreview", "Send Preview")}
-        </button>
-        <SaveDraftButton
-          isSavingRef={isSavingRef}
-          handleSaveDraftRef={handleSaveDraftRef}
-          t={t}
-        />
-        <button
-          onClick={() => {
-            const bodyHtml = extractPuckEmailHtml();
-            const currentRootProps = dataRef.current?.root?.props;
-            const fullHtml = wrapInEmailPreview(bodyHtml, {
-              companyName: emailDesign?.companyName || '',
-              headerMode: emailDesign?.headerMode,
-              primaryColor: emailDesign?.primaryColor,
-              logoUrl: emailDesign?.logoUrl,
-              logoSize: emailDesign?.logoSize,
-              logoAlignment: emailDesign?.logoAlignment,
-              bannerUrl: emailDesign?.bannerUrl,
-              showCompanyName: emailDesign?.showCompanyName,
-              headerText: emailDesign?.headerText,
-              footerText: emailDesign?.footerText,
-              fontFamily: emailDesign?.fontFamily,
-              socialLinks: emailDesign?.socialLinks,
-              contentBackgroundColor: currentRootProps?.backgroundColor,
-              bodyBackgroundColor: currentRootProps?.bodyBackgroundColor,
-              footerTextColor: currentRootProps?.footerTextColor,
-            });
-            setPreviewHtml(fullHtml);
-            setIsEdit(false);
-          }}
-          style={{
-            padding: "4px 12px",
-            marginRight: "8px",
-            background: "#4b5563",
-            color: "white",
-            border: "1px solid #4b5563",
-            borderRadius: "4px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            fontSize: "12px",
-            fontWeight: 500,
-            height: "32px",
-            boxSizing: "border-box",
-            whiteSpace: "nowrap",
-          }}
-          data-testid="button-preview"
-        >
-          <Eye size={16} />
-          {t("newsletter.create.preview", "Preview")}
-        </button>
-        {/* Replace default Puck Publish button with custom "Ready" button */}
-        <button
-          onClick={() => handlePublish(dataRef.current)}
-          style={{
-            padding: "4px 16px",
-            background: "#2563eb",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            fontSize: "14px",
-            fontWeight: 600,
-            height: "32px",
-            boxSizing: "border-box",
-            whiteSpace: "nowrap",
-          }}
-          data-testid="button-ready"
-        >
-          <Rocket size={16} />
-          {t("newsletter.create.ready", "Ready")}
-        </button>
-      </>
-    ),
-  }), [emailDesign, viewport, zoom, handleZoomIn, handleZoomOut, handleZoomReset, t, isDark]);
-
-  const puckPlugins = useMemo(() => [
-    ...(_blocksPlugin ? [{ ..._blocksPlugin(), label: t("puckEditor.sidebar.blocks", { defaultValue: "Blocks" }) }] : []),
-    ...(_outlinePlugin ? [{ ..._outlinePlugin(), label: t("puckEditor.sidebar.outline", { defaultValue: "Outline" }) }] : []),
-    templatesPlugin((key, fallback) => t(key, { defaultValue: fallback })),
-  ], [t]);
 
   if (!isClient || (isEditMode && isLoadingNewsletter)) {
     return (
@@ -1464,15 +1018,48 @@ export default function NewsletterCreatePage() {
               ) : (
                 /* ─── Classic Puck Editor ─── */
                 dataReady ? (
-                  <LazyPuck
+                  <LazyClassicPuckEditor
                     key={puckKeyRef.current}
-                    config={translatedConfig}
                     data={data}
                     onChange={handleDataChange}
                     onPublish={handlePublish}
-                    iframe={iframeConfig}
-                    overrides={puckOverrides}
-                    plugins={puckPlugins}
+                    emailDesign={emailDesign}
+                    viewport={viewport}
+                    zoom={zoom}
+                    isDark={isDark}
+                    t={t}
+                    justSaved={justSaved}
+                    isSaving={isSaving}
+                    hasUnsavedChanges={hasUnsavedChanges}
+                    onSetViewport={setViewport}
+                    onZoomIn={handleZoomIn}
+                    onZoomOut={handleZoomOut}
+                    onZoomReset={handleZoomReset}
+                    onOpenPreview={() => setPreviewOpen(true)}
+                    onSaveDraft={handleSaveDraft}
+                    onRenderPreview={() => {
+                      const bodyHtml = extractPuckEmailHtml();
+                      const currentRootProps = dataRef.current?.root?.props;
+                      const fullHtml = wrapInEmailPreview(bodyHtml, {
+                        companyName: emailDesign?.companyName || '',
+                        headerMode: emailDesign?.headerMode,
+                        primaryColor: emailDesign?.primaryColor,
+                        logoUrl: emailDesign?.logoUrl,
+                        logoSize: emailDesign?.logoSize,
+                        logoAlignment: emailDesign?.logoAlignment,
+                        bannerUrl: emailDesign?.bannerUrl,
+                        showCompanyName: emailDesign?.showCompanyName,
+                        headerText: emailDesign?.headerText,
+                        footerText: emailDesign?.footerText,
+                        fontFamily: emailDesign?.fontFamily,
+                        socialLinks: emailDesign?.socialLinks,
+                        contentBackgroundColor: currentRootProps?.backgroundColor,
+                        bodyBackgroundColor: currentRootProps?.bodyBackgroundColor,
+                        footerTextColor: currentRootProps?.footerTextColor,
+                      });
+                      setPreviewHtml(fullHtml);
+                      setIsEdit(false);
+                    }}
                   />
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>

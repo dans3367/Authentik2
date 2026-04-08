@@ -14,13 +14,6 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAppSelector } from "@/store";
-import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-} from "recharts";
 
 interface MetricItem {
   label: string;
@@ -51,17 +44,74 @@ function ChangeBadge({ change }: { change: number | null }) {
   );
 }
 
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-popover border border-border rounded-lg shadow-xl px-3 py-2 text-xs">
-        <p className="font-semibold text-foreground">{payload[0].name}</p>
-        <p className="text-muted-foreground">{payload[0].value.toLocaleString()}</p>
+function DonutChart({
+  segments,
+  total,
+}: {
+  segments: { name: string; value: number; color: string }[];
+  total: number;
+}) {
+  const size = 160;
+  const strokeWidth = 24;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const meaningfulSegments = segments.filter((segment) => segment.value > 0);
+  const hasData = meaningfulSegments.length > 0 && total > 0;
+
+  let offsetAccumulator = 0;
+
+  return (
+    <div className="relative flex items-center justify-center w-40 h-40">
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        className="w-40 h-40 -rotate-90"
+        aria-hidden="true"
+      >
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          className="text-muted/50"
+        />
+        {hasData
+          ? meaningfulSegments.map((segment, index) => {
+              const segmentLength = (segment.value / total) * circumference;
+              const dashArray = `${segmentLength} ${circumference - segmentLength}`;
+              const dashOffset = -offsetAccumulator;
+              offsetAccumulator += segmentLength;
+
+              return (
+                <circle
+                  key={`${segment.name}-${index}`}
+                  cx={size / 2}
+                  cy={size / 2}
+                  r={radius}
+                  fill="none"
+                  stroke={segment.color}
+                  strokeWidth={strokeWidth}
+                  strokeLinecap="round"
+                  strokeDasharray={dashArray}
+                  strokeDashoffset={dashOffset}
+                  opacity={0.9}
+                />
+              );
+            })
+          : null}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <span className="text-2xl font-extrabold tracking-tight leading-none">
+          {total.toLocaleString()}
+        </span>
+        <span className="text-[10px] text-muted-foreground/70 font-medium uppercase tracking-wider mt-0.5">
+          Total
+        </span>
       </div>
-    );
-  }
-  return null;
-};
+    </div>
+  );
+}
 
 export function HighlightsCard() {
   const { data, isLoading } = useDashboardHighlights();
@@ -112,9 +162,9 @@ export function HighlightsCard() {
     },
   ];
 
-  const chartData = metrics.map((m) => ({
+  const rawChartData = metrics.map((m) => ({
     name: m.label,
-    value: Math.max(m.metric?.value ?? 0, 1),
+    value: m.metric?.value ?? 0,
     color: m.chartColor,
   }));
 
@@ -145,44 +195,10 @@ export function HighlightsCard() {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Donut Chart */}
             <div className="relative flex items-center justify-center">
-              <div className="w-40 h-40 relative z-10">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={48}
-                      outerRadius={72}
-                      paddingAngle={3}
-                      dataKey="value"
-                      strokeWidth={0}
-                      isAnimationActive={true}
-                      activeIndex={-1}
-                      style={{ cursor: "default", outline: "none" }}
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} opacity={0.85} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              {/* Center label */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
-                <span className="text-2xl font-extrabold tracking-tight leading-none">
-                  {totalValue.toLocaleString()}
-                </span>
-                <span className="text-[10px] text-muted-foreground/70 font-medium uppercase tracking-wider mt-0.5">
-                  Total
-                </span>
-              </div>
+              <DonutChart segments={rawChartData} total={totalValue} />
             </div>
 
-            {/* Metric rows */}
             <div className="space-y-1.5">
               {metrics.map((item, index) => (
                 <div
@@ -204,7 +220,6 @@ export function HighlightsCard() {
               ))}
             </div>
 
-            {/* Activity Breakdown Bar */}
             <div className="pt-2 border-t border-border/40">
               <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-[0.12em] mb-2">
                 {t("dashboard.highlights.activityBreakdown")}
