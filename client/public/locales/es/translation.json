@@ -56,7 +56,8 @@
     "segmentation": "Segmentación",
     "management": "Gestión",
     "help": "Ayuda",
-    "legalAgreements": "Acuerdos Legales"
+    "legalAgreements": "Acuerdos Legales",
+    "shopTags": "Etiquetas"
   },
   "dashboard": {
     "welcomeBack": "Bienvenido de nuevo, {{name}}",
@@ -2307,78 +2308,294 @@
         }
       },
       "permissions": {
-        "users.view": { "label": "Ver Usuarios", "description": "Ver lista y detalles de usuarios" },
-        "users.create": { "label": "Crear Usuarios", "description": "Agregar nuevas cuentas de usuario" },
-        "users.edit": { "label": "Editar Usuarios", "description": "Modificar perfiles y configuraciones de usuarios" },
-        "users.delete": { "label": "Eliminar Usuarios", "description": "Eliminar cuentas de usuario" },
-        "users.manage_roles": { "label": "Gestionar Roles", "description": "Cambiar asignaciones de roles de usuarios" },
-        "users.toggle_status": { "label": "Cambiar Estado", "description": "Activar o desactivar usuarios" },
-        "shops.view": { "label": "Ver Tiendas", "description": "Ver lista y detalles de tiendas" },
-        "shops.create": { "label": "Crear Tiendas", "description": "Agregar nuevas ubicaciones de tiendas" },
-        "shops.edit": { "label": "Editar Tiendas", "description": "Modificar información de tiendas" },
-        "shops.delete": { "label": "Eliminar Tiendas", "description": "Eliminar ubicaciones de tiendas" },
-        "shops.toggle_status": { "label": "Cambiar Estado", "description": "Activar o desactivar tiendas" },
-        "billing.view": { "label": "Ver Facturación", "description": "Ver información de suscripción y facturación" },
-        "billing.manage_subscription": { "label": "Gestionar Suscripción", "description": "Cambiar, cancelar o reactivar planes" },
-        "billing.manage_checkout": { "label": "Gestionar Pago", "description": "Crear sesiones de pago y portal" },
-        "emails.view": { "label": "Ver Correos", "description": "Ver historial y registros de correos" },
-        "emails.send": { "label": "Enviar Correos", "description": "Enviar correos individuales" },
-        "emails.view_status": { "label": "Ver Estado", "description": "Ver estado del sistema de correo" },
-        "emails.manage_design": { "label": "Gestionar Diseño", "description": "Editar plantilla maestra de diseño de correo" },
-        "emails.manage_suppression": { "label": "Gestionar Supresión", "description": "Gestionar listas de supresión de correo" },
-        "newsletters.view": { "label": "Ver Boletines", "description": "Ver lista y contenido de boletines" },
-        "newsletters.create": { "label": "Crear Boletines", "description": "Crear nuevos boletines" },
-        "newsletters.send": { "label": "Enviar Boletines", "description": "Enviar y programar boletines" },
-        "contacts.view": { "label": "Ver Contactos", "description": "Ver lista y perfiles de contactos" },
-        "contacts.create": { "label": "Crear Contactos", "description": "Agregar nuevos contactos" },
-        "contacts.edit": { "label": "Editar Contactos", "description": "Modificar información de contactos" },
-        "contacts.delete": { "label": "Eliminar Contactos", "description": "Eliminar contactos" },
-        "contacts.import": { "label": "Importar Contactos", "description": "Importación masiva de contactos" },
-        "contacts.export": { "label": "Exportar Contactos", "description": "Exportar datos de contactos" },
-        "tags.view": { "label": "Ver Etiquetas", "description": "Ver etiquetas disponibles" },
-        "tags.create": { "label": "Crear Etiquetas", "description": "Crear nuevas etiquetas" },
-        "tags.edit": { "label": "Editar Etiquetas", "description": "Modificar etiquetas existentes" },
-        "tags.delete": { "label": "Eliminar Etiquetas", "description": "Eliminar etiquetas" },
-        "forms.view": { "label": "Ver Formularios", "description": "Ver formularios y envíos" },
-        "forms.create": { "label": "Crear Formularios", "description": "Construir nuevos formularios" },
-        "forms.edit": { "label": "Editar Formularios", "description": "Modificar formularios existentes" },
-        "forms.delete": { "label": "Eliminar Formularios", "description": "Eliminar formularios" },
-        "promotions.view": { "label": "Ver Promociones", "description": "Ver lista de promociones" },
-        "promotions.create": { "label": "Crear Promociones", "description": "Crear nuevas promociones" },
-        "promotions.manage": { "label": "Gestionar Promociones", "description": "Editar y eliminar promociones" },
-        "cards.view": { "label": "Ver Tarjetas", "description": "Ver tarjetas personalizadas" },
-        "cards.create": { "label": "Crear Tarjetas", "description": "Diseñar nuevas tarjetas" },
-        "cards.edit": { "label": "Editar Tarjetas", "description": "Modificar diseños de tarjetas" },
-        "cards.manage_images": { "label": "Gestionar Imágenes", "description": "Subir y gestionar imágenes de tarjetas" },
-        "appointments.view": { "label": "Ver Citas", "description": "Ver calendario de citas" },
-        "appointments.create": { "label": "Crear Citas", "description": "Programar nuevas citas" },
-        "appointments.edit": { "label": "Editar Citas", "description": "Modificar detalles de citas" },
-        "appointments.delete": { "label": "Eliminar Citas", "description": "Cancelar y eliminar citas" },
-        "appointments.manage_reminders": { "label": "Gestionar Recordatorios", "description": "Configurar recordatorios de citas" },
-        "appointments.manage_notes": { "label": "Gestionar Notas", "description": "Agregar y editar notas de citas" },
-        "appointments.send_reschedule": { "label": "Enviar Reprogramación", "description": "Enviar correos de reprogramación a clientes" },
-        "segments.view": { "label": "Ver Segmentos", "description": "Ver listas de segmentos" },
-        "segments.create": { "label": "Crear Segmentos", "description": "Crear nuevos segmentos" },
-        "segments.edit": { "label": "Editar Segmentos", "description": "Modificar criterios de segmentos" },
-        "segments.delete": { "label": "Eliminar Segmentos", "description": "Eliminar segmentos" },
-        "templates.view": { "label": "Ver Plantillas", "description": "Ver plantillas disponibles" },
-        "templates.create": { "label": "Crear Plantillas", "description": "Crear nuevas plantillas" },
-        "templates.edit": { "label": "Editar Plantillas", "description": "Modificar plantillas existentes" },
-        "templates.delete": { "label": "Eliminar Plantillas", "description": "Eliminar plantillas" },
-        "templates.duplicate": { "label": "Duplicar Plantillas", "description": "Copiar plantillas existentes" },
-        "birthdays.view": { "label": "Ver Cumpleaños", "description": "Ver calendario y campañas de cumpleaños" },
-        "birthdays.manage": { "label": "Gestionar Cumpleaños", "description": "Configurar automatizaciones de cumpleaños" },
-        "activity.view": { "label": "Ver Actividad", "description": "Ver registros de actividad del sistema" },
-        "analytics.view_dashboard": { "label": "Ver Panel", "description": "Acceder al panel de analíticas" },
-        "analytics.view_reports": { "label": "Ver Informes", "description": "Acceder a informes detallados" },
-        "analytics.export": { "label": "Exportar Datos", "description": "Exportar datos de analíticas" },
-        "account_usage.view": { "label": "Ver Uso", "description": "Ver estadísticas de uso de la cuenta" },
-        "admin.view_sessions": { "label": "Ver Sesiones", "description": "Ver sesiones de usuario activas" },
-        "admin.manage_sessions": { "label": "Gestionar Sesiones", "description": "Terminar sesiones de usuario" },
-        "admin.view_system_stats": { "label": "Estadísticas del Sistema", "description": "Ver estadísticas de todo el sistema" },
-        "settings.view": { "label": "Ver Configuración", "description": "Ver configuración de la aplicación" },
-        "settings.edit": { "label": "Editar Configuración", "description": "Modificar configuración de la aplicación" },
-        "settings.manage_2fa": { "label": "Gestionar 2FA", "description": "Configurar autenticación de dos factores" }
+        "users.view": {
+          "label": "Ver Usuarios",
+          "description": "Ver lista y detalles de usuarios"
+        },
+        "users.create": {
+          "label": "Crear Usuarios",
+          "description": "Agregar nuevas cuentas de usuario"
+        },
+        "users.edit": {
+          "label": "Editar Usuarios",
+          "description": "Modificar perfiles y configuraciones de usuarios"
+        },
+        "users.delete": {
+          "label": "Eliminar Usuarios",
+          "description": "Eliminar cuentas de usuario"
+        },
+        "users.manage_roles": {
+          "label": "Gestionar Roles",
+          "description": "Cambiar asignaciones de roles de usuarios"
+        },
+        "users.toggle_status": {
+          "label": "Cambiar Estado",
+          "description": "Activar o desactivar usuarios"
+        },
+        "shops.view": {
+          "label": "Ver Tiendas",
+          "description": "Ver lista y detalles de tiendas"
+        },
+        "shops.create": {
+          "label": "Crear Tiendas",
+          "description": "Agregar nuevas ubicaciones de tiendas"
+        },
+        "shops.edit": {
+          "label": "Editar Tiendas",
+          "description": "Modificar información de tiendas"
+        },
+        "shops.delete": {
+          "label": "Eliminar Tiendas",
+          "description": "Eliminar ubicaciones de tiendas"
+        },
+        "shops.toggle_status": {
+          "label": "Cambiar Estado",
+          "description": "Activar o desactivar tiendas"
+        },
+        "billing.view": {
+          "label": "Ver Facturación",
+          "description": "Ver información de suscripción y facturación"
+        },
+        "billing.manage_subscription": {
+          "label": "Gestionar Suscripción",
+          "description": "Cambiar, cancelar o reactivar planes"
+        },
+        "billing.manage_checkout": {
+          "label": "Gestionar Pago",
+          "description": "Crear sesiones de pago y portal"
+        },
+        "emails.view": {
+          "label": "Ver Correos",
+          "description": "Ver historial y registros de correos"
+        },
+        "emails.send": {
+          "label": "Enviar Correos",
+          "description": "Enviar correos individuales"
+        },
+        "emails.view_status": {
+          "label": "Ver Estado",
+          "description": "Ver estado del sistema de correo"
+        },
+        "emails.manage_design": {
+          "label": "Gestionar Diseño",
+          "description": "Editar plantilla maestra de diseño de correo"
+        },
+        "emails.manage_suppression": {
+          "label": "Gestionar Supresión",
+          "description": "Gestionar listas de supresión de correo"
+        },
+        "newsletters.view": {
+          "label": "Ver Boletines",
+          "description": "Ver lista y contenido de boletines"
+        },
+        "newsletters.create": {
+          "label": "Crear Boletines",
+          "description": "Crear nuevos boletines"
+        },
+        "newsletters.send": {
+          "label": "Enviar Boletines",
+          "description": "Enviar y programar boletines"
+        },
+        "contacts.view": {
+          "label": "Ver Contactos",
+          "description": "Ver lista y perfiles de contactos"
+        },
+        "contacts.create": {
+          "label": "Crear Contactos",
+          "description": "Agregar nuevos contactos"
+        },
+        "contacts.edit": {
+          "label": "Editar Contactos",
+          "description": "Modificar información de contactos"
+        },
+        "contacts.delete": {
+          "label": "Eliminar Contactos",
+          "description": "Eliminar contactos"
+        },
+        "contacts.import": {
+          "label": "Importar Contactos",
+          "description": "Importación masiva de contactos"
+        },
+        "contacts.export": {
+          "label": "Exportar Contactos",
+          "description": "Exportar datos de contactos"
+        },
+        "tags.view": {
+          "label": "Ver Etiquetas",
+          "description": "Ver etiquetas disponibles"
+        },
+        "tags.create": {
+          "label": "Crear Etiquetas",
+          "description": "Crear nuevas etiquetas"
+        },
+        "tags.edit": {
+          "label": "Editar Etiquetas",
+          "description": "Modificar etiquetas existentes"
+        },
+        "tags.delete": {
+          "label": "Eliminar Etiquetas",
+          "description": "Eliminar etiquetas"
+        },
+        "forms.view": {
+          "label": "Ver Formularios",
+          "description": "Ver formularios y envíos"
+        },
+        "forms.create": {
+          "label": "Crear Formularios",
+          "description": "Construir nuevos formularios"
+        },
+        "forms.edit": {
+          "label": "Editar Formularios",
+          "description": "Modificar formularios existentes"
+        },
+        "forms.delete": {
+          "label": "Eliminar Formularios",
+          "description": "Eliminar formularios"
+        },
+        "promotions.view": {
+          "label": "Ver Promociones",
+          "description": "Ver lista de promociones"
+        },
+        "promotions.create": {
+          "label": "Crear Promociones",
+          "description": "Crear nuevas promociones"
+        },
+        "promotions.manage": {
+          "label": "Gestionar Promociones",
+          "description": "Editar y eliminar promociones"
+        },
+        "cards.view": {
+          "label": "Ver Tarjetas",
+          "description": "Ver tarjetas personalizadas"
+        },
+        "cards.create": {
+          "label": "Crear Tarjetas",
+          "description": "Diseñar nuevas tarjetas"
+        },
+        "cards.edit": {
+          "label": "Editar Tarjetas",
+          "description": "Modificar diseños de tarjetas"
+        },
+        "cards.manage_images": {
+          "label": "Gestionar Imágenes",
+          "description": "Subir y gestionar imágenes de tarjetas"
+        },
+        "appointments.view": {
+          "label": "Ver Citas",
+          "description": "Ver calendario de citas"
+        },
+        "appointments.create": {
+          "label": "Crear Citas",
+          "description": "Programar nuevas citas"
+        },
+        "appointments.edit": {
+          "label": "Editar Citas",
+          "description": "Modificar detalles de citas"
+        },
+        "appointments.delete": {
+          "label": "Eliminar Citas",
+          "description": "Cancelar y eliminar citas"
+        },
+        "appointments.manage_reminders": {
+          "label": "Gestionar Recordatorios",
+          "description": "Configurar recordatorios de citas"
+        },
+        "appointments.manage_notes": {
+          "label": "Gestionar Notas",
+          "description": "Agregar y editar notas de citas"
+        },
+        "appointments.send_reschedule": {
+          "label": "Enviar Reprogramación",
+          "description": "Enviar correos de reprogramación a clientes"
+        },
+        "segments.view": {
+          "label": "Ver Segmentos",
+          "description": "Ver listas de segmentos"
+        },
+        "segments.create": {
+          "label": "Crear Segmentos",
+          "description": "Crear nuevos segmentos"
+        },
+        "segments.edit": {
+          "label": "Editar Segmentos",
+          "description": "Modificar criterios de segmentos"
+        },
+        "segments.delete": {
+          "label": "Eliminar Segmentos",
+          "description": "Eliminar segmentos"
+        },
+        "templates.view": {
+          "label": "Ver Plantillas",
+          "description": "Ver plantillas disponibles"
+        },
+        "templates.create": {
+          "label": "Crear Plantillas",
+          "description": "Crear nuevas plantillas"
+        },
+        "templates.edit": {
+          "label": "Editar Plantillas",
+          "description": "Modificar plantillas existentes"
+        },
+        "templates.delete": {
+          "label": "Eliminar Plantillas",
+          "description": "Eliminar plantillas"
+        },
+        "templates.duplicate": {
+          "label": "Duplicar Plantillas",
+          "description": "Copiar plantillas existentes"
+        },
+        "birthdays.view": {
+          "label": "Ver Cumpleaños",
+          "description": "Ver calendario y campañas de cumpleaños"
+        },
+        "birthdays.manage": {
+          "label": "Gestionar Cumpleaños",
+          "description": "Configurar automatizaciones de cumpleaños"
+        },
+        "activity.view": {
+          "label": "Ver Actividad",
+          "description": "Ver registros de actividad del sistema"
+        },
+        "analytics.view_dashboard": {
+          "label": "Ver Panel",
+          "description": "Acceder al panel de analíticas"
+        },
+        "analytics.view_reports": {
+          "label": "Ver Informes",
+          "description": "Acceder a informes detallados"
+        },
+        "analytics.export": {
+          "label": "Exportar Datos",
+          "description": "Exportar datos de analíticas"
+        },
+        "account_usage.view": {
+          "label": "Ver Uso",
+          "description": "Ver estadísticas de uso de la cuenta"
+        },
+        "admin.view_sessions": {
+          "label": "Ver Sesiones",
+          "description": "Ver sesiones de usuario activas"
+        },
+        "admin.manage_sessions": {
+          "label": "Gestionar Sesiones",
+          "description": "Terminar sesiones de usuario"
+        },
+        "admin.view_system_stats": {
+          "label": "Estadísticas del Sistema",
+          "description": "Ver estadísticas de todo el sistema"
+        },
+        "settings.view": {
+          "label": "Ver Configuración",
+          "description": "Ver configuración de la aplicación"
+        },
+        "settings.edit": {
+          "label": "Editar Configuración",
+          "description": "Modificar configuración de la aplicación"
+        },
+        "settings.manage_2fa": {
+          "label": "Gestionar 2FA",
+          "description": "Configurar autenticación de dos factores"
+        }
       }
     },
     "tags": {
@@ -3202,11 +3419,11 @@
     },
     "editorPicker": {
       "title": "Elige Tu Editor",
-      "description": "Selecciona qué editor te gustaría usar para este boletín. Puedes cambiar el predeterminado en Administración > Diseño de Blog.",
+      "description": "Selecciona qué editor deseas usar para este boletín. Puedes cambiar el predeterminado en Gestión > Diseño del Blog.",
       "classic": "Editor Clásico",
-      "classicDesc": "Editor de bloques con arrastrar y soltar con componentes visuales. Ideal para diseños estructurados con columnas, botones e imágenes.",
-      "notion": "Editor Tipo Notion",
-      "notionDesc": "Experiencia de escritura limpia con comandos de barra y formato en línea. Perfecto para boletines centrados en contenido.",
+      "classicDesc": "Editor visual de arrastrar y soltar con componentes de bloques. Ideal para diseños estructurados con columnas, botones e imágenes.",
+      "notion": "Editor tipo Notion",
+      "notionDesc": "Experiencia de escritura limpia con comandos de barra y formato en línea. Perfecto para boletines centrados en el contenido.",
       "default": "Predeterminado",
       "new": "Nuevo",
       "continue": "Continuar",
@@ -3794,5 +4011,8 @@
     "draft": "Borrador",
     "pendingReview": "Pendiente de Revisión",
     "readyToSend": "Listo para Enviar"
+  },
+  "sidebar": {
+    "dashboard": "Panel de Control"
   }
 }

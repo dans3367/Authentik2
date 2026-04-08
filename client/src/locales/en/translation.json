@@ -57,7 +57,8 @@
     "segmentation": "Segmentation",
     "management": "Management",
     "help": "Help",
-    "legalAgreements": "Legal Agreements"
+    "legalAgreements": "Legal Agreements",
+    "shopTags": "Tags"
   },
   "dashboard": {
     "welcomeBack": "Welcome back, {{name}}",
@@ -2368,78 +2369,294 @@
         }
       },
       "permissions": {
-        "users.view": { "label": "View Users", "description": "View user list and details" },
-        "users.create": { "label": "Create Users", "description": "Add new user accounts" },
-        "users.edit": { "label": "Edit Users", "description": "Modify user profiles and settings" },
-        "users.delete": { "label": "Delete Users", "description": "Remove user accounts" },
-        "users.manage_roles": { "label": "Manage Roles", "description": "Change user role assignments" },
-        "users.toggle_status": { "label": "Toggle Status", "description": "Activate or deactivate users" },
-        "shops.view": { "label": "View Shops", "description": "View shop list and details" },
-        "shops.create": { "label": "Create Shops", "description": "Add new shop locations" },
-        "shops.edit": { "label": "Edit Shops", "description": "Modify shop information" },
-        "shops.delete": { "label": "Delete Shops", "description": "Remove shop locations" },
-        "shops.toggle_status": { "label": "Toggle Status", "description": "Activate or deactivate shops" },
-        "billing.view": { "label": "View Billing", "description": "View subscription and billing info" },
-        "billing.manage_subscription": { "label": "Manage Subscription", "description": "Change, cancel, or reactivate plans" },
-        "billing.manage_checkout": { "label": "Manage Checkout", "description": "Create checkout and portal sessions" },
-        "emails.view": { "label": "View Emails", "description": "View email history and logs" },
-        "emails.send": { "label": "Send Emails", "description": "Send individual emails" },
-        "emails.view_status": { "label": "View Status", "description": "View email system status" },
-        "emails.manage_design": { "label": "Manage Design", "description": "Edit master email design template" },
-        "emails.manage_suppression": { "label": "Manage Suppression", "description": "Manage email suppression lists" },
-        "newsletters.view": { "label": "View Newsletters", "description": "View newsletter list and content" },
-        "newsletters.create": { "label": "Create Newsletters", "description": "Create new newsletters" },
-        "newsletters.send": { "label": "Send Newsletters", "description": "Send and schedule newsletters" },
-        "contacts.view": { "label": "View Contacts", "description": "View contact list and profiles" },
-        "contacts.create": { "label": "Create Contacts", "description": "Add new contacts" },
-        "contacts.edit": { "label": "Edit Contacts", "description": "Modify contact information" },
-        "contacts.delete": { "label": "Delete Contacts", "description": "Remove contacts" },
-        "contacts.import": { "label": "Import Contacts", "description": "Bulk import contacts" },
-        "contacts.export": { "label": "Export Contacts", "description": "Export contact data" },
-        "tags.view": { "label": "View Tags", "description": "View available tags" },
-        "tags.create": { "label": "Create Tags", "description": "Create new tags" },
-        "tags.edit": { "label": "Edit Tags", "description": "Modify existing tags" },
-        "tags.delete": { "label": "Delete Tags", "description": "Remove tags" },
-        "forms.view": { "label": "View Forms", "description": "View forms and submissions" },
-        "forms.create": { "label": "Create Forms", "description": "Build new forms" },
-        "forms.edit": { "label": "Edit Forms", "description": "Modify existing forms" },
-        "forms.delete": { "label": "Delete Forms", "description": "Remove forms" },
-        "promotions.view": { "label": "View Promotions", "description": "View promotion list" },
-        "promotions.create": { "label": "Create Promotions", "description": "Create new promotions" },
-        "promotions.manage": { "label": "Manage Promotions", "description": "Edit and delete promotions" },
-        "cards.view": { "label": "View Cards", "description": "View custom cards" },
-        "cards.create": { "label": "Create Cards", "description": "Design new cards" },
-        "cards.edit": { "label": "Edit Cards", "description": "Modify card designs" },
-        "cards.manage_images": { "label": "Manage Images", "description": "Upload and manage card images" },
-        "appointments.view": { "label": "View Appointments", "description": "View appointment calendar" },
-        "appointments.create": { "label": "Create Appointments", "description": "Schedule new appointments" },
-        "appointments.edit": { "label": "Edit Appointments", "description": "Modify appointment details" },
-        "appointments.delete": { "label": "Delete Appointments", "description": "Cancel and remove appointments" },
-        "appointments.manage_reminders": { "label": "Manage Reminders", "description": "Configure appointment reminders" },
-        "appointments.manage_notes": { "label": "Manage Notes", "description": "Add and edit appointment notes" },
-        "appointments.send_reschedule": { "label": "Send Reschedule", "description": "Send reschedule emails to customers" },
-        "segments.view": { "label": "View Segments", "description": "View segment lists" },
-        "segments.create": { "label": "Create Segments", "description": "Create new segments" },
-        "segments.edit": { "label": "Edit Segments", "description": "Modify segment criteria" },
-        "segments.delete": { "label": "Delete Segments", "description": "Remove segments" },
-        "templates.view": { "label": "View Templates", "description": "View available templates" },
-        "templates.create": { "label": "Create Templates", "description": "Create new templates" },
-        "templates.edit": { "label": "Edit Templates", "description": "Modify existing templates" },
-        "templates.delete": { "label": "Delete Templates", "description": "Remove templates" },
-        "templates.duplicate": { "label": "Duplicate Templates", "description": "Copy existing templates" },
-        "birthdays.view": { "label": "View Birthdays", "description": "View birthday calendar and campaigns" },
-        "birthdays.manage": { "label": "Manage Birthdays", "description": "Configure birthday automations" },
-        "activity.view": { "label": "View Activity", "description": "View system activity logs" },
-        "analytics.view_dashboard": { "label": "View Dashboard", "description": "Access analytics dashboard" },
-        "analytics.view_reports": { "label": "View Reports", "description": "Access detailed reports" },
-        "analytics.export": { "label": "Export Data", "description": "Export analytics data" },
-        "account_usage.view": { "label": "View Usage", "description": "View account usage statistics" },
-        "admin.view_sessions": { "label": "View Sessions", "description": "View active user sessions" },
-        "admin.manage_sessions": { "label": "Manage Sessions", "description": "Terminate user sessions" },
-        "admin.view_system_stats": { "label": "System Stats", "description": "View system-wide statistics" },
-        "settings.view": { "label": "View Settings", "description": "View application settings" },
-        "settings.edit": { "label": "Edit Settings", "description": "Modify application settings" },
-        "settings.manage_2fa": { "label": "Manage 2FA", "description": "Configure two-factor authentication" }
+        "users.view": {
+          "label": "View Users",
+          "description": "View user list and details"
+        },
+        "users.create": {
+          "label": "Create Users",
+          "description": "Add new user accounts"
+        },
+        "users.edit": {
+          "label": "Edit Users",
+          "description": "Modify user profiles and settings"
+        },
+        "users.delete": {
+          "label": "Delete Users",
+          "description": "Remove user accounts"
+        },
+        "users.manage_roles": {
+          "label": "Manage Roles",
+          "description": "Change user role assignments"
+        },
+        "users.toggle_status": {
+          "label": "Toggle Status",
+          "description": "Activate or deactivate users"
+        },
+        "shops.view": {
+          "label": "View Shops",
+          "description": "View shop list and details"
+        },
+        "shops.create": {
+          "label": "Create Shops",
+          "description": "Add new shop locations"
+        },
+        "shops.edit": {
+          "label": "Edit Shops",
+          "description": "Modify shop information"
+        },
+        "shops.delete": {
+          "label": "Delete Shops",
+          "description": "Remove shop locations"
+        },
+        "shops.toggle_status": {
+          "label": "Toggle Status",
+          "description": "Activate or deactivate shops"
+        },
+        "billing.view": {
+          "label": "View Billing",
+          "description": "View subscription and billing info"
+        },
+        "billing.manage_subscription": {
+          "label": "Manage Subscription",
+          "description": "Change, cancel, or reactivate plans"
+        },
+        "billing.manage_checkout": {
+          "label": "Manage Checkout",
+          "description": "Create checkout and portal sessions"
+        },
+        "emails.view": {
+          "label": "View Emails",
+          "description": "View email history and logs"
+        },
+        "emails.send": {
+          "label": "Send Emails",
+          "description": "Send individual emails"
+        },
+        "emails.view_status": {
+          "label": "View Status",
+          "description": "View email system status"
+        },
+        "emails.manage_design": {
+          "label": "Manage Design",
+          "description": "Edit master email design template"
+        },
+        "emails.manage_suppression": {
+          "label": "Manage Suppression",
+          "description": "Manage email suppression lists"
+        },
+        "newsletters.view": {
+          "label": "View Newsletters",
+          "description": "View newsletter list and content"
+        },
+        "newsletters.create": {
+          "label": "Create Newsletters",
+          "description": "Create new newsletters"
+        },
+        "newsletters.send": {
+          "label": "Send Newsletters",
+          "description": "Send and schedule newsletters"
+        },
+        "contacts.view": {
+          "label": "View Contacts",
+          "description": "View contact list and profiles"
+        },
+        "contacts.create": {
+          "label": "Create Contacts",
+          "description": "Add new contacts"
+        },
+        "contacts.edit": {
+          "label": "Edit Contacts",
+          "description": "Modify contact information"
+        },
+        "contacts.delete": {
+          "label": "Delete Contacts",
+          "description": "Remove contacts"
+        },
+        "contacts.import": {
+          "label": "Import Contacts",
+          "description": "Bulk import contacts"
+        },
+        "contacts.export": {
+          "label": "Export Contacts",
+          "description": "Export contact data"
+        },
+        "tags.view": {
+          "label": "View Tags",
+          "description": "View available tags"
+        },
+        "tags.create": {
+          "label": "Create Tags",
+          "description": "Create new tags"
+        },
+        "tags.edit": {
+          "label": "Edit Tags",
+          "description": "Modify existing tags"
+        },
+        "tags.delete": {
+          "label": "Delete Tags",
+          "description": "Remove tags"
+        },
+        "forms.view": {
+          "label": "View Forms",
+          "description": "View forms and submissions"
+        },
+        "forms.create": {
+          "label": "Create Forms",
+          "description": "Build new forms"
+        },
+        "forms.edit": {
+          "label": "Edit Forms",
+          "description": "Modify existing forms"
+        },
+        "forms.delete": {
+          "label": "Delete Forms",
+          "description": "Remove forms"
+        },
+        "promotions.view": {
+          "label": "View Promotions",
+          "description": "View promotion list"
+        },
+        "promotions.create": {
+          "label": "Create Promotions",
+          "description": "Create new promotions"
+        },
+        "promotions.manage": {
+          "label": "Manage Promotions",
+          "description": "Edit and delete promotions"
+        },
+        "cards.view": {
+          "label": "View Cards",
+          "description": "View custom cards"
+        },
+        "cards.create": {
+          "label": "Create Cards",
+          "description": "Design new cards"
+        },
+        "cards.edit": {
+          "label": "Edit Cards",
+          "description": "Modify card designs"
+        },
+        "cards.manage_images": {
+          "label": "Manage Images",
+          "description": "Upload and manage card images"
+        },
+        "appointments.view": {
+          "label": "View Appointments",
+          "description": "View appointment calendar"
+        },
+        "appointments.create": {
+          "label": "Create Appointments",
+          "description": "Schedule new appointments"
+        },
+        "appointments.edit": {
+          "label": "Edit Appointments",
+          "description": "Modify appointment details"
+        },
+        "appointments.delete": {
+          "label": "Delete Appointments",
+          "description": "Cancel and remove appointments"
+        },
+        "appointments.manage_reminders": {
+          "label": "Manage Reminders",
+          "description": "Configure appointment reminders"
+        },
+        "appointments.manage_notes": {
+          "label": "Manage Notes",
+          "description": "Add and edit appointment notes"
+        },
+        "appointments.send_reschedule": {
+          "label": "Send Reschedule",
+          "description": "Send reschedule emails to customers"
+        },
+        "segments.view": {
+          "label": "View Segments",
+          "description": "View segment lists"
+        },
+        "segments.create": {
+          "label": "Create Segments",
+          "description": "Create new segments"
+        },
+        "segments.edit": {
+          "label": "Edit Segments",
+          "description": "Modify segment criteria"
+        },
+        "segments.delete": {
+          "label": "Delete Segments",
+          "description": "Remove segments"
+        },
+        "templates.view": {
+          "label": "View Templates",
+          "description": "View available templates"
+        },
+        "templates.create": {
+          "label": "Create Templates",
+          "description": "Create new templates"
+        },
+        "templates.edit": {
+          "label": "Edit Templates",
+          "description": "Modify existing templates"
+        },
+        "templates.delete": {
+          "label": "Delete Templates",
+          "description": "Remove templates"
+        },
+        "templates.duplicate": {
+          "label": "Duplicate Templates",
+          "description": "Copy existing templates"
+        },
+        "birthdays.view": {
+          "label": "View Birthdays",
+          "description": "View birthday calendar and campaigns"
+        },
+        "birthdays.manage": {
+          "label": "Manage Birthdays",
+          "description": "Configure birthday automations"
+        },
+        "activity.view": {
+          "label": "View Activity",
+          "description": "View system activity logs"
+        },
+        "analytics.view_dashboard": {
+          "label": "View Dashboard",
+          "description": "Access analytics dashboard"
+        },
+        "analytics.view_reports": {
+          "label": "View Reports",
+          "description": "Access detailed reports"
+        },
+        "analytics.export": {
+          "label": "Export Data",
+          "description": "Export analytics data"
+        },
+        "account_usage.view": {
+          "label": "View Usage",
+          "description": "View account usage statistics"
+        },
+        "admin.view_sessions": {
+          "label": "View Sessions",
+          "description": "View active user sessions"
+        },
+        "admin.manage_sessions": {
+          "label": "Manage Sessions",
+          "description": "Terminate user sessions"
+        },
+        "admin.view_system_stats": {
+          "label": "System Stats",
+          "description": "View system-wide statistics"
+        },
+        "settings.view": {
+          "label": "View Settings",
+          "description": "View application settings"
+        },
+        "settings.edit": {
+          "label": "Edit Settings",
+          "description": "Modify application settings"
+        },
+        "settings.manage_2fa": {
+          "label": "Manage 2FA",
+          "description": "Configure two-factor authentication"
+        }
       }
     },
     "tags": {
@@ -3296,6 +3513,17 @@
       "selectedCustomersSummary": "{{count}} selected customers",
       "tagsSelectedSummary": "{{count}} tags selected",
       "segmentListSummary": "{{name}} ({{count}} recipients)"
+    },
+    "editorPicker": {
+      "title": "Choose Your Editor",
+      "description": "Select which editor you'd like to use for this newsletter. You can change the default in Management > Blog Design.",
+      "classic": "Classic Editor",
+      "default": "Default",
+      "classicDesc": "Drag-and-drop block editor with visual components. Great for structured layouts with columns, buttons, and images.",
+      "notion": "Notion-like Editor",
+      "new": "New",
+      "notionDesc": "Clean writing experience with slash commands and inline formatting. Perfect for content-focused newsletters.",
+      "continue": "Continue"
     }
   },
   "advertise": {
@@ -3837,5 +4065,8 @@
     "draft": "Draft",
     "pendingReview": "Pending Review",
     "readyToSend": "Ready to Send"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard"
   }
 }
