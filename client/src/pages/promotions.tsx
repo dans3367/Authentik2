@@ -72,12 +72,12 @@ function PromotionStats() {
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="h-4 w-[100px] bg-gray-200 rounded animate-pulse" />
-              <div className="h-4 w-4 bg-gray-200 rounded animate-pulse" />
+              <div className="h-4 w-[100px] bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
             </CardHeader>
             <CardContent>
-              <div className="h-8 w-[60px] bg-gray-200 rounded animate-pulse mb-2" />
-              <div className="h-3 w-[120px] bg-gray-200 rounded animate-pulse" />
+              <div className="h-8 w-[60px] bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" />
+              <div className="h-3 w-[120px] bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
             </CardContent>
           </Card>
         ))}
@@ -120,7 +120,7 @@ function PromotionStats() {
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
               {stat.title}
             </CardTitle>
-            <stat.icon className="h-4 w-4 text-gray-400" />
+            <stat.icon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -271,7 +271,7 @@ export default function PromotionsPage() {
             <CardTitle className="text-red-600">{t('promotionsPage.toasts.error')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600">{t('promotionsPage.toasts.loadError')}</p>
+            <p className="text-gray-600 dark:text-gray-400">{t('promotionsPage.toasts.loadError')}</p>
           </CardContent>
         </Card>
       </div>
@@ -311,14 +311,14 @@ export default function PromotionsPage() {
                 <Card key={i} className="animate-pulse">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
-                      <div className="h-5 w-1/3 bg-gray-200 rounded" />
-                      <div className="h-8 w-8 bg-gray-200 rounded" />
+                      <div className="h-5 w-1/3 bg-gray-200 dark:bg-gray-700 rounded" />
+                      <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded" />
                     </div>
-                    <div className="mt-2 h-4 w-1/4 bg-gray-200 rounded" />
+                    <div className="mt-2 h-4 w-1/4 bg-gray-200 dark:bg-gray-700 rounded" />
                   </CardHeader>
                   <CardContent>
-                    <div className="h-3 w-3/4 bg-gray-200 rounded mb-2" />
-                    <div className="h-3 w-2/3 bg-gray-200 rounded" />
+                    <div className="h-3 w-3/4 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                    <div className="h-3 w-2/3 bg-gray-200 dark:bg-gray-700 rounded" />
                   </CardContent>
                 </Card>
               ))}
@@ -333,7 +333,7 @@ export default function PromotionsPage() {
                       <div className="flex justify-between items-start">
                         <div>
                           <div className="flex items-center gap-3 mb-2">
-                            <TypeIcon className="h-5 w-5 text-gray-500" />
+                            <TypeIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                             <CardTitle className="text-base font-semibold text-gray-900 dark:text-white">
                               {promotion.title}
                             </CardTitle>
@@ -343,11 +343,11 @@ export default function PromotionsPage() {
                               {promotionTypeOptions[promotion.type]}
                             </Badge>
                             {promotion.isActive ? (
-                              <Badge variant="outline" className="text-green-600 border-green-600">
+                              <Badge variant="outline" className="text-green-600 border-green-600 dark:text-green-400 dark:border-green-700">
                                 {t('promotionsPage.status.active')}
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-gray-600 border-gray-600">
+                              <Badge variant="outline" className="text-gray-600 border-gray-600 dark:text-gray-400 dark:border-gray-600">
                                 {t('promotionsPage.status.inactive')}
                               </Badge>
                             )}
@@ -449,7 +449,7 @@ export default function PromotionsPage() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <Megaphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <Megaphone className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 {t('promotionsPage.list.noPromotions')}
               </h3>

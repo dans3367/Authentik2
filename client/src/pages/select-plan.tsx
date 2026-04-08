@@ -29,6 +29,9 @@ export default function SelectPlanPage() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<{ planId: string; billingCycle: "monthly" | "yearly" } | null>(null);
+  const [showAgreements, setShowAgreements] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const { toast } = useToast();
@@ -112,8 +115,16 @@ export default function SelectPlanPage() {
   }
 
   const handleSelectPlan = (planId: string) => {
-    setSelectedPlanId(planId);
-    checkoutMutation.mutate({ planId, billingCycle });
+    setPendingCheckout({ planId, billingCycle });
+    setAgreed(false);
+    setShowAgreements(true);
+  };
+
+  const handleAgreementsConfirm = () => {
+    if (!agreed || !pendingCheckout) return;
+    setSelectedPlanId(pendingCheckout.planId);
+    setShowAgreements(false);
+    checkoutMutation.mutate(pendingCheckout);
   };
 
   // Shell for loading / confirming states
@@ -516,6 +527,159 @@ export default function SelectPlanPage() {
           </div>
         </main>
       </div>
+
+      {/* Agreements Modal */}
+      {showAgreements && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', animation: 'sp-fadeUp 0.2s ease-out' }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowAgreements(false); } }}
+        >
+          <div
+            className="relative w-full max-w-lg rounded-2xl overflow-hidden"
+            style={{ background: '#111113', border: '1px solid #27272A', boxShadow: '0 32px 80px rgba(0,0,0,0.6)' }}
+          >
+            {/* Modal header */}
+            <div style={{ padding: '28px 28px 0' }}>
+              <div className="flex items-center gap-3 mb-4">
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 style={{ color: '#FAFAFA', fontSize: '16px', fontWeight: 600, lineHeight: 1.2, margin: 0 }}>
+                    Service Agreement
+                  </h2>
+                  <p style={{ color: '#52525B', fontSize: '12px', margin: '2px 0 0' }}>
+                    One last step before checkout
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: '1px', background: '#1E1E22', margin: '20px 0 0' }} />
+
+            {/* Modal body */}
+            <div style={{ padding: '24px 28px' }}>
+              <p style={{ color: '#71717A', fontSize: '13px', lineHeight: '1.7', marginBottom: '20px' }}>
+                By proceeding to checkout, you agree to comply with all applicable communications laws
+                — including <span style={{ color: '#A1A1AA' }}>CAN-SPAM</span>, <span style={{ color: '#A1A1AA' }}>CASL</span>, <span style={{ color: '#A1A1AA' }}>GDPR</span>, and <span style={{ color: '#A1A1AA' }}>TCPA</span> — and accept full responsibility
+                for all communications sent through the platform on behalf of your business.
+              </p>
+
+              {/* Agreement link */}
+              <div
+                style={{ background: '#18181B', border: '1px solid #27272A', borderRadius: '10px', padding: '14px 16px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}
+              >
+                <div>
+                  <p style={{ color: '#A1A1AA', fontSize: '13px', fontWeight: 500, margin: '0 0 2px' }}>
+                    Communications Service Agreement
+                  </p>
+                  <p style={{ color: '#3F3F46', fontSize: '11px', margin: 0 }}>
+                    CAN-SPAM · CASL · GDPR · TCPA · CCPA
+                  </p>
+                </div>
+                <a
+                  href="/communications-service-agreement"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px', color: '#A78BFA', fontSize: '12px', fontWeight: 500, textDecoration: 'none', padding: '6px 12px', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: '8px', transition: 'all 0.2s' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(139,92,246,0.15)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.15)'; }}
+                >
+                  Read
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                </a>
+              </div>
+
+              {/* Checkbox */}
+              <label
+                style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer', marginBottom: '24px' }}
+              >
+                <div style={{ position: 'relative', flexShrink: 0, marginTop: '1px' }}>
+                  <input
+                    type="checkbox"
+                    checked={agreed}
+                    onChange={(e) => setAgreed(e.target.checked)}
+                    style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', margin: 0 }}
+                  />
+                  <div style={{
+                    width: '18px', height: '18px', borderRadius: '5px',
+                    background: agreed ? 'linear-gradient(135deg, #7C3AED, #6366F1)' : '#18181B',
+                    border: agreed ? 'none' : '1px solid #3F3F46',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.15s',
+                    boxShadow: agreed ? '0 0 12px rgba(124,58,237,0.3)' : 'none',
+                  }}>
+                    {agreed && (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                <span style={{ color: '#A1A1AA', fontSize: '13px', lineHeight: '1.6' }}>
+                  I have read and agree to the{' '}
+                  <a
+                    href="/communications-service-agreement"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#A78BFA', textDecoration: 'underline', textDecorationColor: 'rgba(167,139,250,0.4)' }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Communications Service Agreement
+                  </a>
+                  , and I accept full legal responsibility for all communications sent through the platform on behalf of my business.
+                </span>
+              </label>
+
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => { setShowAgreements(false); setPendingCheckout(null); }}
+                  style={{ flex: 1, padding: '11px', borderRadius: '10px', background: 'transparent', border: '1px solid #27272A', color: '#71717A', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#3F3F46'; e.currentTarget.style.color = '#A1A1AA'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#27272A'; e.currentTarget.style.color = '#71717A'; }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAgreementsConfirm}
+                  disabled={!agreed}
+                  style={{
+                    flex: 2, padding: '11px', borderRadius: '10px',
+                    background: agreed ? 'linear-gradient(135deg, #7C3AED, #6366F1)' : '#18181B',
+                    border: agreed ? 'none' : '1px solid #27272A',
+                    color: agreed ? '#FAFAFA' : '#3F3F46',
+                    fontSize: '13px', fontWeight: 600, cursor: agreed ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.2s',
+                    boxShadow: agreed ? '0 0 20px rgba(124,58,237,0.2)' : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  }}
+                  onMouseEnter={(e) => { if (agreed) e.currentTarget.style.boxShadow = '0 0 28px rgba(124,58,237,0.35)'; }}
+                  onMouseLeave={(e) => { if (agreed) e.currentTarget.style.boxShadow = '0 0 20px rgba(124,58,237,0.2)'; }}
+                >
+                  I Agree &amp; Continue to Checkout
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

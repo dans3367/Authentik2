@@ -226,7 +226,7 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme, onCustomizeCol
                     {/* Enhanced sample form preview */}
                     <div className="space-y-2.5 p-3 bg-stone-50 dark:bg-neutral-800/50 rounded-lg border border-stone-100 dark:border-neutral-800 overflow-hidden">
                       <div className="space-y-1">
-                        <div className="text-xs font-medium text-slate-700">Name</div>
+                        <div className="text-xs font-medium text-slate-700 dark:text-slate-300">Name</div>
                         <div className={`h-8 px-3 flex items-center text-xs ${
                           theme.id === 'neon' ? 'bg-gray-900 border-2 border-cyan-400 text-cyan-100' :
                           theme.id === 'nature' ? 'bg-white border-2 border-green-300 rounded-2xl' :
@@ -253,7 +253,7 @@ export function StyleStep({ themes, selectedTheme, onSelectTheme, onCustomizeCol
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <div className="text-xs font-medium text-slate-700">Email</div>
+                        <div className="text-xs font-medium text-slate-700 dark:text-slate-300">Email</div>
                         <div className={`h-8 px-3 flex items-center text-xs ${
                           theme.id === 'neon' ? 'bg-gray-900 border-2 border-green-400 text-green-100' :
                           theme.id === 'nature' ? 'bg-white border-2 border-emerald-300 rounded-2xl' :

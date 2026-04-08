@@ -438,10 +438,10 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
         {/* Mobile Add Components Modal (hidden for email-signup) */}
         {showMobileAdd && !isEmailSignup && (
           <div className="lg:hidden fixed inset-0 bg-black/50 z-[300] flex items-end">
-            <div className="bg-white w-full max-h-[70vh] rounded-t-2xl flex flex-col">
-              <div className="flex-shrink-0 p-4 border-b border-gray-200">
+            <div className="bg-white dark:bg-neutral-900 w-full max-h-[70vh] rounded-t-2xl flex flex-col">
+              <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-neutral-800">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Add Component</h3>
+                  <h3 className="text-lg font-semibold dark:text-neutral-100">Add Component</h3>
                   <Button
                     size="sm"
                     variant="ghost"
@@ -468,10 +468,10 @@ export function BuildStep({ onDataChange, initialTitle, initialElements, initial
         {/* Mobile Properties Modal */}
         {showMobileProperties && selectedElement && (
           <div className="lg:hidden fixed inset-0 bg-black/50 z-[300] flex items-end">
-            <div className="bg-white w-full max-h-[80vh] rounded-t-2xl flex flex-col">
-              <div className="flex-shrink-0 p-4 border-b border-gray-200">
+            <div className="bg-white dark:bg-neutral-900 w-full max-h-[80vh] rounded-t-2xl flex flex-col">
+              <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-neutral-800">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Edit Component</h3>
+                  <h3 className="text-lg font-semibold dark:text-neutral-100">Edit Component</h3>
                   <Button
                     size="sm"
                     variant="ghost"

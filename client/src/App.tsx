@@ -77,6 +77,7 @@ const AcceptableUsePage = lazy(() => import("@/pages/acceptable-use"));
 const DataProcessingPage = lazy(() => import("@/pages/data-processing"));
 const CookiePolicyPage = lazy(() => import("@/pages/cookie-policy"));
 const LegalAgreementsPage = lazy(() => import("@/pages/legal-agreements"));
+const CommunicationsServiceAgreementPage = lazy(() => import("@/pages/communications-service-agreement"));
 const PublicFormPage = lazy(() => import("@/pages/public-form"));
 const PublicNewsletterHub = lazy(() => import("@/pages/public-newsletter"));
 const PublicNewsletterView = lazy(() => import("@/pages/public-newsletter-view"));
@@ -402,6 +403,7 @@ function Router() {
           <Route path="/update-profile" component={UpdateProfilePage} />
           <Route path="/onboarding" component={OnboardingPage} />
           <Route path="/select-plan" component={SelectPlanPage} />
+          <Route path="/communications-service-agreement" component={CommunicationsServiceAgreementPage} />
           <Route path="/confirm-appointment/:id" component={ConfirmAppointmentPage} />
           <Route path="/newsletter/create/:id" component={NewsletterCreatePage} />
           <Route path="/newsletter/create" component={NewsletterCreatePage} />
@@ -462,6 +464,7 @@ function Router() {
                   <Route path="/data-processing" component={DataProcessingPage} />
                   <Route path="/cookie-policy" component={CookiePolicyPage} />
                   <Route path="/legal-agreements" component={LegalAgreementsPage} />
+                  <Route path="/communications-service-agreement" component={CommunicationsServiceAgreementPage} />
 
                   <Route component={NotFound} />
                 </Switch>

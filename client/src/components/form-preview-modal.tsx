@@ -513,12 +513,12 @@ export function FormPreviewModal({ isOpen, onClose, form, formSettings = {} }: F
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden p-0">
-        <DialogHeader className="p-4 border-b border-gray-200 bg-white">
+        <DialogHeader className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Eye className="w-5 h-5 text-blue-600" />
-                <DialogTitle className="text-lg font-semibold text-gray-900">
+                <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
                   Form Preview: {form.title}
                 </DialogTitle>
               </div>
@@ -604,8 +604,8 @@ export function FormPreviewModal({ isOpen, onClose, form, formSettings = {} }: F
               )}
 
               {form.category === 'email-signup' && (
-                <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  <p className="text-xs text-gray-500 leading-relaxed">
+                <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                     By submitting this form, you agree to receive email and phone communications from us, 
                     including marketing messages, updates, and promotional offers. Standard message and data 
                     rates may apply to phone communications. You can opt out at any time by following the 

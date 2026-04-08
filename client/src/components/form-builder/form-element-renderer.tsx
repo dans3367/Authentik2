@@ -184,7 +184,7 @@ export function FormElementRenderer({
       case "image":
         return (
           <div className="w-full">
-            <div className="relative w-full aspect-square bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg overflow-hidden">
+            <div className="relative w-full aspect-square bg-gradient-to-br from-slate-100 to-slate-200 dark:from-neutral-800 dark:to-neutral-700 rounded-lg overflow-hidden">
               {element.src ? (
                 <img
                   src={element.src}
@@ -199,10 +199,10 @@ export function FormElementRenderer({
                 />
               ) : null}
               <div
-                className={`absolute inset-0 flex flex-col items-center justify-center text-slate-500 ${element.src ? "hidden" : ""}`}
+                className={`absolute inset-0 flex flex-col items-center justify-center text-slate-500 dark:text-neutral-400 ${element.src ? "hidden" : ""}`}
               >
                 <svg
-                  className="w-16 h-16 mb-3 text-slate-400"
+                  className="w-16 h-16 mb-3 text-slate-400 dark:text-neutral-500"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -215,7 +215,7 @@ export function FormElementRenderer({
                   />
                 </svg>
                 <p className="text-sm font-medium">Image Placeholder</p>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-400 dark:text-neutral-500 mt-1">
                   Click to configure image source
                 </p>
               </div>
@@ -309,8 +309,8 @@ export function FormElementRenderer({
     ? "space-y-3"
     : `form-element group relative border-2 transition-all duration-300 p-3 md:p-5 rounded-lg md:rounded-xl cursor-pointer hover:shadow-lg hover:shadow-blue-100/20 select-none ${
         isSelected
-          ? "border-blue-400 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 shadow-md shadow-blue-200/25"
-          : "border-transparent hover:border-blue-200 bg-white"
+          ? "border-blue-400 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 dark:from-blue-950/50 dark:to-indigo-950/50 shadow-md shadow-blue-200/25 dark:shadow-blue-900/25"
+          : "border-transparent hover:border-blue-200 dark:hover:border-blue-800 bg-white dark:bg-neutral-900"
       }`;
 
   return (
@@ -419,7 +419,7 @@ export function FormElementRenderer({
         {/* Content - no margin needed since buttons are outside */}
         <div>
           {element.type !== 'label' && (
-            <Label className="block text-sm font-medium text-neutral-700 mb-2">
+            <Label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
               {translatedLabel}
               {element.required && <span className="text-red-500 ml-1">*</span>}
             </Label>
@@ -428,7 +428,7 @@ export function FormElementRenderer({
           {renderFormControl()}
 
           {element.type !== 'label' && element.helpText && (
-            <div className="text-xs text-neutral-500 mt-1">
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
               {element.helpText}
             </div>
           )}

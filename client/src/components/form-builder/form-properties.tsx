@@ -253,7 +253,7 @@ export function FormProperties({
           <CardContent className="space-y-4">
             {/* Form Title */}
             <div>
-              <Label htmlFor="form-title" className="text-sm font-medium text-neutral-700 mb-2">
+              <Label htmlFor="form-title" className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                 {t('formBuilder.properties.formTitle', 'Form Title')}
               </Label>
               <Input
@@ -267,7 +267,7 @@ export function FormProperties({
 
             {/* Form Category */}
             <div>
-              <Label className="text-sm font-medium text-neutral-700 mb-2">
+              <Label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                 {t('formBuilder.properties.formCategory', 'Form Type')}
               </Label>
               <div className="grid grid-cols-3 gap-2 mt-1">
@@ -316,13 +316,13 @@ export function FormProperties({
 
             {/* Form Language */}
             <div>
-              <Label className="text-sm font-medium text-neutral-700 mb-2">
+              <Label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                 {t('formBuilder.properties.formLanguage', 'Form Language')}
               </Label>
               <select
                 value={language}
                 onChange={(e) => handleSettingChange('language', e.target.value as FormLanguage)}
-                className="w-full px-3 py-2 text-sm border border-neutral-200 rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                className="w-full px-3 py-2 text-sm border border-neutral-200 dark:border-neutral-700 rounded-md bg-white dark:bg-neutral-800 dark:text-neutral-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
               >
                 {languageOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -337,7 +337,7 @@ export function FormProperties({
 
             {/* Form Description */}
             <div>
-              <Label htmlFor="form-description" className="text-sm font-medium text-neutral-700 mb-2">
+              <Label htmlFor="form-description" className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                 {t('formBuilder.properties.formDescription', 'Form Description')}
               </Label>
               <Textarea
@@ -352,7 +352,7 @@ export function FormProperties({
 
             {/* Tags */}
             <div>
-              <Label className="text-sm font-medium text-neutral-700 mb-2">
+              <Label className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                 {t('formBuilder.properties.tags', 'Tags')}
               </Label>
 
@@ -428,7 +428,7 @@ export function FormProperties({
 
             {/* Template Email Section - All form types */}
             <div className="space-y-3">
-              <h4 className="text-sm font-medium text-neutral-700 flex items-center gap-2">
+              <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-600" />
                 {t('formBuilder.properties.templateEmailSection', 'Confirmation Email Template')}
               </h4>
@@ -438,7 +438,7 @@ export function FormProperties({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-blue-600" />
-                  <Label htmlFor="enable-template-email" className="text-xs text-neutral-600">
+                  <Label htmlFor="enable-template-email" className="text-xs text-neutral-600 dark:text-neutral-400">
                     {t('formBuilder.properties.enableTemplateEmail', 'Send Template Email on Submit')}
                   </Label>
                 </div>
@@ -460,22 +460,22 @@ export function FormProperties({
                 <div className="space-y-2">
                   {/* Selected template chip or choose button */}
                   {templateId && availableTemplates.find(t => t.id === templateId) ? (
-                    <div className="flex items-center gap-2 p-2 rounded-lg border border-blue-200 bg-blue-50">
+                    <div className="flex items-center gap-2 p-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
                       <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-blue-900 truncate">
+                        <p className="text-xs font-medium text-blue-900 dark:text-blue-200 truncate">
                           {availableTemplates.find(t => t.id === templateId)?.name}
                         </p>
-                        <p className="text-[10px] text-blue-600 truncate">
+                        <p className="text-[10px] text-blue-600 dark:text-blue-400 truncate">
                           {availableTemplates.find(t => t.id === templateId)?.subjectLine}
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleSettingChange('templateId', '')}
-                        className="p-0.5 rounded-full hover:bg-blue-200 transition-colors"
+                        className="p-0.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
                       >
-                        <X className="w-3 h-3 text-blue-600" />
+                        <X className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                       </button>
                     </div>
                   ) : null}
@@ -793,13 +793,13 @@ export function FormProperties({
             {/* Promotion Section - Only for email-signup */}
             {category === 'email-signup' && (
               <div className="space-y-3">
-                <h4 className="text-sm font-medium text-neutral-700">
+                <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                   {t('formBuilder.properties.promotionSection', 'Promotion')}
                 </h4>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Megaphone className="w-4 h-4 text-emerald-600" />
-                    <Label htmlFor="enable-promotion" className="text-xs text-neutral-600">
+                    <Label htmlFor="enable-promotion" className="text-xs text-neutral-600 dark:text-neutral-400">
                       {t('formBuilder.properties.enablePromotion', 'Enable Promotion')}
                     </Label>
                   </div>
@@ -1154,7 +1154,7 @@ export function FormProperties({
 
             {/* Form Options */}
             <div className="space-y-3">
-              <h4 className="text-sm font-medium text-neutral-700">{t('formBuilder.properties.formOptions', 'Form Options')}</h4>
+              <h4 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t('formBuilder.properties.formOptions', 'Form Options')}</h4>
 
               {category !== 'email-signup' && (
                 <div className="flex items-center space-x-2">

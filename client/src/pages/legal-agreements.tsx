@@ -1,8 +1,16 @@
 import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
-import { LayoutDashboard, Scale, Shield, FileText, Mail, Cookie, Database, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Scale, Shield, FileText, Mail, Cookie, Database, ChevronRight, MessageSquare } from 'lucide-react';
 import { Link } from 'wouter';
 
 const legalDocuments = [
+  {
+    title: 'Communications Service Agreement',
+    description: 'Governs your use of email, SMS, and telephone communications sent through the platform. Covers your full compliance responsibilities under CAN-SPAM, CASL, GDPR, TCPA, and all other applicable communications laws.',
+    href: '/communications-service-agreement',
+    icon: MessageSquare,
+    color: 'text-violet-600 dark:text-violet-400',
+    bg: 'bg-violet-50 dark:bg-violet-950/40',
+  },
   {
     title: 'Privacy & Security Statement',
     description: 'How we collect, process, store, and protect your personal data. Covers marketing consent, phone/SMS charges, data sharing, and your rights under GDPR, CCPA, and other regulations.',
