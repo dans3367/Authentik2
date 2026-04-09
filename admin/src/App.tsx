@@ -39,7 +39,13 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.me().then(setUser).catch(() => setUser(null)).finally(() => setLoading(false));
+    // Check auth status directly — bypass the request() wrapper's 401→redirect
+    // to avoid an infinite loop when already on /login.
+    fetch('/admin-api/auth/me', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
   }, []);
 
   return (

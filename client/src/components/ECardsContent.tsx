@@ -642,8 +642,11 @@ export function ECardsContent() {
     queryKey: ["/api/company"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/company");
-      const data = await response.json();
-      return data.company as { id: string; name: string; owner: any } | null;
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error('Failed to fetch company');
+      }
+      return await response.json() as { id: string; name: string; owner: any } | null;
     },
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
   });

@@ -339,7 +339,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
 
   // Handle context menu on editor
   useEffect(() => {
-    if (!editor) return;
+    if (!editor?.view) return;
 
     const editorElement = editor.view.dom;
 
