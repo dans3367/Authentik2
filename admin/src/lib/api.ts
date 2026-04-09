@@ -24,7 +24,17 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   logout: () => request<{ success: boolean }>('/auth/logout', { method: 'POST' }),
-  me: () => request<{ email: string; role: string }>('/auth/me'),
+  me: () => request<{ email: string; name: string; role: string }>('/auth/me'),
+  updateProfile: (data: { name?: string; email?: string }) =>
+    request<{ email: string; name: string; role: string }>('/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ success: boolean }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
   stats: () => request<any>('/stats'),
   users: (params?: { page?: number; limit?: number; search?: string; role?: string }) => {
     const q = new URLSearchParams();
@@ -48,6 +58,17 @@ export const api = {
   deleteSession: (id: string) =>
     request<any>(`/sessions/${id}`, { method: 'DELETE' }),
   tenants: () => request<any>('/tenants'),
+  tenantDetails: (id: string) => request<any>(`/tenants/${id}/details`),
+  changePlan: (tenantId: string, planId: string, isYearly: boolean) =>
+    request<any>(`/tenants/${tenantId}/change-plan`, {
+      method: 'POST',
+      body: JSON.stringify({ planId, isYearly }),
+    }),
+  plans: () => request<any>('/plans'),
   updateTenant: (id: string, data: any) =>
     request<any>(`/tenants/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteTenant: (id: string) =>
+    request<any>(`/tenants/${id}`, { method: 'DELETE' }),
+  suspendTenant: (id: string, suspend: boolean) =>
+    request<any>(`/tenants/${id}/suspend`, { method: 'POST', body: JSON.stringify({ suspend }) }),
 };

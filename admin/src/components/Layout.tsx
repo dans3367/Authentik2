@@ -8,6 +8,7 @@ import {
   Building2,
   LogOut,
   Shield,
+  UserCircle,
 } from 'lucide-react';
 
 const nav = [
@@ -20,7 +21,7 @@ const nav = [
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { user, setUser } = useAuth();
 
   const handleLogout = async () => {
     await api.logout();
@@ -58,10 +59,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="p-4 border-t border-gray-700">
+        <div className="p-4 border-t border-gray-700 space-y-1">
+          <Link
+            to="/profile"
+            className={`flex items-center gap-2 text-sm transition-colors w-full rounded px-1 py-1.5 ${
+              pathname === '/profile'
+                ? 'text-white'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <UserCircle className="w-4 h-4 shrink-0" />
+            <span className="truncate">{user?.name || user?.email || 'Profile'}</span>
+          </Link>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors w-full"
+            className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors w-full px-1 py-1.5"
           >
             <LogOut className="w-4 h-4" />
             Sign Out

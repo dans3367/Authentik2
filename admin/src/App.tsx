@@ -6,10 +6,12 @@ import DashboardPage from './pages/DashboardPage';
 import UsersPage from './pages/UsersPage';
 import SessionsPage from './pages/SessionsPage';
 import TenantsPage from './pages/TenantsPage';
+import ProfilePage from './pages/ProfilePage';
 import Layout from './components/Layout';
+import { ToastProvider } from './components/Toast';
 
 interface AuthContextType {
-  user: { email: string; role: string } | null;
+  user: { email: string; name: string; role: string } | null;
   setUser: (u: any) => void;
   loading: boolean;
 }
@@ -40,6 +42,7 @@ export default function App() {
   }, []);
 
   return (
+    <ToastProvider>
     <AuthContext.Provider value={{ user, setUser, loading }}>
       <BrowserRouter>
         <Routes>
@@ -54,6 +57,7 @@ export default function App() {
                     <Route path="/users" element={<UsersPage />} />
                     <Route path="/sessions" element={<SessionsPage />} />
                     <Route path="/tenants" element={<TenantsPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>
@@ -62,5 +66,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthContext.Provider>
+    </ToastProvider>
   );
 }

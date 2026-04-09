@@ -25,9 +25,10 @@ dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 const PORT = process.env.ADMIN_PORT || 5100;
 const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'admin-panel-secret-key-change-in-production';
 
-// --- Hardcoded admin credentials ---
-const ADMIN_EMAIL = 'admin@zendiwse.com';
-const ADMIN_PASSWORD_HASH = bcrypt.hashSync('Bulls2398$', 10);
+// --- Admin credentials (mutable in-memory; reset on server restart) ---
+let adminEmail = 'admin@zendwise.com';
+let adminPasswordHash = bcrypt.hashSync('Bulls2398$', 10);
+let adminName = 'Super Admin';
 
 // --- Schema (inline to avoid import issues with parent project) ---
 const betterAuthUser = pgTable('better_auth_user', {
@@ -83,6 +84,101 @@ const tenants = pgTable('tenants', {
   updatedAt: timestamp('updated_at'),
 });
 
+const subscriptionPlans = pgTable('subscription_plans', {
+  id: varchar('id').primaryKey(),
+  name: text('name').notNull(),
+  displayName: text('display_name').notNull(),
+  description: text('description').notNull(),
+  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+  yearlyPrice: decimal('yearly_price', { precision: 10, scale: 2 }),
+  stripePriceId: text('stripe_price_id').notNull(),
+  stripeYearlyPriceId: text('stripe_yearly_price_id'),
+  features: text('features').array().notNull(),
+  maxUsers: integer('max_users'),
+  maxProjects: integer('max_projects'),
+  maxShops: integer('max_shops'),
+  storageLimit: integer('storage_limit'),
+  supportLevel: text('support_level').default('email'),
+  trialDays: integer('trial_days').default(14),
+  isPopular: boolean('is_popular').default(false),
+  isActive: boolean('is_active').default(true),
+  sortOrder: integer('sort_order').default(0),
+  monthlyEmailLimit: integer('monthly_email_limit').default(100),
+  allowUsersManagement: boolean('allow_users_management').default(false),
+  allowRolesManagement: boolean('allow_roles_management').default(false),
+  createdAt: timestamp('created_at'),
+  updatedAt: timestamp('updated_at'),
+});
+
+const subscriptions = pgTable('subscriptions', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id').notNull(),
+  userId: varchar('user_id').notNull(),
+  planId: varchar('plan_id').notNull(),
+  stripeSubscriptionId: text('stripe_subscription_id').notNull(),
+  stripeCustomerId: text('stripe_customer_id').notNull(),
+  status: text('status').notNull(),
+  currentPeriodStart: timestamp('current_period_start').notNull(),
+  currentPeriodEnd: timestamp('current_period_end').notNull(),
+  trialStart: timestamp('trial_start'),
+  trialEnd: timestamp('trial_end'),
+  cancelAtPeriodEnd: boolean('cancel_at_period_end').default(false),
+  canceledAt: timestamp('canceled_at'),
+  isYearly: boolean('is_yearly').default(false),
+  downgradeTargetPlanId: varchar('downgrade_target_plan_id'),
+  downgradeScheduledAt: timestamp('downgrade_scheduled_at'),
+  previousPlanId: varchar('previous_plan_id'),
+  createdAt: timestamp('created_at'),
+  updatedAt: timestamp('updated_at'),
+});
+
+const tenantLimits = pgTable('tenant_limits', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id').notNull(),
+  maxShops: integer('max_shops'),
+  maxUsers: integer('max_users'),
+  maxStorageGb: integer('max_storage_gb'),
+  monthlyEmailLimit: integer('monthly_email_limit'),
+  customLimits: text('custom_limits').default('{}'),
+  overrideReason: text('override_reason'),
+  createdBy: varchar('created_by'),
+  expiresAt: timestamp('expires_at'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at'),
+  updatedAt: timestamp('updated_at'),
+});
+
+const companies = pgTable('companies', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id').notNull(),
+  ownerId: varchar('owner_id').notNull(),
+  name: text('name').notNull(),
+  address: text('address'),
+  companyType: text('company_type'),
+  companyEmail: text('company_email'),
+  phone: text('phone'),
+  website: text('website'),
+  description: text('description'),
+  setupCompleted: boolean('setup_completed').default(false),
+  geographicalLocation: text('geographical_location'),
+  language: text('language').default('en'),
+  businessDescription: text('business_description'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at'),
+  updatedAt: timestamp('updated_at'),
+});
+
+const shops = pgTable('shops', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  address: text('address'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at'),
+  updatedAt: timestamp('updated_at'),
+});
+
 // --- Database setup ---
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -119,7 +215,7 @@ function authenticateAdmin(req: express.Request, res: express.Response, next: ex
   }
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AdminTokenPayload;
-    if (decoded.email !== ADMIN_EMAIL) {
+    if (decoded.email !== adminEmail) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     next();
@@ -134,17 +230,17 @@ app.post('/admin-api/auth/login', async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password required' });
   }
-  if (email !== ADMIN_EMAIL || !bcrypt.compareSync(password, ADMIN_PASSWORD_HASH)) {
+  if (email !== adminEmail || !bcrypt.compareSync(password, adminPasswordHash)) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
-  const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: '24h' });
+  const token = jwt.sign({ email: adminEmail }, JWT_SECRET, { expiresIn: '24h' });
   res.cookie('admin_token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000,
   });
-  return res.json({ success: true, email });
+  return res.json({ success: true, email: adminEmail });
 });
 
 app.post('/admin-api/auth/logout', (_req, res) => {
@@ -153,7 +249,43 @@ app.post('/admin-api/auth/logout', (_req, res) => {
 });
 
 app.get('/admin-api/auth/me', authenticateAdmin, (_req, res) => {
-  return res.json({ email: ADMIN_EMAIL, role: 'super_admin' });
+  return res.json({ email: adminEmail, name: adminName, role: 'super_admin' });
+});
+
+app.patch('/admin-api/auth/profile', authenticateAdmin, (req, res) => {
+  const { name, email } = req.body;
+  if (name !== undefined) adminName = String(name).trim();
+  if (email !== undefined) {
+    const trimmed = String(email).trim().toLowerCase();
+    if (!trimmed || !trimmed.includes('@')) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+    adminEmail = trimmed;
+  }
+  // Re-issue JWT so the new email is encoded in the token
+  const token = jwt.sign({ email: adminEmail }, JWT_SECRET, { expiresIn: '24h' });
+  res.cookie('admin_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+  });
+  return res.json({ email: adminEmail, name: adminName, role: 'super_admin' });
+});
+
+app.post('/admin-api/auth/change-password', authenticateAdmin, (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+  }
+  if (!bcrypt.compareSync(currentPassword, adminPasswordHash)) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  }
+  adminPasswordHash = bcrypt.hashSync(newPassword, 10);
+  return res.json({ success: true });
 });
 
 // --- Dashboard stats ---
@@ -355,6 +487,197 @@ app.patch('/admin-api/tenants/:id', authenticateAdmin, async (req, res) => {
   }
 });
 
+// --- Plans ---
+app.get('/admin-api/plans', authenticateAdmin, async (_req, res) => {
+  try {
+    const plans = await db
+      .select()
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.isActive, true))
+      .orderBy(subscriptionPlans.sortOrder);
+    return res.json({ plans });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch plans' });
+  }
+});
+
+// --- Tenant Details (aggregated) ---
+app.get('/admin-api/tenants/:id/details', authenticateAdmin, async (req, res) => {
+  try {
+    const tenantId = req.params.id;
+
+    // Fetch tenant
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId));
+    if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+    // Fetch all related data in parallel
+    const [
+      tenantUsers,
+      tenantSubscriptions,
+      tenantCompanies,
+      tenantLimitOverrides,
+      tenantShops,
+      [userCount],
+    ] = await Promise.all([
+      db.select().from(betterAuthUser).where(eq(betterAuthUser.tenantId, tenantId)).orderBy(desc(betterAuthUser.createdAt)),
+      db.select().from(subscriptions).where(eq(subscriptions.tenantId, tenantId)).orderBy(desc(subscriptions.createdAt)),
+      db.select().from(companies).where(eq(companies.tenantId, tenantId)),
+      db.select().from(tenantLimits).where(eq(tenantLimits.tenantId, tenantId)),
+      db.select().from(shops).where(eq(shops.tenantId, tenantId)),
+      db.select({ count: count() }).from(betterAuthUser).where(eq(betterAuthUser.tenantId, tenantId)),
+    ]);
+
+    // Fetch subscription plan details for each subscription
+    const subscriptionsWithPlans = await Promise.all(
+      tenantSubscriptions.map(async (sub) => {
+        const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, sub.planId));
+        return { ...sub, plan: plan || null };
+      })
+    );
+
+    // Find the owner user (role = Owner)
+    const owner = tenantUsers.find((u) => u.role === 'Owner') || tenantUsers[0] || null;
+
+    return res.json({
+      tenant,
+      owner,
+      users: tenantUsers,
+      userCount: userCount.count,
+      subscriptions: subscriptionsWithPlans,
+      activeSubscription: subscriptionsWithPlans.find((s) => s.status === 'active' || s.status === 'trialing') || null,
+      company: tenantCompanies[0] || null,
+      limits: tenantLimitOverrides[0] || null,
+      shops: tenantShops,
+    });
+  } catch (err) {
+    console.error('Tenant details error:', err);
+    return res.status(500).json({ error: 'Failed to fetch tenant details' });
+  }
+});
+
+// --- Change tenant plan ---
+app.post('/admin-api/tenants/:id/change-plan', authenticateAdmin, async (req, res) => {
+  try {
+    const tenantId = req.params.id;
+    const { planId, isYearly = false } = req.body;
+
+    if (!planId) return res.status(400).json({ error: 'planId is required' });
+
+    const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, planId));
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(isYearly ? periodEnd.getMonth() + 12 : periodEnd.getMonth() + 1);
+
+    // Update the active subscription if one exists
+    const existing = await db
+      .select()
+      .from(subscriptions)
+      .where(and(eq(subscriptions.tenantId, tenantId), eq(subscriptions.status, 'active')));
+
+    if (existing.length > 0) {
+      await db
+        .update(subscriptions)
+        .set({
+          planId,
+          isYearly,
+          previousPlanId: existing[0].planId,
+          updatedAt: now,
+        })
+        .where(eq(subscriptions.id, existing[0].id));
+    } else {
+      // Also check for trialing subscriptions
+      const trialing = await db
+        .select()
+        .from(subscriptions)
+        .where(and(eq(subscriptions.tenantId, tenantId), eq(subscriptions.status, 'trialing')));
+      if (trialing.length > 0) {
+        await db
+          .update(subscriptions)
+          .set({ planId, isYearly, previousPlanId: trialing[0].planId, updatedAt: now })
+          .where(eq(subscriptions.id, trialing[0].id));
+      }
+    }
+
+    // Always update the owner user's subscription plan fields
+    const [owner] = await db
+      .select()
+      .from(betterAuthUser)
+      .where(and(eq(betterAuthUser.tenantId, tenantId), eq(betterAuthUser.role, 'Owner')));
+
+    if (owner) {
+      await db
+        .update(betterAuthUser)
+        .set({ subscriptionPlanId: planId, updatedAt: now })
+        .where(eq(betterAuthUser.id, owner.id));
+    }
+
+    return res.json({ success: true, plan });
+  } catch (err) {
+    console.error('Change plan error:', err);
+    return res.status(500).json({ error: 'Failed to change plan' });
+  }
+});
+
+// --- Suspend / reinstate tenant ---
+app.post('/admin-api/tenants/:id/suspend', authenticateAdmin, async (req, res) => {
+  try {
+    const tenantId = req.params.id;
+    const { suspend } = req.body; // boolean
+
+    if (typeof suspend !== 'boolean') {
+      return res.status(400).json({ error: '`suspend` must be a boolean' });
+    }
+
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId));
+    if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+    const now = new Date();
+
+    // Update tenant active state
+    const [updatedTenant] = await db
+      .update(tenants)
+      .set({ isActive: !suspend, updatedAt: now })
+      .where(eq(tenants.id, tenantId))
+      .returning();
+
+    // Cascade to all users in the tenant
+    await db
+      .update(betterAuthUser)
+      .set({ isActive: !suspend, updatedAt: now })
+      .where(eq(betterAuthUser.tenantId, tenantId));
+
+    return res.json({ success: true, tenant: updatedTenant });
+  } catch (err) {
+    console.error('Suspend tenant error:', err);
+    return res.status(500).json({ error: 'Failed to update tenant status' });
+  }
+});
+
+// --- Delete tenant (full cascade) ---
+app.delete('/admin-api/tenants/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const tenantId = req.params.id;
+
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId));
+    if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+    // Step 1: delete all users belonging to this tenant.
+    // betterAuthUser.tenantId has no FK → tenants so the DB won't cascade it automatically.
+    // Deleting users DOES cascade their betterAuthSession + betterAuthAccount rows (FK cascade).
+    await db.delete(betterAuthUser).where(eq(betterAuthUser.tenantId, tenantId));
+
+    // Step 2: delete the tenant — the DB cascades all 30+ tables that reference tenants.id.
+    await db.delete(tenants).where(eq(tenants.id, tenantId));
+
+    return res.json({ success: true, deleted: tenant });
+  } catch (err) {
+    console.error('Delete tenant error:', err);
+    return res.status(500).json({ error: 'Failed to delete tenant' });
+  }
+});
+
 // --- Serve static files in production ---
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.join(__dirname, 'dist');
@@ -366,5 +689,5 @@ app.get('*', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`\n  Admin Panel Server running on http://localhost:${PORT}`);
-  console.log(`  Login: ${ADMIN_EMAIL}\n`);
+  console.log(`  Login: ${adminEmail}\n`);
 });

@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { Pencil, X, Check } from 'lucide-react';
+import { Pencil, X, Check, Trash2 } from 'lucide-react';
+import TenantDetailPanel from '../components/TenantDetailPanel';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 
 export default function TenantsPage() {
   const [tenants, setTenants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [deletingTenant, setDeletingTenant] = useState<{ id: string; name: string } | null>(null);
 
   const fetchTenants = async () => {
     setLoading(true);
@@ -64,7 +68,13 @@ export default function TenantsPage() {
                       <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                         className="px-2 py-1 border rounded text-sm w-full" />
                     ) : (
-                      <span className="font-medium text-gray-900">{t.name}</span>
+                      <button
+                        onClick={() => setSelectedTenantId(t.id)}
+                        className="font-medium hover:underline text-left cursor-pointer"
+                        style={{ color: '#111827' }}
+                      >
+                        {t.name}
+                      </button>
                     )}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-600">{t.slug}</td>
@@ -103,10 +113,16 @@ export default function TenantsPage() {
                           className="p-1.5 text-gray-400 hover:bg-gray-100 rounded"><X className="w-4 h-4" /></button>
                       </div>
                     ) : (
-                      <button onClick={() => startEdit(t)}
-                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded">
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => startEdit(t)}
+                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setDeletingTenant({ id: t.id, name: t.name })}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -115,6 +131,29 @@ export default function TenantsPage() {
           </tbody>
         </table>
       </div>
+
+      {selectedTenantId && (
+        <TenantDetailPanel
+          tenantId={selectedTenantId}
+          onClose={() => setSelectedTenantId(null)}
+          onDeleted={() => { setSelectedTenantId(null); fetchTenants(); }}
+        />
+      )}
+
+      {deletingTenant && (
+        <ConfirmDeleteModal
+          title={`Delete "${deletingTenant.name}"`}
+          description={`You are about to permanently delete the tenant "${deletingTenant.name}" and all associated data.`}
+          onConfirm={async () => {
+            await api.deleteTenant(deletingTenant.id);
+            setDeletingTenant(null);
+            // Close detail panel if it was open for this tenant
+            if (selectedTenantId === deletingTenant.id) setSelectedTenantId(null);
+            fetchTenants();
+          }}
+          onCancel={() => setDeletingTenant(null)}
+        />
+      )}
     </div>
   );
 }
