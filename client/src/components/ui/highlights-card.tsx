@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   TrendingUp,
@@ -14,6 +15,8 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAppSelector } from "@/store";
+
+const HighlightsDonutChart = lazy(() => import("@/components/ui/highlights-donut-chart"));
 
 interface MetricItem {
   label: string;
@@ -41,75 +44,6 @@ function ChangeBadge({ change }: { change: number | null }) {
       {isPositive ? "+" : ""}
       {change}%
     </span>
-  );
-}
-
-function DonutChart({
-  segments,
-  total,
-}: {
-  segments: { name: string; value: number; color: string }[];
-  total: number;
-}) {
-  const size = 160;
-  const strokeWidth = 24;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const meaningfulSegments = segments.filter((segment) => segment.value > 0);
-  const hasData = meaningfulSegments.length > 0 && total > 0;
-
-  let offsetAccumulator = 0;
-
-  return (
-    <div className="relative flex items-center justify-center w-40 h-40">
-      <svg
-        viewBox={`0 0 ${size} ${size}`}
-        className="w-40 h-40 -rotate-90"
-        aria-hidden="true"
-      >
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          className="text-muted/50"
-        />
-        {hasData
-          ? meaningfulSegments.map((segment, index) => {
-              const segmentLength = (segment.value / total) * circumference;
-              const dashArray = `${segmentLength} ${circumference - segmentLength}`;
-              const dashOffset = -offsetAccumulator;
-              offsetAccumulator += segmentLength;
-
-              return (
-                <circle
-                  key={`${segment.name}-${index}`}
-                  cx={size / 2}
-                  cy={size / 2}
-                  r={radius}
-                  fill="none"
-                  stroke={segment.color}
-                  strokeWidth={strokeWidth}
-                  strokeLinecap="round"
-                  strokeDasharray={dashArray}
-                  strokeDashoffset={dashOffset}
-                  opacity={0.9}
-                />
-              );
-            })
-          : null}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <span className="text-2xl font-extrabold tracking-tight leading-none">
-          {total.toLocaleString()}
-        </span>
-        <span className="text-[10px] text-muted-foreground/70 font-medium uppercase tracking-wider mt-0.5">
-          Total
-        </span>
-      </div>
-    </div>
   );
 }
 
@@ -162,7 +96,7 @@ export function HighlightsCard() {
     },
   ];
 
-  const rawChartData = metrics.map((m) => ({
+  const chartData = metrics.map((m) => ({
     name: m.label,
     value: m.metric?.value ?? 0,
     color: m.chartColor,
@@ -195,9 +129,9 @@ export function HighlightsCard() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="relative flex items-center justify-center">
-              <DonutChart segments={rawChartData} total={totalValue} />
-            </div>
+            <Suspense fallback={<Skeleton className="h-40 w-40 rounded-full mx-auto" />}>
+              <HighlightsDonutChart chartData={chartData} totalValue={totalValue} />
+            </Suspense>
 
             <div className="space-y-1.5">
               {metrics.map((item, index) => (

@@ -204,8 +204,26 @@ export function TemplateSelector({ onSelect, trigger, channel }: TemplateSelecto
                     )}
                     <div>
                       <Label className="text-xs text-gray-500 dark:text-gray-400">Content</Label>
-                      <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded border text-sm max-h-[200px] overflow-auto">
-                        <div dangerouslySetInnerHTML={{ __html: selectedTemplate.body }} />
+                      <div className="mt-1 border rounded-lg shadow-inner bg-gray-100 dark:bg-gray-800 dark:border-gray-700">
+                        {/* Browser chrome */}
+                        <div className="bg-gray-200 dark:bg-gray-700 px-3 py-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 border-b dark:border-gray-600 rounded-t-lg">
+                          <div className="flex gap-1.5">
+                            <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                            <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                            <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+                          </div>
+                          <div className="flex-1 text-center truncate">
+                            {selectedTemplate.subjectLine || selectedTemplate.name}
+                          </div>
+                        </div>
+                        {/* Email header */}
+                        <div className="bg-white dark:bg-gray-800 px-3 py-2 border-b dark:border-gray-600 text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
+                          <div><span className="font-medium text-gray-500">Subject:</span> {selectedTemplate.subjectLine}</div>
+                        </div>
+                        {/* Email body */}
+                        <div className="bg-white dark:bg-gray-900 p-3 text-sm max-h-[200px] overflow-auto rounded-b-lg">
+                          <div dangerouslySetInnerHTML={{ __html: selectedTemplate.body }} />
+                        </div>
                       </div>
                     </div>
                     {selectedTemplate.tags && selectedTemplate.tags.length > 0 && (
