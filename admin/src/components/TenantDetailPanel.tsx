@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useToast } from './Toast';
 import { api } from '../lib/api';
-import { X, Crown, Trash2, PauseCircle, PlayCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Crown, Trash2, PauseCircle, PlayCircle, Loader2, AlertTriangle, LogIn } from 'lucide-react';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import ConfirmModal from './ConfirmModal';
 
@@ -275,7 +275,7 @@ const AVATAR_COLORS = [
   ['#EF4444','#DC2626'], ['#8B5CF6','#7C3AED'], ['#06B6D4','#0891B2'],
 ];
 
-function UserRow({ u, idx }: { u: any; idx: number }) {
+function UserRow({ u, idx, onImpersonate, isImpersonating }: { u: any; idx: number; onImpersonate: (user: any) => void; isImpersonating: boolean }) {
   const [c1, c2] = AVATAR_COLORS[idx % AVATAR_COLORS.length];
   return (
     <div style={{
@@ -308,8 +308,19 @@ function UserRow({ u, idx }: { u: any; idx: number }) {
           {u.email}
         </div>
       </div>
-      {/* Badges */}
-      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+      {/* Actions */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        {u.isActive && (
+          <ActionBtn
+            onClick={() => onImpersonate(u)}
+            title={`Impersonate ${u.name || u.email}`}
+            color={C.indigo}
+            size={28}
+            disabled={isImpersonating}
+          >
+            <LogIn style={{ width: 13, height: 13 }} />
+          </ActionBtn>
+        )}
         <Badge
           label={u.role}
           variant={u.role === 'Owner' ? 'amber' : u.role === 'Administrator' ? 'indigo' : u.role === 'Manager' ? 'green' : 'neutral'}
@@ -322,6 +333,27 @@ function UserRow({ u, idx }: { u: any; idx: number }) {
 
 function UsersTab({ data }: { data: any }) {
   const { users } = data;
+  const toast = useToast();
+  const [impersonating, setImpersonating] = useState<string | null>(null);
+
+  const handleImpersonate = async (user: any) => {
+    setImpersonating(user.id);
+    // Open window synchronously (in the click handler) so the popup blocker allows it
+    const newWindow = window.open('about:blank', '_blank');
+    try {
+      const result = await api.impersonate(user.id);
+      if (newWindow) {
+        newWindow.location.href = result.appUrl;
+      }
+      toast.success(`Impersonating ${user.name || user.email} — opened in new tab. Session expires in 1 hour.`);
+    } catch (err: any) {
+      if (newWindow) newWindow.close();
+      toast.error(err.message || 'Failed to impersonate user');
+    } finally {
+      setImpersonating(null);
+    }
+  };
+
   return (
     <div className="tab-content">
       <SectionLabel>{users?.length ?? 0} Users</SectionLabel>
@@ -332,7 +364,7 @@ function UsersTab({ data }: { data: any }) {
       ) : (
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
           {users.map((u: any, i: number) => (
-            <UserRow key={u.id} u={u} idx={i} />
+            <UserRow key={u.id} u={u} idx={i} onImpersonate={handleImpersonate} isImpersonating={impersonating === u.id} />
           ))}
         </div>
       )}
@@ -356,7 +388,7 @@ function BillingTab({ data, tenantId, onRefresh }: { data: any; tenantId: string
   useEffect(() => {
     setSelectedPlanId(activeSubscription?.planId || '');
     setIsYearly(activeSubscription?.isYearly || false);
-  }, [activeSubscription?.planId]);
+  }, [activeSubscription?.planId, activeSubscription?.isYearly]);
 
   const currentPlanId = activeSubscription?.planId;
   const isDirty = selectedPlanId && (selectedPlanId !== currentPlanId || isYearly !== (activeSubscription?.isYearly || false));
@@ -876,19 +908,21 @@ export default function TenantDetailPanel({ tenantId, onClose, onDeleted }: Prop
 
 // ─── Tiny helper ─────────────────────────────────────────────────────────────
 function ActionBtn({
-  children, onClick, title, color,
-}: { children: React.ReactNode; onClick: () => void; title: string; color: string }) {
+  children, onClick, title, color, size = 32, disabled,
+}: { children: React.ReactNode; onClick: () => void; title: string; color: string; size?: number; disabled?: boolean }) {
   const [hover, setHover] = useState(false);
+  const rgb = color === C.red ? '248,113,113' : color === C.amber ? '251,191,36' : color === C.green ? '52,211,153' : color === C.indigo ? '129,140,248' : '122,130,160';
   return (
     <button
-      onClick={onClick} title={title}
+      onClick={onClick} title={title} disabled={disabled}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{
-        width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer',
+        width: size, height: size, borderRadius: size <= 28 ? 6 : 8, border: 'none', cursor: disabled ? 'default' : 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: hover ? `rgba(${color === C.red ? '248,113,113' : color === C.amber ? '251,191,36' : color === C.green ? '52,211,153' : '122,130,160'}, 0.12)` : 'transparent',
-        color: hover ? color : C.muted,
+        background: hover && !disabled ? `rgba(${rgb}, 0.12)` : 'transparent',
+        color: hover && !disabled ? color : C.muted,
         transition: 'all 0.15s',
+        opacity: disabled ? 0.4 : 1,
       }}
     >
       {children}

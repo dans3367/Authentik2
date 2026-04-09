@@ -72,4 +72,8 @@ export const api = {
     request<any>(`/tenants/${id}`, { method: 'DELETE' }),
   suspendTenant: (id: string, suspend: boolean) =>
     request<any>(`/tenants/${id}/suspend`, { method: 'POST', body: JSON.stringify({ suspend }) }),
+  impersonate: (userId: string) =>
+    request<{ success: boolean; user: { id: string; name: string; email: string }; appUrl: string }>(
+      `/impersonate/${userId}`, { method: 'POST' }
+    ),
 };

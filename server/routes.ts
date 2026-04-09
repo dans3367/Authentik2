@@ -51,6 +51,11 @@ import { newsletterReactionRoutes } from "./routes/newsletterReactionRoutes";
 import { publicNewsletterRoutes } from "./routes/publicNewsletterRoutes";
 import { analyticsRoutes } from "./routes/analyticsRoutes";
 import { translationRoutes } from "./routes/translationRoutes";
+import { db } from "./db";
+import { betterAuthSession } from "@shared/schema";
+import { eq, like, and, gt, sql } from "drizzle-orm";
+import { createHmac } from "crypto";
+import { invalidateTenantPlanCache } from "./utils/userSecurityCache";
 
 // Import middleware
 import { authRateLimiter, apiRateLimiter, jwtTokenRateLimiter, activityLogRateLimiter } from "./middleware/security";
@@ -62,6 +67,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cookie parser middleware
   app.use(cookieParser());
 
+  // Admin cache invalidation — called by the admin server after plan changes.
+  // Secured by BETTER_AUTH_SECRET (shared between both servers).
+  app.post("/api/admin-cache/invalidate-tenant-plan", (req, res) => {
+    const secret = req.headers['x-admin-secret'];
+    if (!secret || secret !== getAuthSecret()) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const { tenantId } = req.body;
+    if (tenantId) {
+      invalidateTenantPlanCache(tenantId);
+    }
+    return res.json({ success: true });
+  });
+
   // Rate limiting
   // Note: Auth rate limiting handled by better-auth
   app.use("/api", apiRateLimiter);
@@ -70,6 +89,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // and attaches req.shopId for downstream route handlers to use for filtering.
   // Runs on all /api routes; skips gracefully if user is not authenticated.
   app.use("/api", filterByShop);
+
+  // Admin impersonation callback — sets the session cookie from this origin and redirects.
+  // Lives outside /api/auth/* to avoid the Better Auth catch-all handler.
+  // Placed after apiRateLimiter so it is rate-limited.
+  app.get("/api/impersonate-callback", async (req, res) => {
+    try {
+      const nonce = req.query.nonce as string;
+      if (!nonce || !/^[a-f0-9]{64}$/.test(nonce)) {
+        return res.status(400).send('Invalid token');
+      }
+
+      // Atomically find AND consume the nonce in one statement to prevent replay races.
+      // The nonce is embedded in userAgent; stripping it marks the session as consumed.
+      const noncePattern = `[nonce:${nonce}]`;
+      const sixtySecondsAgo = new Date(Date.now() - 60_000);
+
+      const [session] = await db
+        .update(betterAuthSession)
+        .set({ userAgent: sql`replace(${betterAuthSession.userAgent}, ${' ' + noncePattern}, '')` })
+        .where(and(
+          like(betterAuthSession.userAgent, `Admin Impersonation%${noncePattern}`),
+          gt(betterAuthSession.createdAt, sixtySecondsAgo),
+        ))
+        .returning();
+
+      if (!session) return res.status(400).send('Invalid or expired impersonation link');
+
+      // Better Auth expects a signed cookie: "{token}.{HMAC-SHA256 base64 signature}"
+      const signature = createHmac('sha256', getAuthSecret()).update(session.token).digest('base64');
+      const signedToken = `${session.token}.${signature}`;
+
+      res.cookie('better-auth.session_token', signedToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 1000,
+        path: '/',
+      });
+
+      return res.redirect('/');
+    } catch (err) {
+      console.error('Impersonate callback error:', err);
+      return res.status(500).send('Failed to complete impersonation');
+    }
+  });
 
   // API Routes
   // Note: Auth routes handled by better-auth middleware

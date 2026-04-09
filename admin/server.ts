@@ -5,7 +5,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { eq, desc, sql, like, or, count, and, gte, isNotNull } from 'drizzle-orm';
+import { eq, desc, sql, like, or, count, and, gte, isNotNull, inArray } from 'drizzle-orm';
 import {
   pgTable,
   text,
@@ -15,6 +15,7 @@ import {
   integer,
   decimal,
 } from 'drizzle-orm/pg-core';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -23,12 +24,22 @@ import { fileURLToPath } from 'url';
 dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env') });
 
 const PORT = process.env.ADMIN_PORT || 5100;
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'admin-panel-secret-key-change-in-production';
+if (!process.env.ADMIN_JWT_SECRET) {
+  throw new Error('ADMIN_JWT_SECRET environment variable is required. Set it in your .env file.');
+}
+const JWT_SECRET = process.env.ADMIN_JWT_SECRET;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const APP_URL = process.env.APP_URL || `http://localhost:${process.env.PORT || 5002}`;
 
 // --- Admin credentials (mutable in-memory; reset on server restart) ---
-let adminEmail = 'admin@zendwise.com';
-let adminPasswordHash = bcrypt.hashSync('Bulls2398$', 10);
-let adminName = 'Super Admin';
+// Seed from env vars; falls back to defaults ONLY in development.
+let adminEmail = process.env.ADMIN_EMAIL || (IS_PRODUCTION ? '' : 'admin@zendwise.com');
+let adminPasswordHash = process.env.ADMIN_PASSWORD_HASH
+  || (IS_PRODUCTION ? '' : bcrypt.hashSync('changeme', 10));
+let adminName = process.env.ADMIN_NAME || 'Super Admin';
+if (IS_PRODUCTION && (!adminEmail || !adminPasswordHash)) {
+  throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD_HASH environment variables are required in production.');
+}
 
 // --- Schema (inline to avoid import issues with parent project) ---
 const betterAuthUser = pgTable('better_auth_user', {
@@ -197,7 +208,8 @@ const db = drizzle(pool);
 
 // --- Express app ---
 const app = express();
-app.use(cors({ origin: true, credentials: true }));
+const ADMIN_CORS_ORIGIN = process.env.ADMIN_CORS_ORIGIN || `http://localhost:${PORT}`;
+app.use(cors({ origin: ADMIN_CORS_ORIGIN, credentials: true }));
 app.use(cookieParser());
 app.use(express.json());
 
@@ -236,7 +248,7 @@ app.post('/admin-api/auth/login', async (req, res) => {
   const token = jwt.sign({ email: adminEmail }, JWT_SECRET, { expiresIn: '24h' });
   res.cookie('admin_token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: IS_PRODUCTION,
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000,
   });
@@ -266,7 +278,7 @@ app.patch('/admin-api/auth/profile', authenticateAdmin, (req, res) => {
   const token = jwt.sign({ email: adminEmail }, JWT_SECRET, { expiresIn: '24h' });
   res.cookie('admin_token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: IS_PRODUCTION,
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000,
   });
@@ -570,47 +582,100 @@ app.post('/admin-api/tenants/:id/change-plan', authenticateAdmin, async (req, re
     const periodEnd = new Date(now);
     periodEnd.setMonth(isYearly ? periodEnd.getMonth() + 12 : periodEnd.getMonth() + 1);
 
-    // Update the active subscription if one exists
-    const existing = await db
-      .select()
-      .from(subscriptions)
-      .where(and(eq(subscriptions.tenantId, tenantId), eq(subscriptions.status, 'active')));
-
-    if (existing.length > 0) {
-      await db
-        .update(subscriptions)
-        .set({
-          planId,
-          isYearly,
-          previousPlanId: existing[0].planId,
-          updatedAt: now,
-        })
-        .where(eq(subscriptions.id, existing[0].id));
-    } else {
-      // Also check for trialing subscriptions
-      const trialing = await db
-        .select()
-        .from(subscriptions)
-        .where(and(eq(subscriptions.tenantId, tenantId), eq(subscriptions.status, 'trialing')));
-      if (trialing.length > 0) {
-        await db
-          .update(subscriptions)
-          .set({ planId, isYearly, previousPlanId: trialing[0].planId, updatedAt: now })
-          .where(eq(subscriptions.id, trialing[0].id));
-      }
-    }
-
-    // Always update the owner user's subscription plan fields
+    // Look up the tenant owner once (used for subscription creation + user update)
     const [owner] = await db
       .select()
       .from(betterAuthUser)
       .where(and(eq(betterAuthUser.tenantId, tenantId), eq(betterAuthUser.role, 'Owner')));
 
+    // Find any existing subscription for this tenant (active or trialing first)
+    const [existing] = await db
+      .select()
+      .from(subscriptions)
+      .where(and(
+        eq(subscriptions.tenantId, tenantId),
+        inArray(subscriptions.status, ['active', 'trialing']),
+      ));
+
+    if (existing) {
+      // Update the existing subscription
+      await db
+        .update(subscriptions)
+        .set({
+          planId,
+          isYearly,
+          status: 'active',
+          previousPlanId: existing.planId,
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          updatedAt: now,
+        })
+        .where(eq(subscriptions.id, existing.id));
+    } else {
+      // No active/trialing subscription — check for any other (canceled, etc.)
+      const [anySub] = await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.tenantId, tenantId));
+
+      if (anySub) {
+        // Reactivate the existing row
+        await db
+          .update(subscriptions)
+          .set({
+            planId,
+            isYearly,
+            status: 'active',
+            previousPlanId: anySub.planId,
+            currentPeriodStart: now,
+            currentPeriodEnd: periodEnd,
+            cancelAtPeriodEnd: false,
+            canceledAt: null,
+            updatedAt: now,
+          })
+          .where(eq(subscriptions.id, anySub.id));
+      } else {
+        // No subscription record at all — create one
+        await db.insert(subscriptions).values({
+          id: crypto.randomUUID(),
+          tenantId,
+          userId: owner?.id ?? tenantId,
+          planId,
+          stripeSubscriptionId: `admin_override_${tenantId}_${Date.now()}`,
+          stripeCustomerId: `admin_customer_${tenantId}`,
+          status: 'active',
+          isYearly,
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+        });
+      }
+    }
+
+    // Always update the owner user's subscription plan fields
     if (owner) {
       await db
         .update(betterAuthUser)
         .set({ subscriptionPlanId: planId, updatedAt: now })
         .where(eq(betterAuthUser.id, owner.id));
+    }
+
+    // Invalidate the main server's tenant plan cache so changes take effect immediately
+    const cacheSecret = process.env.BETTER_AUTH_SECRET;
+    if (cacheSecret) {
+      try {
+        await fetch(`${APP_URL}/api/admin-cache/invalidate-tenant-plan`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-secret': cacheSecret,
+          },
+          body: JSON.stringify({ tenantId }),
+        });
+      } catch {
+        // Non-fatal — cache will expire naturally
+      }
+    } else {
+      console.warn('[Change Plan] BETTER_AUTH_SECRET not set — skipping cache invalidation');
     }
 
     return res.json({ success: true, plan });
@@ -678,6 +743,55 @@ app.delete('/admin-api/tenants/:id', authenticateAdmin, async (req, res) => {
   }
 });
 
+// --- Impersonate user ---
+app.post('/admin-api/impersonate/:userId', authenticateAdmin, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    // Verify user exists and is active
+    const [user] = await db
+      .select({ id: betterAuthUser.id, name: betterAuthUser.name, email: betterAuthUser.email, isActive: betterAuthUser.isActive })
+      .from(betterAuthUser)
+      .where(eq(betterAuthUser.id, userId));
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user.isActive) return res.status(400).json({ error: 'Cannot impersonate an inactive user' });
+
+    // Create a Better Auth session directly in the DB
+    const sessionId = crypto.randomUUID();
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    // One-time nonce for the callback URL (never stored as the session token)
+    const nonce = crypto.randomBytes(32).toString('hex');
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour
+
+    await db.insert(betterAuthSession).values({
+      id: sessionId,
+      token: sessionToken,
+      userId,
+      expiresAt,
+      createdAt: now,
+      updatedAt: now,
+      ipAddress: req.ip || '127.0.0.1',
+      // Embed the nonce in userAgent so the callback can match it without exposing the session token
+      userAgent: `Admin Impersonation (${adminEmail}) [nonce:${nonce}]`,
+    });
+
+    // Build a callback URL using the nonce — the real session token never appears in the URL
+    const impersonateUrl = `${APP_URL}/api/impersonate-callback?nonce=${encodeURIComponent(nonce)}`;
+
+    console.log(`[Impersonation] Admin ${adminEmail} impersonated user ${user.email} (${userId}) from ${req.ip || '127.0.0.1'} at ${now.toISOString()}`);
+
+    return res.json({
+      success: true,
+      user: { id: user.id, name: user.name, email: user.email },
+      appUrl: impersonateUrl,
+    });
+  } catch (err) {
+    console.error('Impersonate error:', err);
+    return res.status(500).json({ error: 'Failed to create impersonation session' });
+  }
+});
+
 // --- Income / Revenue analytics ---
 app.get('/admin-api/income', authenticateAdmin, async (_req, res) => {
   try {
@@ -719,7 +833,6 @@ app.get('/admin-api/income', authenticateAdmin, async (_req, res) => {
       const key = sub.createdAt.toISOString().slice(0, 7); // "2025-03"
       if (!trendMap[key]) trendMap[key] = { new: 0, canceled: 0 };
       trendMap[key].new++;
-      if (sub.status === 'canceled') trendMap[key].canceled++;
     }
 
     // Canceled-at trend (subscriptions canceled in the last 12 months)
@@ -744,8 +857,6 @@ app.get('/admin-api/income', authenticateAdmin, async (_req, res) => {
       .map(([month, v]) => ({ month, ...v }));
 
     // Build per-plan metrics
-    const planMap = new Map(allPlans.map((p) => [p.id, p]));
-
     const planMetrics = allPlans.map((plan) => {
       const rows = subStats.filter((s) => s.planId === plan.id);
 
@@ -756,7 +867,9 @@ app.get('/admin-api/income', authenticateAdmin, async (_req, res) => {
       const activeYearly   = get('active',   true);
       const trialingMonthly = get('trialing', false);
       const trialingYearly  = get('trialing', true);
-      const pastDue        = rows.filter((r) => r.status === 'past_due').reduce((s, r) => s + r.count, 0);
+      const pastDueMonthly = get('past_due', false);
+      const pastDueYearly  = get('past_due', true);
+      const pastDue        = pastDueMonthly + pastDueYearly;
       const canceled       = rows.filter((r) => r.status === 'canceled').reduce((s, r) => s + r.count, 0);
       const incomplete     = rows.filter((r) => r.status === 'incomplete').reduce((s, r) => s + r.count, 0);
 
@@ -783,6 +896,8 @@ app.get('/admin-api/income', authenticateAdmin, async (_req, res) => {
         trialingMonthly,
         trialingYearly,
         pastDue,
+        pastDueMonthly,
+        pastDueYearly,
         canceled,
         incomplete,
         totalActive: activeMonthly + activeYearly,
@@ -812,9 +927,9 @@ app.get('/admin-api/income', authenticateAdmin, async (_req, res) => {
       statusBreakdown,
       trend,
     });
-  } catch (err: any) {
-    console.error('Income error:', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to fetch income data' });
+  } catch (err) {
+    console.error('Income error:', err);
+    return res.status(500).json({ error: 'Failed to fetch income data' });
   }
 });
 

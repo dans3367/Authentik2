@@ -499,7 +499,7 @@ export default function IncomePage() {
             <div style={{ fontFamily: F.body, fontSize: 12, color: '#A16207', marginTop: 3 }}>
               Unresolved failed payments put approximately{' '}
               <strong style={{ fontFamily: F.mono, fontWeight: 600 }}>
-                {fmtCurrency(activePlans.reduce((s, p) => s + (p.pastDue > 0 ? p.price * p.pastDue : 0), 0), 2)}/mo
+                {fmtCurrency(activePlans.reduce((s, p) => s + (p.pastDue > 0 ? p.price * p.pastDueMonthly + (p.yearlyPrice ?? p.price * 12) / 12 * p.pastDueYearly : 0), 0), 2)}/mo
               </strong>
               {' '}of MRR at risk of churning.
             </div>
