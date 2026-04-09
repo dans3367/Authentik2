@@ -65,6 +65,7 @@ export const api = {
       body: JSON.stringify({ planId, isYearly }),
     }),
   plans: () => request<any>('/plans'),
+  income: () => request<any>('/income'),
   updateTenant: (id: string, data: any) =>
     request<any>(`/tenants/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteTenant: (id: string) =>

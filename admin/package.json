@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "concurrently -n api,ui -c cyan,magenta \"tsx server.ts\" \"vite\"",
+    "dev:api": "tsx server.ts",
+    "dev:ui": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "express": "^4.21.2",
@@ -29,11 +32,12 @@
     "@types/cors": "^2.8.17",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
-    "@types/node": "20.16.11",
-    "@vitejs/plugin-react": "^4.3.2",
+    "@types/node": "^20.19.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.1.2",
     "tsx": "^4.19.1",
     "typescript": "5.6.3",
-    "vite": "^5.4.19",
+    "vite": "8.0.5",
     "tailwindcss": "^3.4.19",
     "autoprefixer": "^10.4.24",
     "postcss": "^8.5.6"

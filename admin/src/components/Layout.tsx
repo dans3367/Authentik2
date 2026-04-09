@@ -9,6 +9,7 @@ import {
   LogOut,
   Shield,
   UserCircle,
+  TrendingUp,
 } from 'lucide-react';
 
 const nav = [
@@ -16,6 +17,7 @@ const nav = [
   { to: '/users', label: 'Users', icon: Users },
   { to: '/sessions', label: 'Sessions', icon: KeyRound },
   { to: '/tenants', label: 'Tenants', icon: Building2 },
+  { to: '/income', label: 'Income', icon: TrendingUp },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

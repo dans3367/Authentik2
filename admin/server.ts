@@ -5,7 +5,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { eq, desc, sql, like, or, count, and } from 'drizzle-orm';
+import { eq, desc, sql, like, or, count, and, gte, isNotNull } from 'drizzle-orm';
 import {
   pgTable,
   text,
@@ -675,6 +675,146 @@ app.delete('/admin-api/tenants/:id', authenticateAdmin, async (req, res) => {
   } catch (err) {
     console.error('Delete tenant error:', err);
     return res.status(500).json({ error: 'Failed to delete tenant' });
+  }
+});
+
+// --- Income / Revenue analytics ---
+app.get('/admin-api/income', authenticateAdmin, async (_req, res) => {
+  try {
+    // All plans (including inactive, for historical accuracy)
+    const allPlans = await db
+      .select()
+      .from(subscriptionPlans)
+      .orderBy(subscriptionPlans.sortOrder);
+
+    // Subscription counts grouped by plan × status × billing cycle
+    const subStats = await db
+      .select({
+        planId: subscriptions.planId,
+        status: subscriptions.status,
+        isYearly: subscriptions.isYearly,
+        count: count(),
+      })
+      .from(subscriptions)
+      .groupBy(subscriptions.planId, subscriptions.status, subscriptions.isYearly);
+
+    // Monthly new-subscription trend (last 12 months)
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 11);
+    twelveMonthsAgo.setDate(1);
+    twelveMonthsAgo.setHours(0, 0, 0, 0);
+
+    const recentSubs = await db
+      .select({
+        createdAt: subscriptions.createdAt,
+        status: subscriptions.status,
+      })
+      .from(subscriptions)
+      .where(gte(subscriptions.createdAt, twelveMonthsAgo));
+
+    // Aggregate by YYYY-MM
+    const trendMap: Record<string, { new: number; canceled: number }> = {};
+    for (const sub of recentSubs) {
+      if (!sub.createdAt) continue;
+      const key = sub.createdAt.toISOString().slice(0, 7); // "2025-03"
+      if (!trendMap[key]) trendMap[key] = { new: 0, canceled: 0 };
+      trendMap[key].new++;
+      if (sub.status === 'canceled') trendMap[key].canceled++;
+    }
+
+    // Canceled-at trend (subscriptions canceled in the last 12 months)
+    const canceledRecent = await db
+      .select({ canceledAt: subscriptions.canceledAt })
+      .from(subscriptions)
+      .where(
+        and(
+          isNotNull(subscriptions.canceledAt),
+          gte(subscriptions.canceledAt, twelveMonthsAgo)
+        )
+      );
+    for (const sub of canceledRecent) {
+      if (!sub.canceledAt) continue;
+      const key = sub.canceledAt.toISOString().slice(0, 7);
+      if (!trendMap[key]) trendMap[key] = { new: 0, canceled: 0 };
+      trendMap[key].canceled++;
+    }
+
+    const trend = Object.entries(trendMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, v]) => ({ month, ...v }));
+
+    // Build per-plan metrics
+    const planMap = new Map(allPlans.map((p) => [p.id, p]));
+
+    const planMetrics = allPlans.map((plan) => {
+      const rows = subStats.filter((s) => s.planId === plan.id);
+
+      const get = (status: string, yearly: boolean | null) =>
+        rows.find((r) => r.status === status && (yearly === null || r.isYearly === yearly))?.count ?? 0;
+
+      const activeMonthly  = get('active',   false);
+      const activeYearly   = get('active',   true);
+      const trialingMonthly = get('trialing', false);
+      const trialingYearly  = get('trialing', true);
+      const pastDue        = rows.filter((r) => r.status === 'past_due').reduce((s, r) => s + r.count, 0);
+      const canceled       = rows.filter((r) => r.status === 'canceled').reduce((s, r) => s + r.count, 0);
+      const incomplete     = rows.filter((r) => r.status === 'incomplete').reduce((s, r) => s + r.count, 0);
+
+      const price       = parseFloat(plan.price as string) || 0;
+      const yearlyPrice = parseFloat((plan.yearlyPrice ?? '0') as string) || 0;
+
+      // MRR: monthly subs × price + yearly subs × (yearlyPrice / 12)
+      const mrr = activeMonthly * price + activeYearly * (yearlyPrice / 12);
+      // ARR: MRR × 12 (normalised)
+      const arr = mrr * 12;
+
+      return {
+        id: plan.id,
+        name: plan.name,
+        displayName: plan.displayName,
+        description: plan.description,
+        price,
+        yearlyPrice: yearlyPrice || null,
+        isActive: plan.isActive,
+        isPopular: plan.isPopular,
+        sortOrder: plan.sortOrder,
+        activeMonthly,
+        activeYearly,
+        trialingMonthly,
+        trialingYearly,
+        pastDue,
+        canceled,
+        incomplete,
+        totalActive: activeMonthly + activeYearly,
+        totalTrialing: trialingMonthly + trialingYearly,
+        mrr,
+        arr,
+      };
+    });
+
+    // Overall summary
+    const totalMrr     = planMetrics.reduce((s, p) => s + p.mrr, 0);
+    const totalArr     = totalMrr * 12;
+    const totalActive  = planMetrics.reduce((s, p) => s + p.totalActive, 0);
+    const totalTrialing = planMetrics.reduce((s, p) => s + p.totalTrialing, 0);
+    const totalPastDue = planMetrics.reduce((s, p) => s + p.pastDue, 0);
+    const totalCanceled = planMetrics.reduce((s, p) => s + p.canceled, 0);
+
+    // Full status breakdown across all subscriptions
+    const statusBreakdown = await db
+      .select({ status: subscriptions.status, count: count() })
+      .from(subscriptions)
+      .groupBy(subscriptions.status);
+
+    return res.json({
+      plans: planMetrics,
+      summary: { totalMrr, totalArr, totalActive, totalTrialing, totalPastDue, totalCanceled },
+      statusBreakdown,
+      trend,
+    });
+  } catch (err: any) {
+    console.error('Income error:', err?.message || err);
+    return res.status(500).json({ error: err?.message || 'Failed to fetch income data' });
   }
 });
 

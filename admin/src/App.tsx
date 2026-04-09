@@ -7,6 +7,7 @@ import UsersPage from './pages/UsersPage';
 import SessionsPage from './pages/SessionsPage';
 import TenantsPage from './pages/TenantsPage';
 import ProfilePage from './pages/ProfilePage';
+import IncomePage from './pages/IncomePage';
 import Layout from './components/Layout';
 import { ToastProvider } from './components/Toast';
 
@@ -58,6 +59,7 @@ export default function App() {
                     <Route path="/sessions" element={<SessionsPage />} />
                     <Route path="/tenants" element={<TenantsPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="/income" element={<IncomePage />} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>
