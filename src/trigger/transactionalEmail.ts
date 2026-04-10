@@ -214,53 +214,201 @@ function buildVerificationEmailText(displayName: string, verificationUrl: string
 }
 
 function buildWelcomeEmailHtml(displayName: string, baseUrl: string, appName: string): string {
+  const safeName = escapeHtml(displayName);
+  const safeBase = escapeHtml(baseUrl);
+  const safeApp = escapeHtml(appName);
+
   return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to ${escapeHtml(appName)}</title>
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>No. 001 — Welcome to ${safeApp}</title>
+  <!--[if mso]>
+  <style type="text/css">
+    body, table, td, h1, h2, h3, p, a, span { font-family: Georgia, 'Times New Roman', serif !important; }
+  </style>
+  <![endif]-->
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f7fafc;">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f7fafc;">
+<body style="margin:0;padding:0;background-color:#ede3ce;font-family:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;color:#1c1a17;-webkit-font-smoothing:antialiased;">
+
+  <!-- Preheader (hidden preview text in inbox list) -->
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#ede3ce;">
+    The presses are warm. Your first edition has arrived — welcome to ${safeApp}.
+  </div>
+
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#ede3ce;">
     <tr>
-      <td align="center" style="padding: 32px 16px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+      <td align="center" style="padding:44px 16px;">
+
+        <!-- THE PAGE -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:600px;background-color:#f7efdb;border:1px solid #d9cdad;">
+
+          <!-- Broadsheet top rule: heavy + hairline -->
           <tr>
-            <td>
-              <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
-                <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: #ffffff;">🎉 Account Verified!</h1>
-                <p style="margin: 0; font-size: 16px; opacity: 0.9; color: #ffffff;">Welcome to ${escapeHtml(appName)}</p>
-              </div>
-              <div style="padding: 32px;">
-                <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #1e293b;">Hi${escapeHtml(displayName)}!</h2>
-                <p style="margin: 0 0 16px 0; font-size: 16px; color: #475569; line-height: 1.6;">
-                  Congratulations! Your email address has been successfully verified and your account is now fully activated.
-                </p>
-
-                <p style="margin: 0 0 12px 0; font-size: 16px; color: #475569;">You can now:</p>
-                <ul style="margin: 0 0 24px 0; padding-left: 24px; color: #475569; font-size: 15px; line-height: 2;">
-                  <li>Access all features of ${escapeHtml(appName)}</li>
-                  <li>Manage your profile and account settings</li>
-                  <li>Enable two-factor authentication for extra security</li>
-                  <li>Manage your active sessions across devices</li>
-                </ul>
-
-                <div style="text-align: center; margin: 28px 0;">
-                  <a href="${escapeHtml(baseUrl)}" style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: #ffffff; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; letter-spacing: 0.02em; box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);">
-                    Go to Dashboard
-                  </a>
-                </div>
-
-                <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748b;">
-                  If you have any questions or need help getting started, feel free to reach out to our support team.
-                </p>
-
-                <p style="margin: 24px 0 4px 0; font-size: 14px; color: #475569;">Thank you for joining us!</p>
-                <p style="margin: 0; font-size: 14px; color: #475569; font-weight: 600;">The ${escapeHtml(appName)} Team</p>
-              </div>
+            <td style="border-top:6px solid #1c1a17;padding:0;line-height:0;font-size:0;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:0;line-height:0;font-size:0;">
+              <div style="height:3px;line-height:3px;font-size:0;">&nbsp;</div>
             </td>
           </tr>
+          <tr>
+            <td style="border-top:1px solid #1c1a17;padding:0;line-height:0;font-size:0;">&nbsp;</td>
+          </tr>
+
+          <!-- Masthead -->
+          <tr>
+            <td style="padding:26px 44px 20px 44px;border-bottom:1px solid #1c1a17;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td align="left" valign="middle" style="font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:#7d2b2b;font-weight:700;">
+                    Vol.&nbsp;I &middot; No.&nbsp;001
+                  </td>
+                  <td align="right" valign="middle" style="font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:#6b5d4a;font-weight:700;">
+                    Delivered by hand
+                  </td>
+                </tr>
+              </table>
+              <h1 style="margin:16px 0 8px 0;font-family:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;font-size:42px;line-height:1.02;font-weight:900;letter-spacing:-0.015em;color:#1c1a17;text-align:center;">
+                The ${safeApp} Dispatch
+              </h1>
+              <p style="margin:0;text-align:center;font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:13px;color:#6b5d4a;letter-spacing:0.04em;">
+                — A broadside for the people who still believe in the inbox —
+              </p>
+            </td>
+          </tr>
+
+          <!-- Headline / Editor's note -->
+          <tr>
+            <td style="padding:44px 48px 8px 48px;">
+              <p style="margin:0 0 14px 0;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.32em;text-transform:uppercase;color:#7d2b2b;font-weight:700;">
+                ❧&nbsp;&nbsp;The Welcome&nbsp;&nbsp;❧
+              </p>
+              <h2 style="margin:0 0 22px 0;font-family:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;font-size:38px;line-height:1.08;font-weight:800;letter-spacing:-0.018em;color:#1c1a17;">
+                Welcome${safeName},<br>
+                <span style="font-style:italic;font-weight:400;color:#7d2b2b;">the presses are warm.</span>
+              </h2>
+              <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:1.72;color:#3a342a;">
+                Your studio is verified, the ink is mixed, and your audience is waiting at the door. Consider this your first edition — a small ceremony to mark the start of something that, with any luck, will fill a great many inboxes.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Ornamental rule -->
+          <tr>
+            <td align="center" style="padding:32px 48px 4px 48px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="90" style="border-top:1px solid #1c1a17;line-height:1px;font-size:0;">&nbsp;</td>
+                  <td style="padding:0 16px;font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#7d2b2b;line-height:1;">§</td>
+                  <td width="90" style="border-top:1px solid #1c1a17;line-height:1px;font-size:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- In This Issue -->
+          <tr>
+            <td style="padding:16px 48px 8px 48px;">
+              <p style="margin:0 0 22px 0;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:11px;letter-spacing:0.32em;text-transform:uppercase;color:#6b5d4a;font-weight:700;">
+                In This Issue
+              </p>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td width="54" valign="top" style="padding:4px 0 22px 0;font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;font-size:30px;line-height:1;font-style:italic;color:#7d2b2b;font-weight:700;">I.</td>
+                  <td valign="top" style="padding:4px 0 22px 0;">
+                    <p style="margin:0 0 5px 0;font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;font-size:16px;font-weight:700;color:#1c1a17;">Compose your first letter.</p>
+                    <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.65;color:#3a342a;">Open the editor, pour a coffee, and draft something your readers will actually look forward to.</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td width="54" valign="top" style="padding:4px 0 22px 0;font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;font-size:30px;line-height:1;font-style:italic;color:#7d2b2b;font-weight:700;">II.</td>
+                  <td valign="top" style="padding:4px 0 22px 0;">
+                    <p style="margin:0 0 5px 0;font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;font-size:16px;font-weight:700;color:#1c1a17;">Gather your subscribers.</p>
+                    <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.65;color:#3a342a;">Bring your list in from a CSV or a previous provider. We handle the cleanup; you keep the goodwill.</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td width="54" valign="top" style="padding:4px 0 4px 0;font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;font-size:30px;line-height:1;font-style:italic;color:#7d2b2b;font-weight:700;">III.</td>
+                  <td valign="top" style="padding:4px 0 4px 0;">
+                    <p style="margin:0 0 5px 0;font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;font-size:16px;font-weight:700;color:#1c1a17;">Verify your sending domain.</p>
+                    <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.65;color:#3a342a;">A ten-minute chore that earns a lifetime of inboxes. Worth every second.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Broadsheet pull quote -->
+          <tr>
+            <td style="padding:28px 48px 28px 48px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:3px double #1c1a17;border-bottom:3px double #1c1a17;">
+                <tr>
+                  <td align="center" style="padding:24px 18px;">
+                    <p style="margin:0 0 10px 0;font-family:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;font-size:20px;line-height:1.35;font-style:italic;color:#1c1a17;">
+                      &ldquo;The best newsletters feel like a letter from a friend who happens to know everything.&rdquo;
+                    </p>
+                    <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:#6b5d4a;font-weight:700;">
+                      — From the Editorial Desk
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- CTA: stamped block button -->
+          <tr>
+            <td align="center" style="padding:4px 48px 36px 48px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center" bgcolor="#1c1a17" style="background-color:#1c1a17;">
+                    <a href="${safeBase}" style="display:block;padding:17px 44px;font-family:Georgia,'Times New Roman',serif;font-size:12px;letter-spacing:0.3em;text-transform:uppercase;color:#f7efdb;text-decoration:none;font-weight:700;">
+                      Enter the Studio&nbsp;&nbsp;→
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:18px 0 0 0;font-family:Georgia,'Times New Roman',serif;font-size:11px;font-style:italic;color:#6b5d4a;text-align:center;">
+                or paste this into your browser:<br>
+                <span style="color:#7d2b2b;font-style:normal;">${safeBase}</span>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Broadsheet bottom rule: hairline + heavy -->
+          <tr>
+            <td style="border-top:1px solid #1c1a17;padding:0;line-height:0;font-size:0;">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:0;line-height:0;font-size:0;">
+              <div style="height:3px;line-height:3px;font-size:0;">&nbsp;</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="border-top:6px solid #1c1a17;padding:0;line-height:0;font-size:0;">&nbsp;</td>
+          </tr>
+
+          <!-- Colophon -->
+          <tr>
+            <td style="padding:28px 44px 34px 44px;text-align:center;">
+              <p style="margin:0 0 8px 0;font-family:Georgia,'Times New Roman',serif;font-size:10px;letter-spacing:0.32em;text-transform:uppercase;color:#6b5d4a;font-weight:700;">Colophon</p>
+              <p style="margin:0 0 16px 0;font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;font-size:13px;font-style:italic;color:#3a342a;line-height:1.65;">
+                Set in Iowan Old Style &amp; Georgia. Printed with care.<br>
+                Signed, — The Editors, ${safeApp}
+              </p>
+              <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:10px;color:#8b7e68;letter-spacing:0.06em;line-height:1.7;">
+                You are receiving this because you just joined ${safeApp}.<br>
+                Questions? Simply reply to this letter — a real person is listening.
+              </p>
+            </td>
+          </tr>
+
         </table>
       </td>
     </tr>
@@ -270,21 +418,64 @@ function buildWelcomeEmailHtml(displayName: string, baseUrl: string, appName: st
 }
 
 function buildWelcomeEmailText(displayName: string, baseUrl: string, appName: string): string {
+  const name = displayName.trim();
+  const greeting = name ? `Welcome, ${name},` : "Welcome,";
+
   return [
-    `Hi${displayName}!`,
-    "",
-    `Congratulations! Your email address has been successfully verified and your account is now fully activated.`,
-    "",
-    `You can now:`,
-    `- Access all features of ${appName}`,
-    `- Manage your profile and account settings`,
-    `- Enable two-factor authentication for extra security`,
-    `- Manage your active sessions across devices`,
-    "",
-    `Go to Dashboard: ${baseUrl}`,
-    "",
-    `Thank you for joining us!`,
-    `The ${appName} Team`,
+    `THE ${appName.toUpperCase()} DISPATCH`,
+    `Vol. I  ·  No. 001  ·  Delivered by hand`,
+    `— A broadside for the people who still believe in the inbox —`,
+    ``,
+    `═══════════════════════════════════════════`,
+    ``,
+    `❧   THE WELCOME   ❧`,
+    ``,
+    `${greeting} the presses are warm.`,
+    ``,
+    `Your studio is verified, the ink is mixed, and your`,
+    `audience is waiting at the door. Consider this your`,
+    `first edition — a small ceremony to mark the start of`,
+    `something that, with any luck, will fill a great many`,
+    `inboxes.`,
+    ``,
+    `                     §`,
+    ``,
+    `IN THIS ISSUE`,
+    ``,
+    `  I.  Compose your first letter.`,
+    `      Open the editor, pour a coffee, and draft`,
+    `      something your readers will actually look`,
+    `      forward to.`,
+    ``,
+    ` II.  Gather your subscribers.`,
+    `      Bring your list in from a CSV or a previous`,
+    `      provider. We handle the cleanup; you keep`,
+    `      the goodwill.`,
+    ``,
+    `III.  Verify your sending domain.`,
+    `      A ten-minute chore that earns a lifetime`,
+    `      of inboxes. Worth every second.`,
+    ``,
+    `═══════════════════════════════════════════`,
+    ``,
+    `  "The best newsletters feel like a letter from`,
+    `   a friend who happens to know everything."`,
+    `                       — From the Editorial Desk`,
+    ``,
+    `═══════════════════════════════════════════`,
+    ``,
+    `→ ENTER THE STUDIO`,
+    `  ${baseUrl}`,
+    ``,
+    `───────────────────────────────────────────`,
+    ``,
+    `COLOPHON`,
+    `Set in Iowan Old Style & Georgia. Printed with care.`,
+    `Signed, — The Editors, ${appName}`,
+    ``,
+    `You are receiving this because you just joined ${appName}.`,
+    `Questions? Simply reply to this letter — a real person`,
+    `is listening.`,
   ].join("\n");
 }
 

@@ -9,6 +9,7 @@ import type { sendThankYouEmailTask, ThankYouEmailPayload } from "../../src/trig
 import type { requestBdayEmailTask, RequestBdayEmailPayload } from "../../src/trigger/requestBdayEmail";
 import type { scheduleContactEmailTask, ScheduleContactEmailPayload } from "../../src/trigger/scheduleContactEmail";
 import type { sendTransactionalEmailTask, TransactionalEmailPayload } from "../../src/trigger/transactionalEmail";
+import type { sendNewSignupNotificationTask, NewSignupNotificationPayload } from "../../src/trigger/newSignupNotification";
 
 /**
  * Log a task to the trigger_tasks table for local tracking
@@ -647,6 +648,57 @@ export async function triggerScheduleContactEmail(payload: ScheduleContactEmailP
       relatedType: 'scheduled_email',
       relatedId: payload.contactId,
       scheduledFor: new Date(payload.scheduledForUTC),
+    });
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Trigger a new-signup admin notification email via Trigger.dev + SES.
+ * Sends plan details, username, tenant info etc. to the admin.
+ */
+export async function triggerNewSignupNotification(payload: NewSignupNotificationPayload): Promise<{
+  success: boolean;
+  runId?: string;
+  taskLogId?: string;
+  error?: string;
+}> {
+  const taskId = "send-new-signup-notification";
+  let taskLogId: string | null = null;
+
+  try {
+    const handle = await tasks.trigger<typeof sendNewSignupNotificationTask>(taskId, payload);
+
+    console.log(`🎉 [Trigger.dev] Triggered ${taskId} for ${payload.userEmail}, runId: ${handle.id}`);
+
+    taskLogId = await logTriggerTask({
+      taskId,
+      runId: handle.id,
+      payload,
+      status: 'triggered',
+      tenantId: payload.tenantId,
+      relatedType: 'email',
+    });
+
+    return {
+      success: true,
+      runId: handle.id,
+      taskLogId: taskLogId || undefined,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`🎉 [Trigger.dev] Failed to trigger ${taskId}:`, errorMessage);
+
+    await logTriggerTask({
+      taskId,
+      payload,
+      status: 'failed',
+      tenantId: payload.tenantId,
+      relatedType: 'email',
     });
 
     return {

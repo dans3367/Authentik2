@@ -1450,6 +1450,39 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
     // Invalidate tenant plan cache after subscription provisioning
     if (tenantId) invalidateTenantPlanCache(tenantId);
 
+    // Send admin notification email for new signups
+    if (isNewSignup) {
+      try {
+        const { triggerNewSignupNotification } = await import('../lib/trigger');
+
+        const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, planId) });
+        const ownerUser = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, userId) });
+        const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
+
+        if (plan && ownerUser && tenant) {
+          await triggerNewSignupNotification({
+            userName: ownerUser.name || ownerUser.email,
+            userEmail: ownerUser.email,
+            firstName: ownerUser.firstName || null,
+            lastName: ownerUser.lastName || null,
+            tenantName: tenant.name,
+            tenantSlug: tenant.slug,
+            tenantId,
+            userId,
+            planName: plan.displayName,
+            planPrice: isYearly && plan.yearlyPrice ? plan.yearlyPrice : plan.price,
+            billingCycle: isYearly ? 'yearly' : 'monthly',
+            isFreePlan: parseFloat(plan.price) === 0,
+            signupDate: new Date().toISOString(),
+          });
+          console.log(`📧 [Confirm Checkout] New signup notification triggered for ${ownerUser.email}`);
+        }
+      } catch (notifyError) {
+        console.error('Failed to trigger new signup notification:', notifyError);
+        // Non-fatal — don't block the checkout flow
+      }
+    }
+
     res.json({
       message: 'Subscription activated successfully',
       success: true,
@@ -1601,6 +1634,38 @@ async function handleCheckoutSessionCompleted(session: any) {
       }
 
       console.log(`✅ [Webhook] Free plan subscription created for tenant: ${truncateId(tenantId)}`);
+
+      // Send new signup admin notification for free plan signups via webhook
+      if (isNewSignup) {
+        try {
+          const { triggerNewSignupNotification } = await import('../lib/trigger');
+
+          const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, planId) });
+          const ownerUser = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, userId) });
+          const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
+
+          if (plan && ownerUser && tenant) {
+            await triggerNewSignupNotification({
+              userName: ownerUser.name || ownerUser.email,
+              userEmail: ownerUser.email,
+              firstName: ownerUser.firstName || null,
+              lastName: ownerUser.lastName || null,
+              tenantName: tenant.name,
+              tenantSlug: tenant.slug,
+              tenantId,
+              userId,
+              planName: plan.displayName,
+              planPrice: isYearly && plan.yearlyPrice ? plan.yearlyPrice : plan.price,
+              billingCycle: isYearly ? 'yearly' : 'monthly',
+              isFreePlan: parseFloat(plan.price) === 0,
+              signupDate: new Date().toISOString(),
+            });
+            console.log(`📧 [Webhook] New signup notification triggered for ${ownerUser.email} (free plan)`);
+          }
+        } catch (notifyError) {
+          console.error('Failed to trigger new signup notification from webhook (free plan):', notifyError);
+        }
+      }
     } else {
       // Paid plan — subscription mode: verify payment before provisioning
       if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
@@ -1664,6 +1729,38 @@ async function handleCheckoutSessionCompleted(session: any) {
       console.log(`✅ [Webhook] ${isUpgrade ? 'Upgraded' : 'Paid'} subscription ${stripeSubscription.id} created for tenant: ${truncateId(tenantId)}, planId: ${planId}`);
 
       // Send plan change notification for upgrades via webhook
+      // Send new signup admin notification via webhook (primary path — runs before confirm-checkout)
+      if (isNewSignup) {
+        try {
+          const { triggerNewSignupNotification } = await import('../lib/trigger');
+
+          const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, planId) });
+          const ownerUser = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, userId) });
+          const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
+
+          if (plan && ownerUser && tenant) {
+            await triggerNewSignupNotification({
+              userName: ownerUser.name || ownerUser.email,
+              userEmail: ownerUser.email,
+              firstName: ownerUser.firstName || null,
+              lastName: ownerUser.lastName || null,
+              tenantName: tenant.name,
+              tenantSlug: tenant.slug,
+              tenantId,
+              userId,
+              planName: plan.displayName,
+              planPrice: isYearly && plan.yearlyPrice ? plan.yearlyPrice : plan.price,
+              billingCycle: isYearly ? 'yearly' : 'monthly',
+              isFreePlan: parseFloat(plan.price) === 0,
+              signupDate: new Date().toISOString(),
+            });
+            console.log(`📧 [Webhook] New signup notification triggered for ${ownerUser.email}`);
+          }
+        } catch (notifyError) {
+          console.error('Failed to trigger new signup notification from webhook:', notifyError);
+        }
+      }
+
       if (isUpgrade && existingSub && existingSub.planId !== planId) {
         try {
           const newPlan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, planId) });

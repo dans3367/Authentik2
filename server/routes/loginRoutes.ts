@@ -964,6 +964,26 @@ loginRoutes.get('/verify-email', async (req, res) => {
         .where(eq(betterAuthUser.id, user.id));
 
       console.log('✅ [Verify Email] Email verified for user:', user.email);
+
+      // Dispatch the welcome email — fire-and-forget so a failure here never
+      // blocks verification or session creation. Only sent on the fresh
+      // verification path, not the already-verified branch above.
+      try {
+        const welcomeResult = await triggerTransactionalEmail({
+          type: 'welcome',
+          recipientEmail: user.email,
+          recipientName: user.firstName || user.name?.split(' ')[0],
+          baseUrl: process.env.BASE_URL || 'http://localhost:5002',
+          appName: process.env.APP_NAME || 'Zendwise',
+        });
+        if (welcomeResult.success) {
+          console.log('✅ [Verify Email] Welcome email dispatched, runId:', welcomeResult.runId);
+        } else {
+          console.error('❌ [Verify Email] Failed to dispatch welcome email:', welcomeResult.error);
+        }
+      } catch (welcomeError) {
+        console.error('❌ [Verify Email] Failed to dispatch welcome email:', welcomeError);
+      }
     }
 
     // Create a Better Auth session for the user automatically
