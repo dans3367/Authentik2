@@ -51,6 +51,12 @@ export const api = {
       body: JSON.stringify({ currentPassword, newPassword }),
     }),
   stats: () => request<any>('/stats'),
+  statsUsers: () => request<any>('/stats/users'),
+  statsTenants: () => request<any>('/stats/tenants'),
+  statsSubscriptions: () => request<any>('/stats/subscriptions'),
+  statsEmail: () => request<any>('/stats/email'),
+  statsMarketing: () => request<any>('/stats/marketing'),
+  statsGrowth: () => request<any>('/stats/growth'),
   users: (params?: { page?: number; limit?: number; search?: string; role?: string }) => {
     const q = new URLSearchParams();
     if (params?.page) q.set('page', String(params.page));

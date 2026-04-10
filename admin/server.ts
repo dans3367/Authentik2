@@ -263,10 +263,23 @@ const db = drizzle(pool);
 // --- Express app ---
 const app = express();
 app.set('trust proxy', 1);
+
+// Security headers
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '0');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (IS_PRODUCTION) {
+    res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  }
+  next();
+});
+
 const ADMIN_CORS_ORIGIN = process.env.ADMIN_CORS_ORIGIN || `http://localhost:${PORT}`;
 app.use(cors({ origin: ADMIN_CORS_ORIGIN, credentials: true }));
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // --- Auth middleware ---
 interface AdminTokenPayload {
@@ -391,7 +404,11 @@ app.post('/admin-api/auth/login', async (req, res) => {
 });
 
 app.post('/admin-api/auth/logout', (_req, res) => {
-  res.clearCookie('admin_token');
+  res.clearCookie('admin_token', {
+    httpOnly: true,
+    secure: IS_PRODUCTION,
+    sameSite: 'lax',
+  });
   return res.json({ success: true });
 });
 
@@ -401,11 +418,20 @@ app.get('/admin-api/auth/me', authenticateAdmin, (_req, res) => {
 
 app.patch('/admin-api/auth/profile', authenticateAdmin, (req, res) => {
   const { name, email } = req.body;
-  if (name !== undefined) adminName = String(name).trim();
+  if (name !== undefined) {
+    const trimmedName = String(name).trim();
+    if (trimmedName.length > 200) {
+      return res.status(400).json({ error: 'Name is too long (max 200 characters)' });
+    }
+    adminName = trimmedName;
+  }
   if (email !== undefined) {
     const trimmed = String(email).trim().toLowerCase();
-    if (!trimmed || !trimmed.includes('@')) {
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
       return res.status(400).json({ error: 'Invalid email address' });
+    }
+    if (trimmed.length > 254) {
+      return res.status(400).json({ error: 'Email is too long' });
     }
     adminEmail = trimmed;
   }
@@ -564,6 +590,137 @@ app.get('/admin-api/stats', authenticateAdmin, async (_req, res) => {
   } catch (err) {
     console.error('Stats error:', err);
     return res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// --- Per-section stats (lazy-loaded by dashboard accordions) ---
+
+app.get('/admin-api/stats/users', authenticateAdmin, async (_req, res) => {
+  try {
+    const [
+      [userCount], [activeUsers], [verifiedUsers], [twoFaUsers], [sessionCount],
+    ] = await Promise.all([
+      db.select({ count: count() }).from(betterAuthUser),
+      db.select({ count: count() }).from(betterAuthUser).where(eq(betterAuthUser.isActive, true)),
+      db.select({ count: count() }).from(betterAuthUser).where(eq(betterAuthUser.emailVerified, true)),
+      db.select({ count: count() }).from(betterAuthUser).where(eq(betterAuthUser.twoFactorEnabled, true)),
+      db.select({ count: count() }).from(betterAuthSession),
+    ]);
+    return res.json({
+      total: userCount.count, active: activeUsers.count,
+      verified: verifiedUsers.count, twoFa: twoFaUsers.count,
+      sessions: sessionCount.count,
+    });
+  } catch (err) {
+    console.error('Stats/users error:', err);
+    return res.status(500).json({ error: 'Failed to fetch user stats' });
+  }
+});
+
+app.get('/admin-api/stats/tenants', authenticateAdmin, async (_req, res) => {
+  try {
+    const [
+      [tenantCount], [activeTenants],
+      [companyCount], [setupComplete],
+      [shopCount], [activeShops],
+    ] = await Promise.all([
+      db.select({ count: count() }).from(tenants),
+      db.select({ count: count() }).from(tenants).where(eq(tenants.isActive, true)),
+      db.select({ count: count() }).from(companies),
+      db.select({ count: count() }).from(companies).where(eq(companies.setupCompleted, true)),
+      db.select({ count: count() }).from(shops),
+      db.select({ count: count() }).from(shops).where(eq(shops.isActive, true)),
+    ]);
+    return res.json({
+      total: tenantCount.count, active: activeTenants.count,
+      companies: companyCount.count, setupComplete: setupComplete.count,
+      shops: shopCount.count, activeShops: activeShops.count,
+    });
+  } catch (err) {
+    console.error('Stats/tenants error:', err);
+    return res.status(500).json({ error: 'Failed to fetch tenant stats' });
+  }
+});
+
+app.get('/admin-api/stats/subscriptions', authenticateAdmin, async (_req, res) => {
+  try {
+    const [
+      [activeSubCount], [trialingCount], [canceledSubCount], [pastDueCount],
+    ] = await Promise.all([
+      db.select({ count: count() }).from(subscriptions).where(eq(subscriptions.status, 'active')),
+      db.select({ count: count() }).from(subscriptions).where(eq(subscriptions.status, 'trialing')),
+      db.select({ count: count() }).from(subscriptions).where(eq(subscriptions.status, 'canceled')),
+      db.select({ count: count() }).from(subscriptions).where(eq(subscriptions.status, 'past_due')),
+    ]);
+    return res.json({
+      active: activeSubCount.count, trialing: trialingCount.count,
+      canceled: canceledSubCount.count, pastDue: pastDueCount.count,
+    });
+  } catch (err) {
+    console.error('Stats/subscriptions error:', err);
+    return res.status(500).json({ error: 'Failed to fetch subscription stats' });
+  }
+});
+
+app.get('/admin-api/stats/email', authenticateAdmin, async (_req, res) => {
+  try {
+    let contacts = 0, sends = 0, nlCount = 0, bounces = 0;
+    try { const [r] = await db.select({ count: count() }).from(emailContacts); contacts = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(emailSends); sends = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(newsletters); nlCount = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(bouncedEmails); bounces = r.count; } catch {}
+    return res.json({ contacts, sends, newsletters: nlCount, bounces });
+  } catch (err) {
+    console.error('Stats/email error:', err);
+    return res.status(500).json({ error: 'Failed to fetch email stats' });
+  }
+});
+
+app.get('/admin-api/stats/marketing', authenticateAdmin, async (_req, res) => {
+  try {
+    let formCt = 0, responseCt = 0, campaignCt = 0, templateCt = 0;
+    try { const [r] = await db.select({ count: count() }).from(forms); formCt = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(formResponses); responseCt = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(campaigns); campaignCt = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(templates); templateCt = r.count; } catch {}
+    return res.json({ forms: formCt, formResponses: responseCt, campaigns: campaignCt, templates: templateCt });
+  } catch (err) {
+    console.error('Stats/marketing error:', err);
+    return res.status(500).json({ error: 'Failed to fetch marketing stats' });
+  }
+});
+
+app.get('/admin-api/stats/growth', authenticateAdmin, async (_req, res) => {
+  try {
+    const now = new Date();
+    const d7 = new Date(now); d7.setDate(d7.getDate() - 7);
+    const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+
+    const [
+      [signups7d], [signups30d], [newTenants7d], [newTenants30d],
+      roleBreakdown, subscriptionBreakdown, planBreakdown,
+    ] = await Promise.all([
+      db.select({ count: count() }).from(betterAuthUser).where(gte(betterAuthUser.createdAt, d7)),
+      db.select({ count: count() }).from(betterAuthUser).where(gte(betterAuthUser.createdAt, d30)),
+      db.select({ count: count() }).from(tenants).where(gte(tenants.createdAt, d7)),
+      db.select({ count: count() }).from(tenants).where(gte(tenants.createdAt, d30)),
+      db.select({ role: betterAuthUser.role, count: count() }).from(betterAuthUser).groupBy(betterAuthUser.role),
+      db.select({ status: betterAuthUser.subscriptionStatus, count: count() }).from(betterAuthUser).groupBy(betterAuthUser.subscriptionStatus),
+      db.select({ planName: subscriptionPlans.displayName, count: count() })
+        .from(subscriptions)
+        .leftJoin(subscriptionPlans, eq(subscriptionPlans.id, subscriptions.planId))
+        .where(inArray(subscriptions.status, ['active', 'trialing']))
+        .groupBy(subscriptionPlans.displayName),
+    ]);
+
+    return res.json({
+      users: { signups7d: signups7d.count, signups30d: signups30d.count },
+      tenants: { new7d: newTenants7d.count, new30d: newTenants30d.count },
+      roleBreakdown, subscriptionBreakdown, planBreakdown,
+    });
+  } catch (err) {
+    console.error('Stats/growth error:', err);
+    return res.status(500).json({ error: 'Failed to fetch growth stats' });
   }
 });
 
@@ -1375,5 +1532,5 @@ if (IS_PRODUCTION) {
 
 app.listen(PORT, () => {
   console.log(`\n  Admin Panel Server running on http://localhost:${PORT}`);
-  console.log(`  Login: ${adminEmail}\n`);
+  console.log(`  Login: ${maskEmail(adminEmail)}\n`);
 });
