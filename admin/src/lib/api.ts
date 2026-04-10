@@ -1,21 +1,34 @@
 const BASE = '/admin-api';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const method = options?.method || 'GET';
   const res = await fetch(`${BASE}${url}`, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
-  if (res.status === 401) {
-    if (window.location.pathname !== '/login') {
-      window.location.href = '/login';
-    }
-    throw new Error('Unauthorized');
-  }
+
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || `Request failed: ${res.status}`);
+    const serverError = data?.error || `Request failed: ${res.status} ${res.statusText}`;
+    console.error(
+      `[admin-api] ${method} ${url} → ${res.status} ${res.statusText}`,
+      { serverError, body: data, url: `${BASE}${url}` }
+    );
+
+    if (res.status === 401) {
+      // Only auto-redirect for non-login requests. On the login page we want
+      // to show the real error message ("Invalid credentials", etc.) instead.
+      const isLoginRequest = url.startsWith('/auth/login');
+      if (!isLoginRequest && window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+      throw new Error(serverError);
+    }
+
+    throw new Error(serverError);
   }
+
   return res.json();
 }
 

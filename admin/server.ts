@@ -190,6 +190,59 @@ const shops = pgTable('shops', {
   updatedAt: timestamp('updated_at'),
 });
 
+const emailContacts = pgTable('email_contacts', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id').notNull(),
+  email: text('email').notNull(),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at'),
+});
+
+const emailSends = pgTable('email_sends', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id').notNull(),
+  status: text('status'),
+  createdAt: timestamp('created_at'),
+});
+
+const newsletters = pgTable('newsletters', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id').notNull(),
+  status: text('status'),
+  createdAt: timestamp('created_at'),
+});
+
+const forms = pgTable('forms', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id').notNull(),
+  createdAt: timestamp('created_at'),
+});
+
+const formResponses = pgTable('form_responses', {
+  id: varchar('id').primaryKey(),
+  formId: varchar('form_id').notNull(),
+  createdAt: timestamp('created_at'),
+});
+
+const campaigns = pgTable('campaigns', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id').notNull(),
+  status: text('status'),
+  createdAt: timestamp('created_at'),
+});
+
+const templates = pgTable('templates', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id').notNull(),
+  createdAt: timestamp('created_at'),
+});
+
+const bouncedEmails = pgTable('bounced_emails', {
+  id: varchar('id').primaryKey(),
+  tenantId: varchar('tenant_id'),
+  createdAt: timestamp('created_at'),
+});
+
 // --- Database setup ---
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -220,31 +273,97 @@ interface AdminTokenPayload {
   exp: number;
 }
 
+function maskEmail(email: string): string {
+  if (!email) return '(empty)';
+  const [local, domain] = email.split('@');
+  if (!domain) return `${local.slice(0, 2)}***`;
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
 function authenticateAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
   const token = req.cookies?.admin_token || req.headers.authorization?.replace('Bearer ', '');
   if (!token) {
+    console.warn(`[admin-auth] 401 Not authenticated — ${req.method} ${req.originalUrl} (no cookie/bearer token, origin=${req.headers.origin || 'n/a'})`);
     return res.status(401).json({ error: 'Not authenticated' });
   }
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AdminTokenPayload;
     if (decoded.email !== adminEmail) {
+      console.warn(`[admin-auth] 403 Forbidden — ${req.method} ${req.originalUrl} (token email=${maskEmail(decoded.email)} does not match current adminEmail=${maskEmail(adminEmail)}; admin email may have been changed since token was issued)`);
       return res.status(403).json({ error: 'Forbidden' });
     }
     next();
-  } catch {
+  } catch (err: any) {
+    console.warn(`[admin-auth] 401 Invalid/expired token — ${req.method} ${req.originalUrl} (${err?.name || 'JWTError'}: ${err?.message || 'unknown'})`);
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
 
 // --- Auth routes ---
+
+// Simple in-memory rate limiter for login
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkLoginRateLimit(ip: string): { allowed: boolean; retryAfterSec?: number } {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (entry && now < entry.resetAt) {
+    if (entry.count >= LOGIN_MAX_ATTEMPTS) {
+      return { allowed: false, retryAfterSec: Math.ceil((entry.resetAt - now) / 1000) };
+    }
+    entry.count++;
+    return { allowed: true };
+  }
+  loginAttempts.set(ip, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+  return { allowed: true };
+}
+
+// Cleanup stale entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of loginAttempts) {
+    if (now >= entry.resetAt) loginAttempts.delete(ip);
+  }
+}, 30 * 60 * 1000);
+
 app.post('/admin-api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body ?? {};
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const ua = req.headers['user-agent'] || 'unknown';
+  console.log(`[admin-login] attempt — email=${maskEmail(email || '')} ip=${ip}`);
+
+  // Rate limit check
+  const rateCheck = checkLoginRateLimit(ip);
+  if (!rateCheck.allowed) {
+    console.warn(`[admin-login] 429 Rate limited — ip=${ip} retryAfter=${rateCheck.retryAfterSec}s`);
+    res.set('Retry-After', String(rateCheck.retryAfterSec));
+    return res.status(429).json({ error: 'Too many login attempts. Please try again later.' });
+  }
+
   if (!email || !password) {
+    console.warn(`[admin-login] 400 Missing fields`);
     return res.status(400).json({ error: 'Email and password required' });
   }
-  if (email !== adminEmail || !bcrypt.compareSync(password, adminPasswordHash)) {
+
+  // Cap password length to prevent bcrypt DoS (bcrypt truncates at 72 bytes anyway)
+  if (password.length > 72) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
+
+  const emailMatches = email === adminEmail;
+  const passwordMatches = emailMatches && bcrypt.compareSync(password, adminPasswordHash);
+
+  if (!emailMatches || !passwordMatches) {
+    // Don't reveal whether it was the email or password that failed
+    console.warn(`[admin-login] 401 Invalid credentials — ip=${ip}`);
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  // Reset rate limit on successful login
+  loginAttempts.delete(ip);
+
   const token = jwt.sign({ email: adminEmail }, JWT_SECRET, { expiresIn: '24h' });
   res.cookie('admin_token', token, {
     httpOnly: true,
@@ -252,6 +371,7 @@ app.post('/admin-api/auth/login', async (req, res) => {
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000,
   });
+  console.log(`[admin-login] 200 Success — ${maskEmail(adminEmail)} signed in (cookie set, secure=${IS_PRODUCTION})`);
   return res.json({ success: true, email: adminEmail });
 });
 
@@ -296,6 +416,9 @@ app.post('/admin-api/auth/change-password', authenticateAdmin, (req, res) => {
   if (newPassword.length < 8) {
     return res.status(400).json({ error: 'New password must be at least 8 characters' });
   }
+  if (newPassword.length > 72) {
+    return res.status(400).json({ error: 'New password must be at most 72 characters' });
+  }
   adminPasswordHash = bcrypt.hashSync(newPassword, 10);
   return res.json({ success: true });
 });
@@ -303,6 +426,7 @@ app.post('/admin-api/auth/change-password', authenticateAdmin, (req, res) => {
 // --- Dashboard stats ---
 app.get('/admin-api/stats', authenticateAdmin, async (_req, res) => {
   try {
+    // Core counts
     const [userCount] = await db.select({ count: count() }).from(betterAuthUser);
     const [sessionCount] = await db.select({ count: count() }).from(betterAuthSession);
     const [tenantCount] = await db.select({ count: count() }).from(tenants);
@@ -315,22 +439,107 @@ app.get('/admin-api/stats', authenticateAdmin, async (_req, res) => {
       .from(betterAuthUser)
       .where(eq(betterAuthUser.emailVerified, true));
 
+    // Tenant status
+    const [activeTenants] = await db
+      .select({ count: count() })
+      .from(tenants)
+      .where(eq(tenants.isActive, true));
+
+    // Companies & shops
+    const [companyCount] = await db.select({ count: count() }).from(companies);
+    const [setupComplete] = await db.select({ count: count() }).from(companies).where(eq(companies.setupCompleted, true));
+    const [shopCount] = await db.select({ count: count() }).from(shops);
+    const [activeShops] = await db.select({ count: count() }).from(shops).where(eq(shops.isActive, true));
+
+    // Subscriptions
+    const [activeSubCount] = await db.select({ count: count() }).from(subscriptions).where(eq(subscriptions.status, 'active'));
+    const [trialingCount] = await db.select({ count: count() }).from(subscriptions).where(eq(subscriptions.status, 'trialing'));
+    const [canceledSubCount] = await db.select({ count: count() }).from(subscriptions).where(eq(subscriptions.status, 'canceled'));
+    const [pastDueCount] = await db.select({ count: count() }).from(subscriptions).where(eq(subscriptions.status, 'past_due'));
+
+    // Plan breakdown (how many active subscriptions per plan)
+    const planBreakdown = await db
+      .select({ planName: subscriptionPlans.displayName, count: count() })
+      .from(subscriptions)
+      .leftJoin(subscriptionPlans, eq(subscriptionPlans.id, subscriptions.planId))
+      .where(inArray(subscriptions.status, ['active', 'trialing']))
+      .groupBy(subscriptionPlans.displayName);
+
+    // Email & marketing (wrapped in try/catch so missing tables don't break the whole endpoint)
+    let contactCount = 0, emailSendCount = 0, newsletterCount = 0, formCount = 0, formResponseCount = 0, campaignCount = 0, templateCount = 0, bounceCount = 0;
+    try { const [r] = await db.select({ count: count() }).from(emailContacts); contactCount = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(emailSends); emailSendCount = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(newsletters); newsletterCount = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(forms); formCount = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(formResponses); formResponseCount = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(campaigns); campaignCount = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(templates); templateCount = r.count; } catch {}
+    try { const [r] = await db.select({ count: count() }).from(bouncedEmails); bounceCount = r.count; } catch {}
+
+    // 2FA adoption
+    const [twoFaUsers] = await db
+      .select({ count: count() })
+      .from(betterAuthUser)
+      .where(eq(betterAuthUser.twoFactorEnabled, true));
+
+    // Recent signups (last 7 days & 30 days)
+    const now = new Date();
+    const d7 = new Date(now); d7.setDate(d7.getDate() - 7);
+    const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+    const [signups7d] = await db.select({ count: count() }).from(betterAuthUser).where(gte(betterAuthUser.createdAt, d7));
+    const [signups30d] = await db.select({ count: count() }).from(betterAuthUser).where(gte(betterAuthUser.createdAt, d30));
+    const [newTenants7d] = await db.select({ count: count() }).from(tenants).where(gte(tenants.createdAt, d7));
+    const [newTenants30d] = await db.select({ count: count() }).from(tenants).where(gte(tenants.createdAt, d30));
+
     // Role breakdown
     const roleBreakdown = await db
       .select({ role: betterAuthUser.role, count: count() })
       .from(betterAuthUser)
       .groupBy(betterAuthUser.role);
 
-    // Subscription breakdown
+    // Subscription status breakdown (per-user)
     const subscriptionBreakdown = await db
       .select({ status: betterAuthUser.subscriptionStatus, count: count() })
       .from(betterAuthUser)
       .groupBy(betterAuthUser.subscriptionStatus);
 
     return res.json({
-      users: { total: userCount.count, active: activeUsers.count, verified: verifiedUsers.count },
+      users: {
+        total: userCount.count,
+        active: activeUsers.count,
+        verified: verifiedUsers.count,
+        twoFa: twoFaUsers.count,
+        signups7d: signups7d.count,
+        signups30d: signups30d.count,
+      },
       sessions: { total: sessionCount.count },
-      tenants: { total: tenantCount.count },
+      tenants: {
+        total: tenantCount.count,
+        active: activeTenants.count,
+        new7d: newTenants7d.count,
+        new30d: newTenants30d.count,
+      },
+      companies: { total: companyCount.count, setupComplete: setupComplete.count },
+      shops: { total: shopCount.count, active: activeShops.count },
+      subscriptions: {
+        active: activeSubCount.count,
+        trialing: trialingCount.count,
+        canceled: canceledSubCount.count,
+        pastDue: pastDueCount.count,
+      },
+      email: {
+        contacts: contactCount,
+        sends: emailSendCount,
+        newsletters: newsletterCount,
+        bounces: bounceCount,
+      },
+      marketing: {
+        forms: formCount,
+        formResponses: formResponseCount,
+        campaigns: campaignCount,
+        templates: templateCount,
+      },
+      planBreakdown,
       roleBreakdown,
       subscriptionBreakdown,
     });
@@ -344,7 +553,7 @@ app.get('/admin-api/stats', authenticateAdmin, async (_req, res) => {
 app.get('/admin-api/users', authenticateAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 25;
+    const limit = Math.min(parseInt(req.query.limit as string) || 25, 100);
     const search = req.query.search as string;
     const role = req.query.role as string;
     const offset = (page - 1) * limit;
@@ -353,10 +562,12 @@ app.get('/admin-api/users', authenticateAdmin, async (req, res) => {
     const conditions = [];
 
     if (search) {
+      // Escape LIKE special characters to prevent wildcard injection
+      const escaped = search.replace(/[%_\\]/g, '\\$&');
       conditions.push(
         or(
-          like(betterAuthUser.email, `%${search}%`),
-          like(betterAuthUser.name, `%${search}%`)
+          like(betterAuthUser.email, `%${escaped}%`),
+          like(betterAuthUser.name, `%${escaped}%`)
         )
       );
     }
@@ -375,7 +586,14 @@ app.get('/admin-api/users', authenticateAdmin, async (req, res) => {
       .limit(limit)
       .offset(offset);
 
-    const [total] = await db.select({ count: count() }).from(betterAuthUser);
+    // Total count respecting the same filters
+    let countQuery = db.select({ count: count() }).from(betterAuthUser);
+    if (conditions.length > 0) {
+      for (const cond of conditions) {
+        countQuery = countQuery.where(cond!) as any;
+      }
+    }
+    const [total] = await (countQuery as any);
 
     return res.json({ users, total: total.count, page, limit });
   } catch (err) {
@@ -401,10 +619,22 @@ app.patch('/admin-api/users/:id', authenticateAdmin, async (req, res) => {
   try {
     const { role, isActive, name, email } = req.body;
     const updates: Record<string, any> = { updatedAt: new Date() };
-    if (role !== undefined) updates.role = role;
-    if (isActive !== undefined) updates.isActive = isActive;
-    if (name !== undefined) updates.name = name;
-    if (email !== undefined) updates.email = email;
+    if (role !== undefined) {
+      const validRoles = ['Owner', 'Administrator', 'Manager', 'Employee'];
+      if (!validRoles.includes(role)) {
+        return res.status(400).json({ error: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+      }
+      updates.role = role;
+    }
+    if (isActive !== undefined) updates.isActive = Boolean(isActive);
+    if (name !== undefined) updates.name = String(name).trim();
+    if (email !== undefined) {
+      const trimmed = String(email).trim().toLowerCase();
+      if (!trimmed || !trimmed.includes('@')) {
+        return res.status(400).json({ error: 'Invalid email address' });
+      }
+      updates.email = trimmed;
+    }
 
     const [updated] = await db
       .update(betterAuthUser)
@@ -435,7 +665,7 @@ app.delete('/admin-api/users/:id', authenticateAdmin, async (req, res) => {
 app.get('/admin-api/sessions', authenticateAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 25;
+    const limit = Math.min(parseInt(req.query.limit as string) || 25, 100);
     const offset = (page - 1) * limit;
 
     const sessions = await db
@@ -473,8 +703,67 @@ app.get('/admin-api/tenants', authenticateAdmin, async (_req, res) => {
       .select()
       .from(tenants)
       .orderBy(desc(tenants.createdAt));
-    return res.json({ tenants: allTenants });
+
+    if (allTenants.length === 0) return res.json({ tenants: [] });
+
+    const tenantIds = allTenants.map((t) => t.id);
+
+    // Fetch active/trialing subscriptions with plan names for all tenants at once
+    const activeSubs = await db
+      .select({
+        tenantId: subscriptions.tenantId,
+        planName: subscriptionPlans.displayName,
+        createdAt: subscriptions.createdAt,
+      })
+      .from(subscriptions)
+      .leftJoin(subscriptionPlans, eq(subscriptionPlans.id, subscriptions.planId))
+      .where(
+        and(
+          inArray(subscriptions.tenantId, tenantIds),
+          or(eq(subscriptions.status, 'active'), eq(subscriptions.status, 'trialing'))
+        )
+      )
+      .orderBy(desc(subscriptions.createdAt));
+
+    // Build a map: tenantId → planName (most recent active sub wins)
+    const planByTenant = new Map<string, string | null>();
+    for (const sub of activeSubs) {
+      if (!planByTenant.has(sub.tenantId)) {
+        planByTenant.set(sub.tenantId, sub.planName ?? null);
+      }
+    }
+
+    // Fallback: for tenants with no active subscription row, check owner user's subscriptionPlanId
+    const missingIds = tenantIds.filter((id) => !planByTenant.has(id));
+    if (missingIds.length > 0) {
+      const ownerPlans = await db
+        .select({
+          tenantId: betterAuthUser.tenantId,
+          planName: subscriptionPlans.displayName,
+        })
+        .from(betterAuthUser)
+        .leftJoin(subscriptionPlans, eq(subscriptionPlans.id, betterAuthUser.subscriptionPlanId))
+        .where(
+          and(
+            inArray(betterAuthUser.tenantId, missingIds),
+            eq(betterAuthUser.role, 'Owner')
+          )
+        );
+      for (const row of ownerPlans) {
+        if (!planByTenant.has(row.tenantId)) {
+          planByTenant.set(row.tenantId, row.planName ?? null);
+        }
+      }
+    }
+
+    const tenantsWithPlan = allTenants.map((t) => ({
+      ...t,
+      planName: planByTenant.get(t.id) ?? null,
+    }));
+
+    return res.json({ tenants: tenantsWithPlan });
   } catch (err) {
+    console.error('Fetch tenants error:', err);
     return res.status(500).json({ error: 'Failed to fetch tenants' });
   }
 });
@@ -483,9 +772,19 @@ app.patch('/admin-api/tenants/:id', authenticateAdmin, async (req, res) => {
   try {
     const { name, isActive, maxUsers } = req.body;
     const updates: Record<string, any> = { updatedAt: new Date() };
-    if (name !== undefined) updates.name = name;
-    if (isActive !== undefined) updates.isActive = isActive;
-    if (maxUsers !== undefined) updates.maxUsers = maxUsers;
+    if (name !== undefined) {
+      const trimmed = String(name).trim();
+      if (!trimmed) return res.status(400).json({ error: 'Tenant name cannot be empty' });
+      updates.name = trimmed;
+    }
+    if (isActive !== undefined) updates.isActive = Boolean(isActive);
+    if (maxUsers !== undefined) {
+      const parsed = parseInt(maxUsers);
+      if (isNaN(parsed) || parsed < 1 || parsed > 10000) {
+        return res.status(400).json({ error: 'maxUsers must be between 1 and 10000' });
+      }
+      updates.maxUsers = parsed;
+    }
 
     const [updated] = await db
       .update(tenants)
@@ -636,10 +935,13 @@ app.post('/admin-api/tenants/:id/change-plan', authenticateAdmin, async (req, re
           .where(eq(subscriptions.id, anySub.id));
       } else {
         // No subscription record at all — create one
+        if (!owner) {
+          return res.status(400).json({ error: 'Cannot create subscription: no owner user found for this tenant' });
+        }
         await db.insert(subscriptions).values({
           id: crypto.randomUUID(),
           tenantId,
-          userId: owner?.id ?? tenantId,
+          userId: owner.id,
           planId,
           stripeSubscriptionId: `admin_override_${tenantId}_${Date.now()}`,
           stripeCustomerId: `admin_customer_${tenantId}`,
@@ -933,14 +1235,15 @@ app.get('/admin-api/income', authenticateAdmin, async (_req, res) => {
   }
 });
 
-// --- Serve static files in production ---
+// --- Serve static files (production only) ---
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const distPath = path.join(__dirname, 'dist');
-
-app.use(express.static(distPath));
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
-});
+if (IS_PRODUCTION) {
+  const distPath = path.join(__dirname, 'dist');
+  app.use(express.static(distPath));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`\n  Admin Panel Server running on http://localhost:${PORT}`);
