@@ -10,6 +10,7 @@ import ProfilePage from './pages/ProfilePage';
 import IncomePage from './pages/IncomePage';
 import Layout from './components/Layout';
 import { ToastProvider } from './components/Toast';
+import { ThemeProvider } from './lib/theme';
 
 interface AuthContextType {
   user: { email: string; name: string; role: string } | null;
@@ -49,6 +50,7 @@ export default function App() {
   }, []);
 
   return (
+    <ThemeProvider>
     <ToastProvider>
     <AuthContext.Provider value={{ user, setUser, loading }}>
       <BrowserRouter>
@@ -75,5 +77,6 @@ export default function App() {
       </BrowserRouter>
     </AuthContext.Provider>
     </ToastProvider>
+    </ThemeProvider>
   );
 }

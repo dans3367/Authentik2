@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { useTheme } from '../lib/theme';
 import { AlertTriangle } from 'lucide-react';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
-const T = {
+const LIGHT_T = {
   bg:        '#F9F8F4',
   surface:   '#FFFFFF',
   border:    '#E8E4DA',
@@ -23,6 +24,29 @@ const T = {
   redSoft:   '#FEF2F2',
 };
 
+const DARK_T = {
+  bg:        '#0A0A0F',
+  surface:   '#111118',
+  border:    '#1E1E2A',
+  hairline:  '#1A1A24',
+  text:      '#E4E4EC',
+  dim:       '#8888A0',
+  muted:     '#4A4A60',
+  green:     '#34D399',
+  greenSoft: 'rgba(52,211,153,0.1)',
+  gold:      '#FBBF24',
+  goldSoft:  'rgba(251,191,36,0.1)',
+  blue:      '#60A5FA',
+  blueSoft:  'rgba(96,165,250,0.1)',
+  amber:     '#FBBF24',
+  amberSoft: 'rgba(251,191,36,0.1)',
+  red:       '#F87171',
+  redSoft:   'rgba(248,113,113,0.1)',
+};
+
+// Mutable token reference — updated by the root component before render
+let T = LIGHT_T;
+
 const F = {
   serif: "'Instrument Serif', Georgia, serif",
   body:  "'Figtree', system-ui, sans-serif",
@@ -34,13 +58,15 @@ const PLAN_COLORS = [
   '#EA580C', '#059669', '#D946EF', '#4F46E5', '#DC2626',
 ];
 
-const STATUS_COLORS: Record<string, { fill: string; text: string; bg: string }> = {
-  active:     { fill: '#1A6B4F', text: '#166534', bg: '#EBF5EE' },
-  trialing:   { fill: '#2563EB', text: '#1E40AF', bg: '#EFF6FF' },
-  past_due:   { fill: '#D97706', text: '#92400E', bg: '#FFF8EB' },
-  canceled:   { fill: '#DC2626', text: '#991B1B', bg: '#FEF2F2' },
-  incomplete: { fill: '#EA580C', text: '#9A3412', bg: '#FFF7ED' },
-};
+function getStatusColors(theme: typeof T): Record<string, { fill: string; text: string; bg: string }> {
+  return {
+    active:     { fill: theme.green, text: theme.green, bg: theme.greenSoft },
+    trialing:   { fill: theme.blue,  text: theme.blue,  bg: theme.blueSoft },
+    past_due:   { fill: theme.amber, text: theme.amber, bg: theme.amberSoft },
+    canceled:   { fill: theme.red,   text: theme.red,   bg: theme.redSoft },
+    incomplete: { fill: theme.gold,  text: theme.gold,  bg: theme.goldSoft },
+  };
+}
 
 // ─── Formatting ───────────────────────────────────────────────────────────────
 function fmtCurrency(n: number, decimals = 0) {
@@ -176,7 +202,7 @@ function StatusSegments({ breakdown, total }: { breakdown: { status: string; cou
         {sorted.map((s, i) => (
           <div key={s.status} style={{
             width: `${(s.count / total) * 100}%`,
-            background: STATUS_COLORS[s.status]?.fill ?? T.muted,
+            background: getStatusColors(T)[s.status]?.fill ?? T.muted,
             transformOrigin: 'left',
             animation: `income-bar-fill 0.6s ease-out ${0.2 + i * 0.06}s both`,
           }} />
@@ -185,7 +211,7 @@ function StatusSegments({ breakdown, total }: { breakdown: { status: string; cou
       {/* Legend */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
         {sorted.map((s) => {
-          const colors = STATUS_COLORS[s.status] ?? { fill: T.muted, text: T.dim, bg: T.hairline };
+          const colors = getStatusColors(T)[s.status] ?? { fill: T.muted, text: T.dim, bg: T.hairline };
           return (
             <div key={s.status} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -301,6 +327,9 @@ function PlanCard({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function IncomePage() {
+  const { theme } = useTheme();
+  T = theme === 'dark' ? DARK_T : LIGHT_T;
+
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -338,7 +367,7 @@ export default function IncomePage() {
 
       {/* ── Hero Section ── */}
       <div style={{
-        background: `linear-gradient(135deg, ${T.surface} 0%, #F6F4ED 100%)`,
+        background: `linear-gradient(135deg, ${T.surface} 0%, ${T.bg} 100%)`,
         border: `1px solid ${T.border}`,
         borderRadius: 16, padding: '32px 36px', marginBottom: 24,
         opacity: 0, animation: 'income-rise 0.6s ease-out 0.05s both',
@@ -481,22 +510,22 @@ export default function IncomePage() {
       {summary.totalPastDue > 0 && (
         <div style={{
           background: T.amberSoft,
-          border: `1px solid #FBBF2440`,
+          border: `1px solid ${T.amber}40`,
           borderRadius: 12, padding: '16px 20px',
           display: 'flex', alignItems: 'flex-start', gap: 14,
           opacity: 0, animation: 'income-rise 0.5s ease-out 0.7s both',
         }}>
           <div style={{
             width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-            background: '#FBBF2420', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `${T.amber}20`, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <AlertTriangle style={{ width: 16, height: 16, color: T.amber }} />
           </div>
           <div>
-            <div style={{ fontFamily: F.body, fontSize: 14, fontWeight: 600, color: '#92400E' }}>
+            <div style={{ fontFamily: F.body, fontSize: 14, fontWeight: 600, color: T.amber }}>
               {summary.totalPastDue} account{summary.totalPastDue > 1 ? 's' : ''} past due
             </div>
-            <div style={{ fontFamily: F.body, fontSize: 12, color: '#A16207', marginTop: 3 }}>
+            <div style={{ fontFamily: F.body, fontSize: 12, color: T.amber, marginTop: 3, opacity: 0.8 }}>
               Unresolved failed payments put approximately{' '}
               <strong style={{ fontFamily: F.mono, fontWeight: 600 }}>
                 {fmtCurrency(activePlans.reduce((s, p) => s + (p.pastDue > 0 ? p.price * p.pastDueMonthly + (p.yearlyPrice ?? p.price * 12) / 12 * p.pastDueYearly : 0), 0), 2)}/mo

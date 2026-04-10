@@ -9,6 +9,11 @@ body {
   color: #111827;
 }
 
+.dark body,
+.dark {
+  color-scheme: dark;
+}
+
 a, a:link, a:visited, a:hover, a:active,
 button, button:hover, button:active {
   color: inherit;

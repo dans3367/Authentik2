@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
+import { useTheme } from '../lib/theme';
 import { api } from '../lib/api';
 import {
   LayoutDashboard,
@@ -10,6 +11,8 @@ import {
   Shield,
   UserCircle,
   TrendingUp,
+  Moon,
+  Sun,
 } from 'lucide-react';
 
 const nav = [
@@ -24,6 +27,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = async () => {
     await api.logout();
@@ -37,9 +41,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     .toUpperCase();
 
   return (
-    <div className="flex h-screen bg-gray-50/60">
+    <div className="flex h-screen bg-gray-50/60 dark:bg-gray-950">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200/70 flex flex-col">
+      <aside className="w-64 bg-white dark:bg-gray-950 border-r border-gray-200/70 dark:border-gray-800/60 flex flex-col">
         {/* Brand */}
         <div className="px-5 pt-6 pb-5">
           <div className="flex items-center gap-2.5">
@@ -47,8 +51,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Shield className="w-4.5 h-4.5 text-white" strokeWidth={2.5} />
             </div>
             <div>
-              <div className="font-bold text-[15px] text-gray-900 leading-tight">Admin Panel</div>
-              <div className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.14em] mt-0.5">
+              <div className="font-bold text-[15px] text-gray-900 dark:text-gray-100 leading-tight">Admin Panel</div>
+              <div className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-[0.14em] mt-0.5">
                 Super Admin
               </div>
             </div>
@@ -58,7 +62,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Nav */}
         <nav className="flex-1 px-3 pt-2 space-y-0.5">
           <div className="px-3 mb-2">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.14em]">
+            <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.14em]">
               Overview
             </span>
           </div>
@@ -70,14 +74,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 to={to}
                 className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                   active
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-gray-600 hover:bg-gray-100/70 hover:text-gray-900'
+                    ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/70 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
                 }`}
               >
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
                   active
-                    ? 'bg-indigo-100 text-indigo-600'
-                    : 'bg-gray-100/80 text-gray-500 group-hover:bg-white group-hover:text-gray-700'
+                    ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400'
+                    : 'bg-gray-100/80 dark:bg-gray-900 text-gray-500 dark:text-gray-400 group-hover:bg-white dark:group-hover:bg-gray-800 group-hover:text-gray-700 dark:group-hover:text-gray-200'
                 }`}>
                   <Icon className="w-4 h-4" />
                 </div>
@@ -90,32 +94,43 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Footer: profile + logout */}
+        {/* Footer: theme toggle + profile + logout */}
         <div className="p-3 mt-2">
+          {/* Dark mode toggle */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100/70 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200 transition-all duration-200 mb-1 group"
+          >
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-gray-100/80 dark:bg-gray-900 text-gray-500 dark:text-gray-400 group-hover:bg-white dark:group-hover:bg-gray-800 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors">
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </div>
+            <span className="flex-1 text-left">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+
           <Link
             to="/profile"
             className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
               pathname === '/profile'
-                ? 'bg-indigo-50 ring-1 ring-indigo-100'
-                : 'hover:bg-gray-100/70'
+                ? 'bg-indigo-50 dark:bg-indigo-500/10 ring-1 ring-indigo-100 dark:ring-indigo-500/20'
+                : 'hover:bg-gray-100/70 dark:hover:bg-gray-800/50'
             }`}
           >
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center text-[11px] font-bold text-gray-700 flex-shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center text-[11px] font-bold text-gray-700 dark:text-gray-200 flex-shrink-0">
               {initials}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold text-gray-900 truncate">
+              <div className="text-xs font-semibold text-gray-900 dark:text-gray-100 truncate">
                 {user?.name || 'Super Admin'}
               </div>
-              <div className="text-[10px] text-gray-500 truncate">
+              <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
                 {user?.email || 'admin'}
               </div>
             </div>
-            <UserCircle className="w-4 h-4 text-gray-400 flex-shrink-0" />
+            <UserCircle className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
           </Link>
           <button
             onClick={handleLogout}
-            className="mt-1 flex items-center gap-2.5 w-full px-3 py-2 text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+            className="mt-1 flex items-center gap-2.5 w-full px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
             Sign Out

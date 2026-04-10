@@ -1,17 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../lib/api';
-import {
-  Search, ChevronLeft, ChevronRight, Trash2, Pencil, X, Check,
-  Building2, ChevronDown, Users as UsersIcon,
-} from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Trash2, Pencil, X, Check, Building2 } from 'lucide-react';
 import TenantDetailPanel from '../components/TenantDetailPanel';
-
-const roleStyles: Record<string, string> = {
-  Owner:         'bg-violet-50 text-violet-700 ring-1 ring-violet-100',
-  Administrator: 'bg-blue-50 text-blue-700 ring-1 ring-blue-100',
-  Manager:       'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100',
-  Employee:      'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
-};
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -59,249 +49,152 @@ export default function UsersPage() {
   };
 
   const totalPages = Math.ceil(total / limit);
-  const inputBase = 'px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition';
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-end justify-between mb-6">
-        <div>
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.14em] mb-2">Administration</p>
-          <h1 className="text-[28px] font-extrabold tracking-tight text-gray-900 leading-none">Users</h1>
-          {!loading && (
-            <p className="text-sm text-gray-500 mt-2">
-              {total.toLocaleString()} total {total === 1 ? 'user' : 'users'}
-              {(search || roleFilter) && ' matching your filters'}
-            </p>
-          )}
-        </div>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Users</h1>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+      <div className="flex gap-3 mb-4">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
-            placeholder="Search by name or email…"
+            placeholder="Search by name or email..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className={`w-full pl-9 pr-8 ${inputBase}`}
+            className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none placeholder-gray-400 dark:placeholder-gray-500"
           />
-          {search && (
-            <button
-              onClick={() => { setSearch(''); setPage(1); }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 rounded"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
         </div>
-        <div className="relative">
-          <select
-            value={roleFilter}
-            onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
-            className={`appearance-none pr-9 cursor-pointer ${inputBase}`}
-          >
-            <option value="">All Roles</option>
-            <option value="Owner">Owner</option>
-            <option value="Administrator">Administrator</option>
-            <option value="Manager">Manager</option>
-            <option value="Employee">Employee</option>
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-        </div>
+        <select
+          value={roleFilter}
+          onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
+          className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+        >
+          <option value="">All Roles</option>
+          <option value="Owner">Owner</option>
+          <option value="Administrator">Administrator</option>
+          <option value="Manager">Manager</option>
+          <option value="Employee">Employee</option>
+        </select>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-200/70 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50/60 border-b border-gray-200/70">
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Created</th>
-                <th className="text-right px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>
-                    <td colSpan={6} className="px-5 py-4">
-                      <div className="h-8 bg-gray-100 rounded-lg animate-pulse" />
-                    </td>
-                  </tr>
-                ))
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-5 py-16">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
-                        <UsersIcon className="w-5 h-5 text-gray-400" />
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Name</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Email</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Role</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Status</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Created</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            {loading ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">Loading...</td></tr>
+            ) : users.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No users found</td></tr>
+            ) : (
+              users.map((user) => (
+                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className="px-4 py-3">
+                    {editingId === user.id ? (
+                      <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        className="px-2 py-1 border rounded text-sm w-full dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100" />
+                    ) : (
+                      <span className="font-medium text-gray-900 dark:text-gray-100">{user.name}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                    {editingId === user.id ? (
+                      <input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        className="px-2 py-1 border rounded text-sm w-full dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100" />
+                    ) : user.email}
+                  </td>
+                  <td className="px-4 py-3">
+                    {editingId === user.id ? (
+                      <select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                        className="px-2 py-1 border rounded text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
+                        <option value="Owner">Owner</option>
+                        <option value="Administrator">Administrator</option>
+                        <option value="Manager">Manager</option>
+                        <option value="Employee">Employee</option>
+                      </select>
+                    ) : (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        user.role === 'Owner' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400' :
+                        user.role === 'Administrator' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' :
+                        user.role === 'Manager' ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' :
+                        'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      }`}>{user.role}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {editingId === user.id ? (
+                      <label className="flex items-center gap-1.5 text-sm dark:text-gray-300">
+                        <input type="checkbox" checked={editForm.isActive}
+                          onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} />
+                        Active
+                      </label>
+                    ) : (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        user.isActive
+                          ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400'
+                          : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                      }`}>{user.isActive ? 'Active' : 'Inactive'}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {editingId === user.id ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={saveEdit}
+                          className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10 rounded"><Check className="w-4 h-4" /></button>
+                        <button onClick={() => setEditingId(null)}
+                          className="p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"><X className="w-4 h-4" /></button>
                       </div>
-                      <p className="text-sm font-semibold text-gray-700">No users found</p>
-                      <p className="text-xs text-gray-500 mt-1">Try adjusting your search or filter.</p>
-                    </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-1">
+                        {user.tenantId && (
+                          <button onClick={() => setSelectedTenantId(user.tenantId)}
+                            title="View tenant"
+                            className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded"><Building2 className="w-4 h-4" /></button>
+                        )}
+                        <button onClick={() => startEdit(user)}
+                          className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded"><Pencil className="w-4 h-4" /></button>
+                        <button onClick={() => handleDelete(user.id, user.name)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    )}
                   </td>
                 </tr>
-              ) : (
-                users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="px-5 py-3.5">
-                      {editingId === user.id ? (
-                        <input
-                          value={editForm.name}
-                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
-                        />
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center text-[10px] font-bold text-indigo-700 flex-shrink-0">
-                            {(user.name || user.email || '?').slice(0, 2).toUpperCase()}
-                          </div>
-                          <span className="font-semibold text-gray-900">{user.name || '—'}</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-600">
-                      {editingId === user.id ? (
-                        <input
-                          value={editForm.email}
-                          onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
-                        />
-                      ) : user.email}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {editingId === user.id ? (
-                        <select
-                          value={editForm.role}
-                          onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                        >
-                          <option value="Owner">Owner</option>
-                          <option value="Administrator">Administrator</option>
-                          <option value="Manager">Manager</option>
-                          <option value="Employee">Employee</option>
-                        </select>
-                      ) : (
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                          roleStyles[user.role] ?? 'bg-gray-100 text-gray-700 ring-1 ring-gray-200'
-                        }`}>
-                          {user.role}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {editingId === user.id ? (
-                        <label className="flex items-center gap-1.5 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={editForm.isActive}
-                            onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                          />
-                          Active
-                        </label>
-                      ) : (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                          user.isActive
-                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
-                            : 'bg-red-50 text-red-700 ring-1 ring-red-100'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                          {user.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-500 text-xs">
-                      {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      {editingId === user.id ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={saveEdit}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Save"
-                          >
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setEditingId(null)}
-                            className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
-                            title="Cancel"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-0.5">
-                          {user.tenantId && (
-                            <button
-                              onClick={() => setSelectedTenantId(user.tenantId)}
-                              title="View tenant"
-                              className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            >
-                              <Building2 className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => startEdit(user)}
-                            title="Edit user"
-                            className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(user.id, user.name)}
-                            title="Delete user"
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <span className="text-xs text-gray-500 font-medium">
-            Page <span className="text-gray-900 font-semibold">{page}</span> of{' '}
-            <span className="text-gray-900 font-semibold">{totalPages}</span>
-            <span className="text-gray-400"> · {total.toLocaleString()} total</span>
-          </span>
+        <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-gray-400">
+          <span>Page {page} of {totalPages} ({total} users)</span>
           <div className="flex gap-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-              className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" /> Prev
+            <button disabled={page <= 1} onClick={() => setPage(page - 1)}
+              className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 flex items-center gap-1">
+              <ChevronLeft className="w-4 h-4" /> Prev
             </button>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage(page + 1)}
-              className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
-            >
-              Next <ChevronRight className="w-3.5 h-3.5" />
+            <button disabled={page >= totalPages} onClick={() => setPage(page + 1)}
+              className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 flex items-center gap-1">
+              Next <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
-
       {selectedTenantId && (
         <TenantDetailPanel
           tenantId={selectedTenantId}

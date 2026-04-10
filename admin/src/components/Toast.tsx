@@ -86,8 +86,8 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
       }}
       className={`pointer-events-auto flex items-center gap-3 pl-4 pr-3 py-3 rounded-lg shadow-lg border text-sm font-medium min-w-[280px] max-w-sm ${
         isSuccess
-          ? 'bg-white border-green-200 text-gray-800'
-          : 'bg-white border-red-200 text-gray-800'
+          ? 'bg-white dark:bg-gray-900 border-green-200 dark:border-green-500/30 text-gray-800 dark:text-gray-200'
+          : 'bg-white dark:bg-gray-900 border-red-200 dark:border-red-500/30 text-gray-800 dark:text-gray-200'
       }`}
     >
       {isSuccess ? (

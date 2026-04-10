@@ -1,8 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../lib/api';
-import {
-  Pencil, X, Check, Trash2, Search, Filter, ChevronDown, Building2,
-} from 'lucide-react';
+import { Pencil, X, Check, Trash2, Search, Filter, ChevronDown, Building2 } from 'lucide-react';
 import TenantDetailPanel from '../components/TenantDetailPanel';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal';
 
@@ -77,62 +75,58 @@ export default function TenantsPage() {
     fetchTenants();
   };
 
-  const inputBase = 'px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition';
-
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-end justify-between mb-6">
-        <div>
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.14em] mb-2">Administration</p>
-          <h1 className="text-[28px] font-extrabold tracking-tight text-gray-900 leading-none">Tenants</h1>
-          {!loading && (
-            <p className="text-sm text-gray-500 mt-2">
-              {filteredTenants.length === tenants.length
-                ? `${tenants.length.toLocaleString()} total ${tenants.length === 1 ? 'tenant' : 'tenants'}`
-                : `${filteredTenants.length.toLocaleString()} of ${tenants.length.toLocaleString()} tenants matching filters`}
-            </p>
-          )}
-        </div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Tenants</h1>
+        {!loading && (
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {filteredTenants.length === tenants.length
+              ? `${tenants.length} tenants`
+              : `${filteredTenants.length} of ${tenants.length} tenants`}
+          </span>
+        )}
       </div>
 
-      {/* Filters */}
-      <div className="mb-5 flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+      {/* Search & Filters */}
+      <div className="mb-4 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
             placeholder="Search by name, slug, or domain…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`w-full pl-9 pr-8 ${inputBase}`}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-400 dark:placeholder-gray-500"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 rounded"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
+
         <div className="relative">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className={`appearance-none pr-9 cursor-pointer ${inputBase}`}
+            className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
           >
             <option value="all">All Statuses</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
         </div>
+
         <div className="relative">
           <select
             value={planFilter}
             onChange={(e) => setPlanFilter(e.target.value)}
-            className={`appearance-none pr-9 cursor-pointer ${inputBase}`}
+            className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer"
           >
             <option value="all">All Plans</option>
             <option value="none">No Plan</option>
@@ -140,12 +134,13 @@ export default function TenantsPage() {
               <option key={name} value={name}>{name.replace(/\s*plan\s*/i, '').trim()}</option>
             ))}
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
         </div>
+
         {activeFilterCount > 0 && (
           <button
             onClick={clearFilters}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-colors"
           >
             <Filter className="w-3.5 h-3.5" />
             Clear{activeFilterCount > 1 ? ` (${activeFilterCount})` : ''}
@@ -153,152 +148,102 @@ export default function TenantsPage() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-200/70 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50/60 border-b border-gray-200/70">
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Slug</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Domain</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Plan</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Created</th>
-                <th className="text-right px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>
-                    <td colSpan={7} className="px-5 py-4">
-                      <div className="h-8 bg-gray-100 rounded-lg animate-pulse" />
-                    </td>
-                  </tr>
-                ))
-              ) : filteredTenants.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-16">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
-                        <Building2 className="w-5 h-5 text-gray-400" />
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Name</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Slug</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Domain</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Plan</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Status</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Created</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            {loading ? (
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">Loading...</td></tr>
+            ) : filteredTenants.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                {tenants.length === 0 ? 'No tenants found' : (
+                  <div className="flex flex-col items-center gap-2">
+                    <span>No tenants match your filters</span>
+                    <button onClick={clearFilters} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-sm font-medium">
+                      Clear filters
+                    </button>
+                  </div>
+                )}
+              </td></tr>
+            ) : (
+              filteredTenants.map((t) => (
+                <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className="px-4 py-3">
+                    {editingId === t.id ? (
+                      <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        className="px-2 py-1 border rounded text-sm w-full dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100" />
+                    ) : (
+                      <button
+                        onClick={() => setSelectedTenantId(t.id)}
+                        className="font-medium hover:underline text-left cursor-pointer text-gray-900 dark:text-gray-100"
+                      >
+                        {t.name}
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{t.slug}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{t.domain || '-'}</td>
+                  <td className="px-4 py-3">
+                    {t.planName ? (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400">{t.planName.replace(/\s*plan\s*/i, '').trim()}</span>
+                    ) : (
+                      <span className="text-gray-400 dark:text-gray-500 text-xs">None</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {editingId === t.id ? (
+                      <label className="flex items-center gap-1.5 text-sm dark:text-gray-300">
+                        <input type="checkbox" checked={editForm.isActive}
+                          onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} />
+                        Active
+                      </label>
+                    ) : (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        t.isActive
+                          ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400'
+                          : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                      }`}>{t.isActive ? 'Active' : 'Inactive'}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                    {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {editingId === t.id ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={saveEdit}
+                          className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-500/10 rounded"><Check className="w-4 h-4" /></button>
+                        <button onClick={() => setEditingId(null)}
+                          className="p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"><X className="w-4 h-4" /></button>
                       </div>
-                      <p className="text-sm font-semibold text-gray-700">
-                        {tenants.length === 0 ? 'No tenants yet' : 'No tenants match your filters'}
-                      </p>
-                      {tenants.length > 0 && (
-                        <button
-                          onClick={clearFilters}
-                          className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold mt-2"
-                        >
-                          Clear filters
+                    ) : (
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => startEdit(t)}
+                          className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded">
+                          <Pencil className="w-4 h-4" />
                         </button>
-                      )}
-                    </div>
+                        <button onClick={() => setDeletingTenant({ id: t.id, name: t.name })}
+                          className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
-              ) : (
-                filteredTenants.map((t) => (
-                  <tr key={t.id} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="px-5 py-3.5">
-                      {editingId === t.id ? (
-                        <input
-                          value={editForm.name}
-                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
-                        />
-                      ) : (
-                        <button
-                          onClick={() => setSelectedTenantId(t.id)}
-                          className="flex items-center gap-3 text-left cursor-pointer group"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center text-[10px] font-bold text-teal-700 flex-shrink-0">
-                            {(t.name || '?').slice(0, 2).toUpperCase()}
-                          </div>
-                          <span className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                            {t.name}
-                          </span>
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 font-mono text-xs text-gray-500">{t.slug}</td>
-                    <td className="px-5 py-3.5 text-gray-600 text-xs">{t.domain || '—'}</td>
-                    <td className="px-5 py-3.5">
-                      {t.planName ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100">
-                          {t.planName.replace(/\s*plan\s*/i, '').trim()}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 text-xs">None</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {editingId === t.id ? (
-                        <label className="flex items-center gap-1.5 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={editForm.isActive}
-                            onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                          />
-                          Active
-                        </label>
-                      ) : (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                          t.isActive
-                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
-                            : 'bg-red-50 text-red-700 ring-1 ring-red-100'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${t.isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                          {t.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-500 text-xs">
-                      {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '—'}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      {editingId === t.id ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={saveEdit}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                          >
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setEditingId(null)}
-                            className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end gap-0.5">
-                          <button
-                            onClick={() => startEdit(t)}
-                            title="Edit tenant"
-                            className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setDeletingTenant({ id: t.id, name: t.name })}
-                            title="Delete tenant"
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       {selectedTenantId && (

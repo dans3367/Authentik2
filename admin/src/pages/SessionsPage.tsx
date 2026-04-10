@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../lib/api';
-import { Trash2, ChevronLeft, ChevronRight, KeyRound } from 'lucide-react';
+import { Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<any[]>([]);
@@ -34,123 +34,72 @@ export default function SessionsPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-end justify-between mb-6">
-        <div>
-          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.14em] mb-2">Security</p>
-          <h1 className="text-[28px] font-extrabold tracking-tight text-gray-900 leading-none">Sessions</h1>
-          {!loading && (
-            <p className="text-sm text-gray-500 mt-2">
-              {total.toLocaleString()} active {total === 1 ? 'session' : 'sessions'}
-            </p>
-          )}
-        </div>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Sessions</h1>
 
-      <div className="bg-white rounded-2xl border border-gray-200/70 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50/60 border-b border-gray-200/70">
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Session ID</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">User ID</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">IP Address</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">User Agent</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Created</th>
-                <th className="text-left px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Expires</th>
-                <th className="text-right px-5 py-3.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i}>
-                    <td colSpan={7} className="px-5 py-4">
-                      <div className="h-8 bg-gray-100 rounded-lg animate-pulse" />
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Session ID</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">User ID</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">IP Address</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">User Agent</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Created</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Expires</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            {loading ? (
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">Loading...</td></tr>
+            ) : sessions.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No active sessions</td></tr>
+            ) : (
+              sessions.map((s) => {
+                const expired = s.expiresAt && new Date(s.expiresAt) < new Date();
+                return (
+                  <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{s.id.slice(0, 12)}…</td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{s.userId.slice(0, 12)}…</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{s.ipAddress || '-'}</td>
+                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 max-w-[200px] truncate">{s.userAgent || '-'}</td>
+                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                      {s.createdAt ? new Date(s.createdAt).toLocaleString() : '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        expired
+                          ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                          : 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400'
+                      }`}>
+                        {s.expiresAt ? new Date(s.expiresAt).toLocaleString() : '-'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button onClick={() => handleDelete(s.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
-                ))
-              ) : sessions.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-16">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
-                        <KeyRound className="w-5 h-5 text-gray-400" />
-                      </div>
-                      <p className="text-sm font-semibold text-gray-700">No active sessions</p>
-                      <p className="text-xs text-gray-500 mt-1">Active user sessions will appear here.</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                sessions.map((s) => {
-                  const expired = s.expiresAt && new Date(s.expiresAt) < new Date();
-                  return (
-                    <tr key={s.id} className="hover:bg-gray-50/60 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">
-                          {s.id.slice(0, 12)}…
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 font-mono text-xs text-gray-500">{s.userId.slice(0, 12)}…</td>
-                      <td className="px-5 py-3.5 text-gray-600 text-xs font-mono">{s.ipAddress || '—'}</td>
-                      <td className="px-5 py-3.5 text-gray-500 text-xs max-w-[220px] truncate" title={s.userAgent}>
-                        {s.userAgent ? s.userAgent.slice(0, 40) + '…' : '—'}
-                      </td>
-                      <td className="px-5 py-3.5 text-gray-500 text-xs">
-                        {s.createdAt ? new Date(s.createdAt).toLocaleString() : '—'}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        {s.expiresAt ? (
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                            expired
-                              ? 'bg-red-50 text-red-700 ring-1 ring-red-100'
-                              : 'bg-gray-100 text-gray-700 ring-1 ring-gray-200'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${expired ? 'bg-red-500' : 'bg-gray-400'}`} />
-                            {new Date(s.expiresAt).toLocaleString()}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <button
-                          onClick={() => handleDelete(s.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Revoke session"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <span className="text-xs text-gray-500 font-medium">
-            Page <span className="text-gray-900 font-semibold">{page}</span> of{' '}
-            <span className="text-gray-900 font-semibold">{totalPages}</span>
-            <span className="text-gray-400"> · {total.toLocaleString()} total</span>
-          </span>
+        <div className="flex items-center justify-between mt-4 text-sm text-gray-600 dark:text-gray-400">
+          <span>Page {page} of {totalPages} ({total} sessions)</span>
           <div className="flex gap-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-              className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" /> Prev
+            <button disabled={page <= 1} onClick={() => setPage(page - 1)}
+              className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 flex items-center gap-1">
+              <ChevronLeft className="w-4 h-4" /> Prev
             </button>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage(page + 1)}
-              className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
-            >
-              Next <ChevronRight className="w-3.5 h-3.5" />
+            <button disabled={page >= totalPages} onClick={() => setPage(page + 1)}
+              className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 flex items-center gap-1">
+              Next <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>

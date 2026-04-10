@@ -1,26 +1,24 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../App';
-import { User, Lock, Check, AlertCircle } from 'lucide-react';
+import { User, Lock, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 type Status = { type: 'success' | 'error'; message: string } | null;
 
 function StatusBanner({ status }: { status: Status }) {
   if (!status) return null;
   return (
-    <div
-      className={`flex items-center gap-2 rounded-md px-4 py-3 text-sm ${
-        status.type === 'success'
-          ? 'bg-green-50 text-green-700 border border-green-200'
-          : 'bg-red-50 text-red-700 border border-red-200'
-      }`}
-    >
+    <div className={`flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm ${
+      status.type === 'success'
+        ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 ring-1 ring-emerald-100 dark:ring-emerald-500/20'
+        : 'bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-400 ring-1 ring-red-100 dark:ring-red-500/20'
+    }`}>
       {status.type === 'success' ? (
-        <Check className="w-4 h-4 shrink-0" />
+        <Check className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
       ) : (
-        <AlertCircle className="w-4 h-4 shrink-0" />
+        <AlertCircle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
       )}
-      {status.message}
+      <span className="font-medium">{status.message}</span>
     </div>
   );
 }
@@ -77,100 +75,74 @@ export default function ProfilePage() {
     }
   };
 
+  const inputCls = 'w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-gray-400 dark:placeholder-gray-500';
+  const labelCls = 'block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5';
+
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Profile</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Profile</h1>
 
       {/* Account Details */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
-          <User className="w-4 h-4 text-gray-500" />
-          <h2 className="font-semibold text-gray-800">Account Details</h2>
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6 mb-6">
+        <div className="flex items-center gap-2.5 mb-4">
+          <User className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Account Details</h2>
         </div>
-        <form onSubmit={handleProfileSave} className="px-6 py-5 space-y-4">
+        <form onSubmit={handleProfileSave} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Display name</label>
-            <input
-              type="text"
-              value={profileForm.name}
+            <label className={labelCls}>Name</label>
+            <input type="text" value={profileForm.name}
               onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-              placeholder="Super Admin"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
+              className={inputCls} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
-            <input
-              type="email"
-              value={profileForm.email}
+            <label className={labelCls}>Email</label>
+            <input type="email" value={profileForm.email}
               onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <p className="mt-1 text-xs text-gray-500">This is used to log in to the admin panel.</p>
+              required className={inputCls} />
           </div>
           <StatusBanner status={profileStatus} />
           <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={profileSaving}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-            >
-              {profileSaving ? 'Saving…' : 'Save changes'}
+            <button type="submit" disabled={profileSaving}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition">
+              {profileSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {profileSaving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
         </form>
       </div>
 
       {/* Change Password */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
-          <Lock className="w-4 h-4 text-gray-500" />
-          <h2 className="font-semibold text-gray-800">Change Password</h2>
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+        <div className="flex items-center gap-2.5 mb-4">
+          <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Change Password</h2>
         </div>
-        <form onSubmit={handlePasswordChange} className="px-6 py-5 space-y-4">
+        <form onSubmit={handlePasswordChange} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Current password</label>
-            <input
-              type="password"
-              value={pwForm.currentPassword}
+            <label className={labelCls}>Current Password</label>
+            <input type="password" value={pwForm.currentPassword}
               onChange={(e) => setPwForm({ ...pwForm, currentPassword: e.target.value })}
-              required
-              autoComplete="current-password"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
+              required autoComplete="current-password" className={inputCls} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
-            <input
-              type="password"
-              value={pwForm.newPassword}
+            <label className={labelCls}>New Password</label>
+            <input type="password" value={pwForm.newPassword}
               onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })}
-              required
-              autoComplete="new-password"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <p className="mt-1 text-xs text-gray-500">Minimum 8 characters.</p>
+              required autoComplete="new-password" className={inputCls} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm new password</label>
-            <input
-              type="password"
-              value={pwForm.confirmPassword}
+            <label className={labelCls}>Confirm New Password</label>
+            <input type="password" value={pwForm.confirmPassword}
               onChange={(e) => setPwForm({ ...pwForm, confirmPassword: e.target.value })}
-              required
-              autoComplete="new-password"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
+              required autoComplete="new-password" className={inputCls} />
           </div>
           <StatusBanner status={pwStatus} />
           <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={pwSaving}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-            >
-              {pwSaving ? 'Updating…' : 'Update password'}
+            <button type="submit" disabled={pwSaving}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition">
+              {pwSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {pwSaving ? 'Updating…' : 'Update Password'}
             </button>
           </div>
         </form>

@@ -261,6 +261,7 @@ const db = drizzle(pool);
 
 // --- Express app ---
 const app = express();
+app.set('trust proxy', 1);
 const ADMIN_CORS_ORIGIN = process.env.ADMIN_CORS_ORIGIN || `http://localhost:${PORT}`;
 app.use(cors({ origin: ADMIN_CORS_ORIGIN, credentials: true }));
 app.use(cookieParser());
@@ -330,9 +331,15 @@ setInterval(() => {
 
 app.post('/admin-api/auth/login', async (req, res) => {
   const { email, password } = req.body ?? {};
-  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+
+  if (typeof email !== 'string' || typeof password !== 'string') {
+    console.warn(`[admin-login] 400 Invalid fields`);
+    return res.status(400).json({ error: 'Email and password must be valid strings' });
+  }
+
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
   const ua = req.headers['user-agent'] || 'unknown';
-  console.log(`[admin-login] attempt — email=${maskEmail(email || '')} ip=${ip}`);
+  console.log(`[admin-login] attempt — email=${maskEmail(email)} ip=${ip}`);
 
   // Rate limit check
   const rateCheck = checkLoginRateLimit(ip);
@@ -353,7 +360,14 @@ app.post('/admin-api/auth/login', async (req, res) => {
   }
 
   const emailMatches = email === adminEmail;
-  const passwordMatches = emailMatches && bcrypt.compareSync(password, adminPasswordHash);
+  
+  let passwordMatches = false;
+  if (emailMatches) {
+    passwordMatches = bcrypt.compareSync(password, adminPasswordHash);
+  } else {
+    // Dummy comparison to prevent timing attacks for email enumeration
+    bcrypt.compareSync(password, adminPasswordHash);
+  }
 
   if (!emailMatches || !passwordMatches) {
     // Don't reveal whether it was the email or password that failed
@@ -407,6 +421,9 @@ app.patch('/admin-api/auth/profile', authenticateAdmin, (req, res) => {
 
 app.post('/admin-api/auth/change-password', authenticateAdmin, (req, res) => {
   const { currentPassword, newPassword } = req.body;
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
+    return res.status(400).json({ error: 'Passwords must be valid strings' });
+  }
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: 'currentPassword and newPassword are required' });
   }
