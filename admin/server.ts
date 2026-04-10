@@ -138,6 +138,7 @@ const subscriptions = pgTable('subscriptions', {
   isYearly: boolean('is_yearly').default(false),
   downgradeTargetPlanId: varchar('downgrade_target_plan_id'),
   downgradeScheduledAt: timestamp('downgrade_scheduled_at'),
+  scheduledPlanIsYearly: boolean('scheduled_plan_is_yearly').default(false),
   previousPlanId: varchar('previous_plan_id'),
   createdAt: timestamp('created_at'),
   updatedAt: timestamp('updated_at'),
@@ -866,13 +867,31 @@ app.get('/admin-api/tenants/:id/details', authenticateAdmin, async (req, res) =>
     // Find the owner user (role = Owner)
     const owner = tenantUsers.find((u) => u.role === 'Owner') || tenantUsers[0] || null;
 
+    const activeSub = subscriptionsWithPlans.find((s) => s.status === 'active' || s.status === 'trialing') || null;
+
+    // Resolve scheduled upgrade plan details if one is set
+    let scheduledUpgrade: { planId: string; isYearly: boolean; scheduledAt: string; effectiveDate: string; plan: any } | null = null;
+    if (activeSub?.downgradeTargetPlanId && activeSub?.downgradeScheduledAt) {
+      const [scheduledPlan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, activeSub.downgradeTargetPlanId));
+      if (scheduledPlan) {
+        scheduledUpgrade = {
+          planId: activeSub.downgradeTargetPlanId,
+          isYearly: activeSub.scheduledPlanIsYearly ?? false,
+          scheduledAt: activeSub.downgradeScheduledAt.toISOString(),
+          effectiveDate: activeSub.currentPeriodEnd.toISOString(),
+          plan: scheduledPlan,
+        };
+      }
+    }
+
     return res.json({
       tenant,
       owner,
       users: tenantUsers,
       userCount: userCount.count,
       subscriptions: subscriptionsWithPlans,
-      activeSubscription: subscriptionsWithPlans.find((s) => s.status === 'active' || s.status === 'trialing') || null,
+      activeSubscription: activeSub,
+      scheduledUpgrade,
       company: tenantCompanies[0] || null,
       limits: tenantLimitOverrides[0] || null,
       shops: tenantShops,
@@ -1001,6 +1020,98 @@ app.post('/admin-api/tenants/:id/change-plan', authenticateAdmin, async (req, re
   } catch (err) {
     console.error('Change plan error:', err);
     return res.status(500).json({ error: 'Failed to change plan' });
+  }
+});
+
+// --- Schedule plan upgrade at period end ---
+app.post('/admin-api/tenants/:id/schedule-upgrade', authenticateAdmin, async (req, res) => {
+  try {
+    const tenantId = req.params.id;
+    const { planId, isYearly = false } = req.body;
+
+    if (!planId) return res.status(400).json({ error: 'planId is required' });
+
+    const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, planId));
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+
+    // Find active subscription
+    const [activeSub] = await db
+      .select()
+      .from(subscriptions)
+      .where(and(
+        eq(subscriptions.tenantId, tenantId),
+        inArray(subscriptions.status, ['active', 'trialing']),
+      ));
+
+    if (!activeSub) {
+      return res.status(400).json({ error: 'No active subscription found. Use "Save Plan" to assign one first.' });
+    }
+
+    if (activeSub.planId === planId && activeSub.isYearly === isYearly) {
+      return res.status(400).json({ error: 'Scheduled plan is the same as the current plan and billing cycle.' });
+    }
+
+    const now = new Date();
+    await db
+      .update(subscriptions)
+      .set({
+        downgradeTargetPlanId: planId,
+        downgradeScheduledAt: now,
+        scheduledPlanIsYearly: isYearly,
+        updatedAt: now,
+      })
+      .where(eq(subscriptions.id, activeSub.id));
+
+    return res.json({
+      success: true,
+      scheduledUpgrade: {
+        planId,
+        isYearly,
+        scheduledAt: now.toISOString(),
+        effectiveDate: activeSub.currentPeriodEnd.toISOString(),
+        plan,
+      },
+    });
+  } catch (err) {
+    console.error('Schedule upgrade error:', err);
+    return res.status(500).json({ error: 'Failed to schedule upgrade' });
+  }
+});
+
+app.delete('/admin-api/tenants/:id/schedule-upgrade', authenticateAdmin, async (req, res) => {
+  try {
+    const tenantId = req.params.id;
+
+    const [activeSub] = await db
+      .select()
+      .from(subscriptions)
+      .where(and(
+        eq(subscriptions.tenantId, tenantId),
+        inArray(subscriptions.status, ['active', 'trialing']),
+      ));
+
+    if (!activeSub) {
+      return res.status(400).json({ error: 'No active subscription found.' });
+    }
+
+    if (!activeSub.downgradeTargetPlanId) {
+      return res.status(400).json({ error: 'No scheduled upgrade to cancel.' });
+    }
+
+    await db
+      .update(subscriptions)
+      .set({
+        downgradeTargetPlanId: null,
+        downgradeScheduledAt: null,
+        scheduledPlanIsYearly: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.id, activeSub.id));
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Cancel scheduled upgrade error:', err);
+    return res.status(500).json({ error: 'Failed to cancel scheduled upgrade' });
   }
 });
 

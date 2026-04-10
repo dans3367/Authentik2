@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useToast } from './Toast';
 import { api } from '../lib/api';
-import { X, Crown, Trash2, PauseCircle, PlayCircle, Loader2, AlertTriangle, LogIn } from 'lucide-react';
+import { X, Crown, Trash2, PauseCircle, PlayCircle, Loader2, AlertTriangle, LogIn, CalendarClock, ArrowUpCircle, XCircle } from 'lucide-react';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import ConfirmModal from './ConfirmModal';
 
@@ -374,12 +374,20 @@ function UsersTab({ data }: { data: any }) {
 
 // ─── Billing Tab ──────────────────────────────────────────────────────────────
 function BillingTab({ data, tenantId, onRefresh }: { data: any; tenantId: string; onRefresh: () => void }) {
-  const { subscriptions, owner, activeSubscription } = data;
+  const { subscriptions, owner, activeSubscription, scheduledUpgrade } = data;
+  const toast = useToast();
   const [allPlans, setAllPlans] = useState<any[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>(activeSubscription?.planId || '');
   const [isYearly, setIsYearly] = useState<boolean>(activeSubscription?.isYearly || false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Scheduled upgrade state
+  const [schedPlanId, setSchedPlanId] = useState<string>(scheduledUpgrade?.planId || '');
+  const [schedIsYearly, setSchedIsYearly] = useState<boolean>(scheduledUpgrade?.isYearly || false);
+  const [scheduling, setScheduling] = useState(false);
+  const [schedMsg, setSchedMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     api.plans().then((d) => setAllPlans(d.plans)).catch(console.error);
@@ -388,11 +396,17 @@ function BillingTab({ data, tenantId, onRefresh }: { data: any; tenantId: string
   useEffect(() => {
     setSelectedPlanId(activeSubscription?.planId || '');
     setIsYearly(activeSubscription?.isYearly || false);
-  }, [activeSubscription?.planId, activeSubscription?.isYearly]);
+    setSchedPlanId(scheduledUpgrade?.planId || '');
+    setSchedIsYearly(scheduledUpgrade?.isYearly || false);
+  }, [activeSubscription?.planId, activeSubscription?.isYearly, scheduledUpgrade?.planId, scheduledUpgrade?.isYearly]);
 
   const currentPlanId = activeSubscription?.planId;
   const isDirty = selectedPlanId && (selectedPlanId !== currentPlanId || isYearly !== (activeSubscription?.isYearly || false));
   const selectedPlan = allPlans.find((p) => p.id === selectedPlanId);
+
+  const schedSelectedPlan = allPlans.find((p) => p.id === schedPlanId);
+  const isSchedDirty = schedPlanId && (!scheduledUpgrade || schedPlanId !== scheduledUpgrade.planId || schedIsYearly !== scheduledUpgrade.isYearly);
+  const hasScheduled = !!scheduledUpgrade;
 
   const handleSave = async () => {
     if (!selectedPlanId) return;
@@ -406,6 +420,37 @@ function BillingTab({ data, tenantId, onRefresh }: { data: any; tenantId: string
       setSaveMsg({ type: 'error', text: err.message || 'Failed to change plan' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleScheduleUpgrade = async () => {
+    if (!schedPlanId) return;
+    setScheduling(true);
+    setSchedMsg(null);
+    try {
+      await api.scheduleUpgrade(tenantId, schedPlanId, schedIsYearly);
+      setSchedMsg({ type: 'success', text: `Upgrade to ${schedSelectedPlan?.displayName} scheduled` });
+      toast.success(`Upgrade to ${schedSelectedPlan?.displayName} scheduled for period end`);
+      onRefresh();
+    } catch (err: any) {
+      setSchedMsg({ type: 'error', text: err.message || 'Failed to schedule upgrade' });
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const handleCancelScheduled = async () => {
+    setCancelling(true);
+    setSchedMsg(null);
+    try {
+      await api.cancelScheduledUpgrade(tenantId);
+      setSchedMsg({ type: 'success', text: 'Scheduled upgrade cancelled' });
+      toast.success('Scheduled upgrade cancelled');
+      onRefresh();
+    } catch (err: any) {
+      setSchedMsg({ type: 'error', text: err.message || 'Failed to cancel' });
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -518,6 +563,195 @@ function BillingTab({ data, tenantId, onRefresh }: { data: any; tenantId: string
           </span>
         )}
       </div>
+
+      {/* ── Scheduled Upgrade at Period End ── */}
+      {activeSubscription && (
+        <>
+          <SectionLabel>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <CalendarClock style={{ width: 12, height: 12, color: C.amber }} />
+              Upgrade When Current Plan Expires
+            </span>
+          </SectionLabel>
+
+          {/* Active scheduled upgrade banner */}
+          {hasScheduled && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(251,191,36,0.10) 0%, rgba(251,191,36,0.03) 100%)',
+              border: `1px solid rgba(251,191,36,0.25)`,
+              borderRadius: 10, padding: '14px 16px', marginBottom: 12,
+              boxShadow: '0 0 16px rgba(251,191,36,0.06)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <ArrowUpCircle style={{ width: 16, height: 16, color: C.amber }} />
+                  <span style={{ fontFamily: F.body, fontSize: 14, fontWeight: 700, color: C.text }}>
+                    {scheduledUpgrade.plan?.displayName || scheduledUpgrade.planId}
+                  </span>
+                  <Badge label="Scheduled" variant="amber" />
+                </div>
+                <button
+                  onClick={handleCancelScheduled}
+                  disabled={cancelling}
+                  title="Cancel scheduled upgrade"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    background: 'rgba(248,113,113,0.1)', border: `1px solid rgba(248,113,113,0.25)`,
+                    borderRadius: 7, padding: '5px 10px', cursor: cancelling ? 'not-allowed' : 'pointer',
+                    fontFamily: F.body, fontSize: 11, fontWeight: 600, color: C.red,
+                    transition: 'all 0.15s', opacity: cancelling ? 0.5 : 1,
+                  }}
+                >
+                  {cancelling ? <Loader2 style={{ width: 12, height: 12 }} className="animate-spin" /> : <XCircle style={{ width: 12, height: 12 }} />}
+                  Cancel
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontFamily: F.body, fontSize: 10, color: C.muted, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 2 }}>New Price</div>
+                  <div style={{ fontFamily: F.mono, fontSize: 14, fontWeight: 500, color: C.amber }}>
+                    ${scheduledUpgrade.isYearly ? scheduledUpgrade.plan?.yearlyPrice : scheduledUpgrade.plan?.price}
+                    <span style={{ fontFamily: F.body, fontSize: 10, color: C.dim, marginLeft: 3 }}>/{scheduledUpgrade.isYearly ? 'yr' : 'mo'}</span>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontFamily: F.body, fontSize: 10, color: C.muted, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 2 }}>Effective Date</div>
+                  <div style={{ fontFamily: F.mono, fontSize: 14, fontWeight: 500, color: C.text }}>
+                    {fmtDate(scheduledUpgrade.effectiveDate)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontFamily: F.body, fontSize: 10, color: C.muted, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 2 }}>Scheduled</div>
+                  <div style={{ fontFamily: F.mono, fontSize: 14, fontWeight: 500, color: C.dim }}>
+                    {fmtDate(scheduledUpgrade.scheduledAt)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Plan selector for scheduling */}
+          {allPlans.length > 0 && (
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: '14px 16px', marginBottom: 12,
+            }}>
+              <div style={{ fontFamily: F.body, fontSize: 12, color: C.dim, marginBottom: 10 }}>
+                Select the plan this tenant should be upgraded to when the current billing period ends
+                {activeSubscription.currentPeriodEnd && (
+                  <span style={{ color: C.amber, fontWeight: 600 }}>
+                    {' '}({fmtDate(activeSubscription.currentPeriodEnd)})
+                  </span>
+                )}.
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                {allPlans
+                  .filter((p) => p.id !== currentPlanId)
+                  .map((plan) => {
+                    const isSelected = plan.id === schedPlanId;
+                    return (
+                      <label key={plan.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                        background: isSelected ? 'rgba(251,191,36,0.07)' : 'transparent',
+                        border: `1px solid ${isSelected ? 'rgba(251,191,36,0.3)' : C.border}`,
+                        borderRadius: 8, padding: '10px 12px',
+                        transition: 'all 0.15s',
+                      }}>
+                        <div style={{ position: 'relative', width: 16, height: 16, flexShrink: 0 }}>
+                          <input
+                            type="radio" name="sched-plan" value={plan.id}
+                            checked={isSelected}
+                            onChange={() => setSchedPlanId(plan.id)}
+                            style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+                          />
+                          <div style={{
+                            width: 16, height: 16, borderRadius: '50%',
+                            border: `2px solid ${isSelected ? C.amber : C.muted}`,
+                            background: isSelected ? C.amberBg : 'transparent',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'all 0.15s',
+                          }}>
+                            {isSelected && <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.amber }} />}
+                          </div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontFamily: F.body, fontSize: 13, fontWeight: 600, color: C.text }}>
+                              {plan.displayName}
+                            </span>
+                            {plan.isPopular && <Badge label="Popular" variant="indigo" />}
+                          </div>
+                          <div style={{ display: 'flex', gap: 10, marginTop: 3 }}>
+                            <span style={{ fontFamily: F.mono, fontSize: 11, color: C.amber }}>${plan.price}/mo</span>
+                            {plan.yearlyPrice && <span style={{ fontFamily: F.mono, fontSize: 11, color: C.dim }}>${plan.yearlyPrice}/yr</span>}
+                            <span style={{ fontFamily: F.body, fontSize: 10, color: C.dim }}>{plan.maxUsers ?? '∞'} users · {plan.maxShops ?? '∞'} shops</span>
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+              </div>
+
+              {/* Billing cycle for scheduled plan */}
+              {schedSelectedPlan?.yearlyPrice && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <span style={{ fontFamily: F.body, fontSize: 12, color: C.dim }}>Billing cycle</span>
+                  <div style={{
+                    display: 'flex', background: C.bg, border: `1px solid ${C.border}`,
+                    borderRadius: 8, overflow: 'hidden',
+                  }}>
+                    {(['Monthly', 'Yearly'] as const).map((label) => {
+                      const active = label === 'Yearly' ? schedIsYearly : !schedIsYearly;
+                      return (
+                        <button key={label} onClick={() => setSchedIsYearly(label === 'Yearly')} style={{
+                          padding: '5px 12px',
+                          fontFamily: F.body, fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                          background: active ? C.amber : 'transparent',
+                          color: active ? '#000' : C.dim,
+                          border: 'none', transition: 'all 0.15s',
+                        }}>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Schedule / update buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  onClick={handleScheduleUpgrade}
+                  disabled={!schedPlanId || scheduling || (schedPlanId === currentPlanId)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    padding: '7px 16px', borderRadius: 8, border: 'none',
+                    cursor: schedPlanId && !scheduling && schedPlanId !== currentPlanId ? 'pointer' : 'not-allowed',
+                    background: schedPlanId && !scheduling && schedPlanId !== currentPlanId ? C.amber : C.muted,
+                    color: schedPlanId && !scheduling && schedPlanId !== currentPlanId ? '#000' : C.surface,
+                    fontFamily: F.body, fontSize: 12, fontWeight: 600,
+                    transition: 'all 0.15s',
+                    opacity: !schedPlanId || scheduling || schedPlanId === currentPlanId ? 0.5 : 1,
+                  }}
+                >
+                  {scheduling && <Loader2 style={{ width: 13, height: 13 }} className="animate-spin" />}
+                  <CalendarClock style={{ width: 13, height: 13 }} />
+                  {hasScheduled ? 'Update Scheduled Upgrade' : 'Schedule Upgrade'}
+                </button>
+                {schedMsg && (
+                  <span style={{
+                    fontFamily: F.body, fontSize: 12,
+                    color: schedMsg.type === 'success' ? C.green : C.red,
+                  }}>
+                    {schedMsg.text}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Stripe details */}
       {owner && (owner.stripeCustomerId || owner.stripeSubscriptionId) && (

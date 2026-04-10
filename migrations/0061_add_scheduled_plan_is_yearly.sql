@@ -1,0 +1,1 @@
+ALTER TABLE "subscriptions" ADD COLUMN "scheduled_plan_is_yearly" boolean DEFAULT false;

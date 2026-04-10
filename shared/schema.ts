@@ -203,9 +203,10 @@ export const subscriptions = pgTable("subscriptions", {
   cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
   canceledAt: timestamp("canceled_at"),
   isYearly: boolean("is_yearly").default(false),
-  // Downgrade scheduling fields
+  // Downgrade / upgrade scheduling fields
   downgradeTargetPlanId: varchar("downgrade_target_plan_id"),
   downgradeScheduledAt: timestamp("downgrade_scheduled_at"),
+  scheduledPlanIsYearly: boolean("scheduled_plan_is_yearly").default(false),
   previousPlanId: varchar("previous_plan_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

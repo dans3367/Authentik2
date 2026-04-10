@@ -79,6 +79,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ planId, isYearly }),
     }),
+  scheduleUpgrade: (tenantId: string, planId: string, isYearly: boolean) =>
+    request<any>(`/tenants/${tenantId}/schedule-upgrade`, {
+      method: 'POST',
+      body: JSON.stringify({ planId, isYearly }),
+    }),
+  cancelScheduledUpgrade: (tenantId: string) =>
+    request<any>(`/tenants/${tenantId}/schedule-upgrade`, {
+      method: 'DELETE',
+    }),
   plans: () => request<any>('/plans'),
   income: () => request<any>('/income'),
   updateTenant: (id: string, data: any) =>
