@@ -774,18 +774,18 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     }
   };
 
-  // Image manipulation functions - TEMPORARILY DISABLED
+  // Image manipulation functions
   const handleZoomIn = () => {
-    // setImageScale(prev => Math.min(prev + 0.1, 2)); // Reduced max zoom to prevent excessive blurriness
+    setImageScale(prev => Math.min(prev + 0.1, 2)); // Reduced max zoom to prevent excessive blurriness
   };
 
   const handleZoomOut = () => {
-    // setImageScale(prev => Math.max(prev - 0.1, 0.8)); // Reduced min zoom to maintain quality
+    setImageScale(prev => Math.max(prev - 0.1, 0.8)); // Reduced min zoom to maintain quality
   };
 
   const handleResetPosition = () => {
-    // setImagePosition({ x: 0, y: 0 });
-    // setImageScale(1);
+    setImagePosition({ x: 0, y: 0 });
+    setImageScale(1);
   };
 
   // TEMPORARILY DISABLED - Image manipulation handlers
@@ -1335,6 +1335,27 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                           <ImageOff className="w-4 h-4 mr-2" />
                           Remove Image
                         </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={handleZoomIn}
+                          disabled={!imageUrl || imageError || imageScale >= 2}
+                        >
+                          <ZoomIn className="w-4 h-4 mr-2" />
+                          Zoom In
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={handleZoomOut}
+                          disabled={!imageUrl || imageError || imageScale <= 0.8}
+                        >
+                          <ZoomOut className="w-4 h-4 mr-2" />
+                          Zoom Out
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={handleResetPosition}
+                          disabled={!imageUrl || imageError || (imagePosition.x === 0 && imagePosition.y === 0 && imageScale === 1)}
+                        >
+                          <RotateCcw className="w-4 h-4 mr-2" />
+                          Reset Position
+                        </DropdownMenuItem>
                         <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                           <RefreshCw className="w-4 h-4 mr-2" />
                           Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
@@ -1661,6 +1682,27 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                           <DropdownMenuItem onClick={handleRemoveImage}>
                             <ImageOff className="w-4 h-4 mr-2" />
                             Remove Image
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={handleZoomIn}
+                            disabled={!imageUrl || imageError || imageScale >= 2}
+                          >
+                            <ZoomIn className="w-4 h-4 mr-2" />
+                            Zoom In
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={handleZoomOut}
+                            disabled={!imageUrl || imageError || imageScale <= 0.8}
+                          >
+                            <ZoomOut className="w-4 h-4 mr-2" />
+                            Zoom Out
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={handleResetPosition}
+                            disabled={!imageUrl || imageError || (imagePosition.x === 0 && imagePosition.y === 0 && imageScale === 1)}
+                          >
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                            Reset Position
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                             <RefreshCw className="w-4 h-4 mr-2" />
