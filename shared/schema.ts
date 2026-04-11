@@ -42,6 +42,9 @@ export const betterAuthUser = pgTable("better_auth_user", {
   // Downgrade soft-lock fields
   suspendedByDowngrade: boolean("suspended_by_downgrade").default(false),
   suspendedAt: timestamp("suspended_at"),
+  // Company name captured during signup, read by tenant provisioning.
+  // Cleared once the tenant/company is created.
+  pendingCompanyName: text("pending_company_name"),
 });
 
 export const betterAuthSession = pgTable("better_auth_session", {

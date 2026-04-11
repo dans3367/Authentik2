@@ -1325,10 +1325,13 @@ export default function BirthdaysPage() {
                         </div>
                         <div className="mt-2 flex items-center justify-between">
                           <span className="text-sm font-medium text-gray-900">{tpl.name}</span>
-                          {isSelected && (
-                            <span className="text-xs font-semibold text-blue-600">Selected</span>
-                          )}
                         </div>
+                        {isSelected && (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_0_2px_rgba(34,197,94,0.2)]" />
+                            <span className="text-xs font-semibold text-green-600">Active</span>
+                          </div>
+                        )}
                       </button>
                     );
                   })}

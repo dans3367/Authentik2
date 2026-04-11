@@ -5,6 +5,7 @@ import { db } from "./db";
 import { betterAuthUser, betterAuthSession, betterAuthAccount, betterAuthVerification } from "@shared/schema";
 import { triggerTransactionalEmail } from "./lib/trigger";
 import { eq } from "drizzle-orm";
+import crypto from "crypto";
 
 export function getAuthSecret(): string {
   const secret = process.env.BETTER_AUTH_SECRET;
@@ -162,6 +163,13 @@ const authInstance = betterAuth({
         defaultValue: "en",
         required: false,
       },
+      pendingCompanyName: {
+        type: "string",
+        required: false,
+        // Writable from the signup client so the company name entered on the
+        // signup form is persisted atomically on the user row and read later
+        // by tenant provisioning (see provisionTenantForUser).
+      },
     },
   },
   // Hooks — pre-signup: enforce password complexity; post-signup: parse name.
@@ -182,6 +190,26 @@ const authInstance = betterAuth({
           throw new APIError("BAD_REQUEST", {
             message: `Password must contain at least ${errors.join(", ")}`,
           });
+        }
+      }
+
+      // Sanitize the pendingCompanyName signup field — mirrors the guards in
+      // /api/signup/store-company-name (trim + 200 char cap) since the field
+      // now flows directly through Better Auth's additionalFields and bypasses
+      // that endpoint's validation.
+      if (path.includes("sign-up") && ctx.body?.pendingCompanyName != null) {
+        const raw = ctx.body.pendingCompanyName;
+        if (typeof raw !== "string") {
+          delete ctx.body.pendingCompanyName;
+        } else {
+          const trimmed = raw.trim();
+          if (!trimmed) {
+            delete ctx.body.pendingCompanyName;
+          } else if (trimmed.length > 200) {
+            throw new APIError("BAD_REQUEST", { message: "Company name too long" });
+          } else {
+            ctx.body.pendingCompanyName = trimmed;
+          }
         }
       }
     }),
@@ -227,6 +255,28 @@ const authInstance = betterAuth({
             .set({ firstName, lastName, updatedAt: new Date() })
             .where(eq(betterAuthUser.id, userRecord.id));
           console.log(`📝 [Signup Hook] Parsed name for ${email}: firstName=${firstName}, lastName=${lastName}`);
+        }
+
+        // Persist the pending company name captured via /api/signup/store-company-name
+        // onto the user row so tenant/company provisioning (which may run minutes later
+        // after Stripe checkout) can read it reliably — the in-memory Map has a short
+        // TTL and a tight capacity, so we must copy it to durable storage immediately.
+        if (!userRecord.pendingCompanyName) {
+          const hmacKey = process.env.BETTER_AUTH_SECRET || '';
+          const pendingStoreKey = crypto
+            .createHmac('sha256', hmacKey)
+            .update(userRecord.email.toLowerCase())
+            .digest('hex');
+          const pendingEntry = (global as any).pendingCompanyNames?.get?.(pendingStoreKey);
+          const pendingName =
+            pendingEntry && pendingEntry.expiresAt > Date.now() ? pendingEntry.name : null;
+          if (pendingName) {
+            await db.update(betterAuthUser)
+              .set({ pendingCompanyName: pendingName, updatedAt: new Date() })
+              .where(eq(betterAuthUser.id, userRecord.id));
+            (global as any).pendingCompanyNames?.delete?.(pendingStoreKey);
+            console.log(`📝 [Signup Hook] Persisted pending company name for ${email}`);
+          }
         }
 
         console.log(`✅ [Signup Hook] User created: ${email} (tenant will be created after payment)`);

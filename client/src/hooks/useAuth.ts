@@ -86,25 +86,34 @@ export function useRegister() {
       // This prevents the new account from inheriting the old user's dashboard
       await clearAllAuthState();
 
-      // Step 1: Store company name on the server before signup
-      // This allows the auth hook to access it when creating the tenant/company
-      await fetch(`${getApiBaseUrl()}/api/signup/store-company-name`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: data.email,
-          companyName: data.companyName,
-        }),
-      });
+      // Step 1: Store company name on the server before signup.
+      // This is now a best-effort fallback — the primary path passes
+      // `pendingCompanyName` directly to Better Auth below so it is persisted
+      // atomically on the user row, but we still populate the in-memory map
+      // for any legacy code paths that read from it.
+      try {
+        await fetch(`${getApiBaseUrl()}/api/signup/store-company-name`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: data.email,
+            companyName: data.companyName,
+          }),
+        });
+      } catch {
+        // Ignore — the atomic signUp.email call below carries the name.
+      }
 
-      // Step 2: Proceed with Better Auth signup
+      // Step 2: Proceed with Better Auth signup, passing the company name as
+      // an additional field so it lands on the user row in the same insert.
       const result = await signUp.email({
         email: data.email,
         password: data.password,
         name: `${data.firstName} ${data.lastName}`,
-      });
+        pendingCompanyName: data.companyName,
+      } as any);
 
       if (result.error) {
         throw new Error(result.error.message);

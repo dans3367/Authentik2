@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/LazyRichTextEditor";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, Smile, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift, CalendarIcon, Loader2 } from "lucide-react";
+import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift, CalendarIcon, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -164,7 +164,6 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number; startX: number; startY: number } | null>(null);
   const [showImageControls, setShowImageControls] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -593,22 +592,6 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
     }
   }, [showImageControls]);
 
-  // Handle escape key to close emoji picker
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && showEmojiPicker) {
-        setShowEmojiPicker(false);
-      }
-    };
-
-    if (showEmojiPicker) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-      };
-    }
-  }, [showEmojiPicker]);
-
   // Search Unsplash images with pagination support
   const searchUnsplash = async (query: string, page: number = 1, append: boolean = false) => {
     if (!query.trim()) return;
@@ -874,31 +857,6 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
     // setImageScale(prev => Math.max(0.8, Math.min(2, prev + delta))); // Limited range for better quality
   };
 
-  // Emoji functionality
-  const birthdayEmojis = [
-    '🎉', '🎂', '🎈', '🎁', '🎊', '🥳', '🍰', '🎀',
-    '✨', '🌟', '💝', '🎵', '🎶', '💫', '🌈', '🦄',
-    '🍾', '🥂', '🍭', '🍬', '🎪', '🎭', '🎨', '💐',
-    '🌺', '🌸', '🌻', '🌷', '🔥', '💖', '💕', '💗'
-  ];
-
-  const insertEmoji = (emoji: string) => {
-    if (titleInputRef.current) {
-      const input = titleInputRef.current;
-      const start = input.selectionStart || 0;
-      const end = input.selectionEnd || 0;
-      const newTitle = title.slice(0, start) + emoji + title.slice(end);
-      setTitle(newTitle);
-      setShowEmojiPicker(false);
-
-      // Focus back to input and set cursor position after emoji
-      setTimeout(() => {
-        input.focus();
-        input.setSelectionRange(start + emoji.length, start + emoji.length);
-      }, 0);
-    }
-  };
-
   // Reset functionality
   const handleReset = () => {
     const isCustomTheme = isCustomCardMode || customImage;
@@ -934,9 +892,6 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
 
         console.log('✅ [Card Designer] Custom theme reset complete');
       }
-
-      // Always close emoji picker
-      setShowEmojiPicker(false);
 
       // Focus on title input for immediate editing
       setTimeout(() => {
@@ -1308,43 +1263,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder={t('ecards.designer.addGreeting')}
-                      className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
+                      className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
                     />
-                    <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
-                      <DropdownMenu open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-gray-400 hover:text-gray-600"
-                            onClick={() => setShowEmojiPicker(true)}
-                          >
-                            <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          className="w-72 sm:w-80 p-3 sm:p-4"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="space-y-2 sm:space-y-3">
-                            <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">{t('ecards.designer.emojiMenuTitle')}</div>
-                            <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
-                              {birthdayEmojis.map((emoji, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => insertEmoji(emoji)}
-                                  className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-center"
-                                  title={t('ecards.designer.insertEmoji', { emoji })}
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
                   </div>
 
                   {/* Description */}
@@ -1641,43 +1561,8 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder={t('ecards.designer.addGreeting')}
-                        className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 pr-8 sm:pr-12 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
+                        className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold border-0 shadow-none px-0 focus-visible:ring-0 text-center placeholder:text-gray-400 placeholder:font-normal h-auto min-h-[3rem] sm:min-h-[4rem] md:min-h-[5rem] lg:min-h-[6rem] py-2 sm:py-3 md:py-4 leading-tight"
                       />
-                      <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
-                        <DropdownMenu open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-gray-400 hover:text-gray-600"
-                              onClick={() => setShowEmojiPicker(true)}
-                            >
-                              <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="w-72 sm:w-80 p-3 sm:p-4"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="space-y-2 sm:space-y-3">
-                              <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">{t('ecards.designer.emojiMenuTitle')}</div>
-                              <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 sm:gap-2">
-                                {birthdayEmojis.map((emoji, index) => (
-                                  <button
-                                    key={index}
-                                    onClick={() => insertEmoji(emoji)}
-                                    className="w-7 h-7 sm:w-8 sm:h-8 text-base sm:text-lg hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-center"
-                                    title={t('ecards.designer.insertEmoji', { emoji })}
-                                  >
-                                    {emoji}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
                     </div>
 
                     {/* Rich text editor with bubble (tooltip) menu */}

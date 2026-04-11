@@ -84,12 +84,21 @@ async function provisionTenantForUser(userId: string): Promise<string> {
 
     console.log(`🔧 [Provision] Creating tenant+company for user: ${maskEmail(userRecord.email)}`);
 
-    // Get company name from pending signups store (HMAC-keyed Map)
+    // Resolve the company name entered at signup. Prefer the durable column on
+    // the user row (populated by the Better Auth post-signup hook), then fall
+    // back to the in-memory map (legacy signups that predate the column), then
+    // to 'My Organization'. We deliberately no longer generate
+    // `${userRecord.name}'s Organization` — that produced noise like "Bob Owens's
+    // Organization" which propagated into tenants, companies, shops and the
+    // email/blog design company-name fields.
     const hmacKey = process.env.BETTER_AUTH_SECRET || '';
     const pendingStoreKey = crypto.createHmac('sha256', hmacKey).update(userRecord.email.toLowerCase()).digest('hex');
     const pendingEntry = (global as any).pendingCompanyNames?.get?.(pendingStoreKey);
-    const pendingCompanyName = pendingEntry && pendingEntry.expiresAt > Date.now() ? pendingEntry.name : undefined;
-    const companyName = pendingCompanyName || (userRecord.name ? `${userRecord.name}'s Organization` : 'My Organization');
+    const pendingCompanyNameFromMap = pendingEntry && pendingEntry.expiresAt > Date.now() ? pendingEntry.name : undefined;
+    const companyName =
+      (userRecord.pendingCompanyName && userRecord.pendingCompanyName.trim()) ||
+      pendingCompanyNameFromMap ||
+      'My Organization';
 
     // Generate a unique slug
     let baseSlug = userRecord.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '-');
@@ -117,11 +126,13 @@ async function provisionTenantForUser(userId: string): Promise<string> {
       throw new Error('Failed to create tenant');
     }
 
-    // Update user with new tenant ID
+    // Update user with new tenant ID and clear the pending company name now
+    // that it has been persisted onto the tenant/company/shop records.
     await db.update(betterAuthUser)
       .set({
         tenantId: newTenant.id,
         role: 'Owner',
+        pendingCompanyName: null,
         updatedAt: new Date(),
       })
       .where(eq(betterAuthUser.id, userRecord.id));
