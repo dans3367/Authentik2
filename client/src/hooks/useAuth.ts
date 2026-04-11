@@ -1,8 +1,9 @@
 import { useSession, signIn, signOut, signUp, authClient, type ExtendedUser } from "@/lib/betterAuthClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getApiBaseUrl } from "@/lib/apiConfig";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { clearAllAuthState, clearClientCaches, setIntentionalLogout } from "@/lib/clearAuthState";
 import type {
   LoginCredentials,
@@ -306,27 +307,133 @@ export function useChangePassword() {
   return { mutateAsync, isPending };
 }
 
+export interface DeletionStatus {
+  pending: boolean;
+  requestedAt: string | null;
+  scheduledPurgeAt: string | null;
+  requestedByUserId: string | null;
+  reason: string | null;
+}
+
+/**
+ * Poll the account deletion status. Returns whether the current tenant is
+ * pending deletion and when the purge is scheduled.
+ */
+export function useDeletionStatus(enabled = true) {
+  return useQuery<DeletionStatus>({
+    queryKey: ["/api/account/deletion-status"],
+    enabled,
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export interface DeleteAccountInput {
+  password: string;
+  confirmText: string;
+  reason?: string;
+}
+
+/**
+ * Request deletion of the entire tenant account (Owner only).
+ * The account enters a 30-day grace period during which the Owner can still
+ * log in and cancel the deletion via useCancelAccountDeletion().
+ */
 export function useDeleteAccount() {
   const { toast } = useToast();
   const [isPending, setIsPending] = useState(false);
 
-  const mutateAsync = async () => {
+  const mutateAsync = async (input: DeleteAccountInput): Promise<DeletionStatus> => {
     setIsPending(true);
     try {
-      // TODO: Implement with better-auth API
-      console.log('Account deletion requested');
+      const response = await apiRequest("POST", "/api/account/delete", input);
+      const status = (await response.json()) as DeletionStatus;
 
       toast({
-        title: "Account Deleted",
-        description: "Your account has been deleted successfully.",
+        title: "Account scheduled for deletion",
+        description: status.scheduledPurgeAt
+          ? `Your account will be permanently deleted on ${new Date(status.scheduledPurgeAt).toLocaleDateString()}.`
+          : "Your account has been scheduled for deletion.",
       });
 
-      // Clear all auth state after deletion
-      await clearAllAuthState();
+      return status;
     } catch (error: any) {
       toast({
         title: "Deletion Failed",
-        description: error.message || "Failed to delete account.",
+        description: error.message?.replace(/^\d+:\s*/, "") || "Failed to schedule account deletion.",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { mutateAsync, isPending };
+}
+
+/** Cancel a pending account deletion during the 30-day grace period. */
+export function useCancelAccountDeletion() {
+  const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
+
+  const mutateAsync = async (): Promise<DeletionStatus> => {
+    setIsPending(true);
+    try {
+      const response = await apiRequest("POST", "/api/account/cancel-deletion");
+      const status = (await response.json()) as DeletionStatus;
+
+      toast({
+        title: "Deletion cancelled",
+        description: "Your account is active again. Welcome back!",
+      });
+
+      // Refresh all queries to reflect the now-active account
+      queryClient.invalidateQueries();
+
+      return status;
+    } catch (error: any) {
+      toast({
+        title: "Failed to cancel",
+        description: error.message?.replace(/^\d+:\s*/, "") || "Failed to cancel deletion.",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { mutateAsync, isPending };
+}
+
+/** Trigger a JSON data export download of all tenant-owned data. */
+export function useExportAccountData() {
+  const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
+
+  const mutateAsync = async (): Promise<void> => {
+    setIsPending(true);
+    try {
+      const response = await apiRequest("GET", "/api/account/export");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `account-export-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export downloaded",
+        description: "Your account data has been downloaded.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Export failed",
+        description: error.message?.replace(/^\d+:\s*/, "") || "Failed to export account data.",
         variant: "destructive",
       });
       throw error;

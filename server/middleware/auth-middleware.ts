@@ -104,6 +104,18 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
         return res.status(401).json({ message: 'User not found' });
       }
 
+      // Also load the tenant's pending-deletion state so we can gate access.
+      // This piggybacks on the user security cache lookup so it's a one-time
+      // cost per cache miss.
+      let tenantDeletionScheduledAt: Date | null = null;
+      if (dbRecord.tenantId) {
+        const tenantRecord = await db.query.tenants.findFirst({
+          where: eq(tenants.id, dbRecord.tenantId),
+          columns: { deletionScheduledAt: true },
+        });
+        tenantDeletionScheduledAt = tenantRecord?.deletionScheduledAt ?? null;
+      }
+
       // Populate cache for subsequent requests
       userRecord = {
         id: dbRecord.id,
@@ -111,6 +123,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
         tenantId: dbRecord.tenantId,
         isActive: dbRecord.isActive ?? false,
         language: dbRecord.language || 'en',
+        tenantDeletionScheduledAt,
       };
       setUserSecurity(sessionUser.id, userRecord);
     }
@@ -158,6 +171,29 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     };
 
     req.user = authUser;
+
+    // Pending-deletion gate: if the tenant has been scheduled for deletion,
+    // only a narrow whitelist of endpoints is usable (so the Owner can still
+    // check status, cancel, export data, or log out).
+    if (userRecord.tenantDeletionScheduledAt) {
+      const allowedDuringDeletion = [
+        '/api/account/deletion-status',
+        '/api/account/cancel-deletion',
+        '/api/account/export',
+        '/api/auth/logout',
+      ];
+      // req.originalUrl is the full URL including query string — strip ?...
+      const pathname = (req.originalUrl || '').split('?')[0];
+      const isAllowed = allowedDuringDeletion.some((p) => pathname.startsWith(p));
+      if (!isAllowed) {
+        return res.status(403).json({
+          code: 'TENANT_PENDING_DELETION',
+          message: 'This account is scheduled for deletion.',
+          scheduledPurgeAt: userRecord.tenantDeletionScheduledAt,
+        });
+      }
+    }
+
     next();
   } catch (error) {
     console.error('Authentication middleware error:', error);

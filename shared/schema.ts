@@ -96,6 +96,11 @@ export const tenants = pgTable("tenants", {
   isActive: boolean("is_active").default(true),
   settings: text("settings").default('{}'), // JSON settings
   maxUsers: integer("max_users").default(10), // User limit per tenant
+  // Account deletion (30-day grace period flow)
+  deletionRequestedAt: timestamp("deletion_requested_at"), // when Owner clicked delete
+  deletionScheduledAt: timestamp("deletion_scheduled_at"), // when grace period ends / purge runs
+  deletionRequestedByUserId: text("deletion_requested_by_user_id"), // Owner who initiated
+  deletionReason: text("deletion_reason"), // optional feedback
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

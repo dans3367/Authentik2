@@ -44,6 +44,7 @@ import { segmentListRoutes } from "./routes/segmentListRoutes";
 import { activityRoutes } from "./routes/activityRoutes";
 import { clickhouseActivityRoutes } from "./routes/clickhouseActivityRoutes";
 import { accountUsageRoutes } from "./routes/accountUsageRoutes";
+import { accountRoutes } from "./routes/accountRoutes";
 import { roleRoutes } from "./routes/roleRoutes";
 import internalRoutes from "./routes/internalRoutes";
 import { statsRoutes } from "./routes/statsRoutes";
@@ -197,6 +198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/activity-logs", authenticateToken, requireTenant, activityLogRateLimiter, activityRoutes);
   app.use("/api/axiom-activity-logs", authenticateToken, requireTenant, activityLogRateLimiter, clickhouseActivityRoutes);
   app.use("/api/account-usage", accountUsageRoutes);
+  app.use("/api/account", accountRoutes); // Self-service account deletion & data export
   app.use("/api/stats", statsRoutes);
   app.use("/api/analytics", analyticsRoutes);
 

@@ -21,6 +21,9 @@ export interface CachedUserSecurity {
   tenantId: string;
   isActive: boolean;
   language: string;
+  // null = tenant is active, Date = tenant is pending deletion and will be
+  // purged at this time. Populated from tenants.deletion_scheduled_at.
+  tenantDeletionScheduledAt: Date | null;
 }
 
 // Short TTL (60s) keeps the blast radius of stale data small.

@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAuth, useUpdateProfile, useChangePassword, useDeleteAccount, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
+import { useAuth, useUpdateProfile, useChangePassword, useDeleteAccount, useCancelAccountDeletion, useExportAccountData, useDeletionStatus, useSetup2FA, useEnable2FA, useDisable2FA } from "@/hooks/useAuth";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { use2FA } from "@/hooks/use2FA";
@@ -301,6 +301,11 @@ export default function ProfilePage() {
   const updateProfileMutation = useUpdateProfile();
   const changePasswordMutation = useChangePassword();
   const deleteAccountMutation = useDeleteAccount();
+  const cancelDeletionMutation = useCancelAccountDeletion();
+  const exportAccountMutation = useExportAccountData();
+  const deletionStatusQuery = useDeletionStatus(true);
+  const deletionStatus = deletionStatusQuery.data;
+  const isAccountPendingDeletion = !!deletionStatus?.pending;
   const setup2FAMutation = useSetup2FA();
   const enable2FAMutation = useEnable2FA();
   const disable2FAMutation = useDisable2FA();
@@ -434,6 +439,8 @@ export default function ProfilePage() {
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteReason, setDeleteReason] = useState("");
   const [twoFactorSetup, setTwoFactorSetup] = useState<{
     secret: string;
     qrCode: string;
@@ -514,8 +521,39 @@ export default function ProfilePage() {
   };
 
   const onDeleteAccount = async () => {
-    await deleteAccountMutation.mutateAsync();
-    setShowDeleteDialog(false);
+    try {
+      await deleteAccountMutation.mutateAsync({
+        password: deletePassword,
+        confirmText: deleteConfirmText,
+        reason: deleteReason || undefined,
+      });
+      setShowDeleteDialog(false);
+      setDeletePassword("");
+      setDeleteConfirmText("");
+      setDeleteReason("");
+      // Refetch user/session so the app picks up the pending-deletion state
+      // and the blocked-account screen renders.
+      window.location.href = "/";
+    } catch {
+      // Error toast is shown by the mutation
+    }
+  };
+
+  const onCancelDeletion = async () => {
+    try {
+      await cancelDeletionMutation.mutateAsync();
+      window.location.reload();
+    } catch {
+      // Error toast is shown by the mutation
+    }
+  };
+
+  const onExportAccount = async () => {
+    try {
+      await exportAccountMutation.mutateAsync();
+    } catch {
+      // Error toast is shown by the mutation
+    }
   };
 
   const onSetup2FA = async () => {
@@ -1380,7 +1418,79 @@ export default function ProfilePage() {
                   {t('profile.danger.title')}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {/* Pending deletion banner — only shown if account is currently scheduled for deletion */}
+                {isAccountPendingDeletion && deletionStatus?.scheduledPurgeAt && (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700/50 rounded-xl p-6 space-y-3">
+                    <div className="flex items-start space-x-3">
+                      <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-amber-900 dark:text-amber-200 mb-1">
+                          Account deletion scheduled
+                        </h3>
+                        <p className="text-sm text-amber-800 dark:text-amber-300">
+                          Your account will be permanently deleted on{' '}
+                          <strong>
+                            {new Date(deletionStatus.scheduledPurgeAt).toLocaleDateString(undefined, {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })}
+                          </strong>
+                          . You can cancel this and restore your account at any time before then.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        onClick={onCancelDeletion}
+                        disabled={cancelDeletionMutation.isPending}
+                        className="border-amber-400 text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                      >
+                        {cancelDeletionMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Cancelling…
+                          </>
+                        ) : (
+                          "Cancel deletion"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Export data card */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200/50 dark:border-blue-700/30 rounded-xl p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-1">Export your data</h3>
+                      <p className="text-sm text-blue-800 dark:text-blue-300">
+                        Download a JSON file containing your account, contacts, newsletters, forms, templates, and appointments. Recommended before deleting your account.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={onExportAccount}
+                      disabled={exportAccountMutation.isPending}
+                      className="flex-shrink-0"
+                    >
+                      {exportAccountMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Exporting…
+                        </>
+                      ) : (
+                        "Download export"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Delete account card — hidden while pending deletion */}
+                {!isAccountPendingDeletion && (
                 <div className="bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border border-red-200/50 dark:border-red-700/30 rounded-xl p-8">
                   <div className="flex items-start space-x-4">
                     <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-rose-500 rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
@@ -1391,6 +1501,9 @@ export default function ProfilePage() {
                         <h3 className="text-xl font-semibold text-red-800 dark:text-red-300 mb-2">{t('profile.danger.deleteAccount')}</h3>
                         <p className="text-red-700 dark:text-red-400 leading-relaxed">
                           {t('profile.danger.deleteDescription')}
+                        </p>
+                        <p className="text-red-700 dark:text-red-400 leading-relaxed mt-2 text-sm">
+                          You'll have a 30-day grace period to cancel before your data is permanently removed.
                         </p>
                       </div>
                       <div className="pt-2">
@@ -1416,6 +1529,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1520,7 +1634,11 @@ export default function ProfilePage() {
         {/* Delete Account Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={(open) => {
           setShowDeleteDialog(open);
-          if (!open) setDeleteConfirmText("");
+          if (!open) {
+            setDeleteConfirmText("");
+            setDeletePassword("");
+            setDeleteReason("");
+          }
         }}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -1531,8 +1649,20 @@ export default function ProfilePage() {
               <AlertDialogDescription asChild>
                 <div className="space-y-4">
                   <p>
-                    Are you absolutely sure you want to delete your account? This action cannot be undone and will permanently remove all your data.
+                    Are you absolutely sure you want to delete your account? Your account will be scheduled for permanent deletion in 30 days. You can cancel during the grace period by logging back in.
                   </p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Confirm your password:
+                    </p>
+                    <Input
+                      type="password"
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      placeholder="Your account password"
+                      autoComplete="current-password"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Type <span className="font-mono font-bold text-red-600">Delete Account</span> to confirm:
@@ -1545,6 +1675,17 @@ export default function ProfilePage() {
                       autoComplete="off"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Reason (optional — helps us improve):
+                    </p>
+                    <Input
+                      value={deleteReason}
+                      onChange={(e) => setDeleteReason(e.target.value)}
+                      placeholder="Why are you leaving?"
+                      autoComplete="off"
+                    />
+                  </div>
                 </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -1552,7 +1693,11 @@ export default function ProfilePage() {
               <AlertDialogCancel>{t('profile.danger.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={onDeleteAccount}
-                disabled={deleteConfirmText !== 'Delete Account'}
+                disabled={
+                  deleteConfirmText !== 'Delete Account' ||
+                  !deletePassword ||
+                  deleteAccountMutation.isPending
+                }
                 className="bg-red-600 hover:bg-red-700 focus:ring-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t('profile.danger.confirmDelete')}

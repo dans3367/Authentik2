@@ -18,6 +18,7 @@ import { toNodeHandler } from "better-auth/node";
 import { serverLogger } from "./logger";
 import { startSessionCleanupWorker, stopSessionCleanupWorker } from "./workers/SessionCleanupWorker";
 import { startAppointmentAutoReminderWorker, stopAppointmentAutoReminderWorker } from "./workers/AppointmentAutoReminderWorker";
+import { startTenantPurgeWorker, stopTenantPurgeWorker } from "./workers/TenantPurgeWorker";
 import { flushSecurityCache } from "./utils/userSecurityCache";
 
 const app = express();
@@ -232,12 +233,14 @@ app.use((req, res, next) => {
     log(`Server is running on http://localhost:${port} (API + Frontend)`);
     startSessionCleanupWorker();
     startAppointmentAutoReminderWorker();
+    startTenantPurgeWorker();
   });
 
   // Graceful shutdown
   const shutdown = () => {
     stopSessionCleanupWorker();
     stopAppointmentAutoReminderWorker();
+    stopTenantPurgeWorker();
     flushSecurityCache();
   };
   process.on('SIGINT', shutdown);
