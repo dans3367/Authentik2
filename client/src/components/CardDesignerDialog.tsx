@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/LazyRichTextEditor";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift, CalendarIcon, Eye, Monitor, Smartphone } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { MoreVertical, Edit, Trash2, ImagePlus, ImageOff, Search, ZoomIn, ZoomOut, Move, RotateCcw, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, Palette, Gift, CalendarIcon, Eye, Monitor, Smartphone, Paintbrush } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -33,7 +33,17 @@ type DesignerData = {
   cardName?: string;
   sendDate?: string; // ISO date string (YYYY-MM-DD)
   occasionType?: string; // Type of occasion/holiday (e.g., "Mother's Day", "Christmas", "Valentine's Day")
+  backgroundGradient?: string; // ID of the selected background gradient preset
 };
+
+const BACKGROUND_PRESETS = [
+  { id: 'purple-haze', label: 'Purple Haze', style: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
+  { id: 'sunset-glow', label: 'Sunset Glow', style: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
+  { id: 'ocean-breeze', label: 'Ocean Breeze', style: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
+  { id: 'emerald-dream', label: 'Emerald Dream', style: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' },
+  { id: 'white', label: 'White', style: '#ffffff' },
+  { id: 'black', label: 'Black', style: '#1a1a2e' },
+] as const;
 
 interface CardDesignerDialogProps {
   open: boolean;
@@ -95,6 +105,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
   const [cardName, setCardName] = useState(initialData?.cardName ?? "");
   const [sendDate, setSendDate] = useState(initialData?.sendDate ?? "");
   const [occasionType, setOccasionType] = useState(initialData?.occasionType ?? "");
+  const [backgroundGradient, setBackgroundGradient] = useState(initialData?.backgroundGradient ?? "purple-haze");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [unsplashOpen, setUnsplashOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"design" | "promotions">("design");
@@ -116,6 +127,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     customImage: boolean;
     imagePosition: { x: number; y: number };
     imageScale: number;
+    backgroundGradient: string;
   } | null>(null);
 
   // Pagination state for Unsplash
@@ -149,6 +161,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     setSignature(initialData?.signature ?? "");
     setCardName(initialData?.cardName ?? "");
     setSendDate(initialData?.sendDate ?? "");
+    setBackgroundGradient(initialData?.backgroundGradient ?? "purple-haze");
     setOccasionType(initialData?.occasionType ?? "");
 
     // Default theme header images (must match BirthdayCardsContent grid and theme-change effect)
@@ -223,6 +236,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       customImage: finalCustomImage,
       imagePosition: finalImagePosition,
       imageScale: finalImageScale,
+      backgroundGradient: initialData?.backgroundGradient ?? "purple-haze",
     });
 
     // Reset change tracking
@@ -373,6 +387,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       customImage,
       imagePosition,
       imageScale,
+      backgroundGradient,
     };
 
     // Debounce the preview updates to avoid too many calls
@@ -385,7 +400,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [open, title, description, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale]); // Removed onPreviewChange from dependencies
+  }, [open, title, description, message, imageUrl, signature, initialThemeId, customImage, imagePosition, imageScale, backgroundGradient]); // Removed onPreviewChange from dependencies
 
   // Debug effect to track image state changes
   useEffect(() => {
@@ -413,10 +428,11 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       customImage !== initialValues.customImage ||
       imagePosition.x !== initialValues.imagePosition.x ||
       imagePosition.y !== initialValues.imagePosition.y ||
-      imageScale !== initialValues.imageScale;
+      imageScale !== initialValues.imageScale ||
+      backgroundGradient !== initialValues.backgroundGradient;
 
     setHasUnsavedChanges(hasChanges);
-  }, [open, initialValues, title, message, imageUrl, signature, customImage, imagePosition, imageScale]);
+  }, [open, initialValues, title, message, imageUrl, signature, customImage, imagePosition, imageScale, backgroundGradient]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -904,6 +920,12 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       ? { primary: '#667eea', secondary: '#764ba2' }
       : (themeColors[themeId] || themeColors['default']);
 
+    // Use selected background gradient preset, fall back to theme colors
+    const selectedPreset = BACKGROUND_PRESETS.find(p => p.id === backgroundGradient);
+    const bodyBackground = selectedPreset
+      ? selectedPreset.style
+      : `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`;
+
     const signatureSection = displaySignature
       ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-style: italic; color: #718096;">${displaySignature}</div>`
       : '';
@@ -932,7 +954,7 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
   </head>
-  <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%); min-height: 100vh;">
+  <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: ${bodyBackground}; min-height: 100vh;">
     <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
       ${headerImageHtml}
       <div style="padding: 30px 30px 20px 30px; text-align: center; border-bottom: 1px solid #f0f0f0;">
@@ -978,7 +1000,8 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
       imageScale,
       cardName,
       sendDate,
-      occasionType
+      occasionType,
+      backgroundGradient
     } as DesignerData);
     setHasUnsavedChanges(false); // Reset change tracking after save
     onOpenChange(false);
@@ -1311,6 +1334,29 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                           <RotateCcw className="w-4 h-4 mr-2" />
                           Reset Position
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <Paintbrush className="w-4 h-4 mr-2" />
+                            Background
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            {BACKGROUND_PRESETS.map((preset) => (
+                              <DropdownMenuItem
+                                key={preset.id}
+                                onClick={() => setBackgroundGradient(preset.id)}
+                                className="flex items-center gap-2"
+                              >
+                                <div className="w-5 h-5 rounded-full shrink-0" style={{ background: preset.style, border: preset.id === 'white' ? '1px solid #e5e7eb' : undefined }} />
+                                <span>{preset.label}</span>
+                                {backgroundGradient === preset.id && (
+                                  <span className="ml-auto text-xs text-muted-foreground">✓</span>
+                                )}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                           <RefreshCw className="w-4 h-4 mr-2" />
                           Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}
@@ -1624,6 +1670,29 @@ export function CardDesignerDialog({ open, onOpenChange, initialThemeId, initial
                             <RotateCcw className="w-4 h-4 mr-2" />
                             Reset Position
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                              <Paintbrush className="w-4 h-4 mr-2" />
+                              Background
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              {BACKGROUND_PRESETS.map((preset) => (
+                                <DropdownMenuItem
+                                  key={preset.id}
+                                  onClick={() => setBackgroundGradient(preset.id)}
+                                  className="flex items-center gap-2"
+                                >
+                                  <div className="w-5 h-5 rounded-full shrink-0" style={{ background: preset.style, border: preset.id === 'white' ? '1px solid #e5e7eb' : undefined }} />
+                                  <span>{preset.label}</span>
+                                  {backgroundGradient === preset.id && (
+                                    <span className="ml-auto text-xs text-muted-foreground">✓</span>
+                                  )}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem className="text-red-600" onClick={handleReset}>
                             <RefreshCw className="w-4 h-4 mr-2" />
                             Reset {(initialThemeId === 'custom' || (initialThemeId && initialThemeId.startsWith('custom-'))) ? 'Card' : 'Text'}

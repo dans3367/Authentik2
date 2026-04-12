@@ -81,6 +81,7 @@ interface CustomThemeData {
   customImage: boolean;
   imagePosition: { x: number; y: number };
   imageScale: number;
+  backgroundGradient?: string;
 }
 
 
@@ -188,6 +189,10 @@ export function BirthdayCardsContent() {
   // State for promotion selection
   const [selectedPromotions, setSelectedPromotions] = useState<string[]>([]);
   const [splitPromotionalEmail, setSplitPromotionalEmail] = useState<boolean>(false);
+
+  // Custom email test state
+  const [customTestEmail, setCustomTestEmail] = useState("");
+  const [sendingCustomEmail, setSendingCustomEmail] = useState(false);
 
   // Customer modal state
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
@@ -325,8 +330,25 @@ export function BirthdayCardsContent() {
     refetchOnWindowFocus: false,
   });
 
-  // Extract users array from response data
-  const users: User[] = usersData?.users || [];
+  // Extract users array from response data, ensuring the logged-in user is always included
+  const users: User[] = useMemo(() => {
+    const fetchedUsers: User[] = usersData?.users || [];
+    if (!currentUser) return fetchedUsers;
+    const alreadyIncluded = fetchedUsers.some(u => u.id === currentUser.id);
+    if (alreadyIncluded) return fetchedUsers;
+    // Prepend the current user so they always appear in the list
+    return [{
+      id: currentUser.id,
+      email: currentUser.email,
+      firstName: currentUser.firstName ?? null,
+      lastName: currentUser.lastName ?? null,
+      role: (currentUser.role as User['role']) || 'Employee',
+      emailVerified: currentUser.emailVerified ?? false,
+      twoFactorEnabled: currentUser.twoFactorEnabled ?? false,
+      tenantId: currentUser.tenantId,
+      createdAt: String(currentUser.createdAt),
+    }, ...fetchedUsers];
+  }, [usersData, currentUser]);
 
   // Fetch user's company for business name
   const { data: company } = useQuery({
@@ -540,6 +562,7 @@ export function BirthdayCardsContent() {
             customImage: Boolean(themeSpecificData.customImage && themeSpecificData.imageUrl),
             imagePosition: themeSpecificData.imagePosition || { x: 0, y: 0 },
             imageScale: themeSpecificData.imageScale || 1,
+            backgroundGradient: themeSpecificData.backgroundGradient || 'purple-haze',
           };
         }
       } catch {
@@ -556,6 +579,7 @@ export function BirthdayCardsContent() {
       customImage: false, // This is key - tells the dialog it's NOT a custom image
       imagePosition: { x: 0, y: 0 },
       imageScale: 1,
+      backgroundGradient: 'purple-haze',
     };
   }, [birthdaySettings?.customThemeData, birthdaySettings?.customMessage, designerThemeId]);
 
@@ -867,6 +891,7 @@ export function BirthdayCardsContent() {
     customImage?: boolean;
     imagePosition?: { x: number; y: number };
     imageScale?: number;
+    backgroundGradient?: string;
   }) => {
     // Update real-time preview as user makes changes
     try {
@@ -880,6 +905,7 @@ export function BirthdayCardsContent() {
         customImage: previewData.customImage || false,
         imagePosition: previewData.imagePosition || { x: 0, y: 0 },
         imageScale: previewData.imageScale || 1,
+        backgroundGradient: previewData.backgroundGradient || 'purple-haze',
       };
 
       // Update preview data for the current theme being edited
@@ -967,6 +993,33 @@ export function BirthdayCardsContent() {
 
   const handleSendTestBirthdayCard = (userId: string) => {
     sendTestBirthdayMutation.mutate(userId);
+  };
+
+  const handleSendCustomTestEmail = async (email: string) => {
+    if (!email || !email.includes('@')) return;
+    setSendingCustomEmail(true);
+    try {
+      const requestPayload = {
+        userEmail: email,
+        userFirstName: email.split('@')[0],
+        emailTemplate: birthdaySettings?.emailTemplate || 'default',
+        customMessage: birthdaySettings?.customMessage || '',
+        customThemeData: birthdaySettings?.customThemeData || null,
+        senderName: birthdaySettings?.senderName || '',
+        promotionId: birthdaySettings?.promotionId || null,
+        splitPromotionalEmail: splitPromotionalEmail
+      };
+      const response = await apiRequest('POST', '/api/birthday-test', requestPayload);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        throw new Error(errorData.error || `Failed to send test (${response.status})`);
+      }
+      toast({ title: "Test Card Sent", description: `Test birthday card sent to ${email}` });
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to send test card", variant: "destructive" });
+    } finally {
+      setSendingCustomEmail(false);
+    }
   };
 
   // User selection handlers
@@ -1385,7 +1438,7 @@ export function BirthdayCardsContent() {
           hideDescription={true}
           onSave={(data) => {
             try {
-              localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage }));
+              localStorage.setItem('birthdayCardDesignerDraft', JSON.stringify({ title: data.title, message: data.message, signature: data.signature, imageUrl: data.imageUrl, themeId: data.themeId, customImage: (data as any).customImage, backgroundGradient: (data as any).backgroundGradient }));
             } catch { }
 
             // Create theme data for preview updates
@@ -1397,6 +1450,7 @@ export function BirthdayCardsContent() {
               customImage: (data as any).customImage || false,
               imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
               imageScale: (data as any).imageScale || 1,
+              backgroundGradient: (data as any).backgroundGradient || 'purple-haze',
             };
 
             // Update preview state immediately for instant visual feedback
@@ -1438,8 +1492,10 @@ export function BirthdayCardsContent() {
               }
             };
 
-            // Check if user has made any text customizations (title or signature)
+            // Check if user has made any customizations worth persisting
             const hasTextCustomizations = data.title !== '' || data.signature !== '';
+            const hasBackgroundCustomization = (data as any).backgroundGradient && (data as any).backgroundGradient !== 'purple-haze';
+            const hasAnyCustomization = hasTextCustomizations || hasBackgroundCustomization || data.message !== (birthdaySettings?.customMessage || '');
 
             // Save button should preserve current theme selection and only save theme-specific data
             if (designerThemeId === 'custom') {
@@ -1455,7 +1511,7 @@ export function BirthdayCardsContent() {
                 customMessage: data.message,
                 customThemeData: JSON.stringify(updatedThemeData),
               });
-            } else if (hasTextCustomizations || data.message !== (birthdaySettings?.customMessage || '')) {
+            } else if (hasAnyCustomization) {
               // For default themes with any customizations, save the theme-specific data
               console.log('🎨 [Birthday Cards] Saving theme-specific customizations for', currentThemeId);
               const currentTemplate = birthdaySettings?.emailTemplate || 'default';
@@ -1494,6 +1550,7 @@ export function BirthdayCardsContent() {
               customImage: (data as any).customImage || false,
               imagePosition: (data as any).imagePosition || { x: 0, y: 0 },
               imageScale: (data as any).imageScale || 1,
+              backgroundGradient: (data as any).backgroundGradient || 'purple-haze',
             };
 
             // Update preview state immediately
@@ -1535,6 +1592,9 @@ export function BirthdayCardsContent() {
               }
             };
 
+            const hasBackgroundCustomization = (data as any).backgroundGradient && (data as any).backgroundGradient !== 'purple-haze';
+            const hasAnyCustomization = hasTextCustomizations || hasBackgroundCustomization || data.message !== (birthdaySettings?.customMessage || '');
+
             if (themeId === 'custom') {
               // Save as custom theme only if explicitly custom
               console.log('🎨 [Birthday Cards] Making custom theme active');
@@ -1552,7 +1612,7 @@ export function BirthdayCardsContent() {
 
               console.log('🎨 [Birthday Cards] Custom theme payload:', payload);
               updateSettingsMutation.mutate(payload);
-            } else if (isDefaultTheme && (hasTextCustomizations || data.message !== (birthdaySettings?.customMessage || ''))) {
+            } else if (isDefaultTheme && hasAnyCustomization) {
               // For default themes with customizations, save theme-specific data but keep original theme template
               console.log('🎨 [Birthday Cards] Making default theme with customizations active:', currentThemeId);
               const payload = {
@@ -1576,6 +1636,7 @@ export function BirthdayCardsContent() {
                 emailTemplate: themeId || 'default',
                 segmentFilter: birthdaySettings?.segmentFilter || 'all',
                 customMessage: data.message,
+                customThemeData: JSON.stringify(updatedThemeData), // Always save to preserve background gradient
                 senderName: birthdaySettings?.senderName || company?.name || 'Your Company',
               };
 
@@ -1983,136 +2044,181 @@ export function BirthdayCardsContent() {
 
         {/* Test Tab */}
         {activeTab === "test" && (
-          <Card className="w-11/12">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
+          <div className="w-11/12 space-y-6">
+            {/* Custom Email Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
                   <Mail className="h-5 w-5" />
-                  {t('birthdays.test.title')}
+                  {t('birthdays.test.customEmailTitle')}
                 </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
-                    {t('birthdays.test.testMode')}
-                  </Badge>
-                  <Badge variant="secondary">
-                    {users.length} {t('birthdays.test.users')}
-                  </Badge>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t('birthdays.test.description')}
-              </p>
-            </CardHeader>
-            <CardContent className="p-0">
-              {/* Bulk Actions for Users */}
-              {selectedUsers.length > 0 && (
-                <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{selectedUsers.length} {t('birthdays.test.usersSelected')}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedUsers([])}
-                    >
-                      {t('birthdays.test.clearSelection')}
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => {
-                        selectedUsers.forEach(userId => {
-                          handleSendTestBirthdayCard(userId);
-                        });
-                        setSelectedUsers([]);
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {t('birthdays.test.customEmailDescription')}
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end gap-3">
+                  <div className="flex-1">
+                    <Label htmlFor="custom-test-email" className="text-sm font-medium mb-1.5 block">
+                      {t('birthdays.test.emailAddress')}
+                    </Label>
+                    <Input
+                      id="custom-test-email"
+                      type="email"
+                      placeholder="name@example.com"
+                      value={customTestEmail}
+                      onChange={(e) => setCustomTestEmail(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && customTestEmail.includes('@')) {
+                          handleSendCustomTestEmail(customTestEmail);
+                        }
                       }}
-                      disabled={sendTestBirthdayMutation.isPending || tokenLoading}
-                    >
-                      <Mail className="h-4 w-4 mr-2" />
-                      {tokenLoading ? t('birthdays.test.refreshing') : sendTestBirthdayMutation.isPending ? t('birthdays.test.sending') : t('birthdays.test.sendTestCards')}
-                    </Button>
+                    />
+                  </div>
+                  <Button
+                    onClick={() => handleSendCustomTestEmail(customTestEmail)}
+                    disabled={sendingCustomEmail || !customTestEmail.includes('@')}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    {sendingCustomEmail ? t('birthdays.test.sending') : t('birthdays.test.sendTestCard')}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Team Users Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Users className="h-5 w-5" />
+                    {t('birthdays.test.teamUsersTitle')}
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
+                      {t('birthdays.test.testMode')}
+                    </Badge>
+                    <Badge variant="secondary">
+                      {users.length} {t('birthdays.test.users')}
+                    </Badge>
                   </div>
                 </div>
-              )}
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {t('birthdays.test.description')}
+                </p>
+              </CardHeader>
+              <CardContent className="p-0">
+                {/* Bulk Actions for Users */}
+                {selectedUsers.length > 0 && (
+                  <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border-b">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{selectedUsers.length} {t('birthdays.test.usersSelected')}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedUsers([])}
+                      >
+                        {t('birthdays.test.clearSelection')}
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                          selectedUsers.forEach(userId => {
+                            handleSendTestBirthdayCard(userId);
+                          });
+                          setSelectedUsers([]);
+                        }}
+                        disabled={sendTestBirthdayMutation.isPending || tokenLoading}
+                      >
+                        <Mail className="h-4 w-4 mr-2" />
+                        {tokenLoading ? t('birthdays.test.refreshing') : sendTestBirthdayMutation.isPending ? t('birthdays.test.sending') : t('birthdays.test.sendTestCards')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
-              {usersLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
-                </div>
-              ) : users.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('birthdays.test.noUsers')}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('birthdays.test.noUsersDescription')}</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">
-                          <Checkbox
-                            checked={isAllUsersSelected}
-                            onCheckedChange={handleSelectAllUsers}
-                            aria-label={t('birthdays.test.selectAllUsers')}
-                          />
-                        </TableHead>
-                        <TableHead>{t('birthdays.test.name')}</TableHead>
-                        <TableHead>{t('birthdays.test.email')}</TableHead>
-                        <TableHead>{t('birthdays.test.role')}</TableHead>
-                        <TableHead>{t('birthdays.test.emailVerified')}</TableHead>
-                        <TableHead>{t('birthdays.test.actions')}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell>
+                {usersLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+                  </div>
+                ) : users.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">{t('birthdays.test.noUsers')}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">{t('birthdays.test.noUsersDescription')}</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">
                             <Checkbox
-                              checked={selectedUsers.includes(user.id)}
-                              onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
-                              aria-label={`Select ${getUserName(user)}`}
+                              checked={isAllUsersSelected}
+                              onCheckedChange={handleSelectAllUsers}
+                              aria-label={t('birthdays.test.selectAllUsers')}
                             />
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{getUserName(user)}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm">{user.email}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm capitalize">{user.role}</span>
-                          </TableCell>
-                          <TableCell>
-                            {user.emailVerified ? (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <XCircle className="h-4 w-4 text-red-500" />
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleSendTestBirthdayCard(user.id)}
-                              disabled={sendTestBirthdayMutation.isPending || tokenLoading}
-                              className="flex items-center gap-2"
-                            >
-                              <Mail className="h-4 w-4" />
-                              {tokenLoading ? t('birthdays.test.refreshing') : sendTestBirthdayMutation.isPending ? t('birthdays.test.sending') : t('birthdays.test.sendTestCard')}
-                            </Button>
-                          </TableCell>
+                          </TableHead>
+                          <TableHead>{t('birthdays.test.name')}</TableHead>
+                          <TableHead>{t('birthdays.test.email')}</TableHead>
+                          <TableHead>{t('birthdays.test.role')}</TableHead>
+                          <TableHead>{t('birthdays.test.emailVerified')}</TableHead>
+                          <TableHead>{t('birthdays.test.actions')}</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedUsers.includes(user.id)}
+                                onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
+                                aria-label={`Select ${getUserName(user)}`}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{getUserName(user)}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm">{user.email}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm capitalize">{user.role}</span>
+                            </TableCell>
+                            <TableCell>
+                              {user.emailVerified ? (
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-red-500" />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleSendTestBirthdayCard(user.id)}
+                                disabled={sendTestBirthdayMutation.isPending || tokenLoading}
+                                className="flex items-center gap-2"
+                              >
+                                <Mail className="h-4 w-4" />
+                                {tokenLoading ? t('birthdays.test.refreshing') : sendTestBirthdayMutation.isPending ? t('birthdays.test.sending') : t('birthdays.test.sendTestCard')}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+          </div>
         )}
 
         {/* Promotions Tab */}

@@ -690,7 +690,7 @@
       "title": "Test Birthday Cards",
       "testMode": "Test Mode",
       "users": "Users",
-      "description": "Send test birthday cards to users individually or select multiple users for bulk sending. Test emails will be sent to the selected user's actual email address.",
+      "description": "Send test birthday cards to team members individually or select multiple users for bulk sending.",
       "usersSelected": "user(s) selected",
       "clearSelection": "Clear Selection",
       "sendTestCards": "Send Test Cards to Selected",
@@ -704,7 +704,11 @@
       "role": "Role",
       "emailVerified": "Email Verified",
       "actions": "Actions",
-      "sendTestCard": "Send Test Card"
+      "sendTestCard": "Send Test Card",
+      "customEmailTitle": "Send to Custom Email",
+      "customEmailDescription": "Enter any email address to send a test birthday card to.",
+      "emailAddress": "Email Address",
+      "teamUsersTitle": "Team Users"
     },
     "promotions": {
       "title": "Promotions",

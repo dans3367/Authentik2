@@ -376,6 +376,16 @@ export function processPlaceholders(content: string, params: { recipientName?: s
   return processed;
 }
 
+// Background gradient presets - must match client-side BACKGROUND_PRESETS
+const BACKGROUND_GRADIENT_STYLES: Record<string, string> = {
+  'purple-haze': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  'sunset-glow': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+  'ocean-breeze': 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+  'emerald-dream': 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+  'white': '#ffffff',
+  'black': '#1a1a2e',
+};
+
 // Helper function to render birthday template (also exported for test endpoint)
 export function renderBirthdayTemplate(
   template: 'default' | 'confetti' | 'balloons' | 'custom',
@@ -466,8 +476,12 @@ export function renderBirthdayTemplate(
       `
       : '';
 
+    const customBodyBg = customData.backgroundGradient && BACKGROUND_GRADIENT_STYLES[customData.backgroundGradient]
+      ? BACKGROUND_GRADIENT_STYLES[customData.backgroundGradient]
+      : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+
     return `<html>
-      <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+      <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: ${customBodyBg};">
         <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
           <!-- 1. Header Image (standalone) -->
           ${headerImageSection}
@@ -505,6 +519,7 @@ export function renderBirthdayTemplate(
 
   let headline = `Happy Birthday${params.recipientName ? ', ' + params.recipientName : ''}!`;
   let signature = '';
+  let themeBackgroundGradient: string | undefined;
 
   if (params.customThemeData) {
     try {
@@ -526,6 +541,9 @@ export function renderBirthdayTemplate(
         }
         if (themeSpecificData.signature) {
           signature = themeSpecificData.signature;
+        }
+        if (themeSpecificData.backgroundGradient) {
+          themeBackgroundGradient = themeSpecificData.backgroundGradient;
         }
       }
     } catch (e) {
@@ -574,8 +592,12 @@ export function renderBirthdayTemplate(
     `;
   }
 
+  const defaultBodyBg = themeBackgroundGradient && BACKGROUND_GRADIENT_STYLES[themeBackgroundGradient]
+    ? BACKGROUND_GRADIENT_STYLES[themeBackgroundGradient]
+    : `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`;
+
   return `<html>
-    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);">
+    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: ${defaultBodyBg};">
       <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1);">
         <!-- 1. Header Image (standalone) -->
         <div style="height: 200px; background-image: url('${headerImage}'); background-size: cover; background-position: center; border-radius: 12px 12px 0 0;"></div>

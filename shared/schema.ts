@@ -2336,6 +2336,7 @@ export interface CustomThemeData {
   customImage: boolean;
   imagePosition: { x: number; y: number };
   imageScale: number;
+  backgroundGradient?: string;
 }
 
 // Custom e-cards table for storing user-created custom holiday/occasion cards
