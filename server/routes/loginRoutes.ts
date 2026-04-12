@@ -88,21 +88,26 @@ async function completeBrowserSignIn(req: any, res: any, email: string, password
   }
 }
 
-// Rate limiting for resend verification
-const resendRateLimit = new Map<string, { count: number; resetAt: number; nextAllowedAt: number }>();
-
-// Clean up expired rate limit entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [email, data] of Array.from(resendRateLimit.entries())) {
-    if (data.resetAt < now) {
-      resendRateLimit.delete(email);
-    }
-  }
-}, 5 * 60 * 1000);
+// Cooldown between consecutive resend-verification requests for the same user.
+// Enforced against better_auth_user.last_verification_email_sent so the limit
+// survives process restarts and is consistent across workers. Previously this
+// was tracked in an unbounded in-memory Map.
+const RESEND_VERIFICATION_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
 
 // Resend verification email endpoint
 loginRoutes.post('/resend-verification', async (req, res) => {
+  // Constant-time response: all code paths must take roughly the same
+  // duration to prevent timing side-channels that reveal account existence
+  // or rate-limit state.
+  const MINIMUM_RESPONSE_MS = 200;
+  const startTime = Date.now();
+  const equalizeTiming = async () => {
+    const elapsed = Date.now() - startTime;
+    if (elapsed < MINIMUM_RESPONSE_MS) {
+      await new Promise(resolve => setTimeout(resolve, MINIMUM_RESPONSE_MS - elapsed));
+    }
+  };
+
   try {
     const { email } = req.body;
 
@@ -114,38 +119,29 @@ loginRoutes.post('/resend-verification', async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check rate limiting
-    const now = Date.now();
-    const rateLimitData = resendRateLimit.get(normalizedEmail);
-
-    if (rateLimitData) {
-      // Check if we're still in cooldown period
-      if (now < rateLimitData.nextAllowedAt) {
-        const retryAfterMinutes = Math.ceil((rateLimitData.nextAllowedAt - now) / 60000);
-        return res.status(429).json({
-          message: `Please wait ${retryAfterMinutes} minute${retryAfterMinutes > 1 ? 's' : ''} before requesting another verification email`,
-          retryAfter: retryAfterMinutes,
-          nextAllowedAt: new Date(rateLimitData.nextAllowedAt).toISOString()
-        });
-      }
-
-      // Reset counter if past reset time
-      if (now >= rateLimitData.resetAt) {
-        resendRateLimit.delete(normalizedEmail);
-      }
-    }
-
     console.log('📧 [Resend Verification] Request for email:', normalizedEmail);
-
-    // Constant-time response: all code paths must take roughly the same
-    // duration to prevent timing side-channels that reveal account existence.
-    const MINIMUM_RESPONSE_MS = 200;
-    const startTime = Date.now();
 
     // Find user by email
     const user = await db.query.betterAuthUser.findFirst({
       where: eq(betterAuthUser.email, normalizedEmail)
     });
+
+    // Enforce the cooldown against the persisted timestamp. Only applies to
+    // real, unverified users — matches the prior in-memory semantics where
+    // rate-limit entries were only ever created for that cohort.
+    if (user && !user.emailVerified && user.lastVerificationEmailSent) {
+      const lastSentMs = user.lastVerificationEmailSent.getTime();
+      const cooldownEndsAt = lastSentMs + RESEND_VERIFICATION_COOLDOWN_MS;
+      if (Date.now() < cooldownEndsAt) {
+        const retryAfterMinutes = Math.ceil((cooldownEndsAt - Date.now()) / 60000);
+        await equalizeTiming();
+        return res.status(429).json({
+          message: `Please wait ${retryAfterMinutes} minute${retryAfterMinutes > 1 ? 's' : ''} before requesting another verification email`,
+          retryAfter: retryAfterMinutes,
+          nextAllowedAt: new Date(cooldownEndsAt).toISOString()
+        });
+      }
+    }
 
     // Only send email if user exists and is NOT yet verified.
     // All other paths (no user, already verified) do nothing but still
@@ -166,11 +162,13 @@ loginRoutes.post('/resend-verification', async (req, res) => {
 
       // Persist the token on the user row so the verify-email endpoint can
       // enforce single-use: only the latest token is valid, and it is
-      // cleared after consumption.
+      // cleared after consumption. Also stamp lastVerificationEmailSent so
+      // the next request hits the cooldown above.
       await db.update(betterAuthUser)
         .set({
           emailVerificationToken: verificationToken,
           emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          lastVerificationEmailSent: new Date(),
           updatedAt: new Date()
         })
         .where(eq(betterAuthUser.id, user.id));
@@ -195,17 +193,6 @@ loginRoutes.post('/resend-verification', async (req, res) => {
       } catch (emailError) {
         console.error('❌ [Resend Verification] Failed to dispatch email task:', emailError);
       }
-
-      // Update rate limiting - 2 minutes cooldown between requests
-      const nextAllowedAt = now + (2 * 60 * 1000); // 2 minutes
-      const resetAt = now + (60 * 60 * 1000); // 1 hour
-      const currentData = resendRateLimit.get(normalizedEmail);
-
-      resendRateLimit.set(normalizedEmail, {
-        count: (currentData?.count || 0) + 1,
-        resetAt: currentData?.resetAt || resetAt,
-        nextAllowedAt: nextAllowedAt
-      });
     } else if (user) {
       console.log('ℹ️ [Resend Verification] User already verified:', normalizedEmail);
     } else {
@@ -214,10 +201,7 @@ loginRoutes.post('/resend-verification', async (req, res) => {
 
     // Enforce minimum response time so all paths (no user, verified,
     // unverified) are indistinguishable by timing.
-    const elapsed = Date.now() - startTime;
-    if (elapsed < MINIMUM_RESPONSE_MS) {
-      await new Promise(resolve => setTimeout(resolve, MINIMUM_RESPONSE_MS - elapsed));
-    }
+    await equalizeTiming();
 
     // Identical response shape for every path — no extra fields that
     // leak state (e.g. nextAllowedAt was previously only on the
