@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -30,7 +30,6 @@ import {
   ChevronRight,
   Undo2,
   XCircle,
-  RefreshCw
 } from "lucide-react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -115,9 +114,6 @@ export default function NewsletterPage() {
   const [editRecipientsNewsletter, setEditRecipientsNewsletter] = useState<NewsletterListItem | null>(null);
   const [showEditorPicker, setShowEditorPicker] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [refreshCooldown, setRefreshCooldown] = useState(false);
-  const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
@@ -154,17 +150,6 @@ export default function NewsletterPage() {
   const reviewerSettings = pageData?.reviewerSettings as { enabled: boolean; reviewerId: string | null; reviewer: any } | undefined;
   const emailDesign = pageData?.emailDesign;
 
-  const handleRefresh = useCallback(() => {
-    if (refreshCooldown || isLoading) return;
-    refetch();
-    setLastRefreshed(new Date());
-    setRefreshCooldown(true);
-    cooldownTimer.current = setTimeout(() => setRefreshCooldown(false), 5000);
-  }, [refreshCooldown, isLoading, refetch]);
-
-  useEffect(() => () => {
-    if (cooldownTimer.current) clearTimeout(cooldownTimer.current);
-  }, []);
 
   const reviewerEnabled = reviewerSettings?.enabled ?? false;
   const isCurrentUserDesignatedReviewer = reviewerSettings?.reviewerId === currentUserId;
@@ -622,23 +607,6 @@ export default function NewsletterPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-10 rounded-xl border-border/50 bg-card text-sm"
               />
-            </div>
-            <div className="flex items-center gap-2.5">
-              {lastRefreshed && (
-                <span className="text-[10px] text-muted-foreground/40 hidden sm:block">
-                  {t("newsletter.lastUpdated", "Updated")} {format(lastRefreshed, currentLanguage === 'es' ? 'h:mm:ss a' : 'h:mm:ss a', { locale: currentLanguage === 'es' ? esLocale : undefined })}
-                </span>
-              )}
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleRefresh}
-                disabled={isLoading || refreshCooldown}
-                title={t("newsletter.refresh", "Refresh newsletters")}
-                className="rounded-xl h-10 w-10 border-border/50"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </Button>
             </div>
           </div>
         )}

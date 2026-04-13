@@ -29,9 +29,8 @@ import {
   ChevronRight,
   Undo2,
   XCircle,
-  RefreshCw,
 } from "lucide-react";
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useRealtimeNewsletters } from "@/hooks/useRealtimeNewsletters";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
@@ -106,9 +105,6 @@ export default function AdvertisePage() {
   const [editRecipientsItem, setEditRecipientsItem] = useState<AdvertiseItem | null>(null);
   const [showEditorPicker, setShowEditorPicker] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [refreshCooldown, setRefreshCooldown] = useState(false);
-  const cooldownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
@@ -136,14 +132,6 @@ export default function AdvertisePage() {
     refetchOnWindowFocus: true,
     retry: 2,
   });
-
-  const handleRefresh = useCallback(() => {
-    if (refreshCooldown || isLoading) return;
-    refetch();
-    setLastRefreshed(new Date());
-    setRefreshCooldown(true);
-    cooldownTimer.current = setTimeout(() => setRefreshCooldown(false), 5000);
-  }, [refreshCooldown, isLoading, refetch]);
 
   const { data: reviewerSettings } = useQuery<{ enabled: boolean; reviewerId: string | null; reviewer: any }>({
     queryKey: ["/api/newsletters/reviewer-settings"],
@@ -438,23 +426,6 @@ export default function AdvertisePage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
               />
-            </div>
-            <div className="flex items-center gap-3">
-              {lastRefreshed && (
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                  {t("advertise.lastUpdated")} {format(lastRefreshed, currentLanguage === "es" ? "h:mm:ss a" : "h:mm:ss a", { locale: currentLanguage === "es" ? esLocale : undefined })}
-                </span>
-              )}
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleRefresh}
-                disabled={isLoading || refreshCooldown}
-                title={t("advertise.refresh")}
-                className="rounded-xl h-[42px] w-[42px] border-gray-200 dark:border-gray-700"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-              </Button>
             </div>
           </div>
         )}

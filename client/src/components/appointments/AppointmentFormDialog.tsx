@@ -291,6 +291,7 @@ export function AppointmentFormDialog({
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Input
               type="date"
+              min={toLocalDateString(new Date())}
               value={toLocalDateString(appointmentData.appointmentDate)}
               onChange={(e) => setAppointmentData(prev => ({
                 ...prev,
