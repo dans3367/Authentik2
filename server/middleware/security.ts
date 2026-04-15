@@ -158,6 +158,26 @@ export const passwordResetRateLimiter = createRateLimiter({
   skipSuccessfulRequests: false,
 });
 
+// Rate limiter for /verify-email token consumption.
+// JWT decode + DB lookups per hit — cap per-IP to block brute-force token guessing
+// and "resend" spam from the verification page.
+export const verifyEmailRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  message: "Too many verification attempts. Please try again later.",
+  skipSuccessfulRequests: true, // only count failed / invalid-token hits toward the limit
+});
+
+// Rate limiter for /resend-verification. Per-user 2-min cooldown is enforced
+// in the handler via better_auth_user.last_verification_email_sent; this IP
+// limiter stops spraying across many different email addresses from one source.
+export const resendVerificationRateLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  message: "Too many verification email requests. Please try again later.",
+  skipSuccessfulRequests: false,
+});
+
 // MongoDB injection protection
 export const mongoSanitizer = mongoSanitize({
   replaceWith: "_",

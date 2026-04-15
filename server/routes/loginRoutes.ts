@@ -10,7 +10,7 @@ import { auth, getAuthSecret } from '../auth';
 import jwt from 'jsonwebtoken';
 import { triggerTransactionalEmail } from '../lib/trigger';
 import { randomBytes } from 'crypto';
-import { twoFactorRateLimiter, passwordResetRateLimiter, loginRateLimiter } from '../middleware/security';
+import { twoFactorRateLimiter, passwordResetRateLimiter, loginRateLimiter, verifyEmailRateLimiter, resendVerificationRateLimiter } from '../middleware/security';
 import { validatePasswordStrength } from '../middleware/security-enhanced';
 import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
@@ -95,7 +95,7 @@ async function completeBrowserSignIn(req: any, res: any, email: string, password
 const RESEND_VERIFICATION_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
 
 // Resend verification email endpoint
-loginRoutes.post('/resend-verification', async (req, res) => {
+loginRoutes.post('/resend-verification', resendVerificationRateLimiter, async (req, res) => {
   // Constant-time response: all code paths must take roughly the same
   // duration to prevent timing side-channels that reveal account existence
   // or rate-limit state.
@@ -869,7 +869,7 @@ export async function requireTwoFactorVerification(req: any, res: any, next: any
 }
 
 // Custom email verification endpoint that creates a session automatically
-loginRoutes.get('/verify-email', async (req, res) => {
+loginRoutes.get('/verify-email', verifyEmailRateLimiter, async (req, res) => {
   try {
     const token = req.query.token as string;
 
