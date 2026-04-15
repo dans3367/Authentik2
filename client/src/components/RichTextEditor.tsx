@@ -339,12 +339,28 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
 
   // Handle context menu on editor
   useEffect(() => {
-    if (!editor?.view) return;
-
-    const editorElement = editor.view.dom;
+    // Tiptap's `editor.view` is a throwing getter — optional chaining cannot
+    // guard it. Skip until the editor is truly mounted and not destroyed, and
+    // wrap the access in try/catch so a race with StrictMode double-mount or
+    // HMR teardown doesn't blow up React.
+    if (!editor || editor.isDestroyed) return;
+    let editorElement: HTMLElement;
+    try {
+      editorElement = editor.view.dom as HTMLElement;
+    } catch {
+      return;
+    }
 
     const handleContextMenu = (event: MouseEvent) => {
-      const { state, view } = editor;
+      if (editor.isDestroyed) return;
+      let state: typeof editor.state;
+      let view: typeof editor.view;
+      try {
+        state = editor.state;
+        view = editor.view;
+      } catch {
+        return;
+      }
       const { from, to } = state.selection;
       const selectedText = state.doc.textBetween(from, to, ' ');
       
