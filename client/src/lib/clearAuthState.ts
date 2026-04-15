@@ -82,6 +82,9 @@ export async function clearAllAuthState(): Promise<void> {
     console.warn('⚠️ [Auth] Failed to clear cookies:', e);
   }
 
+  // 7. Reset the intentional logout flag so future 401 errors are not suppressed
+  _isIntentionalLogout = false;
+
   console.log('✅ [Auth] All auth state cleared');
 }
 

@@ -133,12 +133,12 @@ loginRoutes.post('/resend-verification', resendVerificationRateLimiter, async (r
       const lastSentMs = user.lastVerificationEmailSent.getTime();
       const cooldownEndsAt = lastSentMs + RESEND_VERIFICATION_COOLDOWN_MS;
       if (Date.now() < cooldownEndsAt) {
-        const retryAfterMinutes = Math.ceil((cooldownEndsAt - Date.now()) / 60000);
+        // Return the same 200 response as all other paths to prevent
+        // account-existence enumeration via differing status codes.
         await equalizeTiming();
-        return res.status(429).json({
-          message: `Please wait ${retryAfterMinutes} minute${retryAfterMinutes > 1 ? 's' : ''} before requesting another verification email`,
-          retryAfter: retryAfterMinutes,
-          nextAllowedAt: new Date(cooldownEndsAt).toISOString()
+        return res.json({
+          message: 'Verification email sent successfully',
+          success: true
         });
       }
     }
@@ -1031,6 +1031,16 @@ loginRoutes.get('/verify-email', verifyEmailRateLimiter, async (req, res) => {
 // and receive a new verification email at the updated address.
 const changeEmailRateLimit = new Map<string, { nextAllowedAt: number }>();
 
+// Clean up expired change-email rate limit entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of changeEmailRateLimit) {
+    if (now >= value.nextAllowedAt) {
+      changeEmailRateLimit.delete(key);
+    }
+  }
+}, 10 * 60 * 1000);
+
 loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any, res) => {
   try {
     const userId = req.user?.id;
@@ -1296,7 +1306,7 @@ loginRoutes.post('/forgot-password', passwordResetRateLimiter, async (req, res) 
 });
 
 // Reset password - verify token and set new password
-loginRoutes.post('/reset-password', async (req, res) => {
+loginRoutes.post('/reset-password', passwordResetRateLimiter, async (req, res) => {
   try {
     const { token, password } = req.body;
 
