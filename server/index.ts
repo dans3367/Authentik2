@@ -112,15 +112,16 @@ app.use((req, res, next) => {
 
 // Better Auth middleware for authentication
 // Note: better-auth uses toNodeHandler for Express integration
-// Only handle standard better-auth routes, exclude custom routes like verify-login
+// Only handle standard better-auth routes, exclude our custom routes
 app.all("/api/auth/*", (req, res, next) => {
   // Skip custom auth routes that should be handled by our custom routes
-  const customRoutes = ['verify-login', 'verify-2fa', 'check-2fa-requirement', 'verify-session-2fa', '2fa-status', 'verify-email', 'resend-verification', 'change-email-unverified', 'forgot-password', 'reset-password', 'profile', 'avatar'];
+  const customRoutes = ['verify-2fa', 'check-2fa-requirement', 'verify-session-2fa', '2fa-status', 'verify-email', 'resend-verification', 'change-email-unverified', 'forgot-password', 'reset-password', 'profile', 'avatar'];
 
   // SECURITY: Block Better Auth built-in routes that bypass our security controls
   // (cache invalidation, role hierarchy checks, 2FA, rate limiting, audit logging).
   // These operations are handled by our custom endpoints instead.
-  // - sign-in/email: bypasses 2FA (our verify-login calls auth.api.signInEmail() programmatically)
+  // - sign-in/email: bypasses 2FA (check-2fa-requirement handles the login flow
+  //   via a direct auth.handler() call in completeBrowserSignIn)
   // - update-user: allows setting role/isActive/tenantId (privilege escalation)
   // - change-password, set-password: bypass rate limiting and audit logging
   // - change-email, delete-user: bypass our custom flows

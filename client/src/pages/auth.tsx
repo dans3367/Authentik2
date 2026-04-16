@@ -218,7 +218,11 @@ export default function AuthPage() {
   const watchAllRegister = registerForm.watch();
   useEffect(() => {
     try {
-      sessionStorage.setItem(REGISTER_STORAGE_KEY, JSON.stringify(watchAllRegister));
+      // Never persist password material to sessionStorage — any XSS or
+      // extension with page access could read it. Only non-secret fields
+      // need to survive a tab switch.
+      const { password, confirmPassword, ...safeToPersist } = watchAllRegister;
+      sessionStorage.setItem(REGISTER_STORAGE_KEY, JSON.stringify(safeToPersist));
     } catch {}
   }, [watchAllRegister]);
 

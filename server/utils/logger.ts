@@ -124,5 +124,21 @@ class Logger {
 
 export const logger = new Logger();
 
+/**
+ * Redact an email address for safe inclusion in a log line.
+ * Keeps the first two chars of the local part and the full domain so logs
+ * remain useful for correlating events, without persisting the full PII.
+ * Returns a fixed placeholder for malformed / missing input.
+ */
+export function redactEmail(email: string | null | undefined): string {
+  if (!email || typeof email !== 'string') return '<no-email>';
+  const atIdx = email.indexOf('@');
+  if (atIdx <= 0) return '<invalid-email>';
+  const local = email.slice(0, atIdx);
+  const domain = email.slice(atIdx + 1);
+  const head = local.length <= 2 ? local : local.slice(0, 2);
+  return `${head}***@${domain}`;
+}
+
 
 

@@ -497,7 +497,12 @@ export function useEnable2FA() {
   const { toast } = useToast();
   const [isPending, setIsPending] = useState(false);
 
-  const mutateAsync = async (token: string, secret: string) => {
+  // Note: the server reads the pending secret from server-side storage keyed
+  // by the authenticated user, so the client only needs to send the TOTP
+  // code the user entered. Do not reintroduce a `secret` parameter here —
+  // it would imply the client can choose the secret, which would be a 2FA
+  // bypass.
+  const mutateAsync = async (token: string) => {
     setIsPending(true);
     try {
       const response = await fetch(`${getApiBaseUrl()}/api/2fa/enable`, {
@@ -506,7 +511,7 @@ export function useEnable2FA() {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ token, secret }),
+        body: JSON.stringify({ token }),
       });
 
       if (!response.ok) {

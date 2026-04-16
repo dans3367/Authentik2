@@ -573,7 +573,7 @@ export default function ProfilePage() {
     if (!twoFactorToken.trim() || !twoFactorSetup?.secret) return;
 
     try {
-      await enable2FAMutation.mutateAsync(twoFactorToken, twoFactorSetup.secret);
+      await enable2FAMutation.mutateAsync(twoFactorToken);
       setTwoFactorSetup(null);
       setTwoFactorToken("");
       // Refresh 2FA status to update the UI immediately
