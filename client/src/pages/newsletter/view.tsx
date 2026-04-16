@@ -607,17 +607,17 @@ export default function NewsletterViewPage() {
   const getTimelineIcon = (type: TimelineEvent['type']) => {
     switch (type) {
       case 'created':
-        return <Newspaper className="h-4 w-4" strokeWidth={1.5} />;
+        return Newspaper;
       case 'scheduled':
-        return <Calendar className="h-4 w-4" strokeWidth={1.5} />;
+        return Calendar;
       case 'sent':
-        return <Send className="h-4 w-4" strokeWidth={1.5} />;
+        return Send;
       case 'opened':
-        return <Eye className="h-4 w-4" strokeWidth={1.5} />;
+        return Eye;
       case 'clicked':
-        return <MousePointer className="h-4 w-4" strokeWidth={1.5} />;
+        return MousePointer;
       default:
-        return <Activity className="h-4 w-4" strokeWidth={1.5} />;
+        return Activity;
     }
   };
 
@@ -1159,21 +1159,91 @@ export default function NewsletterViewPage() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 lg:space-y-8">
-          <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-6 min-w-max">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-overview">{t("newsletter.view.tabs.overview", "Overview")}</TabsTrigger>
-              <TabsTrigger value="live-tracking" className="text-xs sm:text-sm" data-testid="tab-live-tracking">
-                <Activity className="h-3 w-3 mr-1" />
-                {t("newsletter.view.tabs.live", "Live")}
-              </TabsTrigger>
-              <TabsTrigger value="reactions" className="text-xs sm:text-sm" data-testid="tab-reactions">
-                <Smile className="h-3 w-3 mr-1" />
-                {t("newsletter.view.tabs.reactions", "Reactions")}
-              </TabsTrigger>
-              <TabsTrigger value="content" className="text-xs sm:text-sm" data-testid="tab-content">{t("newsletter.view.tabs.content", "Content")}</TabsTrigger>
-              <TabsTrigger value="status" className="text-xs sm:text-sm" data-testid="tab-status">{t("newsletter.view.tabs.taskStatus", "Task Status")}</TabsTrigger>
-              <TabsTrigger value="detailed-stats" className="text-xs sm:text-sm" data-testid="tab-detailed-stats">{t("newsletter.view.detailedStats", "Detailed Stats")}</TabsTrigger>
-            </TabsList>
+          <div className="relative">
+            {/* Gradient border effect */}
+            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent" />
+            
+            <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+              <TabsList className="inline-flex h-12 p-1.5 bg-gradient-to-b from-gray-50/80 to-gray-100/80 dark:from-gray-800/50 dark:to-gray-900/50 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/40 rounded-xl shadow-sm min-w-max">
+                <TabsTrigger 
+                  value="overview" 
+                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-md data-[state=active]:shadow-gray-200/50 dark:data-[state=active]:shadow-black/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
+                  data-testid="tab-overview"
+                >
+                  <span className="flex items-center gap-2">
+                    <Newspaper className="h-4 w-4 transition-transform duration-300 group-data-[state=active]:scale-110" strokeWidth={1.5} />
+                    <span className="hidden sm:inline">{t("newsletter.view.tabs.overview", "Overview")}</span>
+                    <span className="sm:hidden">{t("newsletter.view.tabs.overviewShort", "Overview")}</span>
+                  </span>
+                </TabsTrigger>
+                
+                <TabsTrigger 
+                  value="live-tracking" 
+                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-md data-[state=active]:shadow-blue-100/50 dark:data-[state=active]:shadow-blue-900/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
+                  data-testid="tab-live-tracking"
+                >
+                  <span className="flex items-center gap-2">
+                    <Activity className="h-4 w-4" strokeWidth={1.5} />
+                    <span className="relative">
+                      {t("newsletter.view.tabs.live", "Live")}
+                      {/* Live pulse indicator */}
+                      <span className="absolute -top-1 -right-2 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                      </span>
+                    </span>
+                  </span>
+                </TabsTrigger>
+                
+                <TabsTrigger 
+                  value="reactions" 
+                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-amber-600 dark:data-[state=active]:text-amber-400 data-[state=active]:shadow-md data-[state=active]:shadow-amber-100/50 dark:data-[state=active]:shadow-amber-900/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
+                  data-testid="tab-reactions"
+                >
+                  <span className="flex items-center gap-2">
+                    <Smile className="h-4 w-4" strokeWidth={1.5} />
+                    <span className="hidden sm:inline">{t("newsletter.view.tabs.reactions", "Reactions")}</span>
+                    <span className="sm:hidden">{t("newsletter.view.tabs.reactionsShort", "React")}</span>
+                  </span>
+                </TabsTrigger>
+                
+                <TabsTrigger 
+                  value="content" 
+                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:shadow-md data-[state=active]:shadow-indigo-100/50 dark:data-[state=active]:shadow-indigo-900/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
+                  data-testid="tab-content"
+                >
+                  <span className="flex items-center gap-2">
+                    <Eye className="h-4 w-4" strokeWidth={1.5} />
+                    <span className="hidden sm:inline">{t("newsletter.view.tabs.content", "Content")}</span>
+                    <span className="sm:hidden">{t("newsletter.view.tabs.contentShort", "View")}</span>
+                  </span>
+                </TabsTrigger>
+                
+                <TabsTrigger 
+                  value="status" 
+                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-purple-600 dark:data-[state=active]:text-purple-400 data-[state=active]:shadow-md data-[state=active]:shadow-purple-100/50 dark:data-[state=active]:shadow-purple-900/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
+                  data-testid="tab-status"
+                >
+                  <span className="flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
+                    <span className="hidden sm:inline">{t("newsletter.view.tabs.taskStatus", "Status")}</span>
+                    <span className="sm:hidden">{t("newsletter.view.tabs.taskStatusShort", "Status")}</span>
+                  </span>
+                </TabsTrigger>
+                
+                <TabsTrigger 
+                  value="detailed-stats" 
+                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-md data-[state=active]:shadow-emerald-100/50 dark:data-[state=active]:shadow-emerald-900/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
+                  data-testid="tab-detailed-stats"
+                >
+                  <span className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" strokeWidth={1.5} />
+                    <span className="hidden sm:inline">{t("newsletter.view.detailedStats", "Analytics")}</span>
+                    <span className="sm:hidden">{t("newsletter.view.detailedStatsShort", "Stats")}</span>
+                  </span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </div>
 
           <TabsContent value="live-tracking" className="space-y-6 lg:space-y-8">
@@ -1215,86 +1285,104 @@ export default function NewsletterViewPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="overview" className="space-y-6 lg:space-y-8">
-            <div className="grid gap-4 lg:gap-6 md:grid-cols-2">
-              {/* Newsletter Details */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Newspaper className="h-5 w-5" />
+          <TabsContent value="overview" className="space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="grid gap-5 lg:gap-6 md:grid-cols-2">
+              {/* Newsletter Details Card */}
+              <Card className="border border-gray-200/60 dark:border-gray-700/40 shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+                <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2.5 text-lg">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 flex items-center justify-center">
+                      <Newspaper className="h-5 w-5 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
+                    </div>
                     {t("newsletter.view.newsletterDetails", "Newsletter Details")}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.created", "Created")}</p>
-                      <p className="text-sm text-gray-900 dark:text-gray-100">
-                        {format(new Date(newsletter.createdAt || ''), 'PPP p')}
+                <CardContent className="space-y-5 pt-0">
+                  {/* Date Information Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-gray-50/80 to-gray-100/50 dark:from-gray-800/30 dark:to-gray-900/20 border border-gray-100 dark:border-gray-700/30">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("newsletter.view.created", "Created")}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-1">
+                        {format(new Date(newsletter.createdAt || ''), 'MMM d, yyyy')}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {format(new Date(newsletter.createdAt || ''), 'h:mm a')}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.updated", "Updated")}</p>
-                      <p className="text-sm text-gray-900 dark:text-gray-100">
-                        {format(new Date(newsletter.updatedAt || ''), 'PPP p')}
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-gray-50/80 to-gray-100/50 dark:from-gray-800/30 dark:to-gray-900/20 border border-gray-100 dark:border-gray-700/30">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("newsletter.view.updated", "Updated")}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-1">
+                        {format(new Date(newsletter.updatedAt || ''), 'MMM d, yyyy')}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatDistanceToNow(new Date(newsletter.updatedAt || ''), { addSuffix: true })}
                       </p>
                     </div>
                     {newsletter.scheduledAt && (
-                      <>
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.scheduled", "Scheduled")}</p>
-                          <p className="text-sm text-gray-900 dark:text-gray-100">
-                            {format(new Date(newsletter.scheduledAt), 'PPP p')}
-                          </p>
-                        </div>
-                      </>
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-amber-50/80 to-orange-50/50 dark:from-amber-900/20 dark:to-orange-900/10 border border-amber-200/50 dark:border-amber-800/30 sm:col-span-2">
+                        <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">{t("newsletter.view.scheduled", "Scheduled")}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-1">
+                          {format(new Date(newsletter.scheduledAt), 'PPP p')}
+                        </p>
+                      </div>
                     )}
                     {newsletter.sentAt && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.sent", "Sent")}</p>
-                        <p className="text-sm text-gray-900 dark:text-gray-100">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-green-50/80 to-emerald-50/50 dark:from-green-900/20 dark:to-emerald-900/10 border border-green-200/50 dark:border-green-800/30 sm:col-span-2">
+                        <p className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">{t("newsletter.view.sent", "Sent")}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-1">
                           {format(new Date(newsletter.sentAt), 'PPP p')}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          {formatDistanceToNow(new Date(newsletter.sentAt), { addSuffix: true })}
                         </p>
                       </div>
                     )}
                   </div>
 
-                  <Separator />
+                  <Separator className="bg-gray-100 dark:bg-gray-800" />
 
+                  {/* Author Section */}
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">{t("newsletter.view.author", "Author")}</p>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                        <User className="h-4 w-4 text-white" />
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">{t("newsletter.view.author", "Author")}</p>
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-blue-50/50 to-indigo-50/30 dark:from-blue-900/20 dark:to-indigo-900/10 border border-blue-100/50 dark:border-blue-800/30">
+                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+                        <User className="h-5 w-5 text-white" strokeWidth={1.5} />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                           {newsletter.user?.firstName || ''} {newsletter.user?.lastName || ''}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {newsletter.user?.email || 'Unknown'}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <Separator />
+                  <Separator className="bg-gray-100 dark:bg-gray-800" />
+
+                  {/* Targeting Section */}
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">{t("newsletter.view.targeting", "Targeting")}</p>
-                    <div className="space-y-2">
-                      <Badge variant="outline">
-                        <Tag className="h-3 w-3 mr-1" />
-                        {newsletter.recipientType === 'all' ? t("newsletter.view.allContacts", "All Contacts") :
-                          newsletter.recipientType === 'selected' ? t("newsletter.view.selectedContacts", "Selected Contacts") : t("newsletter.view.taggedContacts", "Tagged Contacts")}
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">{t("newsletter.view.targeting", "Targeting")}</p>
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-purple-50/50 to-pink-50/30 dark:from-purple-900/20 dark:to-pink-900/10 border border-purple-100/50 dark:border-purple-800/30 space-y-3">
+                      <Badge variant="outline" className="bg-white/50 dark:bg-gray-800/50 border-purple-200 dark:border-purple-700/50 text-purple-700 dark:text-purple-300 px-3 py-1.5">
+                        <Tag className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.5} />
+                        <span className="font-medium">
+                          {newsletter.recipientType === 'all' ? t("newsletter.view.allContacts", "All Contacts") :
+                            newsletter.recipientType === 'selected' ? t("newsletter.view.selectedContacts", "Selected Contacts") : t("newsletter.view.taggedContacts", "Tagged Contacts")}
+                        </span>
                       </Badge>
                       {newsletter.selectedContactIds?.length ? (
-                        <p className="text-xs text-gray-500">
-                          {newsletter.selectedContactIds.length} {t("newsletter.view.specificContacts", "{{count}} specific contacts", { count: newsletter.selectedContactIds.length }).split(' ').slice(1).join(' ')}
+                        <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                          <Users className="h-3.5 w-3.5 text-gray-400" strokeWidth={1.5} />
+                          {newsletter.selectedContactIds.length} {t("newsletter.view.specificContactsShort", "specific contacts selected", { count: newsletter.selectedContactIds.length })}
                         </p>
                       ) : null}
                       {newsletter.selectedTagIds?.length ? (
-                        <p className="text-xs text-gray-500">
-                          {newsletter.selectedTagIds.length} {t("newsletter.view.tagGroups", "{{count}} tag groups", { count: newsletter.selectedTagIds.length }).split(' ').slice(1).join(' ')}
+                        <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                          <Tag className="h-3.5 w-3.5 text-gray-400" strokeWidth={1.5} />
+                          {newsletter.selectedTagIds.length} {t("newsletter.view.tagGroupsShort", "tag groups", { count: newsletter.selectedTagIds.length })}
                         </p>
                       ) : null}
                       <Button
@@ -1302,8 +1390,9 @@ export default function NewsletterViewPage() {
                         size="sm"
                         onClick={() => setShowRecipientsModal(true)}
                         data-testid="button-view-recipients"
+                        className="w-full sm:w-auto mt-2 bg-white/70 dark:bg-gray-800/50 hover:bg-white dark:hover:bg-gray-700 border-gray-200 dark:border-gray-600"
                       >
-                        <Users className="h-4 w-4 mr-1.5" />
+                        <Users className="h-4 w-4 mr-2" strokeWidth={1.5} />
                         {t("newsletter.view.viewRecipients", "View Recipients")}
                       </Button>
                     </div>
@@ -1311,81 +1400,107 @@ export default function NewsletterViewPage() {
                 </CardContent>
               </Card>
 
-              {/* Activity Timeline */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
+              {/* Activity Timeline Card */}
+              <Card className="border border-gray-200/60 dark:border-gray-700/40 shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+                <div className="h-1 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2.5 text-lg">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40 flex items-center justify-center">
+                      <Activity className="h-5 w-5 text-green-600 dark:text-green-400" strokeWidth={1.5} />
+                    </div>
                     {t("newsletter.view.activityTimeline", "Activity Timeline")}
                   </CardTitle>
-                  <CardDescription>
-                    {t("newsletter.view.recentEvents", "Recent events and status changes")}
+                  <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
+                    {t("newsletter.view.recentEventsDesc", "Recent events and status changes for this newsletter")}
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {mockTimelineEvents.map((event, index) => {
-                      const Icon = getTimelineIcon(event.type);
-                      return (
-                        <div key={event.id} className="flex items-start gap-3">
-                          <div className={`w-8 h-8 rounded-full ${getTimelineColor(event.status)} flex items-center justify-center text-white`}>
-                            {Icon}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                {event.title}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {formatDistanceToNow(event.timestamp, { addSuffix: true })}
-                              </p>
+                <CardContent className="pt-0">
+                  <div className="relative">
+                    {/* Timeline connector line */}
+                    <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-gradient-to-b from-green-200 via-emerald-200 to-teal-200 dark:from-green-800/50 dark:via-emerald-800/50 dark:to-teal-800/50" />
+                    
+                    <div className="space-y-4">
+                      {mockTimelineEvents.map((event, index) => {
+                        const Icon = getTimelineIcon(event.type);
+                        const isLast = index === mockTimelineEvents.length - 1;
+                        return (
+                          <div key={event.id} className="relative flex items-start gap-4 group">
+                            {/* Timeline node */}
+                            <div className={`relative z-10 w-8 h-8 rounded-full ${getTimelineColor(event.status)} flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform duration-200 ring-4 ring-white dark:ring-gray-800`}>
+                              <Icon className="h-4 w-4" strokeWidth={1.5} />
                             </div>
-                            {event.description && (
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                {event.description}
-                              </p>
-                            )}
+                            
+                            {/* Content */}
+                            <div className="flex-1 min-w-0 pt-0.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                    {event.title}
+                                  </p>
+                                  {event.description && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                                      {event.description}
+                                    </p>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap flex-shrink-0">
+                                  {formatDistanceToNow(event.timestamp, { addSuffix: true })}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
-          <TabsContent value="content" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Eye className="h-5 w-5" strokeWidth={1.5} />
+          <TabsContent value="content" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <Card className="border border-gray-200/60 dark:border-gray-700/40 shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+              <CardHeader className="pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="flex items-center gap-2.5 text-lg mb-2">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center">
+                        <Eye className="h-5 w-5 text-indigo-600 dark:text-indigo-400" strokeWidth={1.5} />
+                      </div>
                       {t("newsletter.view.emailPreview", "Email Preview")}
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
                       {t("newsletter.view.emailPreviewDesc", "How this newsletter appears in your recipients' inbox")}
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="gap-1">
-                      <Mail className="h-3 w-3" strokeWidth={1.5} />
-                      {newsletter.subject}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="gap-1.5 px-3 py-1.5 bg-indigo-50/50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-300">
+                      <Mail className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      <span className="truncate max-w-[200px] sm:max-w-[300px]">{newsletter.subject}</span>
                     </Badge>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="rounded-lg border bg-muted/30 p-3 sm:p-6 lg:p-8">
+              <CardContent className="pt-0">
+                <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-gradient-to-br from-gray-50/50 to-gray-100/30 dark:from-gray-800/30 dark:to-gray-900/20 p-4 sm:p-6 lg:p-8">
                   <div className="mx-auto max-w-[640px]">
-                    <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-                      <Mail className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      <span>{t("newsletter.view.from", "From")}: {newsletter.user?.email || "your-company"}</span>
-                      <span className="mx-1">|</span>
-                      <span>{t("newsletter.view.subject", "Subject")}: {newsletter.subject}</span>
+                    {/* Email metadata bar */}
+                    <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-gray-500 dark:text-gray-400 p-3 rounded-lg bg-white/60 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-700/30">
+                      <div className="flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5 text-gray-400" strokeWidth={1.5} />
+                        <span className="font-medium">{t("newsletter.view.from", "From")}:</span>
+                        <span className="truncate max-w-[150px]">{newsletter.user?.email || "your-company"}</span>
+                      </div>
+                      <div className="hidden sm:block w-px h-3 bg-gray-300 dark:bg-gray-600" />
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium">{t("newsletter.view.subject", "Subject")}:</span>
+                        <span className="truncate max-w-[200px]">{newsletter.subject}</span>
+                      </div>
                     </div>
-                    <div className="rounded-md border bg-white shadow-sm overflow-hidden">
+                    
+                    {/* Email preview container */}
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg shadow-gray-200/50 dark:shadow-black/30 overflow-hidden transition-shadow duration-300 hover:shadow-xl hover:shadow-gray-200/60 dark:hover:shadow-black/40">
                       <iframe
                         ref={iframeRef}
                         srcDoc={emailPreviewHtml}
@@ -1403,76 +1518,96 @@ export default function NewsletterViewPage() {
                         data-testid="iframe-email-preview"
                       />
                     </div>
+                    
+                    {/* Preview footer note */}
+                    <p className="mt-4 text-xs text-center text-gray-400 dark:text-gray-500">
+                      {t("newsletter.view.previewNote", "This is a preview of how your newsletter will appear. Actual rendering may vary by email client.")}
+                    </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="status" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <RefreshCw className="h-5 w-5" />
+          <TabsContent value="status" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <Card className="border border-gray-200/60 dark:border-gray-700/40 shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-purple-500 via-violet-500 to-fuchsia-500" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2.5 text-lg">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-100 to-violet-100 dark:from-purple-900/40 dark:to-violet-900/40 flex items-center justify-center">
+                    <RefreshCw className="h-5 w-5 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
+                  </div>
                   {t("newsletter.view.processingStatus", "Newsletter Processing Status")}
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
                   {t("newsletter.view.processingStatusDesc", "Track the progress of your newsletter through the delivery pipeline")}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-8 pt-0">
                 {/* Progress Steps Indicator */}
-                <div className="mb-8">
-                  <div className="flex items-center justify-between">
+                <div className="relative p-6 rounded-2xl bg-gradient-to-br from-gray-50/80 to-gray-100/50 dark:from-gray-800/30 dark:to-gray-900/20 border border-gray-200/50 dark:border-gray-700/30">
+                  <div className="flex items-start justify-between gap-2">
                     {([
-                      { step: 1, title: t("newsletter.view.contentValidation", "Content Validation"), key: 'validation' as const, icon: CheckCircle, description: t("newsletter.view.contentValidationDesc", "Validating content and checking for issues") },
-                      { step: 2, title: t("newsletter.view.emailDelivery", "Email Delivery"), key: 'delivery' as const, icon: Send, description: t("newsletter.view.emailDeliveryDesc", "Sending emails to recipients") },
-                      { step: 3, title: t("newsletter.view.analyticsCollection", "Analytics Collection"), key: 'analytics' as const, icon: BarChart3, description: t("newsletter.view.analyticsCollectionDesc", "Collecting engagement data (completed 24hrs after start)") }
+                      { step: 1, title: t("newsletter.view.contentValidation", "Validation"), key: 'validation' as const, icon: CheckCircle, description: t("newsletter.view.contentValidationDesc", "Content check") },
+                      { step: 2, title: t("newsletter.view.emailDelivery", "Delivery"), key: 'delivery' as const, icon: Send, description: t("newsletter.view.emailDeliveryDesc", "Sending emails") },
+                      { step: 3, title: t("newsletter.view.analyticsCollection", "Analytics"), key: 'analytics' as const, icon: BarChart3, description: t("newsletter.view.analyticsCollectionDesc", "24hr data collection") }
                     ] as const).map((item, index) => {
                       const isCompleted = getTaskStepStatus(item.key) === 'completed';
                       const isActive = getTaskStepStatus(item.key) === 'running';
                       const isPending = getTaskStepStatus(item.key) === 'pending';
                       const Icon = item.icon;
+                      const isLast = index === 2;
 
                       return (
-                        <div key={item.key} className="flex items-center">
-                          {index > 0 && (
-                            <div className="w-8 h-0.5 bg-gray-200 dark:bg-gray-700 mr-4">
-                              <div
-                                className={`h-full transition-all duration-300 ${isCompleted || getCurrentTaskStep() > item.step ? 'bg-green-500 w-full' : 'bg-transparent w-0'
-                                  }`}
-                              />
-                            </div>
-                          )}
-                          <div className="flex flex-col items-center text-center min-w-0">
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium transition-colors mb-2 ${isCompleted
-                              ? 'bg-green-500 text-white'
+                        <div key={item.key} className="flex-1 flex items-center">
+                          <div className="flex flex-col items-center text-center w-full">
+                            {/* Step Circle */}
+                            <div className={`relative w-14 h-14 rounded-full flex items-center justify-center transition-all duration-500 ${isCompleted
+                              ? 'bg-gradient-to-br from-green-400 to-emerald-500 text-white shadow-lg shadow-green-200 dark:shadow-green-900/30'
                               : isActive
-                                ? 'bg-blue-500 text-white'
+                                ? 'bg-gradient-to-br from-blue-400 to-indigo-500 text-white shadow-lg shadow-blue-200 dark:shadow-blue-900/30 ring-4 ring-blue-100 dark:ring-blue-900/30 animate-pulse'
                                 : isPending
-                                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                                  : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                                  ? 'bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 text-gray-500 dark:text-gray-400'
+                                  : 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 text-gray-400'
                               }`}>
                               {isCompleted ? (
-                                <CheckCircle className="w-6 h-6" strokeWidth={1.5} />
+                                <CheckCircle className="w-7 h-7" strokeWidth={1.5} />
                               ) : isActive ? (
-                                <RefreshCw className="w-5 h-5 animate-spin" strokeWidth={1.5} />
+                                <RefreshCw className="w-6 h-6 animate-spin" strokeWidth={1.5} />
                               ) : (
-                                <Icon className="w-5 h-5" strokeWidth={1.5} />
+                                <Icon className="w-6 h-6" strokeWidth={1.5} />
                               )}
+                              
+                              {/* Step number badge */}
+                              <span className={`absolute -top-1 -right-1 w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${isCompleted || isActive ? 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300' : 'bg-gray-400 dark:bg-gray-600 text-white'}`}>
+                                {item.step}
+                              </span>
                             </div>
-                            <div className="max-w-[120px]">
-                              <p className={`text-sm font-medium mb-1 ${isActive
-                                ? 'text-gray-900 dark:text-gray-100'
-                                : 'text-gray-600 dark:text-gray-400'
+                            
+                            {/* Title & Description */}
+                            <div className="mt-3">
+                              <p className={`text-sm font-semibold mb-0.5 ${isActive
+                                ? 'text-blue-600 dark:text-blue-400'
+                                : isCompleted 
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : 'text-gray-600 dark:text-gray-400'
                                 }`}>
                                 {item.title}
                               </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-500 leading-tight">
+                              <p className="text-xs text-gray-400 dark:text-gray-500">
                                 {item.description}
                               </p>
                             </div>
                           </div>
+                          
+                          {/* Connector Line */}
+                          {!isLast && (
+                            <div className="w-full h-1 mx-2 mt-[-28px] rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-700 ease-out ${isCompleted ? 'bg-gradient-to-r from-green-400 to-emerald-500 w-full' : 'w-0'}`}
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1480,20 +1615,32 @@ export default function NewsletterViewPage() {
                 </div>
 
                 {/* Detailed Status Cards */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {/* Content Validation */}
-                  <div className="border rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/30">
-                    <div className="flex items-center justify-between mb-3">
+                  <div className={`rounded-xl p-4 transition-all duration-300 ${getTaskStepStatus('validation') === 'completed' 
+                    ? 'bg-gradient-to-r from-green-50/80 to-emerald-50/50 dark:from-green-900/20 dark:to-emerald-900/10 border border-green-200/60 dark:border-green-800/40' 
+                    : getTaskStepStatus('validation') === 'running'
+                      ? 'bg-gradient-to-r from-blue-50/80 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/10 border border-blue-200/60 dark:border-blue-800/40'
+                      : 'bg-gradient-to-r from-gray-50/80 to-gray-100/50 dark:from-gray-800/30 dark:to-gray-900/20 border border-gray-200/50 dark:border-gray-700/30'
+                  }`}>
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        {getTaskStepStatus('validation') === 'completed' ? (
-                          <CheckCircle className="h-5 w-5 text-green-500" />
-                        ) : getTaskStepStatus('validation') === 'running' ? (
-                          <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />
-                        ) : (
-                          <Clock className="h-5 w-5 text-gray-400" />
-                        )}
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${getTaskStepStatus('validation') === 'completed' 
+                          ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400' 
+                          : getTaskStepStatus('validation') === 'running'
+                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                        }`}>
+                          {getTaskStepStatus('validation') === 'completed' ? (
+                            <CheckCircle className="h-5 w-5" strokeWidth={1.5} />
+                          ) : getTaskStepStatus('validation') === 'running' ? (
+                            <RefreshCw className="h-5 w-5 animate-spin" strokeWidth={1.5} />
+                          ) : (
+                            <Clock className="h-5 w-5" strokeWidth={1.5} />
+                          )}
+                        </div>
                         <div>
-                          <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <h4 className={`text-sm font-semibold ${getTaskStepStatus('validation') === 'running' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'}`}>
                             {t("newsletter.view.contentValidation", "Content Validation")}
                           </h4>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -1501,86 +1648,136 @@ export default function NewsletterViewPage() {
                           </p>
                         </div>
                       </div>
-                      <Badge variant={
-                        getTaskStepStatus('validation') === 'completed' ? 'default' :
-                          getTaskStepStatus('validation') === 'running' ? 'secondary' : 'outline'
-                      }>
-                        {getTaskStepStatus('validation') === 'completed' ? t("newsletter.view.completed", "Completed") :
-                          getTaskStepStatus('validation') === 'running' ? t("newsletter.view.inProgress", "In Progress") : t("newsletter.view.pending", "Pending")}
+                      <Badge className={`${getTaskStepStatus('validation') === 'completed' 
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 border-green-200 dark:border-green-800' 
+                        : getTaskStepStatus('validation') === 'running'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                          : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700'
+                      }`}>
+                        {getTaskStepStatus('validation') === 'completed' ? (
+                          <span className="flex items-center gap-1"><CheckCircle className="h-3 w-3" /> {t("newsletter.view.completed", "Completed")}</span>
+                        ) : getTaskStepStatus('validation') === 'running' ? (
+                          <span className="flex items-center gap-1"><RefreshCw className="h-3 w-3 animate-spin" /> {t("newsletter.view.inProgress", "In Progress")}</span>
+                        ) : t("newsletter.view.pending", "Pending")}
                       </Badge>
                     </div>
                     {getTaskStepStatus('validation') === 'running' && (
-                      <Progress value={75} className="h-2" />
+                      <div className="mt-3">
+                        <Progress value={75} className="h-2 bg-blue-100 dark:bg-blue-900/30" />
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1.5">75% {t("newsletter.view.complete", "complete")}</p>
+                      </div>
                     )}
                   </div>
 
                   {/* Email Delivery */}
-                  <div className="border rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/30">
-                    <div className="flex items-center justify-between mb-3">
+                  <div className={`rounded-xl p-4 transition-all duration-300 ${getTaskStepStatus('delivery') === 'completed' 
+                    ? 'bg-gradient-to-r from-green-50/80 to-emerald-50/50 dark:from-green-900/20 dark:to-emerald-900/10 border border-green-200/60 dark:border-green-800/40' 
+                    : getTaskStepStatus('delivery') === 'running'
+                      ? 'bg-gradient-to-r from-blue-50/80 to-indigo-50/50 dark:from-blue-900/20 dark:to-indigo-900/10 border border-blue-200/60 dark:border-blue-800/40'
+                      : 'bg-gradient-to-r from-gray-50/80 to-gray-100/50 dark:from-gray-800/30 dark:to-gray-900/20 border border-gray-200/50 dark:border-gray-700/30'
+                  }`}>
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        {getTaskStepStatus('delivery') === 'completed' ? (
-                          <CheckCircle className="h-5 w-5 text-green-500" />
-                        ) : getTaskStepStatus('delivery') === 'running' ? (
-                          <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />
-                        ) : (
-                          <Clock className="h-5 w-5 text-gray-400" />
-                        )}
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${getTaskStepStatus('delivery') === 'completed' 
+                          ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400' 
+                          : getTaskStepStatus('delivery') === 'running'
+                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                        }`}>
+                          {getTaskStepStatus('delivery') === 'completed' ? (
+                            <CheckCircle className="h-5 w-5" strokeWidth={1.5} />
+                          ) : getTaskStepStatus('delivery') === 'running' ? (
+                            <Send className="h-5 w-5 animate-pulse" strokeWidth={1.5} />
+                          ) : (
+                            <Clock className="h-5 w-5" strokeWidth={1.5} />
+                          )}
+                        </div>
                         <div>
-                          <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <h4 className={`text-sm font-semibold ${getTaskStepStatus('delivery') === 'running' ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'}`}>
                             {t("newsletter.view.emailDelivery", "Email Delivery")}
                           </h4>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {t("newsletter.view.sendingToRecipients", "Sending newsletter to {{count}} recipients", { count: newsletter.recipientCount || 0 })}
+                            {t("newsletter.view.sendingToRecipients", "Sending to {{count}} recipients", { count: newsletter.recipientCount || 0 })}
                           </p>
                         </div>
                       </div>
-                      <Badge variant={
-                        getTaskStepStatus('delivery') === 'completed' ? 'default' :
-                          getTaskStepStatus('delivery') === 'running' ? 'secondary' : 'outline'
-                      }>
-                        {getTaskStepStatus('delivery') === 'completed' ? t("newsletter.view.completed", "Completed") :
-                          getTaskStepStatus('delivery') === 'running' ? t("newsletter.view.inProgress", "In Progress") : t("newsletter.view.pending", "Pending")}
+                      <Badge className={`${getTaskStepStatus('delivery') === 'completed' 
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 border-green-200 dark:border-green-800' 
+                        : getTaskStepStatus('delivery') === 'running'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                          : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700'
+                      }`}>
+                        {getTaskStepStatus('delivery') === 'completed' ? (
+                          <span className="flex items-center gap-1"><CheckCircle className="h-3 w-3" /> {t("newsletter.view.completed", "Completed")}</span>
+                        ) : getTaskStepStatus('delivery') === 'running' ? (
+                          <span className="flex items-center gap-1"><RefreshCw className="h-3 w-3 animate-spin" /> {t("newsletter.view.inProgress", "In Progress")}</span>
+                        ) : t("newsletter.view.pending", "Pending")}
                       </Badge>
                     </div>
                     {getTaskStepStatus('delivery') === 'running' && (
-                      <Progress value={45} className="h-2" />
+                      <div className="mt-3">
+                        <Progress value={45} className="h-2 bg-blue-100 dark:bg-blue-900/30" />
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1.5">45% {t("newsletter.view.deliveredCount", "delivered")}</p>
+                      </div>
                     )}
                   </div>
 
                   {/* Analytics Collection */}
-                  <div className="border rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/30">
-                    <div className="flex items-center justify-between mb-3">
+                  <div className={`rounded-xl p-4 transition-all duration-300 ${getTaskStepStatus('analytics') === 'completed' 
+                    ? 'bg-gradient-to-r from-green-50/80 to-emerald-50/50 dark:from-green-900/20 dark:to-emerald-900/10 border border-green-200/60 dark:border-green-800/40' 
+                    : getTaskStepStatus('analytics') === 'running'
+                      ? 'bg-gradient-to-r from-purple-50/80 to-violet-50/50 dark:from-purple-900/20 dark:to-violet-900/10 border border-purple-200/60 dark:border-purple-800/40'
+                      : 'bg-gradient-to-r from-gray-50/80 to-gray-100/50 dark:from-gray-800/30 dark:to-gray-900/20 border border-gray-200/50 dark:border-gray-700/30'
+                  }`}>
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        {getTaskStepStatus('analytics') === 'completed' ? (
-                          <CheckCircle className="h-5 w-5 text-green-500" />
-                        ) : getTaskStepStatus('analytics') === 'running' ? (
-                          <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />
-                        ) : (
-                          <Clock className="h-5 w-5 text-gray-400" />
-                        )}
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${getTaskStepStatus('analytics') === 'completed' 
+                          ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400' 
+                          : getTaskStepStatus('analytics') === 'running'
+                            ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                        }`}>
+                          {getTaskStepStatus('analytics') === 'completed' ? (
+                            <CheckCircle className="h-5 w-5" strokeWidth={1.5} />
+                          ) : getTaskStepStatus('analytics') === 'running' ? (
+                            <BarChart3 className="h-5 w-5 animate-pulse" strokeWidth={1.5} />
+                          ) : (
+                            <Clock className="h-5 w-5" strokeWidth={1.5} />
+                          )}
+                        </div>
                         <div>
-                          <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <h4 className={`text-sm font-semibold ${getTaskStepStatus('analytics') === 'running' ? 'text-purple-700 dark:text-purple-300' : 'text-gray-900 dark:text-gray-100'}`}>
                             {t("newsletter.view.analyticsCollection", "Analytics Collection")}
                           </h4>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {t("newsletter.view.analyticsGatheringDesc", "Gathering engagement data - completes 24 hours after sending")}
+                            {t("newsletter.view.analyticsGatheringDesc", "24-hour engagement tracking")}
                           </p>
                         </div>
                       </div>
-                      <Badge variant={
-                        getTaskStepStatus('analytics') === 'completed' ? 'default' :
-                          getTaskStepStatus('analytics') === 'running' ? 'secondary' : 'outline'
-                      }>
-                        {getTaskStepStatus('analytics') === 'completed' ? t("newsletter.view.completed", "Completed") :
-                          getTaskStepStatus('analytics') === 'running' ? t("newsletter.view.collectingData", "Collecting Data") : t("newsletter.view.pending", "Pending")}
+                      <Badge className={`${getTaskStepStatus('analytics') === 'completed' 
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 border-green-200 dark:border-green-800' 
+                        : getTaskStepStatus('analytics') === 'running'
+                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                          : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700'
+                      }`}>
+                        {getTaskStepStatus('analytics') === 'completed' ? (
+                          <span className="flex items-center gap-1"><CheckCircle className="h-3 w-3" /> {t("newsletter.view.completed", "Completed")}</span>
+                        ) : getTaskStepStatus('analytics') === 'running' ? (
+                          <span className="flex items-center gap-1"><RefreshCw className="h-3 w-3 animate-spin" /> {t("newsletter.view.collecting", "Collecting")}</span>
+                        ) : t("newsletter.view.pending", "Pending")}
                       </Badge>
                     </div>
                     {getTaskStepStatus('analytics') === 'running' && (
-                      <div className="space-y-2">
-                        <Progress value={65} className="h-2" />
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {newsletter.sentAt && t("newsletter.view.timeRemaining", "Time remaining: {{time}}", { time: getAnalyticsTimeRemaining() })}
-                        </p>
+                      <div className="mt-3 space-y-2">
+                        <Progress value={65} className="h-2 bg-purple-100 dark:bg-purple-900/30" />
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-purple-600 dark:text-purple-400">
+                            {t("newsletter.view.collectingDataProgress", "Collecting engagement data...")}
+                          </p>
+                          <p className="text-xs font-medium text-purple-700 dark:text-purple-300">
+                            {newsletter.sentAt && getAnalyticsTimeRemaining()} {t("newsletter.view.remainingShort", "left")}
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1589,7 +1786,7 @@ export default function NewsletterViewPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="detailed-stats" className="space-y-6 lg:space-y-8">
+          <TabsContent value="detailed-stats" className="space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
             {/* Analytics Collection Status Banner */}
             {newsletter?.status === 'sent' && getTaskStepStatus('analytics') === 'running' && (
               <div className="rounded-xl border border-blue-200 dark:border-blue-800/50 bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-blue-950/40 p-5 shadow-sm">
@@ -1704,10 +1901,13 @@ export default function NewsletterViewPage() {
             {/* Engagement Rates & Insights */}
             {newsletter?.status === 'sent' && (
               <div className="grid gap-4 lg:gap-6 md:grid-cols-2">
-                <Card>
+                <Card className="border border-gray-200/60 dark:border-gray-700/40 shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+                  <div className="h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
                   <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-2 text-base">
-                      <BarChart3 className="h-5 w-5 text-indigo-500" strokeWidth={1.5} />
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center">
+                        <BarChart3 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" strokeWidth={1.5} />
+                      </div>
                       {t("newsletter.view.engagementRates", "Engagement Rates")}
                     </CardTitle>
                   </CardHeader>
@@ -1782,10 +1982,13 @@ export default function NewsletterViewPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border border-gray-200/60 dark:border-gray-700/40 shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+                  <div className="h-1 bg-gradient-to-r from-emerald-500 via-green-500 to-lime-500" />
                   <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-2 text-base">
-                      <TrendingUp className="h-5 w-5 text-emerald-500" strokeWidth={1.5} />
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-100 to-green-100 dark:from-emerald-900/40 dark:to-green-900/40 flex items-center justify-center">
+                        <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={1.5} />
+                      </div>
                       {t("newsletter.view.performanceInsights", "Performance Insights")}
                     </CardTitle>
                   </CardHeader>
@@ -1870,13 +2073,16 @@ export default function NewsletterViewPage() {
             {newsletter?.status === 'sent' && <ReactionInsightsSection newsletterId={newsletter.id} />}
 
             {/* Per-Recipient Stats Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <List className="h-5 w-5" strokeWidth={1.5} />
+            <Card className="border border-gray-200/60 dark:border-gray-700/40 shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2.5 text-lg">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/40 dark:to-teal-900/40 flex items-center justify-center">
+                    <List className="h-5 w-5 text-emerald-600 dark:text-emerald-400" strokeWidth={1.5} />
+                  </div>
                   {t("newsletter.view.perRecipientActivity", "Per-Recipient Email Activity")}
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
                   {t("newsletter.view.perRecipientActivityDesc", "Individual delivery status and engagement activity for each recipient")}
                 </CardDescription>
               </CardHeader>
