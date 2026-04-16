@@ -38,7 +38,8 @@ import {
   Smile,
   ThumbsUp,
   ThumbsDown,
-  Undo2
+  Undo2,
+  Info
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1060,97 +1061,108 @@ export default function NewsletterViewPage() {
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-          <Card>
+          {/* Recipients */}
+          <Card className="group relative overflow-hidden border border-gray-200/60 dark:border-gray-700/40 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
+            <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
             <CardContent className="p-4 lg:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t("newsletter.view.recipients", "Recipients")}
                   </p>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-recipients-count">
+                  <p className="mt-1.5 text-2xl lg:text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100" data-testid="text-recipients-count">
                     {(newsletter.recipientCount || 0).toLocaleString()}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium">
+                    <Users className="h-3 w-3" strokeWidth={2} />
                     {t("newsletter.view.totalSentTo", "Total sent to")}
                   </p>
                 </div>
-                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shrink-0">
-                  <Users className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
+                <div className="w-11 h-11 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105">
+                  <Users className="text-blue-600 dark:text-blue-400 w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          {/* Unique Opens */}
+          <Card className="group relative overflow-hidden border border-gray-200/60 dark:border-gray-700/40 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
+            <div className="h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
             <CardContent className="p-4 lg:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t("newsletter.view.uniqueOpens", "Unique Opens")}
                   </p>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-opens-count">
-                    {newsletter.opens || 0}
+                  <p className="mt-1.5 text-2xl lg:text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100" data-testid="text-opens-count">
+                    {(newsletter.opens || 0).toLocaleString()}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tabular-nums">
+                    <TrendingUp className="h-3 w-3" strokeWidth={2} />
                     {t("newsletter.view.uniqueRate", "{{rate}}% unique rate", { rate: uniqueOpenRate })}
                   </p>
                 </div>
-                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shrink-0">
-                  <Eye className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
+                <div className="w-11 h-11 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/40 dark:to-teal-900/40 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105">
+                  <Eye className="text-emerald-600 dark:text-emerald-400 w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          {/* Clicks */}
+          <Card className="group relative overflow-hidden border border-gray-200/60 dark:border-gray-700/40 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
+            <div className="h-1 bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500" />
             <CardContent className="p-4 lg:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t("newsletter.view.clicks", "Clicks")}
                   </p>
-                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold" data-testid="text-clicks-count">
-                    {newsletter.clickCount}
+                  <p className="mt-1.5 text-2xl lg:text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100" data-testid="text-clicks-count">
+                    {(newsletter.clickCount || 0).toLocaleString()}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold tabular-nums">
+                    <TrendingUp className="h-3 w-3" strokeWidth={2} />
                     {t("newsletter.view.ctr", "{{rate}}% CTR", { rate: clickThroughRate })}
                   </p>
                 </div>
-                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shrink-0">
-                  <MousePointer className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
+                <div className="w-11 h-11 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/40 dark:to-pink-900/40 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105">
+                  <MousePointer className="text-purple-600 dark:text-purple-400 w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          {/* Delivery Issues */}
+          <Card className="group relative overflow-hidden border border-gray-200/60 dark:border-gray-700/40 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
+            <div className="h-1 bg-gradient-to-r from-red-500 via-orange-500 to-amber-500" />
             <CardContent className="p-4 lg:p-6">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   {t("newsletter.view.deliveryIssues", "Delivery Issues")}
                 </p>
-                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shrink-0">
-                  <AlertTriangle className="text-white w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
+                <div className="w-11 h-11 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-red-100 to-orange-100 dark:from-red-900/40 dark:to-orange-900/40 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105">
+                  <AlertTriangle className="text-red-600 dark:text-red-400 w-5 h-5 lg:w-6 lg:h-6" strokeWidth={1.5} />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-bounces-count">
+                <div className="rounded-lg bg-red-50/70 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 px-2 py-2">
+                  <p className="text-lg lg:text-2xl font-bold tabular-nums text-red-700 dark:text-red-300" data-testid="text-bounces-count">
                     {liveStats?.bounced ?? 0}
                   </p>
-                  <p className="text-xs text-muted-foreground">{t("newsletter.view.bounced", "Bounced")}</p>
+                  <p className="text-[10px] lg:text-xs font-medium text-red-600/80 dark:text-red-400/80 uppercase tracking-wide">{t("newsletter.view.bounced", "Bounced")}</p>
                 </div>
-                <div>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-suppressed-count">
+                <div className="rounded-lg bg-amber-50/70 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 px-2 py-2">
+                  <p className="text-lg lg:text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-300" data-testid="text-suppressed-count">
                     {liveStats?.suppressed ?? 0}
                   </p>
-                  <p className="text-xs text-muted-foreground">{t("newsletter.view.suppressed", "Suppressed")}</p>
+                  <p className="text-[10px] lg:text-xs font-medium text-amber-600/80 dark:text-amber-400/80 uppercase tracking-wide">{t("newsletter.view.suppressed", "Suppressed")}</p>
                 </div>
-                <div>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold" data-testid="text-complaints-count">
+                <div className="rounded-lg bg-orange-50/70 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-900/30 px-2 py-2">
+                  <p className="text-lg lg:text-2xl font-bold tabular-nums text-orange-700 dark:text-orange-300" data-testid="text-complaints-count">
                     {liveStats?.complained ?? 0}
                   </p>
-                  <p className="text-xs text-muted-foreground">{t("newsletter.view.complaints", "Complaints")}</p>
+                  <p className="text-[10px] lg:text-xs font-medium text-orange-600/80 dark:text-orange-400/80 uppercase tracking-wide">{t("newsletter.view.complaints", "Complaints")}</p>
                 </div>
               </div>
             </CardContent>
@@ -1836,63 +1848,69 @@ export default function NewsletterViewPage() {
             {/* Aggregate Engagement Metrics */}
             {newsletter?.status === 'sent' && (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4">
-                <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20">
+                <Card className="group relative overflow-hidden border-0 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20">
+                  <div className="h-0.5 bg-gradient-to-r from-blue-400 to-blue-600" />
                   <CardContent className="p-4 text-center">
-                    <div className="w-9 h-9 rounded-lg bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center mx-auto mb-2">
+                    <div className="w-9 h-9 rounded-lg bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center mx-auto mb-2 transition-transform duration-300 group-hover:scale-110">
                       <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
                     </div>
-                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{liveStats?.delivered ?? 0}</p>
-                    <p className="text-xs font-medium text-blue-600/80 dark:text-blue-400/80 mt-0.5">{t("newsletter.view.delivered", "Delivered")}</p>
+                    <p className="text-2xl font-bold tabular-nums text-blue-700 dark:text-blue-300">{(liveStats?.delivered ?? 0).toLocaleString()}</p>
+                    <p className="text-[11px] font-semibold text-blue-600/80 dark:text-blue-400/80 mt-0.5 uppercase tracking-wide">{t("newsletter.view.delivered", "Delivered")}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/40 dark:to-emerald-900/20">
+                <Card className="group relative overflow-hidden border-0 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 bg-gradient-to-br from-emerald-50 to-teal-100/50 dark:from-emerald-950/40 dark:to-teal-900/20">
+                  <div className="h-0.5 bg-gradient-to-r from-emerald-400 to-teal-500" />
                   <CardContent className="p-4 text-center">
-                    <div className="w-9 h-9 rounded-lg bg-green-500/10 dark:bg-green-400/10 flex items-center justify-center mx-auto mb-2">
-                      <Eye className="h-4 w-4 text-green-600 dark:text-green-400" strokeWidth={1.5} />
+                    <div className="w-9 h-9 rounded-lg bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center mx-auto mb-2 transition-transform duration-300 group-hover:scale-110">
+                      <Eye className="h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={1.5} />
                     </div>
-                    <p className="text-2xl font-bold text-green-700 dark:text-green-300">{newsletter.opens || 0}</p>
-                    <p className="text-xs font-medium text-green-600/80 dark:text-green-400/80 mt-0.5">{t("newsletter.view.uniqueOpens", "Unique Opens")}</p>
+                    <p className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{(newsletter.opens || 0).toLocaleString()}</p>
+                    <p className="text-[11px] font-semibold text-emerald-600/80 dark:text-emerald-400/80 mt-0.5 uppercase tracking-wide">{t("newsletter.view.uniqueOpens", "Unique Opens")}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-violet-100/50 dark:from-purple-950/40 dark:to-violet-900/20">
+                <Card className="group relative overflow-hidden border-0 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 bg-gradient-to-br from-purple-50 to-fuchsia-100/50 dark:from-purple-950/40 dark:to-fuchsia-900/20">
+                  <div className="h-0.5 bg-gradient-to-r from-purple-400 to-fuchsia-500" />
                   <CardContent className="p-4 text-center">
-                    <div className="w-9 h-9 rounded-lg bg-purple-500/10 dark:bg-purple-400/10 flex items-center justify-center mx-auto mb-2">
+                    <div className="w-9 h-9 rounded-lg bg-purple-500/10 dark:bg-purple-400/10 flex items-center justify-center mx-auto mb-2 transition-transform duration-300 group-hover:scale-110">
                       <MousePointer className="h-4 w-4 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
                     </div>
-                    <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{newsletter.clickCount || 0}</p>
-                    <p className="text-xs font-medium text-purple-600/80 dark:text-purple-400/80 mt-0.5">{t("newsletter.view.clicks", "Clicks")}</p>
+                    <p className="text-2xl font-bold tabular-nums text-purple-700 dark:text-purple-300">{(newsletter.clickCount || 0).toLocaleString()}</p>
+                    <p className="text-[11px] font-semibold text-purple-600/80 dark:text-purple-400/80 mt-0.5 uppercase tracking-wide">{t("newsletter.view.clicks", "Clicks")}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-rose-100/50 dark:from-red-950/40 dark:to-rose-900/20">
+                <Card className="group relative overflow-hidden border-0 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 bg-gradient-to-br from-red-50 to-rose-100/50 dark:from-red-950/40 dark:to-rose-900/20">
+                  <div className="h-0.5 bg-gradient-to-r from-red-400 to-rose-500" />
                   <CardContent className="p-4 text-center">
-                    <div className="w-9 h-9 rounded-lg bg-red-500/10 dark:bg-red-400/10 flex items-center justify-center mx-auto mb-2">
+                    <div className="w-9 h-9 rounded-lg bg-red-500/10 dark:bg-red-400/10 flex items-center justify-center mx-auto mb-2 transition-transform duration-300 group-hover:scale-110">
                       <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" strokeWidth={1.5} />
                     </div>
-                    <p className="text-2xl font-bold text-red-700 dark:text-red-300">{liveStats?.bounced ?? 0}</p>
-                    <p className="text-xs font-medium text-red-600/80 dark:text-red-400/80 mt-0.5">{t("newsletter.view.bounced", "Bounced")}</p>
+                    <p className="text-2xl font-bold tabular-nums text-red-700 dark:text-red-300">{(liveStats?.bounced ?? 0).toLocaleString()}</p>
+                    <p className="text-[11px] font-semibold text-red-600/80 dark:text-red-400/80 mt-0.5 uppercase tracking-wide">{t("newsletter.view.bounced", "Bounced")}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/40 dark:to-amber-900/20">
+                <Card className="group relative overflow-hidden border-0 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/40 dark:to-amber-900/20">
+                  <div className="h-0.5 bg-gradient-to-r from-orange-400 to-amber-500" />
                   <CardContent className="p-4 text-center">
-                    <div className="w-9 h-9 rounded-lg bg-orange-500/10 dark:bg-orange-400/10 flex items-center justify-center mx-auto mb-2">
+                    <div className="w-9 h-9 rounded-lg bg-orange-500/10 dark:bg-orange-400/10 flex items-center justify-center mx-auto mb-2 transition-transform duration-300 group-hover:scale-110">
                       <ShieldOff className="h-4 w-4 text-orange-600 dark:text-orange-400" strokeWidth={1.5} />
                     </div>
-                    <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{liveStats?.complained ?? 0}</p>
-                    <p className="text-xs font-medium text-orange-600/80 dark:text-orange-400/80 mt-0.5">{t("newsletter.view.complaints", "Complaints")}</p>
+                    <p className="text-2xl font-bold tabular-nums text-orange-700 dark:text-orange-300">{(liveStats?.complained ?? 0).toLocaleString()}</p>
+                    <p className="text-[11px] font-semibold text-orange-600/80 dark:text-orange-400/80 mt-0.5 uppercase tracking-wide">{t("newsletter.view.complaints", "Complaints")}</p>
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-sm bg-gradient-to-br from-yellow-50 to-amber-100/50 dark:from-yellow-950/40 dark:to-amber-900/20">
+                <Card className="group relative overflow-hidden border-0 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 bg-gradient-to-br from-yellow-50 to-amber-100/50 dark:from-yellow-950/40 dark:to-amber-900/20">
+                  <div className="h-0.5 bg-gradient-to-r from-yellow-400 to-amber-500" />
                   <CardContent className="p-4 text-center">
-                    <div className="w-9 h-9 rounded-lg bg-yellow-500/10 dark:bg-yellow-400/10 flex items-center justify-center mx-auto mb-2">
+                    <div className="w-9 h-9 rounded-lg bg-yellow-500/10 dark:bg-yellow-400/10 flex items-center justify-center mx-auto mb-2 transition-transform duration-300 group-hover:scale-110">
                       <XCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" strokeWidth={1.5} />
                     </div>
-                    <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">{liveStats?.suppressed ?? 0}</p>
-                    <p className="text-xs font-medium text-yellow-600/80 dark:text-yellow-400/80 mt-0.5">{t("newsletter.view.suppressed", "Suppressed")}</p>
+                    <p className="text-2xl font-bold tabular-nums text-yellow-700 dark:text-yellow-300">{(liveStats?.suppressed ?? 0).toLocaleString()}</p>
+                    <p className="text-[11px] font-semibold text-yellow-600/80 dark:text-yellow-400/80 mt-0.5 uppercase tracking-wide">{t("newsletter.view.suppressed", "Suppressed")}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -2283,33 +2301,39 @@ export default function NewsletterViewPage() {
             {selectedTrajectory && (
               <div className="space-y-6">
                 {/* Email Overview */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">{t("newsletter.view.emailDetails", "Email Details")}</CardTitle>
+                <Card className="border border-gray-200/60 dark:border-gray-700/40 shadow-sm overflow-hidden">
+                  <div className="h-1 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500" />
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2.5 text-lg">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-100 to-blue-100 dark:from-sky-900/40 dark:to-blue-900/40 flex items-center justify-center">
+                        <Mail className="h-5 w-5 text-sky-600 dark:text-sky-400" strokeWidth={1.5} />
+                      </div>
+                      {t("newsletter.view.emailDetails", "Email Details")}
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.from", "From")}</p>
-                        <p className="text-sm">{selectedTrajectory.from}</p>
+                  <CardContent className="pt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30">
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("newsletter.view.from", "From")}</p>
+                        <p className="text-sm text-gray-900 dark:text-gray-100 mt-1 break-all">{selectedTrajectory.from}</p>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.to", "To")}</p>
-                        <p className="text-sm">{selectedTrajectory.to}</p>
+                      <div className="p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30">
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("newsletter.view.to", "To")}</p>
+                        <p className="text-sm text-gray-900 dark:text-gray-100 mt-1 break-all">{selectedTrajectory.to}</p>
                       </div>
-                      <div className="md:col-span-2">
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.subject", "Subject")}</p>
-                        <p className="text-sm">{selectedTrajectory.subject}</p>
+                      <div className="p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30 sm:col-span-2">
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("newsletter.view.subject", "Subject")}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-1">{selectedTrajectory.subject}</p>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.status", "Status")}</p>
-                        <Badge className="mt-1">
+                      <div className="p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30">
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("newsletter.view.status", "Status")}</p>
+                        <Badge className="mt-1.5">
                           {selectedTrajectory.status || 'Unknown'}
                         </Badge>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.createdAt", "Created At")}</p>
-                        <p className="text-sm">
+                      <div className="p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30">
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("newsletter.view.createdAt", "Created At")}</p>
+                        <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
                           {selectedTrajectory.createdAt ?
                             format(new Date(selectedTrajectory.createdAt), 'PPP p') :
                             'Unknown'
@@ -2322,50 +2346,56 @@ export default function NewsletterViewPage() {
 
                 {/* Engagement Summary */}
                 {selectedTrajectory.totalEvents > 1 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">{t("newsletter.view.engagementSummary", "Engagement Summary")}</CardTitle>
-                      <CardDescription>
+                  <Card className="border border-gray-200/60 dark:border-gray-700/40 shadow-sm overflow-hidden">
+                    <div className="h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2.5 text-lg">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 flex items-center justify-center">
+                          <BarChart3 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" strokeWidth={1.5} />
+                        </div>
+                        {t("newsletter.view.engagementSummary", "Engagement Summary")}
+                      </CardTitle>
+                      <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
                         {t("newsletter.view.engagementSummaryDesc", "Quick overview of recipient engagement with this email")}
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-0">
                       <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                        <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                          <div className="flex items-center justify-center w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full mx-auto mb-2">
+                        <div className="group relative overflow-hidden p-3 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/60 dark:from-blue-950/40 dark:to-blue-900/20 border border-blue-100 dark:border-blue-900/30 text-center transition-all duration-300 hover:shadow-sm">
+                          <div className="flex items-center justify-center w-9 h-9 bg-blue-500/10 dark:bg-blue-400/10 rounded-lg mx-auto mb-2 transition-transform duration-300 group-hover:scale-110">
                             <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
                           </div>
-                          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{selectedTrajectory.totalEvents}</p>
-                          <p className="text-sm text-blue-600 dark:text-blue-400">{t("newsletter.view.totalEvents", "Total Events")}</p>
+                          <p className="text-2xl font-bold tabular-nums text-blue-700 dark:text-blue-300">{selectedTrajectory.totalEvents}</p>
+                          <p className="text-[11px] font-semibold text-blue-600/80 dark:text-blue-400/80 mt-0.5 uppercase tracking-wide">{t("newsletter.view.totalEvents", "Total Events")}</p>
                         </div>
 
-                        <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                          <div className="flex items-center justify-center w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full mx-auto mb-2">
+                        <div className="group relative overflow-hidden p-3 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100/60 dark:from-purple-950/40 dark:to-purple-900/20 border border-purple-100 dark:border-purple-900/30 text-center transition-all duration-300 hover:shadow-sm">
+                          <div className="flex items-center justify-center w-9 h-9 bg-purple-500/10 dark:bg-purple-400/10 rounded-lg mx-auto mb-2 transition-transform duration-300 group-hover:scale-110">
                             <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
                           </div>
-                          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{selectedTrajectory.totalOpens || 0}</p>
-                          <p className="text-sm text-purple-600 dark:text-purple-400">{t("newsletter.view.opens", "Opens")}</p>
+                          <p className="text-2xl font-bold tabular-nums text-purple-700 dark:text-purple-300">{selectedTrajectory.totalOpens || 0}</p>
+                          <p className="text-[11px] font-semibold text-purple-600/80 dark:text-purple-400/80 mt-0.5 uppercase tracking-wide">{t("newsletter.view.opens", "Opens")}</p>
                         </div>
 
-                        <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                          <div className="flex items-center justify-center w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-full mx-auto mb-2">
+                        <div className="group relative overflow-hidden p-3 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100/60 dark:from-orange-950/40 dark:to-orange-900/20 border border-orange-100 dark:border-orange-900/30 text-center transition-all duration-300 hover:shadow-sm">
+                          <div className="flex items-center justify-center w-9 h-9 bg-orange-500/10 dark:bg-orange-400/10 rounded-lg mx-auto mb-2 transition-transform duration-300 group-hover:scale-110">
                             <MousePointer className="h-4 w-4 text-orange-600 dark:text-orange-400" strokeWidth={1.5} />
                           </div>
-                          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{selectedTrajectory.totalClicks || 0}</p>
-                          <p className="text-sm text-orange-600 dark:text-orange-400">{t("newsletter.view.clicks", "Clicks")}</p>
+                          <p className="text-2xl font-bold tabular-nums text-orange-700 dark:text-orange-300">{selectedTrajectory.totalClicks || 0}</p>
+                          <p className="text-[11px] font-semibold text-orange-600/80 dark:text-orange-400/80 mt-0.5 uppercase tracking-wide">{t("newsletter.view.clicks", "Clicks")}</p>
                         </div>
 
-                        <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                          <div className="flex items-center justify-center w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full mx-auto mb-2">
-                            <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" strokeWidth={1.5} />
+                        <div className="group relative overflow-hidden p-3 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/60 dark:from-emerald-950/40 dark:to-emerald-900/20 border border-emerald-100 dark:border-emerald-900/30 text-center transition-all duration-300 hover:shadow-sm">
+                          <div className="flex items-center justify-center w-9 h-9 bg-emerald-500/10 dark:bg-emerald-400/10 rounded-lg mx-auto mb-2 transition-transform duration-300 group-hover:scale-110">
+                            <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={1.5} />
                           </div>
-                          <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                          <p className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
                             {selectedTrajectory.totalOpens > 0 ?
                               Math.round((selectedTrajectory.totalClicks / selectedTrajectory.totalOpens) * 100) :
                               0
                             }%
                           </p>
-                          <p className="text-sm text-green-600 dark:text-green-400">{t("newsletter.view.clickRate", "Click Rate")}</p>
+                          <p className="text-[11px] font-semibold text-emerald-600/80 dark:text-emerald-400/80 mt-0.5 uppercase tracking-wide">{t("newsletter.view.clickRate", "Click Rate")}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -2373,26 +2403,32 @@ export default function NewsletterViewPage() {
                 )}
 
                 {/* Event Timeline */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center justify-between">
-                      <span>{t("newsletter.view.eventTimeline", "Event Timeline")}</span>
-                      <div className="flex gap-2 text-sm">
+                <Card className="border border-gray-200/60 dark:border-gray-700/40 shadow-sm overflow-hidden">
+                  <div className="h-1 bg-gradient-to-r from-teal-500 via-cyan-500 to-sky-500" />
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center justify-between gap-3 text-lg">
+                      <span className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-100 to-cyan-100 dark:from-teal-900/40 dark:to-cyan-900/40 flex items-center justify-center">
+                          <Activity className="h-5 w-5 text-teal-600 dark:text-teal-400" strokeWidth={1.5} />
+                        </div>
+                        {t("newsletter.view.eventTimeline", "Event Timeline")}
+                      </span>
+                      <div className="flex gap-2 text-sm shrink-0">
                         {selectedTrajectory.totalOpens > 0 && (
-                          <Badge variant="secondary" className="gap-1">
+                          <Badge variant="secondary" className="gap-1 tabular-nums">
                             <Eye className="h-3 w-3" strokeWidth={1.5} />
                             {selectedTrajectory.totalOpens} {selectedTrajectory.totalOpens === 1 ? 'Open' : 'Opens'}
                           </Badge>
                         )}
                         {selectedTrajectory.totalClicks > 0 && (
-                          <Badge variant="secondary" className="gap-1">
+                          <Badge variant="secondary" className="gap-1 tabular-nums">
                             <MousePointer className="h-3 w-3" strokeWidth={1.5} />
                             {selectedTrajectory.totalClicks} {selectedTrajectory.totalClicks === 1 ? 'Click' : 'Clicks'}
                           </Badge>
                         )}
                       </div>
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-sm text-gray-500 dark:text-gray-400">
                       Detailed chronological events showing each interaction with this email
                       {selectedTrajectory.totalOpens > 1 && (
                         <span className="text-purple-600 dark:text-purple-400 ml-1">
@@ -2401,7 +2437,7 @@ export default function NewsletterViewPage() {
                       )}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="pt-0">
                     {selectedTrajectory.events && selectedTrajectory.events.length > 0 ? (
                       <div className="space-y-4 max-h-96 overflow-y-auto">
                         {selectedTrajectory.events.map((event: any, index: number) => (
@@ -2500,39 +2536,45 @@ export default function NewsletterViewPage() {
 
                 {/* Additional Metadata */}
                 {selectedTrajectory.metadata && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">{t("newsletter.view.additionalInfo", "Additional Information")}</CardTitle>
+                  <Card className="border border-gray-200/60 dark:border-gray-700/40 shadow-sm overflow-hidden">
+                    <div className="h-1 bg-gradient-to-r from-slate-400 via-gray-400 to-zinc-400" />
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2.5 text-lg">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-100 to-gray-100 dark:from-slate-800/60 dark:to-gray-800/60 flex items-center justify-center">
+                          <Info className="h-5 w-5 text-slate-600 dark:text-slate-400" strokeWidth={1.5} />
+                        </div>
+                        {t("newsletter.view.additionalInfo", "Additional Information")}
+                      </CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <CardContent className="pt-0">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {selectedTrajectory.metadata.reply_to && (
-                          <div>
-                            <p className="font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.replyTo", "Reply To")}</p>
-                            <p>{selectedTrajectory.metadata.reply_to}</p>
+                          <div className="p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30">
+                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("newsletter.view.replyTo", "Reply To")}</p>
+                            <p className="text-sm text-gray-900 dark:text-gray-100 mt-1 break-all">{selectedTrajectory.metadata.reply_to}</p>
                           </div>
                         )}
                         {selectedTrajectory.metadata.cc && (
-                          <div>
-                            <p className="font-medium text-gray-600 dark:text-gray-400">CC</p>
-                            <p>{Array.isArray(selectedTrajectory.metadata.cc) ?
+                          <div className="p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30">
+                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">CC</p>
+                            <p className="text-sm text-gray-900 dark:text-gray-100 mt-1 break-all">{Array.isArray(selectedTrajectory.metadata.cc) ?
                               selectedTrajectory.metadata.cc.join(', ') :
                               selectedTrajectory.metadata.cc}
                             </p>
                           </div>
                         )}
                         {selectedTrajectory.metadata.bcc && (
-                          <div>
-                            <p className="font-medium text-gray-600 dark:text-gray-400">BCC</p>
-                            <p>{Array.isArray(selectedTrajectory.metadata.bcc) ?
+                          <div className="p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30">
+                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">BCC</p>
+                            <p className="text-sm text-gray-900 dark:text-gray-100 mt-1 break-all">{Array.isArray(selectedTrajectory.metadata.bcc) ?
                               selectedTrajectory.metadata.bcc.join(', ') :
                               selectedTrajectory.metadata.bcc}
                             </p>
                           </div>
                         )}
-                        <div>
-                          <p className="font-medium text-gray-600 dark:text-gray-400">{t("newsletter.view.emailId", "Email ID")}</p>
-                          <p className="font-mono text-xs">{selectedTrajectory.emailId}</p>
+                        <div className="p-3 rounded-lg bg-gray-50/70 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30">
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("newsletter.view.emailId", "Email ID")}</p>
+                          <p className="font-mono text-xs text-gray-700 dark:text-gray-300 mt-1 break-all">{selectedTrajectory.emailId}</p>
                         </div>
                       </div>
                     </CardContent>
