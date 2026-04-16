@@ -1171,92 +1171,99 @@ export default function NewsletterViewPage() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 lg:space-y-8">
-          <div className="relative">
-            {/* Gradient border effect */}
-            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent" />
-            
-            <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-              <TabsList className="inline-flex h-12 p-1.5 bg-gradient-to-b from-gray-50/80 to-gray-100/80 dark:from-gray-800/50 dark:to-gray-900/50 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/40 rounded-xl shadow-sm min-w-max">
-                <TabsTrigger 
-                  value="overview" 
-                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-md data-[state=active]:shadow-gray-200/50 dark:data-[state=active]:shadow-black/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
-                  data-testid="tab-overview"
-                >
-                  <span className="flex items-center gap-2">
-                    <Newspaper className="h-4 w-4 transition-transform duration-300 group-data-[state=active]:scale-110" strokeWidth={1.5} />
-                    <span className="hidden sm:inline">{t("newsletter.view.tabs.overview", "Overview")}</span>
-                    <span className="sm:hidden">{t("newsletter.view.tabs.overviewShort", "Overview")}</span>
-                  </span>
-                </TabsTrigger>
-                
-                <TabsTrigger 
-                  value="live-tracking" 
-                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-md data-[state=active]:shadow-blue-100/50 dark:data-[state=active]:shadow-blue-900/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
-                  data-testid="tab-live-tracking"
-                >
-                  <span className="flex items-center gap-2">
-                    <Activity className="h-4 w-4" strokeWidth={1.5} />
-                    <span className="relative">
-                      {t("newsletter.view.tabs.live", "Live")}
-                      {/* Live pulse indicator */}
-                      <span className="absolute -top-1 -right-2 flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                      </span>
-                    </span>
-                  </span>
-                </TabsTrigger>
-                
-                <TabsTrigger 
-                  value="reactions" 
-                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-amber-600 dark:data-[state=active]:text-amber-400 data-[state=active]:shadow-md data-[state=active]:shadow-amber-100/50 dark:data-[state=active]:shadow-amber-900/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
-                  data-testid="tab-reactions"
-                >
-                  <span className="flex items-center gap-2">
-                    <Smile className="h-4 w-4" strokeWidth={1.5} />
-                    <span className="hidden sm:inline">{t("newsletter.view.tabs.reactions", "Reactions")}</span>
-                    <span className="sm:hidden">{t("newsletter.view.tabs.reactionsShort", "React")}</span>
-                  </span>
-                </TabsTrigger>
-                
-                <TabsTrigger 
-                  value="content" 
-                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:shadow-md data-[state=active]:shadow-indigo-100/50 dark:data-[state=active]:shadow-indigo-900/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
-                  data-testid="tab-content"
-                >
-                  <span className="flex items-center gap-2">
-                    <Eye className="h-4 w-4" strokeWidth={1.5} />
-                    <span className="hidden sm:inline">{t("newsletter.view.tabs.content", "Content")}</span>
-                    <span className="sm:hidden">{t("newsletter.view.tabs.contentShort", "View")}</span>
-                  </span>
-                </TabsTrigger>
-                
-                <TabsTrigger 
-                  value="status" 
-                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-purple-600 dark:data-[state=active]:text-purple-400 data-[state=active]:shadow-md data-[state=active]:shadow-purple-100/50 dark:data-[state=active]:shadow-purple-900/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
-                  data-testid="tab-status"
-                >
-                  <span className="flex items-center gap-2">
-                    <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
-                    <span className="hidden sm:inline">{t("newsletter.view.tabs.taskStatus", "Status")}</span>
-                    <span className="sm:hidden">{t("newsletter.view.tabs.taskStatusShort", "Status")}</span>
-                  </span>
-                </TabsTrigger>
-                
-                <TabsTrigger 
-                  value="detailed-stats" 
-                  className="relative px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-md data-[state=active]:shadow-emerald-100/50 dark:data-[state=active]:shadow-emerald-900/20 data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30" 
-                  data-testid="tab-detailed-stats"
-                >
-                  <span className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" strokeWidth={1.5} />
-                    <span className="hidden sm:inline">{t("newsletter.view.detailedStats", "Analytics")}</span>
-                    <span className="sm:hidden">{t("newsletter.view.detailedStatsShort", "Stats")}</span>
-                  </span>
-                </TabsTrigger>
-              </TabsList>
-            </div>
-          </div>
+          {(() => {
+            // Tailwind's JIT scans static strings, so the per-accent classes
+            // have to be listed as literal strings here rather than built
+            // from a template like `text-${accent}-600`.
+            const tabTriggerBase =
+              "group relative flex-1 sm:flex-none px-3 sm:px-4 py-2.5 text-sm font-medium transition-all duration-300 ease-out rounded-lg " +
+              "data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:shadow-md " +
+              "data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-gray-400 " +
+              "data-[state=inactive]:hover:text-gray-900 dark:data-[state=inactive]:hover:text-gray-200 " +
+              "data-[state=inactive]:hover:bg-gray-200/50 dark:data-[state=inactive]:hover:bg-gray-700/30";
+
+            const tabs = [
+              {
+                value: "overview",
+                icon: Newspaper,
+                label: t("newsletter.view.tabs.overview", "Overview"),
+                accent: "data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-gray-200/50 dark:data-[state=active]:shadow-black/20",
+              },
+              {
+                value: "live-tracking",
+                icon: Activity,
+                label: t("newsletter.view.tabs.live", "Live"),
+                accent: "data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-blue-100/50 dark:data-[state=active]:shadow-blue-900/20",
+                livePulse: true,
+              },
+              {
+                value: "reactions",
+                icon: Smile,
+                label: t("newsletter.view.tabs.reactions", "Reactions"),
+                shortLabel: t("newsletter.view.tabs.reactionsShort", "React"),
+                accent: "data-[state=active]:text-amber-600 dark:data-[state=active]:text-amber-400 data-[state=active]:shadow-amber-100/50 dark:data-[state=active]:shadow-amber-900/20",
+              },
+              {
+                value: "content",
+                icon: Eye,
+                label: t("newsletter.view.tabs.content", "Content"),
+                shortLabel: t("newsletter.view.tabs.contentShort", "View"),
+                accent: "data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:shadow-indigo-100/50 dark:data-[state=active]:shadow-indigo-900/20",
+              },
+              {
+                value: "status",
+                icon: RefreshCw,
+                label: t("newsletter.view.tabs.taskStatus", "Status"),
+                accent: "data-[state=active]:text-purple-600 dark:data-[state=active]:text-purple-400 data-[state=active]:shadow-purple-100/50 dark:data-[state=active]:shadow-purple-900/20",
+              },
+              {
+                value: "detailed-stats",
+                icon: BarChart3,
+                label: t("newsletter.view.detailedStats", "Analytics"),
+                shortLabel: t("newsletter.view.detailedStatsShort", "Stats"),
+                accent: "data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-emerald-100/50 dark:data-[state=active]:shadow-emerald-900/20",
+              },
+            ] as const;
+
+            return (
+              <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0">
+                <div className="overflow-x-auto scrollbar-hide">
+                  <TabsList className="inline-flex h-12 p-1.5 bg-gradient-to-b from-gray-50/80 to-gray-100/80 dark:from-gray-800/50 dark:to-gray-900/50 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/40 rounded-xl shadow-sm min-w-max">
+                    {tabs.map(({ value, icon: Icon, label, shortLabel, accent, livePulse }) => (
+                      <TabsTrigger
+                        key={value}
+                        value={value}
+                        className={`${tabTriggerBase} ${accent}`}
+                        data-testid={`tab-${value}`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-4 w-4 transition-transform duration-300 group-data-[state=active]:scale-110" strokeWidth={1.5} />
+                          {shortLabel ? (
+                            <>
+                              <span className="hidden sm:inline">{label}</span>
+                              <span className="sm:hidden">{shortLabel}</span>
+                            </>
+                          ) : (
+                            <span>{label}</span>
+                          )}
+                          {livePulse && (
+                            <span className="relative inline-flex h-2 w-2 shrink-0" aria-hidden>
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                              <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                            </span>
+                          )}
+                        </span>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
+                {/* Edge fade masks — hint that more tabs exist when the list
+                    overflows horizontally. Hidden on sm+ where there's room. */}
+                <div className="pointer-events-none absolute top-0 bottom-0 left-0 w-6 bg-gradient-to-r from-white to-transparent dark:from-gray-950 sm:hidden" aria-hidden />
+                <div className="pointer-events-none absolute top-0 bottom-0 right-0 w-6 bg-gradient-to-l from-white to-transparent dark:from-gray-950 sm:hidden" aria-hidden />
+              </div>
+            );
+          })()}
 
           <TabsContent value="live-tracking" className="space-y-6 lg:space-y-8">
             <LiveTrackingPanel newsletterId={newsletter.id} />
