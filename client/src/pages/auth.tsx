@@ -57,6 +57,7 @@ export default function AuthPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [twoFactorData, setTwoFactorData] = useState<{
     tempSessionToken: string;
+    rememberMe: boolean;
   } | null>(null);
   const [is2FAVerifying, setIs2FAVerifying] = useState(false);
   const [is2FAStatusChecking, setIs2FAStatusChecking] = useState(false);
@@ -80,7 +81,8 @@ export default function AuthPage() {
         credentials: 'include',
         body: JSON.stringify({
           email: data.email,
-          password: data.password
+          password: data.password,
+          rememberMe
         })
       });
 
@@ -99,7 +101,8 @@ export default function AuthPage() {
 
       if (check2FAResult.requires2FA) {
         setTwoFactorData({
-          tempSessionToken: check2FAResult.tempSessionToken
+          tempSessionToken: check2FAResult.tempSessionToken,
+          rememberMe,
         });
         setCurrentView("twoFactor");
       } else {
@@ -239,6 +242,7 @@ export default function AuthPage() {
         body: JSON.stringify({
           token: data.token,
           tempSessionToken: twoFactorData.tempSessionToken,
+          rememberMe: twoFactorData.rememberMe,
         }),
       });
 

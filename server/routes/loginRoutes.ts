@@ -46,7 +46,7 @@ function getAuthOrigin(req: any) {
   return process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
 }
 
-async function completeBrowserSignIn(req: any, res: any, email: string, password: string) {
+async function completeBrowserSignIn(req: any, res: any, email: string, password: string, rememberMe: boolean) {
   // Only forward a minimal, audited set of headers into the internal Better
   // Auth handler. Client-supplied `cookie` is intentionally NOT forwarded —
   // an attacker could otherwise seed Better Auth with their own rate-limit
@@ -74,10 +74,13 @@ async function completeBrowserSignIn(req: any, res: any, email: string, password
   const signInUrl = `${authOrigin}/api/auth/sign-in/email`;
   console.log(`🔍 [completeBrowserSignIn] Making internal request to: ${signInUrl}`);
 
+  // Better Auth's sign-in/email honors `rememberMe`: when false it emits a
+  // session-only cookie (no Max-Age) and marks the session row accordingly,
+  // so forwarding the flag is enough — no cookie post-processing needed.
   const signInRequest = new Request(signInUrl, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, rememberMe }),
   });
 
   const signInResponse = await auth.handler(signInRequest);
@@ -270,7 +273,7 @@ setInterval(async () => {
 // sessions. Uses better-auth/crypto to check the password hash directly.
 loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
@@ -278,6 +281,10 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
 
     const normalizedEmail = String(email).toLowerCase().trim();
     const requestIp = req.ip || req.socket?.remoteAddress || 'unknown';
+    // Coerce: only a literal `true` enables the long-lived cookie. Any other
+    // value (including missing/undefined from older clients) falls back to a
+    // session-only cookie, which is the safer default.
+    const remember = rememberMe === true;
 
     // Identity-based lockout. Complements the IP-based loginRateLimiter so a
     // distributed credential-stuffing attack against a single account still
@@ -361,7 +368,7 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
       // client receives the exact cookies Better Auth expects.
       console.log(`✅ [2FA Check] No 2FA required for user ${userRecord.id}`);
 
-      await completeBrowserSignIn(req, res, email, password);
+      await completeBrowserSignIn(req, res, email, password, remember);
       console.log('✅ [2FA Check] Better Auth cookies forwarded for non-2FA user');
 
       return res.json({
@@ -423,7 +430,8 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
 // temp token were leaked).
 loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
   try {
-    const { token, tempSessionToken } = req.body;
+    const { token, tempSessionToken, rememberMe } = req.body;
+    const remember = rememberMe === true;
 
     if (!token) {
       return res.status(400).json({
@@ -522,7 +530,10 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
     await db.delete(temp2faSessions)
       .where(eq(temp2faSessions.id, tempSession.id));
 
-    // Create session directly (same approach as verify-email)
+    // Create session directly (same approach as verify-email). Session row
+    // always lasts 7 days server-side — `rememberMe` only controls whether
+    // the browser cookie is persistent (7-day Max-Age) or session-only
+    // (dropped on browser close).
     const sessionId = `session_${Date.now()}_${randomBytes(12).toString('base64url')}`;
     const newSessionToken = `${sessionId}_token_${randomBytes(18).toString('base64url')}`;
     const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -538,14 +549,18 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
       updatedAt: new Date()
     });
 
-    // Set the session cookie
-    res.cookie('better-auth.session_token', newSessionToken, {
+    // Set the session cookie. Omit `maxAge` when rememberMe is false so the
+    // browser treats it as a session cookie (cleared on browser close).
+    const sessionCookieOpts: Record<string, any> = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: '/'
-    });
+      path: '/',
+    };
+    if (remember) {
+      sessionCookieOpts.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+    }
+    res.cookie('better-auth.session_token', newSessionToken, sessionCookieOpts);
 
     console.log('✅ [2FA] Session created directly after verification for user:', user.id);
 
