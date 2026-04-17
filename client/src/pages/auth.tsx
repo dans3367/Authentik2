@@ -11,7 +11,7 @@ import { useAuth, useLogin, useRegister } from "@/hooks/useAuth";
 import { loginSchema, registerSchema, forgotPasswordSchema } from "@shared/schema";
 import type { LoginCredentials, RegisterData, ForgotPasswordData } from "@shared/schema";
 import { calculatePasswordStrength, getPasswordStrengthText } from "@/lib/authUtils";
-import { Eye, EyeOff, ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Loader2, ShieldCheck, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthView = "login" | "register" | "forgot" | "twoFactor";
@@ -24,30 +24,6 @@ export default function AuthPage() {
     return 'login';
   };
   const [currentView, setCurrentView] = useState<AuthView>(getInitialView);
-
-  // Force dark theme on auth page for the obsidian aesthetic
-  useEffect(() => {
-    const root = document.documentElement;
-    const originalTheme = localStorage.getItem('theme');
-    root.classList.remove('light');
-    root.classList.add('dark');
-
-    return () => {
-      if (originalTheme === 'light' || !originalTheme) {
-        root.classList.remove('dark');
-        root.classList.add('light');
-      }
-    };
-  }, []);
-
-  // Load brand typeface
-  useEffect(() => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@1,6..96,400&display=swap';
-    document.head.appendChild(link);
-    return () => { document.head.removeChild(link); };
-  }, []);
 
   // Sync URL hash when view changes
   useEffect(() => {
@@ -314,185 +290,176 @@ export default function AuthPage() {
     }
   };
 
-  const strengthColors = ['#ef4444', '#f97316', '#eab308', '#22c55e'];
-  const strengthColor = strengthColors[Math.max(0, passwordStrength - 1)] || '#ef4444';
+  // Strength bar color map — Tailwind JIT needs literal classes.
+  const strengthFillClass =
+    passwordStrength >= 4
+      ? 'bg-emerald-500'
+      : passwordStrength === 3
+      ? 'bg-lime-500'
+      : passwordStrength === 2
+      ? 'bg-amber-500'
+      : 'bg-red-500';
+
+  const strengthTextClass =
+    passwordStrength >= 4
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : passwordStrength === 3
+      ? 'text-lime-600 dark:text-lime-400'
+      : passwordStrength === 2
+      ? 'text-amber-600 dark:text-amber-400'
+      : 'text-red-600 dark:text-red-400';
 
   const renderPasswordStrength = () => (
-    <div className="mt-3">
-      <div className="auth-strength-bar">
+    <div className="mt-2">
+      <div className="h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
         <div
-          className="auth-strength-fill"
-          style={{
-            width: `${(passwordStrength / 4) * 100}%`,
-            backgroundColor: strengthColor,
-          }}
+          className={`h-full rounded-full transition-all duration-300 ${strengthFillClass}`}
+          style={{ width: `${(passwordStrength / 4) * 100}%` }}
         />
       </div>
-      <p className="text-xs mt-1.5 transition-colors duration-300" style={{ color: strengthColor }}>
+      <p className={`text-xs mt-1 font-medium transition-colors duration-300 ${strengthTextClass}`}>
         {getPasswordStrengthText(passwordStrength)}
       </p>
     </div>
   );
 
-  // Shared input className for consistent dark styling
-  const inputCx = "bg-white/[0.04] border-white/[0.08] text-white/90 placeholder:text-white/25 h-11";
+  // Consistent sizing for all form inputs on this page.
+  const inputCx = 'h-11';
+
+  // Segmented tab buttons for Sign In / Create Account — uses the same
+  // pill-over-soft-bg language as the newsletter tab bar.
+  const segClass = (active: boolean) =>
+    `flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+      active
+        ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm'
+        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+    }`;
 
   return (
-    <div className="auth-page auth-grain min-h-screen flex items-center justify-center relative overflow-hidden"
-         style={{ background: '#08080a' }}>
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden bg-gray-50 dark:bg-gray-950">
+      {/* Decorative background orbs — blue/indigo/purple palette to match
+          the rest of the project's accent language. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-40 -left-40 w-[28rem] h-[28rem] rounded-full bg-gradient-to-br from-blue-400/25 to-indigo-400/20 dark:from-blue-500/15 dark:to-indigo-500/10 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-40 -right-40 w-[28rem] h-[28rem] rounded-full bg-gradient-to-br from-purple-400/20 to-pink-400/15 dark:from-purple-500/12 dark:to-pink-500/8 blur-3xl"
+      />
 
-      {/* ── Ambient gradient orbs ── */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div
-          className="auth-orb-1 absolute rounded-full"
-          style={{
-            width: 650, height: 650,
-            top: '-12%', right: '-8%',
-            background: 'radial-gradient(circle, rgba(201,149,107,0.18) 0%, transparent 70%)',
-            filter: 'blur(80px)',
-          }}
-        />
-        <div
-          className="auth-orb-2 absolute rounded-full"
-          style={{
-            width: 500, height: 500,
-            bottom: '-18%', left: '-6%',
-            background: 'radial-gradient(circle, rgba(168,120,90,0.12) 0%, transparent 70%)',
-            filter: 'blur(80px)',
-          }}
-        />
-        <div
-          className="auth-orb-3 absolute rounded-full"
-          style={{
-            width: 300, height: 300,
-            top: '40%', left: '50%',
-            background: 'radial-gradient(circle, rgba(201,149,107,0.06) 0%, transparent 70%)',
-            filter: 'blur(60px)',
-          }}
-        />
-      </div>
-
-      {/* ── Content ── */}
-      <div className="relative z-10 w-full max-w-[440px] mx-auto px-6 py-12">
-
+      <div className="relative z-10 w-full max-w-[440px]">
         {/* Brand */}
-        <div className="auth-enter text-center mb-10" style={{ animationDelay: '0ms' }}>
-          <h1
-            className="text-[44px] text-white/90 tracking-tight leading-none select-none"
-            style={{ fontFamily: "'Bodoni Moda', serif", fontStyle: 'italic' }}
-          >
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 mb-4">
+            <ShieldCheck className="w-7 h-7 text-white" strokeWidth={1.5} />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
             Authentik
           </h1>
-          <div className="flex items-center justify-center gap-4 mt-3">
-            <div className="h-px w-10 bg-gradient-to-r from-transparent to-[#c9956b]/30" />
-            <p className="text-[10px] text-white/25 tracking-[0.3em] uppercase font-medium">
-              Secure Platform
-            </p>
-            <div className="h-px w-10 bg-gradient-to-l from-transparent to-[#c9956b]/30" />
-          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Secure platform for modern teams
+          </p>
         </div>
 
         {/* Card */}
-        <div
-          className="auth-enter auth-glass rounded-2xl"
-          style={{ animationDelay: '80ms' }}
-        >
-          {/* ── Tab Navigation ── */}
+        <div className="relative bg-white dark:bg-gray-900 border border-gray-200/60 dark:border-gray-700/40 rounded-2xl shadow-xl overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+
+          {/* Segmented Sign In / Create Account switch */}
           {currentView !== "forgot" && currentView !== "twoFactor" && (
-            <div className="flex border-b border-white/[0.06] px-8 pt-2">
-              <button
-                className={`auth-tab flex-1 py-3.5 text-sm font-medium tracking-wide ${
-                  currentView === "login"
-                    ? "auth-tab-active text-white/90"
-                    : "text-white/35 hover:text-white/55"
-                }`}
-                onClick={() => setCurrentView("login")}
-              >
-                Sign In
-              </button>
-              <button
-                className={`auth-tab flex-1 py-3.5 text-sm font-medium tracking-wide ${
-                  currentView === "register"
-                    ? "auth-tab-active text-white/90"
-                    : "text-white/35 hover:text-white/55"
-                }`}
-                onClick={() => setCurrentView("register")}
-              >
-                Create Account
-              </button>
+            <div className="px-6 sm:px-8 pt-6">
+              <div className="inline-flex w-full p-1 bg-gray-100 dark:bg-gray-800/60 rounded-lg border border-gray-200/60 dark:border-gray-700/40">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("login")}
+                  className={segClass(currentView === "login")}
+                  data-testid="tab-login"
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("register")}
+                  className={segClass(currentView === "register")}
+                  data-testid="tab-register"
+                >
+                  Create Account
+                </button>
+              </div>
             </div>
           )}
 
-          <div className="p-8">
+          <div className="p-6 sm:p-8">
             {/* ══════════════ LOGIN ══════════════ */}
             {currentView === "login" && (
-              <div className="auth-enter" style={{ animationDelay: '150ms' }}>
-                <div className="mb-7">
-                  <h2 className="text-xl font-semibold text-white/90 mb-1.5">Welcome back</h2>
-                  <p className="text-sm text-white/35">Sign in to continue to your dashboard</p>
+              <div>
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Welcome back</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Sign in to continue to your dashboard</p>
                 </div>
 
-                <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-5">
+                <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
                   <div>
-                    <Label htmlFor="email" className="text-white/50 text-xs font-medium tracking-wide uppercase">
+                    <Label htmlFor="email" className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                       Email
                     </Label>
                     <Input
                       id="email"
                       type="email"
                       placeholder="you@company.com"
-                      className={`mt-2 ${inputCx}`}
+                      className={`mt-1.5 ${inputCx}`}
                       {...loginForm.register("email")}
                     />
                     {loginForm.formState.errors.email && (
-                      <p className="text-red-400 text-xs mt-1.5">
+                      <p className="text-red-500 dark:text-red-400 text-xs mt-1.5">
                         {loginForm.formState.errors.email.message}
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <Label htmlFor="password" className="text-white/50 text-xs font-medium tracking-wide uppercase">
+                    <Label htmlFor="password" className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                       Password
                     </Label>
-                    <div className="relative mt-2">
+                    <div className="relative mt-1.5">
                       <Input
                         id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
-                        className={`pr-11 ${inputCx}`}
+                        className={`${inputCx} pr-11`}
                         {...loginForm.register("password")}
                       />
                       <button
                         type="button"
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                         onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
                       >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showPassword ? <EyeOff className="w-4 h-4" strokeWidth={1.5} /> : <Eye className="w-4 h-4" strokeWidth={1.5} />}
                       </button>
                     </div>
                     {loginForm.formState.errors.password && (
-                      <p className="text-red-400 text-xs mt-1.5">
+                      <p className="text-red-500 dark:text-red-400 text-xs mt-1.5">
                         {loginForm.formState.errors.password.message}
                       </p>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-2">
                       <Checkbox
                         id="remember"
                         checked={rememberMe}
                         onCheckedChange={(checked) => setRememberMe(checked === true)}
-                        className="border-white/15 data-[state=checked]:bg-[#c9956b] data-[state=checked]:border-[#c9956b]"
                       />
-                      <Label htmlFor="remember" className="text-sm text-white/35 cursor-pointer">
+                      <Label htmlFor="remember" className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
                         Remember me
                       </Label>
                     </div>
                     <button
                       type="button"
-                      className="text-sm text-[#c9956b]/80 hover:text-[#c9956b] transition-colors font-medium"
+                      className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                       onClick={() => setCurrentView("forgot")}
                     >
                       Forgot password?
@@ -501,7 +468,7 @@ export default function AuthPage() {
 
                   <Button
                     type="submit"
-                    className="auth-btn-primary w-full h-11 mt-2 text-sm"
+                    className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 transition-all duration-300"
                     disabled={isLoginLoading || is2FAStatusChecking}
                   >
                     {isLoginLoading || is2FAStatusChecking ? (
@@ -519,42 +486,42 @@ export default function AuthPage() {
 
             {/* ══════════════ REGISTER ══════════════ */}
             {currentView === "register" && (
-              <div className="auth-enter" style={{ animationDelay: '150ms' }}>
-                <div className="mb-7">
-                  <h2 className="text-xl font-semibold text-white/90 mb-1.5">Get started</h2>
-                  <p className="text-sm text-white/35">Create your account in seconds</p>
+              <div>
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Get started</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Create your account in seconds</p>
                 </div>
 
                 <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label htmlFor="firstName" className="text-white/50 text-xs font-medium tracking-wide uppercase">
+                      <Label htmlFor="firstName" className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                         First name
                       </Label>
                       <Input
                         id="firstName"
                         placeholder="John"
-                        className={`mt-2 ${inputCx}`}
+                        className={`mt-1.5 ${inputCx}`}
                         {...registerForm.register("firstName")}
                       />
                       {registerForm.formState.errors.firstName && (
-                        <p className="text-red-400 text-xs mt-1">
+                        <p className="text-red-500 dark:text-red-400 text-xs mt-1">
                           {registerForm.formState.errors.firstName.message}
                         </p>
                       )}
                     </div>
                     <div>
-                      <Label htmlFor="lastName" className="text-white/50 text-xs font-medium tracking-wide uppercase">
+                      <Label htmlFor="lastName" className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                         Last name
                       </Label>
                       <Input
                         id="lastName"
                         placeholder="Doe"
-                        className={`mt-2 ${inputCx}`}
+                        className={`mt-1.5 ${inputCx}`}
                         {...registerForm.register("lastName")}
                       />
                       {registerForm.formState.errors.lastName && (
-                        <p className="text-red-400 text-xs mt-1">
+                        <p className="text-red-500 dark:text-red-400 text-xs mt-1">
                           {registerForm.formState.errors.lastName.message}
                         </p>
                       )}
@@ -562,62 +529,63 @@ export default function AuthPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor="companyName" className="text-white/50 text-xs font-medium tracking-wide uppercase">
+                    <Label htmlFor="companyName" className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                       Company
                     </Label>
                     <Input
                       id="companyName"
                       placeholder="Acme Inc."
-                      className={`mt-2 ${inputCx}`}
+                      className={`mt-1.5 ${inputCx}`}
                       {...registerForm.register("companyName")}
                     />
                     {registerForm.formState.errors.companyName && (
-                      <p className="text-red-400 text-xs mt-1">
+                      <p className="text-red-500 dark:text-red-400 text-xs mt-1">
                         {registerForm.formState.errors.companyName.message}
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <Label htmlFor="registerEmail" className="text-white/50 text-xs font-medium tracking-wide uppercase">
+                    <Label htmlFor="registerEmail" className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                       Email
                     </Label>
                     <Input
                       id="registerEmail"
                       type="email"
                       placeholder="john@company.com"
-                      className={`mt-2 ${inputCx}`}
+                      className={`mt-1.5 ${inputCx}`}
                       {...registerForm.register("email")}
                     />
                     {registerForm.formState.errors.email && (
-                      <p className="text-red-400 text-xs mt-1">
+                      <p className="text-red-500 dark:text-red-400 text-xs mt-1">
                         {registerForm.formState.errors.email.message}
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <Label htmlFor="registerPassword" className="text-white/50 text-xs font-medium tracking-wide uppercase">
+                    <Label htmlFor="registerPassword" className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                       Password
                     </Label>
-                    <div className="relative mt-2">
+                    <div className="relative mt-1.5">
                       <Input
                         id="registerPassword"
                         type={showRegisterPassword ? "text" : "password"}
                         placeholder="Create a strong password"
-                        className={`pr-11 ${inputCx}`}
+                        className={`${inputCx} pr-11`}
                         {...registerForm.register("password")}
                       />
                       <button
                         type="button"
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                         onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                        aria-label={showRegisterPassword ? "Hide password" : "Show password"}
                       >
-                        {showRegisterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showRegisterPassword ? <EyeOff className="w-4 h-4" strokeWidth={1.5} /> : <Eye className="w-4 h-4" strokeWidth={1.5} />}
                       </button>
                     </div>
                     {registerForm.formState.errors.password && (
-                      <p className="text-red-400 text-xs mt-1">
+                      <p className="text-red-500 dark:text-red-400 text-xs mt-1">
                         {registerForm.formState.errors.password.message}
                       </p>
                     )}
@@ -625,36 +593,36 @@ export default function AuthPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor="confirmPassword" className="text-white/50 text-xs font-medium tracking-wide uppercase">
+                    <Label htmlFor="confirmPassword" className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                       Confirm password
                     </Label>
                     <Input
                       id="confirmPassword"
                       type="password"
                       placeholder="Confirm your password"
-                      className={`mt-2 ${inputCx}`}
+                      className={`mt-1.5 ${inputCx}`}
                       {...registerForm.register("confirmPassword")}
                     />
                     {registerForm.formState.errors.confirmPassword && (
-                      <p className="text-red-400 text-xs mt-1">
+                      <p className="text-red-500 dark:text-red-400 text-xs mt-1">
                         {registerForm.formState.errors.confirmPassword.message}
                       </p>
                     )}
                   </div>
 
-                  <div className="flex items-start space-x-3 pt-1">
+                  <div className="flex items-start gap-3 pt-1">
                     <Checkbox
                       id="terms"
                       required
-                      className="mt-0.5 border-white/15 data-[state=checked]:bg-[#c9956b] data-[state=checked]:border-[#c9956b]"
+                      className="mt-0.5"
                     />
-                    <Label htmlFor="terms" className="text-sm text-white/35 leading-relaxed cursor-pointer">
+                    <Label htmlFor="terms" className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed cursor-pointer">
                       I agree to the{" "}
-                      <a href="#" className="text-[#c9956b]/80 hover:text-[#c9956b] transition-colors">
+                      <a href="#" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors">
                         Terms of Service
                       </a>{" "}
                       and{" "}
-                      <a href="#" className="text-[#c9956b]/80 hover:text-[#c9956b] transition-colors">
+                      <a href="#" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors">
                         Privacy Policy
                       </a>
                     </Label>
@@ -662,7 +630,7 @@ export default function AuthPage() {
 
                   <Button
                     type="submit"
-                    className="auth-btn-primary w-full h-11 mt-2 text-sm"
+                    className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 transition-all duration-300"
                     disabled={isRegisterLoading}
                   >
                     {isRegisterLoading ? (
@@ -680,33 +648,33 @@ export default function AuthPage() {
 
             {/* ══════════════ FORGOT PASSWORD ══════════════ */}
             {currentView === "forgot" && (
-              <div className="auth-enter" style={{ animationDelay: '150ms' }}>
-                <div className="mb-7">
+              <div>
+                <div className="mb-6">
                   <button
-                    className="flex items-center text-white/35 hover:text-white/60 transition-colors mb-5 text-sm"
+                    className="inline-flex items-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors mb-4 text-sm font-medium"
                     onClick={() => setCurrentView("login")}
                   >
-                    <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+                    <ArrowLeft className="w-3.5 h-3.5 mr-1.5" strokeWidth={1.5} />
                     Back to sign in
                   </button>
-                  <h2 className="text-xl font-semibold text-white/90 mb-1.5">Reset password</h2>
-                  <p className="text-sm text-white/35">We'll send you a link to reset your password</p>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Reset password</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">We'll send you a link to reset your password</p>
                 </div>
 
-                <form onSubmit={forgotForm.handleSubmit(onForgotPassword)} className="space-y-5">
+                <form onSubmit={forgotForm.handleSubmit(onForgotPassword)} className="space-y-4">
                   <div>
-                    <Label htmlFor="resetEmail" className="text-white/50 text-xs font-medium tracking-wide uppercase">
+                    <Label htmlFor="resetEmail" className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                       Email address
                     </Label>
                     <Input
                       id="resetEmail"
                       type="email"
                       placeholder="you@company.com"
-                      className={`mt-2 ${inputCx}`}
+                      className={`mt-1.5 ${inputCx}`}
                       {...forgotForm.register("email")}
                     />
                     {forgotForm.formState.errors.email && (
-                      <p className="text-red-400 text-xs mt-1.5">
+                      <p className="text-red-500 dark:text-red-400 text-xs mt-1.5">
                         {forgotForm.formState.errors.email.message}
                       </p>
                     )}
@@ -714,7 +682,7 @@ export default function AuthPage() {
 
                   <Button
                     type="submit"
-                    className="auth-btn-primary w-full h-11 text-sm"
+                    className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 transition-all duration-300"
                     disabled={forgotPasswordMutation.isPending}
                   >
                     {forgotPasswordMutation.isPending ? (
@@ -732,23 +700,28 @@ export default function AuthPage() {
 
             {/* ══════════════ TWO-FACTOR ══════════════ */}
             {currentView === "twoFactor" && (
-              <div className="auth-enter" style={{ animationDelay: '150ms' }}>
-                <div className="mb-7">
+              <div>
+                <div className="mb-6">
                   <button
                     onClick={() => {
                       setCurrentView("login");
                       setTwoFactorData(null);
                     }}
-                    className="flex items-center text-white/35 hover:text-white/60 transition-colors mb-5 text-sm"
+                    className="inline-flex items-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors mb-4 text-sm font-medium"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+                    <ArrowLeft className="w-3.5 h-3.5 mr-1.5" strokeWidth={1.5} />
                     Back to login
                   </button>
-                  <h2 className="text-xl font-semibold text-white/90 mb-1.5">Two-factor authentication</h2>
-                  <p className="text-sm text-white/35">Enter the 6-digit code from your authenticator app</p>
+                  <div className="flex items-center gap-2.5 mb-1.5">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 flex items-center justify-center">
+                      <KeyRound className="h-5 w-5 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
+                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Two-factor authentication</h2>
+                  </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Enter the 6-digit code from your authenticator app</p>
                 </div>
 
-                <form onSubmit={twoFactorForm.handleSubmit(onTwoFactorSubmit)} className="space-y-6">
+                <form onSubmit={twoFactorForm.handleSubmit(onTwoFactorSubmit)} className="space-y-5">
                   <div className="flex justify-center">
                     <InputOTP
                       maxLength={6}
@@ -761,7 +734,7 @@ export default function AuthPage() {
                           <InputOTPSlot
                             key={index}
                             index={index}
-                            className="auth-otp-slot"
+                            className="w-11 h-12 text-lg font-semibold rounded-lg border-gray-200 dark:border-gray-700"
                           />
                         ))}
                       </InputOTPGroup>
@@ -769,21 +742,21 @@ export default function AuthPage() {
                   </div>
 
                   {twoFactorForm.formState.errors.token && (
-                    <p className="text-red-400 text-xs text-center">
+                    <p className="text-red-500 dark:text-red-400 text-xs text-center">
                       {twoFactorForm.formState.errors.token.message}
                     </p>
                   )}
 
-                  <Alert className="bg-white/[0.03] border-white/[0.06] text-white/50">
-                    <ShieldCheck className="h-4 w-4 text-[#c9956b]/60" />
-                    <AlertDescription className="text-white/40 text-sm">
+                  <Alert className="bg-blue-50/80 dark:bg-blue-950/30 border-blue-200/60 dark:border-blue-800/40">
+                    <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
+                    <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm">
                       Open your authenticator app and enter the 6-digit code for Authentik.
                     </AlertDescription>
                   </Alert>
 
                   <Button
                     type="submit"
-                    className="auth-btn-primary w-full h-11 text-sm"
+                    className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 transition-all duration-300"
                     disabled={is2FAVerifying}
                   >
                     {is2FAVerifying ? (
@@ -802,14 +775,9 @@ export default function AuthPage() {
         </div>
 
         {/* Footer */}
-        <div
-          className="auth-enter text-center mt-8"
-          style={{ animationDelay: '200ms' }}
-        >
-          <p className="text-[11px] text-white/15 tracking-wide">
-            Protected by enterprise-grade encryption
-          </p>
-        </div>
+        <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-6">
+          Protected by enterprise-grade encryption
+        </p>
       </div>
     </div>
   );
