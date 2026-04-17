@@ -37,6 +37,7 @@ import appointmentNotesRoutes from "./routes/appointmentNotesRoutes";
 import appointmentConfirmationRoutes from "./routes/appointmentConfirmationRoutes";
 import suppressionManagementRoutes from "./routes/suppressionManagementRoutes";
 import aiRoutes from "./routes/aiRoutes";
+import newsletterAIRoutes from "./routes/newsletterAIRoutes";
 import { templateRoutes } from "./routes/templateRoutes";
 import { signupRoutes } from "./routes/signupRoutes";
 import { tenantFixRoutes } from "./routes/tenantFixRoutes";
@@ -170,6 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/shops", shopsRoutes);
   app.use("/api", emailManagementRoutes);
   app.use("/api/newsletters", translationRoutes);  // Must be before newsletterRoutes so /translation-languages isn't caught by /:id
+  app.use("/api/newsletters/ai", newsletterAIRoutes);  // Must be before newsletterRoutes so /ai/* isn't caught by /:id
   app.use("/api/newsletters", newsletterRoutes);
   app.use("/api/card-images", cardImageRoutes);
   app.use("/api/newsletter-images", newsletterImageRoutes);

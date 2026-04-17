@@ -256,6 +256,10 @@ export default function NewsletterCreatePage() {
               parsed.root.props.subject = nl.subject || parsed.root.props.subject || "";
             }
             setData(parsed);
+            // Keep dataRef in sync. Puck's onChange only fires after user edits,
+            // so without this the ref stays at initialData and the "Back to Editor"
+            // button from the preview pane wipes the content.
+            dataRef.current = parsed;
           }
         } catch {
           // puckData was invalid JSON, start fresh
