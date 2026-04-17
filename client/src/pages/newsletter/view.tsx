@@ -1228,14 +1228,14 @@ export default function NewsletterViewPage() {
             return (
               <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0">
                 <div className="overflow-x-auto scrollbar-hide">
-                  <TabsList className="inline-flex h-12 p-1.5 bg-gradient-to-b from-gray-50/80 to-gray-100/80 dark:from-gray-800/50 dark:to-gray-900/50 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/40 rounded-xl shadow-sm min-w-max">
-                    {tabs.map(({ value, icon: Icon, label, shortLabel, accent, livePulse }) => (
-                      <TabsTrigger
-                        key={value}
-                        value={value}
-                        className={`${tabTriggerBase} ${accent}`}
-                        data-testid={`tab-${value}`}
-                      >
+                    <TabsList className="inline-flex h-12 p-1.5 gap-1.5 bg-gradient-to-b from-gray-50/80 to-gray-100/80 dark:from-gray-800/50 dark:to-gray-900/50 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/40 rounded-xl shadow-sm min-w-max">
+                      {tabs.map(({ value, icon: Icon, label, shortLabel, accent, livePulse }) => (
+                        <TabsTrigger
+                          key={value}
+                          value={value}
+                          className={`${tabTriggerBase} ${accent}`}
+                          data-testid={`tab-${value}`}
+                        >
                         <span className="flex items-center gap-2">
                           <Icon className="h-4 w-4 transition-transform duration-300 group-data-[state=active]:scale-110" strokeWidth={1.5} />
                           {shortLabel ? (
