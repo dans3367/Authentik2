@@ -1146,23 +1146,23 @@ export default function NewsletterViewPage() {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-lg bg-red-50/70 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 px-2 py-2">
-                  <p className="text-lg lg:text-2xl font-bold tabular-nums text-red-700 dark:text-red-300" data-testid="text-bounces-count">
+                <div className="rounded-lg bg-red-50/70 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 px-2 py-2 text-center">
+                  <p className="text-base lg:text-lg font-bold tabular-nums text-red-700 dark:text-red-300" data-testid="text-bounces-count">
                     {liveStats?.bounced ?? 0}
                   </p>
-                  <p className="text-[10px] lg:text-xs font-medium text-red-600/80 dark:text-red-400/80 uppercase tracking-wide">{t("newsletter.view.bounced", "Bounced")}</p>
+                  <p className="text-[9px] font-medium text-red-600/80 dark:text-red-400/80 uppercase tracking-wide">{t("newsletter.view.bounced", "Bounced")}</p>
                 </div>
-                <div className="rounded-lg bg-amber-50/70 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 px-2 py-2">
-                  <p className="text-lg lg:text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-300" data-testid="text-suppressed-count">
+                <div className="rounded-lg bg-amber-50/70 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 px-2 py-2 text-center">
+                  <p className="text-base lg:text-lg font-bold tabular-nums text-amber-700 dark:text-amber-300" data-testid="text-suppressed-count">
                     {liveStats?.suppressed ?? 0}
                   </p>
-                  <p className="text-[10px] lg:text-xs font-medium text-amber-600/80 dark:text-amber-400/80 uppercase tracking-wide">{t("newsletter.view.suppressed", "Suppressed")}</p>
+                  <p className="text-[9px] font-medium text-amber-600/80 dark:text-amber-400/80 uppercase tracking-wide">{t("newsletter.view.suppressed", "Suppressed")}</p>
                 </div>
-                <div className="rounded-lg bg-orange-50/70 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-900/30 px-2 py-2">
-                  <p className="text-lg lg:text-2xl font-bold tabular-nums text-orange-700 dark:text-orange-300" data-testid="text-complaints-count">
+                <div className="rounded-lg bg-orange-50/70 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-900/30 px-2 py-2 text-center">
+                  <p className="text-base lg:text-lg font-bold tabular-nums text-orange-700 dark:text-orange-300" data-testid="text-complaints-count">
                     {liveStats?.complained ?? 0}
                   </p>
-                  <p className="text-[10px] lg:text-xs font-medium text-orange-600/80 dark:text-orange-400/80 uppercase tracking-wide">{t("newsletter.view.complaints", "Complaints")}</p>
+                  <p className="text-[9px] font-medium text-orange-600/80 dark:text-orange-400/80 uppercase tracking-wide">{t("newsletter.view.complaints", "Complaints")}</p>
                 </div>
               </div>
             </CardContent>
