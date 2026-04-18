@@ -10,6 +10,28 @@ const router = Router();
 const AI_MODEL = 'google/gemini-2.5-flash-lite';
 const PLACEHOLDER_SRC = 'https://placehold.co/600x400/e2e8f0/64748b?text=Select+image';
 
+/**
+ * Log an error without letting util.inspect crash on it.
+ * AI SDK v5 errors can contain getters, streams, or circular refs that
+ * throw inside Node's default console.error formatting.
+ */
+function logSafe(label: string, error: unknown): void {
+  const e = error as any;
+  const safe = {
+    name: e?.name,
+    message: e?.message,
+    code: e?.code,
+    status: e?.status ?? e?.statusCode,
+    cause: e?.cause?.message,
+  };
+  try {
+    console.error(label, safe);
+    if (e?.stack) console.error(e.stack);
+  } catch {
+    console.error(label, e?.message || '(unloggable error)');
+  }
+}
+
 function ensureApiKey(res: any): boolean {
   if (!process.env.AI_GATEWAY_API_KEY) {
     res.status(500).json({ success: false, error: 'AI Gateway API key not configured' });
@@ -115,6 +137,8 @@ function transformToPuckData(structure: NewsletterStructure): { puckData: any; i
             sizing: 'fill',
             borderRadius: 8,
             caption: block.caption || '',
+            imageQuery: block.imageQuery,
+            aiGenerated: true,
           },
         });
         content.push({ type: 'Space', props: { id: uid('space'), size: '24px', direction: 'vertical' } });
@@ -194,7 +218,7 @@ RULES:
       imageSlots,
     });
   } catch (error: any) {
-    console.error('generate-structure error:', error);
+    logSafe('generate-structure error:', error);
     res.status(500).json({ success: false, error: error?.message || 'Failed to generate newsletter structure' });
   }
 });
@@ -255,7 +279,7 @@ const SlotQuerySchema = z.object({
 
 const ImageSuggestionsBodySchema = z.object({
   slots: z.array(SlotQuerySchema).min(1).max(5),
-  perSlot: z.number().int().min(1).max(6).optional(),
+  perSlot: z.number().int().min(1).max(18).optional(),
 });
 
 router.post('/image-suggestions', authenticateToken, requireTenant, requirePermission('newsletters.create'), async (req: any, res) => {
@@ -280,7 +304,7 @@ router.post('/image-suggestions', authenticateToken, requireTenant, requirePermi
 
     res.json({ success: true, results });
   } catch (error: any) {
-    console.error('image-suggestions error:', error);
+    logSafe('image-suggestions error:', error);
     res.status(500).json({ success: false, error: error?.message || 'Failed to fetch image suggestions' });
   }
 });
@@ -365,7 +389,7 @@ router.post('/finalize', authenticateToken, requireTenant, requirePermission('ne
       editUrl: `/newsletter/create/${newsletter.id}?editor=classic`,
     });
   } catch (error: any) {
-    console.error('finalize error:', error);
+    logSafe('finalize error:', error);
     res.status(500).json({ success: false, error: error?.message || 'Failed to finalize newsletter' });
   }
 });
@@ -390,7 +414,7 @@ router.get('/unsplash-search', authenticateToken, requireTenant, async (req: any
     const results = await unsplashProvider.search(q, perPage);
     res.json({ success: true, results });
   } catch (error: any) {
-    console.error('unsplash-search error:', error);
+    logSafe('unsplash-search error:', error);
     res.status(500).json({ success: false, error: error?.message || 'Unsplash search failed' });
   }
 });

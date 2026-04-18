@@ -777,7 +777,7 @@ export default function NewsletterViewPage() {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Button
                   onClick={() => navigate('/newsletter')}
-                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 transition-all duration-300 px-6"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg transition-all duration-300 px-6"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" strokeWidth={1.5} />
                   {t("newsletter.view.backToNewsletters", "Back to Newsletters")}

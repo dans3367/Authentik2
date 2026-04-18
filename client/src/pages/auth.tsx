@@ -472,7 +472,7 @@ export default function AuthPage() {
 
                   <Button
                     type="submit"
-                    className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 transition-all duration-300"
+                    className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg transition-all duration-300"
                     disabled={isLoginLoading || is2FAStatusChecking}
                   >
                     {isLoginLoading || is2FAStatusChecking ? (
@@ -634,7 +634,7 @@ export default function AuthPage() {
 
                   <Button
                     type="submit"
-                    className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 transition-all duration-300"
+                    className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg transition-all duration-300"
                     disabled={isRegisterLoading}
                   >
                     {isRegisterLoading ? (
@@ -686,7 +686,7 @@ export default function AuthPage() {
 
                   <Button
                     type="submit"
-                    className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 transition-all duration-300"
+                    className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg transition-all duration-300"
                     disabled={forgotPasswordMutation.isPending}
                   >
                     {forgotPasswordMutation.isPending ? (
@@ -760,7 +760,7 @@ export default function AuthPage() {
 
                   <Button
                     type="submit"
-                    className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 dark:shadow-blue-500/15 transition-all duration-300"
+                    className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg transition-all duration-300"
                     disabled={is2FAVerifying}
                   >
                     {is2FAVerifying ? (

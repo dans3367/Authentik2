@@ -8,6 +8,8 @@ import {
   Check,
   RefreshCw,
   ImageIcon,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   Dialog,
@@ -88,6 +90,8 @@ export function AINewsletterWizardModal({
   const [selections, setSelections] = useState<Record<string, ImageCandidate>>({});
   const [requeryText, setRequeryText] = useState<Record<string, string>>({});
   const [requeryingSlot, setRequeryingSlot] = useState<string | null>(null);
+  const [expandedSlots, setExpandedSlots] = useState<Record<string, boolean>>({});
+  const [expandingSlot, setExpandingSlot] = useState<string | null>(null);
 
   // Step 3 state
   const [isFinalizing, setIsFinalizing] = useState(false);
@@ -107,6 +111,8 @@ export function AINewsletterWizardModal({
     setSelections({});
     setRequeryText({});
     setRequeryingSlot(null);
+    setExpandedSlots({});
+    setExpandingSlot(null);
     setIsFinalizing(false);
     setIsLoadingImages(false);
   }, [open]);
@@ -197,6 +203,13 @@ export function AINewsletterWizardModal({
         delete next[slot.blockId];
         return next;
       });
+      // Collapse expansion since we reset to a fresh 3 candidates
+      setExpandedSlots((prev) => {
+        if (!prev[slot.blockId]) return prev;
+        const next = { ...prev };
+        delete next[slot.blockId];
+        return next;
+      });
     } catch (error: any) {
       toast({
         title: "Search failed",
@@ -205,6 +218,41 @@ export function AINewsletterWizardModal({
       });
     } finally {
       setRequeryingSlot(null);
+    }
+  }
+
+  async function handleShowMore(slot: ImageSlot) {
+    const currentCount = slotResults[slot.blockId]?.candidates.length ?? 0;
+    const query = (requeryText[slot.blockId] ?? slot.imageQuery).trim();
+    if (query.length < 2) return;
+
+    // Already have enough results — just reveal them.
+    if (currentCount >= 12) {
+      setExpandedSlots((prev) => ({ ...prev, [slot.blockId]: true }));
+      return;
+    }
+
+    setExpandingSlot(slot.blockId);
+    try {
+      const res = await apiRequest("POST", `/api/newsletters/ai/image-suggestions${shopParam}`, {
+        slots: [{ blockId: slot.blockId, imageQuery: query }],
+        perSlot: 12,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Search failed");
+      }
+      const fresh = (data.results as SlotResult[])[0];
+      setSlotResults((prev) => ({ ...prev, [slot.blockId]: fresh }));
+      setExpandedSlots((prev) => ({ ...prev, [slot.blockId]: true }));
+    } catch (error: any) {
+      toast({
+        title: "Could not load more images",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setExpandingSlot(null);
     }
   }
 
@@ -328,6 +376,13 @@ export function AINewsletterWizardModal({
                 const selected = selections[slot.blockId];
                 const isRequerying = requeryingSlot === slot.blockId;
                 const currentQuery = requeryText[slot.blockId] ?? slot.imageQuery;
+                const isExpanded = !!expandedSlots[slot.blockId];
+                const isExpanding = expandingSlot === slot.blockId;
+                const totalCandidates = result?.candidates.length ?? 0;
+                const visibleCandidates = isExpanded
+                  ? result?.candidates ?? []
+                  : (result?.candidates ?? []).slice(0, 3);
+                const canShowMore = !isExpanded && totalCandidates > 0 && !result?.error;
 
                 return (
                   <div key={slot.blockId} className="space-y-2.5">
@@ -384,42 +439,76 @@ export function AINewsletterWizardModal({
                         No images found. Try a different search.
                       </div>
                     ) : (
-                      <div className="grid grid-cols-3 gap-2">
-                        {result?.candidates.map((cand) => {
-                          const isSelected = selected?.id === cand.id && selected?.provider === cand.provider;
-                          return (
+                      <>
+                        <div className="grid grid-cols-3 gap-2">
+                          {visibleCandidates.map((cand) => {
+                            const isSelected = selected?.id === cand.id && selected?.provider === cand.provider;
+                            return (
+                              <button
+                                key={`${cand.provider}-${cand.id}`}
+                                type="button"
+                                onClick={() =>
+                                  setSelections((prev) => ({ ...prev, [slot.blockId]: cand }))
+                                }
+                                className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
+                                  isSelected
+                                    ? "border-emerald-500 shadow-md ring-1 ring-emerald-500/30"
+                                    : "border-transparent hover:border-muted-foreground/30"
+                                }`}
+                              >
+                                <img
+                                  src={cand.thumbUrl}
+                                  alt={cand.alt}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                />
+                                {isSelected && (
+                                  <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                                  </div>
+                                )}
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1">
+                                  <div className="text-[10px] text-white/90 truncate">
+                                    {cand.attribution.name}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="pt-1">
+                          {isExpanded ? (
                             <button
-                              key={`${cand.provider}-${cand.id}`}
                               type="button"
                               onClick={() =>
-                                setSelections((prev) => ({ ...prev, [slot.blockId]: cand }))
+                                setExpandedSlots((prev) => {
+                                  const next = { ...prev };
+                                  delete next[slot.blockId];
+                                  return next;
+                                })
                               }
-                              className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
-                                isSelected
-                                  ? "border-emerald-500 shadow-md ring-1 ring-emerald-500/30"
-                                  : "border-transparent hover:border-muted-foreground/30"
-                              }`}
+                              className="text-xs font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 inline-flex items-center gap-1"
                             >
-                              <img
-                                src={cand.thumbUrl}
-                                alt={cand.alt}
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                              />
-                              {isSelected && (
-                                <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                                  <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                                </div>
-                              )}
-                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1">
-                                <div className="text-[10px] text-white/90 truncate">
-                                  {cand.attribution.name}
-                                </div>
-                              </div>
+                              <ChevronUp className="w-3 h-3" />
+                              Show fewer photos
                             </button>
-                          );
-                        })}
-                      </div>
+                          ) : canShowMore ? (
+                            <button
+                              type="button"
+                              onClick={() => handleShowMore(slot)}
+                              disabled={isExpanding || currentQuery.trim().length < 2}
+                              className="text-xs font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 disabled:opacity-50 inline-flex items-center gap-1"
+                            >
+                              {isExpanding ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3" />
+                              )}
+                              Show more photos for "{currentQuery.trim()}"
+                            </button>
+                          ) : null}
+                        </div>
+                      </>
                     )}
                   </div>
                 );

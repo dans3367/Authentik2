@@ -219,7 +219,7 @@ export default function EmailCompose() {
               <Save className="w-4 h-4 mr-2" />
               Save Draft
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700">
+            <Button className="bg-indigo-600 hover:bg-indigo-700">
               <Send className="w-4 h-4 mr-2" />
               Send Campaign
             </Button>

@@ -801,7 +801,7 @@ export default function ProfilePage() {
                       <Button
                         type="submit"
                         disabled={updateProfileMutation.isPending}
-                        className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white shadow-lg px-6 h-11"
+                        className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg px-6 h-11"
                       >
                         {updateProfileMutation.isPending ? (
                           <>

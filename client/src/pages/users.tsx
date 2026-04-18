@@ -536,7 +536,7 @@ export default function UsersPage() {
                 </p>
                 <Button
                   onClick={() => setLocation('/profile?tab=subscription')}
-                  className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
+                  className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white"
                 >
                   {t('users.upgradePlan', 'Upgrade Plan')}
                 </Button>
@@ -965,7 +965,7 @@ export default function UsersPage() {
                         <DialogTrigger asChild>
                           <Button
                             disabled={!limits.canAddUser}
-                            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                            className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                           >
                             <Plus className="h-4 w-4 mr-2" />
                             {t('users.addUser')}
@@ -1095,7 +1095,7 @@ export default function UsersPage() {
                                 <Button
                                   type="submit"
                                   disabled={createUserMutation.isPending}
-                                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                                  className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                                 >
                                   {createUserMutation.isPending ? t('users.createDialog.creating') : t('users.createDialog.createUser')}
                                 </Button>
@@ -1602,7 +1602,7 @@ export default function UsersPage() {
                       <Button
                         type="submit"
                         disabled={updateUserMutation.isPending}
-                        className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                        className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                       >
                         {updateUserMutation.isPending ? "Updating..." : "Update User"}
                       </Button>
@@ -1715,7 +1715,7 @@ export default function UsersPage() {
                     <Button
                       onClick={handleSetPassword}
                       disabled={!isPasswordValid || !doPasswordsMatch || setPasswordMutation.isPending}
-                      className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                      className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                     >
                       {setPasswordMutation.isPending ? "Setting..." : "Set Password"}
                     </Button>

@@ -1063,7 +1063,7 @@ export default function EditEmailContact() {
                     <Button
                       type="submit"
                       disabled={updateContactMutation.isPending}
-                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
                     >
                       {updateContactMutation.isPending ? (
                         <>

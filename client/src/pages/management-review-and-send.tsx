@@ -317,7 +317,7 @@ export default function ManagementReviewAndSend() {
                                     </p>
                                     <Button
                                         onClick={() => setLocation("/profile?tab=subscription")}
-                                        className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
+                                        className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white"
                                     >
                                         {t("reviewAndSend.upgradePlan", "Upgrade Plan")}
                                     </Button>

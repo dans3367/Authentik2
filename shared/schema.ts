@@ -399,7 +399,9 @@ export const emailContacts = pgTable("email_contacts", {
   prefSurveysForms: boolean("pref_surveys_forms").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  tenantEmailUnique: uniqueIndex("email_contacts_tenant_email_unique").on(table.tenantId, table.email),
+}));
 
 export const emailLists = pgTable("email_lists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

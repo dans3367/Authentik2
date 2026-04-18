@@ -386,7 +386,7 @@ export default function ManagementRolesPermissions() {
                 </p>
                 <Button
                   onClick={() => setLocation('/profile?tab=subscription')}
-                  className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
+                  className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white"
                 >
                   {t('management.rolesPermissions.upgradePlan', 'Upgrade Plan')}
                 </Button>
@@ -687,7 +687,7 @@ export default function ManagementRolesPermissions() {
                       size="sm"
                       onClick={savePermissions}
                       disabled={pendingChangeCount === 0 || savePermissionsMutation.isPending}
-                      className="bg-blue-600 hover:bg-blue-700"
+                      className="bg-indigo-600 hover:bg-indigo-700"
                     >
                       <Save className="h-3.5 w-3.5 mr-1" />
                       {savePermissionsMutation.isPending
@@ -1179,7 +1179,7 @@ export default function ManagementRolesPermissions() {
             <Button
               onClick={confirmRoleChange}
               disabled={changeRoleMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-indigo-600 hover:bg-indigo-700"
             >
               {changeRoleMutation.isPending
                 ? t("management.rolesPermissions.updating", "Updating...")

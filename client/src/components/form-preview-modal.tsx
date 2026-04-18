@@ -131,7 +131,7 @@ const fallbackThemes: FormTheme[] = [
       field: 'mb-6',
       label: 'block text-sm font-medium text-gray-700 mb-2',
       input: 'w-full px-4 py-3 h-12 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 bg-white',
-      button: 'w-full bg-blue-600 text-white py-3 px-6 rounded-md hover:bg-blue-700 transition-colors duration-200 font-medium shadow-sm hover:shadow-md',
+      button: 'w-full bg-indigo-600 text-white py-3 px-6 rounded-md hover:bg-indigo-700 transition-colors duration-200 font-medium shadow-sm hover:shadow-md',
       background: 'bg-gray-50',
       booleanSwitch: {
         track: 'border data-[state=unchecked]:bg-gray-200 data-[state=unchecked]:border-gray-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600',

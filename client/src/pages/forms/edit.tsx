@@ -82,7 +82,7 @@ export default function EditForm() {
           <p className="text-gray-600 mb-6">The form you're trying to edit doesn't exist or you don't have permission to access it.</p>
           <button
             onClick={() => setLocation('/forms')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
             Back to Forms
           </button>

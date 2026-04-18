@@ -108,7 +108,7 @@ const themes: Record<string, ThemeStyles> = {
     select: 'w-full px-3 py-2 bg-white border border-gray-300 rounded-md transition-colors duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none',
     radio: 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300',
     checkbox: 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded',
-    button: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
+    button: 'w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
     background: 'bg-gray-50'
   },
   'retro': {
@@ -261,7 +261,7 @@ const themes: Record<string, ThemeStyles> = {
     select: 'w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none',
     radio: 'h-4 w-4 text-blue-500 focus:ring-blue-500 border-gray-600',
     checkbox: 'h-4 w-4 text-blue-500 focus:ring-blue-500 border-gray-600 rounded',
-    button: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
+    button: 'w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
     background: 'bg-gray-900'
   },
   'modern-bold': {
@@ -278,7 +278,7 @@ const themes: Record<string, ThemeStyles> = {
     select: 'w-full px-4 py-4 bg-white border-2 border-blue-300 rounded-xl transition-all duration-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-600/20 focus:outline-none font-semibold',
     radio: 'h-5 w-5 text-blue-600 focus:ring-blue-600 border-2 border-blue-300',
     checkbox: 'h-5 w-5 text-blue-600 focus:ring-blue-600 border-2 border-blue-300 rounded',
-    button: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 px-6 rounded-xl uppercase tracking-wide transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
+    button: 'w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-6 rounded-xl uppercase tracking-wide transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
     background: 'bg-gradient-to-br from-blue-50 to-indigo-100'
   },
   'monospace-terminal': {
@@ -998,7 +998,7 @@ const PublicFormPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={submitting || (showTurnstile && !turnstileToken)}
-                className={theme?.button || 'w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed'}
+                className={theme?.button || 'w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed'}
               >
                 {(() => {
                   const lang = (form?.formData?.settings?.language || 'en') as FormLanguage;

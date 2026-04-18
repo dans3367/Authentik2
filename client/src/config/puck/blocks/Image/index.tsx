@@ -2,6 +2,7 @@ import React from "react";
 import { ComponentConfig } from "@puckeditor/core";
 import { Section } from "../../components/Section";
 import { withLayout, WithLayout } from "../../components/Layout";
+import { ReplaceImageField } from "./ReplaceImageField";
 
 type ImageItem = {
   src: string;
@@ -19,6 +20,10 @@ export type ImageProps = WithLayout<{
   gap?: number;
   borderRadius?: number;
   caption?: string;
+  /** Stock-photo search query used to source the image. Enables the Replace-image picker. */
+  imageQuery?: string;
+  /** Set when the block was produced by the AI newsletter wizard. Locks the block to a single image. */
+  aiGenerated?: boolean;
 }>;
 
 const AUTO_SIZES: Record<string, number> = {
@@ -80,6 +85,13 @@ const ImageInner: ComponentConfig<ImageProps> = {
     gap: { type: "number", label: "Gap between images (px)", min: 0, max: 48 },
     borderRadius: { type: "number", label: "Border Radius (px)", min: 0, max: 50 },
     caption: { type: "textarea", label: "Caption (optional)" },
+    imageQuery: {
+      type: "custom",
+      label: "Replace image",
+      render: ({ value, onChange }) => (
+        <ReplaceImageField value={value as string | undefined} onChange={onChange} />
+      ),
+    },
   },
   defaultProps: {
     images: [
@@ -98,19 +110,26 @@ const ImageInner: ComponentConfig<ImageProps> = {
   },
   resolveFields: (data, { fields }) => {
     const isSingle = (data.props.images?.length ?? 1) <= 1;
+    const isAi = !!data.props.aiGenerated;
+
+    // Lock AI-generated blocks to a single image — no "add" button in the array editor.
+    const lockedFields = isAi && fields.images?.type === "array"
+      ? { ...fields, images: { ...fields.images, max: 1 } }
+      : fields;
+
     if (data.props.sizing === "preset") {
-      const { width, height, ..._rest } = fields;
+      const { width, height, ..._rest } = lockedFields;
       // Hide gap if single image
       if (isSingle) { const { gap, ...rest } = _rest; return rest; }
       return _rest;
     }
     if (data.props.sizing === "fixed") {
-      const { autoSize, ..._rest } = fields;
+      const { autoSize, ..._rest } = lockedFields;
       if (isSingle) { const { gap, ...rest } = _rest; return rest; }
       return _rest;
     }
     // auto or fill — hide all size controls
-    const { width, height, autoSize, ..._rest } = fields;
+    const { width, height, autoSize, ..._rest } = lockedFields;
     if (isSingle) { const { gap, ...rest } = _rest; return rest; }
     return _rest;
   },

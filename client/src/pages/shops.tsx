@@ -776,7 +776,7 @@ export default function ShopsPage() {
                 </p>
                 <Button
                   onClick={() => setLocation('/profile?tab=subscription')}
-                  className="mt-6 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white"
+                  className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white"
                 >
                   {t('common.upgradePlan', 'Upgrade Plan')}
                 </Button>
@@ -815,7 +815,7 @@ export default function ShopsPage() {
                 data?.limits && !data.limits.canAddShop ? (
                   <Button
                     onClick={() => setShowLimitModal(true)}
-                    className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                    className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     {t('shops.addShop')}
@@ -823,7 +823,7 @@ export default function ShopsPage() {
                 ) : (
                   <Link href="/shops/new">
                     <Button
-                      className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                      className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       {t('shops.addShop')}
@@ -1088,7 +1088,7 @@ export default function ShopsPage() {
                       </p>
                       {canCreateShops && !searchTerm && statusFilter === 'all' && categoryFilter === 'all' && (
                         <Link href="/shops/new">
-                          <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                          <Button className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600">
                             <Plus className="mr-2 h-4 w-4" />
                             {t('shops.empty.createFirstShop')}
                           </Button>
@@ -1175,7 +1175,7 @@ export default function ShopsPage() {
                     setShowLimitModal(false);
                     setLocation('/profile?tab=subscription');
                   }}
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700"
                 >
                   {t('shops.limitDialog.upgradePlan')}
                 </Button>

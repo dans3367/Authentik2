@@ -187,7 +187,7 @@ export default function ShopDetailsPage() {
               <p className="text-gray-500 dark:text-gray-400 mb-6">{t('shops.shopNotFoundDescription')}</p>
               <Button
                 onClick={() => navigate('/shops')}
-                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 {t('shops.backToShops')}
@@ -238,7 +238,7 @@ export default function ShopDetailsPage() {
             </Badge>
             {canEditShops && (
               <Link href={`/shops/${shop.id}/edit`}>
-                <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                <Button className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600">
                   <Edit className="mr-2 h-4 w-4" />
                   {t('shops.editShop')}
                 </Button>

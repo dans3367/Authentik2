@@ -244,7 +244,7 @@ export default function CompanyPage() {
               {canEdit && (
                 <Button
                   onClick={() => setIsEditing(true)}
-                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                  className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                 >
                   <Building2 className="mr-2 h-4 w-4" />
                   Add Company Information

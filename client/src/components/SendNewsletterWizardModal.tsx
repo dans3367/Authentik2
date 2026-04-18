@@ -1204,7 +1204,7 @@ export function SendNewsletterWizardModal({
                     <Button
                       onClick={() => handleScheduleSend()}
                       disabled={isScheduling || !isScheduleValid()}
-                      className="bg-blue-600 hover:bg-blue-700"
+                      className="bg-indigo-600 hover:bg-indigo-700"
                       data-testid="button-confirm-schedule"
                     >
                       {isScheduling ? (

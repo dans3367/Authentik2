@@ -502,7 +502,7 @@ export default function ScheduleContactEmailPage() {
           <Button variant="outline" onClick={() => navigate(`/email-contacts/view/${id}`)}>
             Cancel
           </Button>
-          <Button onClick={() => scheduleMutation.mutate()} disabled={!canSubmit || scheduleMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={() => scheduleMutation.mutate()} disabled={!canSubmit || scheduleMutation.isPending} className="bg-indigo-600 hover:bg-indigo-700">
             <Clock className="w-4 h-4 mr-2" /> {scheduleMutation.isPending ? "Scheduling..." : "Schedule Email"}
           </Button>
         </div>

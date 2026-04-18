@@ -761,7 +761,7 @@ export function AddContactDialog({ open, onOpenChange }: AddContactDialogProps) 
               <Button
                 type="submit"
                 disabled={createContactMutation.isPending}
-                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
+                className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700"
               >
                 {createContactMutation.isPending ? (
                   <>
