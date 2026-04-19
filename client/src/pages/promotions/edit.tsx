@@ -96,7 +96,6 @@ export default function EditPromotionPage() {
     targetAudience: 'all',
     isActive: true,
     maxUses: '',
-    validFrom: '',
     validTo: '',
     promotionalCodes: [] as string[],
   });
@@ -158,7 +157,6 @@ export default function EditPromotionPage() {
   useEffect(() => {
     if (promotion) {
       const promotionData = promotion as any;
-      const validFrom = promotionData.validFrom ? new Date(promotionData.validFrom).toISOString().split('T')[0] : '';
       const validTo = promotionData.validTo ? new Date(promotionData.validTo).toISOString().split('T')[0] : '';
 
       let parsedMetadata: any = {};
@@ -179,7 +177,6 @@ export default function EditPromotionPage() {
         targetAudience: promotionData.targetAudience || 'all',
         isActive: promotionData.isActive ?? true,
         maxUses: promotionData.maxUses ? String(promotionData.maxUses) : '',
-        validFrom,
         validTo,
         promotionalCodes: promotionData.promotionalCodes || [],
       });
@@ -330,21 +327,11 @@ export default function EditPromotionPage() {
     const submitData = {
       ...formData,
       maxUses: formData.maxUses ? parseInt(formData.maxUses) : undefined,
-      validFrom: formData.validFrom ? new Date(formData.validFrom + 'T00:00:00') : undefined,
       validTo: formData.validTo ? new Date(formData.validTo + 'T23:59:59') : undefined,
       promotionalCodes: formData.promotionalCodes.length > 0 ? formData.promotionalCodes : undefined,
       termsContent: trimmedTerms ? formData.termsContent : null,
       metadata: JSON.stringify(metadataObj),
     };
-
-    if (submitData.validFrom && submitData.validTo && submitData.validFrom >= submitData.validTo) {
-      toast({
-        title: t('promotionsPage.validation.error'),
-        description: t('promotionsPage.validation.dateRangeInvalid'),
-        variant: "destructive",
-      });
-      return;
-    }
 
     updatePromotionMutation.mutate(submitData);
   };
@@ -409,7 +396,8 @@ export default function EditPromotionPage() {
   const promotionData = promotion as any;
 
   return (
-    <div className="container mx-auto p-4 lg:p-6 max-w-5xl">
+    <>
+    <div className="container mx-auto p-4 lg:p-6">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button
@@ -490,9 +478,9 @@ export default function EditPromotionPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="flex flex-col lg:flex-row lg:items-start gap-6">
         {/* Main Form Content */}
-        <div className="lg:col-span-2">
+        <div className="flex-1 min-w-0">
           {/* Step 1: Details */}
           {currentStep === 'details' && (
             <div className="space-y-6">
@@ -689,21 +677,6 @@ export default function EditPromotionPage() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="validFrom" className="text-sm font-medium">
-                        {t('promotionsPage.createPage.validFrom')}
-                      </Label>
-                      <Input
-                        id="validFrom"
-                        type="date"
-                        value={formData.validFrom}
-                        onChange={(e) => updateField('validFrom', e.target.value)}
-                        className="h-11"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {t('promotionsPage.createPage.validFromHelp')}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
                       <Label htmlFor="validTo" className="text-sm font-medium">
                         {t('promotionsPage.createPage.validTo')}
                       </Label>
@@ -711,7 +684,7 @@ export default function EditPromotionPage() {
                         id="validTo"
                         type="date"
                         value={formData.validTo}
-                        min={formData.validFrom || undefined}
+                        min={new Date().toISOString().split('T')[0]}
                         onChange={(e) => updateField('validTo', e.target.value)}
                         className="h-11"
                       />
@@ -1134,12 +1107,6 @@ export default function EditPromotionPage() {
                         <p className="text-sm font-medium">{formData.maxUses}</p>
                       </div>
                     )}
-                    {formData.validFrom && (
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Valid From</p>
-                        <p className="text-sm font-medium">{new Date(formData.validFrom).toLocaleDateString()}</p>
-                      </div>
-                    )}
                     {formData.validTo && (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Valid Until</p>
@@ -1245,9 +1212,9 @@ export default function EditPromotionPage() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6 lg:self-start lg:h-fit">
+        <aside className="w-full lg:w-[340px] lg:shrink-0 lg:sticky lg:top-[5.5rem] lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1 space-y-6">
           {/* Live Preview Card */}
-          <Card className="lg:sticky lg:top-6">
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Eye className="h-4 w-4 text-muted-foreground" />
@@ -1322,7 +1289,7 @@ export default function EditPromotionPage() {
                   { label: 'Content written', done: !!(formData.content.trim() && formData.content !== '<p></p>') },
                   { label: 'Codes added', done: formData.promotionalCodes.length > 0, optional: true },
                   { label: 'Terms attached', done: hasTerms, optional: true },
-                  { label: 'Schedule set', done: !!(formData.validFrom || formData.validTo), optional: true },
+                  { label: 'Schedule set', done: !!formData.validTo, optional: true },
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <div className={cn(
@@ -1347,12 +1314,13 @@ export default function EditPromotionPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </aside>
       </div>
+    </div>
 
-      {/* Bottom Action Bar */}
-      <div className="sticky bottom-0 mt-8 -mx-4 px-4 py-4 bg-background/95 backdrop-blur-sm border-t lg:-mx-6 lg:px-6">
-        <div className="flex items-center justify-between max-w-5xl mx-auto">
+    {/* Bottom Action Bar */}
+    <div className="sticky bottom-0 w-full px-4 lg:px-6 py-4 bg-background/95 backdrop-blur-sm border-t">
+      <div className="flex items-center justify-between">
           <Button
             type="button"
             variant="ghost"
@@ -1389,9 +1357,9 @@ export default function EditPromotionPage() {
                 )}
               </Button>
             )}
-          </div>
         </div>
       </div>
     </div>
+    </>
   );
 }

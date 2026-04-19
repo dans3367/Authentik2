@@ -110,9 +110,11 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 
-  /* Prevent horizontal overflow and ensure proper responsive behavior */
+  /* Prevent horizontal overflow without breaking position: sticky
+     (overflow-x: hidden would force overflow-y: auto per CSS spec,
+     turning html/body into scroll containers and breaking sticky). */
   html, body {
-    overflow-x: hidden;
+    overflow-x: clip;
     width: 100%;
   }
 

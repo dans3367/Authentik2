@@ -396,9 +396,9 @@ export default function CreatePromotionPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="flex flex-col lg:flex-row lg:items-start gap-6">
         {/* Main Form Content */}
-        <div className="lg:col-span-2">
+        <div className="flex-1 min-w-0">
           {/* Step 1: Details */}
           {currentStep === 'details' && (
             <div className="space-y-6">
@@ -1174,9 +1174,9 @@ export default function CreatePromotionPage() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6 lg:self-start lg:h-fit">
+        <aside className="w-full lg:w-[340px] lg:shrink-0 lg:sticky lg:top-[5.5rem] lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1 space-y-6">
           {/* Live Preview Card */}
-          <Card className="lg:sticky lg:top-6">
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Eye className="h-4 w-4 text-muted-foreground" />
@@ -1281,7 +1281,7 @@ export default function CreatePromotionPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </aside>
       </div>
 
       {/* Bottom Action Bar */}
