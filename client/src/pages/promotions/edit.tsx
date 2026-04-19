@@ -63,7 +63,7 @@ const STEPS = [
   { id: 'details', label: 'Details', icon: Megaphone },
   { id: 'content', label: 'Content', icon: FileText },
   { id: 'codes', label: 'Codes', icon: Code },
-  { id: 'terms', label: 'Terms', icon: ScrollText },
+  { id: 'terms', label: 'Terms & Conditions', icon: ScrollText },
   { id: 'review', label: 'Review', icon: Check },
 ] as const;
 
@@ -98,6 +98,7 @@ export default function EditPromotionPage() {
     maxUses: '',
     validTo: '',
     promotionalCodes: [] as string[],
+    codesEnabled: true,
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -179,6 +180,7 @@ export default function EditPromotionPage() {
         maxUses: promotionData.maxUses ? String(promotionData.maxUses) : '',
         validTo,
         promotionalCodes: promotionData.promotionalCodes || [],
+        codesEnabled: parsedMetadata.codesEnabled ?? (promotionData.promotionalCodes?.length > 0),
       });
 
       if (promotionData.promotionalCodes && promotionData.promotionalCodes.length > 0) {
@@ -306,7 +308,7 @@ export default function EditPromotionPage() {
       return;
     }
 
-    if (formData.promotionalCodes.length > 0) {
+    if (formData.codesEnabled && formData.promotionalCodes.length > 0) {
       const validation = validatePromotionalCodes(formData.promotionalCodes);
       if (validation.errors.length > 0) {
         toast({
@@ -319,16 +321,18 @@ export default function EditPromotionPage() {
     }
 
     const trimmedTerms = formData.termsContent.replace(/<[^>]*>/g, '').trim();
-    const metadataObj = { 
+    const metadataObj = {
       designTemplate: formData.designTemplate,
-      borderStyle: formData.borderStyle
+      borderStyle: formData.borderStyle,
+      codesEnabled: formData.codesEnabled,
     };
 
+    const { codesEnabled: _codesEnabled, ...formDataForSubmit } = formData;
     const submitData = {
-      ...formData,
+      ...formDataForSubmit,
       maxUses: formData.maxUses ? parseInt(formData.maxUses) : undefined,
       validTo: formData.validTo ? new Date(formData.validTo + 'T23:59:59') : undefined,
-      promotionalCodes: formData.promotionalCodes.length > 0 ? formData.promotionalCodes : undefined,
+      promotionalCodes: formData.codesEnabled && formData.promotionalCodes.length > 0 ? formData.promotionalCodes : undefined,
       termsContent: trimmedTerms ? formData.termsContent : null,
       metadata: JSON.stringify(metadataObj),
     };
@@ -412,21 +416,12 @@ export default function EditPromotionPage() {
       </div>
 
       <div className="mb-8">
-        <div className="flex items-center gap-3">
-          <div className={cn(
-            "w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10 text-primary"
-          )}>
-            <TypeIcon className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
-              {t('promotionsPage.editPage.title')}
-            </h1>
-            <p className="text-muted-foreground mt-0.5">
-              {t('promotionsPage.editPage.subtitle')}
-            </p>
-          </div>
-        </div>
+        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
+          {t('promotionsPage.editPage.title')}
+        </h1>
+        <p className="text-muted-foreground mt-0.5">
+          {t('promotionsPage.editPage.subtitle')}
+        </p>
       </div>
 
       {/* Step Indicator */}
@@ -767,6 +762,19 @@ export default function EditPromotionPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="codesEnabled" className="text-sm font-medium">Include promotional codes</Label>
+                    <p className="text-xs text-muted-foreground">When disabled, no code will be attached to this promotion or shown in the preview.</p>
+                  </div>
+                  <Switch
+                    id="codesEnabled"
+                    checked={formData.codesEnabled}
+                    onCheckedChange={(checked) => updateField('codesEnabled', checked)}
+                  />
+                </div>
+
+                {formData.codesEnabled && (
                 <Tabs value={codeGenerationMode} onValueChange={(v: string) => setCodeGenerationMode(v as 'upload' | 'unique' | 'single')}>
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="single" className="flex items-center gap-2">
@@ -960,6 +968,7 @@ export default function EditPromotionPage() {
                     </div>
                   </TabsContent>
                 </Tabs>
+                )}
               </CardContent>
             </Card>
           )}
@@ -1007,37 +1016,6 @@ export default function EditPromotionPage() {
                   <CardDescription>Review all details before updating your promotion</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Title & Type */}
-                  <div className="flex items-start gap-4">
-                    <div className={cn(
-                      "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-primary/10 text-primary"
-                    )}>
-                      <TypeIcon className="h-6 w-6" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold">{formData.title || 'Untitled Promotion'}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-none shadow-none">
-                          {promotionTypeOptions.find(opt => opt.value === formData.type)?.label}
-                        </Badge>
-                        {formData.isActive ? (
-                          <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950 dark:border-green-700">
-                            {t('promotionsPage.status.active')}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-gray-500">
-                            {t('promotionsPage.status.inactive')}
-                          </Badge>
-                        )}
-                      </div>
-                      {formData.description && (
-                        <p className="text-sm text-muted-foreground mt-2">{formData.description}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <Separator />
-
                   {/* Email-accurate content preview */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -1072,7 +1050,7 @@ export default function EditPromotionPage() {
                               : '<p style="font-style:italic;" class="opacity-50 text-sm">No content provided</p>',
                           }}
                         />
-                        {currentStepIndex >= 2 && (
+                        {currentStepIndex >= 2 && formData.codesEnabled && (
                           <div className={cn(
                             "mt-6 mb-2 mx-auto max-w-[200px] p-3 rounded backdrop-blur-sm border border-dashed border-current text-center transition-all",
                             DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.color ? "bg-background/20 opacity-90" : "bg-muted/50 text-foreground"
@@ -1113,7 +1091,7 @@ export default function EditPromotionPage() {
                         <p className="text-sm font-medium">{new Date(formData.validTo).toLocaleDateString()}</p>
                       </div>
                     )}
-                    {formData.promotionalCodes.length > 0 && (
+                    {formData.codesEnabled && formData.promotionalCodes.length > 0 && (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Promo Codes</p>
                         <p className="text-sm font-medium">
@@ -1212,6 +1190,7 @@ export default function EditPromotionPage() {
         </div>
 
         {/* Sidebar */}
+        {currentStep !== 'review' && (
         <aside className="w-full lg:w-[340px] lg:shrink-0 lg:sticky lg:top-[5.5rem] lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1 space-y-6">
           {/* Live Preview Card */}
           <Card>
@@ -1257,7 +1236,7 @@ export default function EditPromotionPage() {
                   />
                 )}
 
-                {currentStepIndex >= 2 && (
+                {currentStepIndex >= 2 && formData.codesEnabled && (
                   <div className={cn(
                     "mt-3 mb-2 p-2 rounded backdrop-blur-sm border border-dashed border-current text-center transition-all",
                     DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.color ? "bg-background/20 opacity-90" : "bg-muted/50 text-foreground"
@@ -1287,7 +1266,7 @@ export default function EditPromotionPage() {
                 {[
                   { label: 'Title set', done: !!formData.title.trim() },
                   { label: 'Content written', done: !!(formData.content.trim() && formData.content !== '<p></p>') },
-                  { label: 'Codes added', done: formData.promotionalCodes.length > 0, optional: true },
+                  ...(formData.codesEnabled ? [{ label: 'Codes added', done: formData.promotionalCodes.length > 0, optional: true }] : []),
                   { label: 'Terms attached', done: hasTerms, optional: true },
                   { label: 'Schedule set', done: !!formData.validTo, optional: true },
                 ].map((item, idx) => (
@@ -1315,6 +1294,7 @@ export default function EditPromotionPage() {
             </CardContent>
           </Card>
         </aside>
+        )}
       </div>
     </div>
 
