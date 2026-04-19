@@ -45,6 +45,15 @@ const getCodeFormatOptions = (t: any) => [
   { value: 'numeric', label: t('promotionsPage.createPage.codeFormats.numeric') },
 ];
 
+const promotionTypeColors: Record<string, string> = {
+  newsletter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+  survey: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+  birthday: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
+  announcement: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+  sale: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+  event: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
+};
+
 const DESIGN_TEMPLATES = [
   { id: 'template-1', label: 'Classic Minimal', color: 'bg-white dark:bg-slate-950', textColor: 'text-slate-900 dark:text-slate-100', borderColor: 'border-slate-200 dark:border-slate-800' },
   { id: 'template-2', label: 'Modern Vibrant', color: 'bg-blue-100 dark:bg-blue-900/40', textColor: 'text-blue-900 dark:text-blue-100', borderColor: 'border-blue-400 dark:border-blue-700' },
@@ -884,12 +893,20 @@ export default function CreatePromotionPage() {
                       <p className="text-xs text-muted-foreground">
                         {t('promotionsPage.createPage.codesHelp')}
                       </p>
+                      {userCodesInput.trim() && (
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                          <span className="font-medium text-foreground">
+                            {formData.promotionalCodes.length}
+                          </span>{' '}
+                          unique code{formData.promotionalCodes.length === 1 ? '' : 's'} will be included from your list.
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
                 </Tabs>
 
                 {/* Generated/Uploaded Codes Display */}
-                {formData.promotionalCodes.length > 0 && (
+                {formData.promotionalCodes.length > 0 && codeGenerationMode === 'generate' && (
                   <div className="space-y-3 pt-4 border-t">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -1157,9 +1174,9 @@ export default function CreatePromotionPage() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-6 lg:self-start lg:h-fit">
           {/* Live Preview Card */}
-          <Card className="sticky top-6">
+          <Card className="lg:sticky lg:top-6">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Eye className="h-4 w-4 text-muted-foreground" />

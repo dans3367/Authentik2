@@ -3,7 +3,7 @@ import { useLocation, useRoute } from 'wouter';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Loader2, Megaphone, Save, Upload, Wand2, Code, Copy, Check, Trash2, Mail, FileText, Gift, TrendingUp, Calendar, Eye, LayoutDashboard, AlertCircle, Ticket, ScrollText, Palette, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Megaphone, Save, Upload, Wand2, Code, Check, Mail, FileText, Gift, TrendingUp, Calendar, Eye, LayoutDashboard, AlertCircle, Ticket, ScrollText, Palette, CheckCircle2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { generatePromotionalCodes, parseUserCodes, validatePromotionalCodes, formatCodesForDisplay, CODE_GENERATION_PRESETS, type CodeFormat } from '@/utils/codeGeneration';
 import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import RichTextEditor from '@/components/LazyRichTextEditor';
@@ -249,33 +248,10 @@ export default function EditPromotionPage() {
     }
   };
 
-  const handleCopyCodesList = async () => {
-    if (formData.promotionalCodes.length === 0) return;
-    try {
-      await navigator.clipboard.writeText(formatCodesForDisplay(formData.promotionalCodes));
-      toast({
-        title: t('promotionsPage.toasts.success'),
-        description: t('promotionsPage.toasts.codesCopied'),
-      });
-    } catch (error) {
-      toast({
-        title: t('promotionsPage.toasts.error'),
-        description: t('promotionsPage.toasts.copyError'),
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleSingleCodeChange = (value: string) => {
     const normalized = value.trim().toUpperCase();
     setSingleCodeInput(value.toUpperCase());
     setFormData(prev => ({ ...prev, promotionalCodes: normalized ? [normalized] : [] }));
-  };
-
-  const handleClearCodes = () => {
-    setFormData(prev => ({ ...prev, promotionalCodes: [] }));
-    setUserCodesInput('');
-    setSingleCodeInput('');
   };
 
   // Step validation
@@ -389,6 +365,12 @@ export default function EditPromotionPage() {
   const hasTerms = !!(formData.termsContent.replace(/<[^>]*>/g, '').trim());
 
   const TypeIcon = promotionTypeIcons[formData.type] || Megaphone;
+  const codeCountLabel = `${formData.promotionalCodes.length} code${formData.promotionalCodes.length === 1 ? '' : 's'}`;
+  const previewDisplayCode = codeGenerationMode === 'single'
+    ? (singleCodeInput || formData.promotionalCodes[0] || 'YOURCODE')
+    : codeGenerationMode === 'upload'
+      ? (formData.promotionalCodes[0] || 'YOURCODE')
+      : `${generateOptions.prefix}${generateOptions.format === 'numeric' ? '0'.repeat(generateOptions.length) : 'X'.repeat(generateOptions.length)}${generateOptions.suffix}`;
 
   // Early return for invalid routes (after hooks)
   if (!match || !promotionId) {
@@ -994,50 +976,17 @@ export default function EditPromotionPage() {
                       <p className="text-xs text-muted-foreground">
                         {t('promotionsPage.createPage.codesHelp')}
                       </p>
+                      {userCodesInput.trim() && (
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                          <span className="font-medium text-foreground">
+                            {formData.promotionalCodes.length}
+                          </span>{' '}
+                          unique code{formData.promotionalCodes.length === 1 ? '' : 's'} will be included from your list.
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
                 </Tabs>
-
-                {/* Generated/Uploaded Codes Display */}
-                {formData.promotionalCodes.length > 0 && (
-                  <div className="space-y-3 pt-4 border-t">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="font-mono">
-                          {formData.promotionalCodes.length} codes
-                        </Badge>
-                      </div>
-                      <div className="flex gap-2">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button type="button" variant="outline" size="sm" onClick={handleCopyCodesList}>
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>{t('promotionsPage.createPage.copyAll')}</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button type="button" variant="outline" size="sm" onClick={handleClearCodes}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Clear all codes</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </div>
-                    <div className="bg-muted/50 p-3 rounded-lg border max-h-40 overflow-y-auto">
-                      <pre className="text-xs font-mono whitespace-pre-wrap break-all">
-                        {formData.promotionalCodes.slice(0, 50).join('\n')}
-                        {formData.promotionalCodes.length > 50 && `\n... and ${formData.promotionalCodes.length - 50} more`}
-                      </pre>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}
@@ -1157,12 +1106,7 @@ export default function EditPromotionPage() {
                           )}>
                             <span className="text-[10px] uppercase tracking-wider font-bold opacity-70 mb-1 block">Promo Code</span>
                             <code className="text-base font-mono font-bold tracking-widest drop-shadow-sm">
-                              {codeGenerationMode === 'single'
-                                ? (singleCodeInput || 'YOURCODE')
-                                : codeGenerationMode === 'upload'
-                                  ? (userCodesInput.split('\n')[0] || 'YOURCODE').toUpperCase()
-                                  : `${generateOptions.prefix}${generateOptions.format === 'numeric' ? '0'.repeat(generateOptions.length) : 'X'.repeat(generateOptions.length)}${generateOptions.suffix}`
-                              }
+                              {previewDisplayCode}
                             </code>
                           </div>
                         )}
@@ -1205,7 +1149,11 @@ export default function EditPromotionPage() {
                     {formData.promotionalCodes.length > 0 && (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Promo Codes</p>
-                        <p className="text-sm font-medium">{formData.promotionalCodes.length} codes</p>
+                        <p className="text-sm font-medium">
+                          {formData.promotionalCodes.length === 1
+                            ? 'Single shared code'
+                            : codeCountLabel}
+                        </p>
                       </div>
                     )}
                     {hasTerms && (
@@ -1297,9 +1245,9 @@ export default function EditPromotionPage() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-6 lg:self-start lg:h-fit">
           {/* Live Preview Card */}
-          <Card className="sticky top-6">
+          <Card className="lg:sticky lg:top-6">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Eye className="h-4 w-4 text-muted-foreground" />
@@ -1349,12 +1297,7 @@ export default function EditPromotionPage() {
                   )}>
                     <span className="text-[9px] uppercase tracking-wider font-bold opacity-70 mb-1 block">Code Example</span>
                     <code className="text-sm font-mono font-bold tracking-widest drop-shadow-sm">
-                      {codeGenerationMode === 'single'
-                        ? (singleCodeInput || 'YOURCODE')
-                        : codeGenerationMode === 'upload'
-                          ? (userCodesInput.split('\n')[0] || 'YOURCODE').toUpperCase()
-                          : `${generateOptions.prefix}${generateOptions.format === 'numeric' ? '0'.repeat(generateOptions.length) : 'X'.repeat(generateOptions.length)}${generateOptions.suffix}`
-                      }
+                      {previewDisplayCode}
                     </code>
                   </div>
                 )}

@@ -160,7 +160,7 @@ function generateSingleCode(length: number, charset: string, prefix: string, suf
  * Format codes for display
  */
 export function formatCodesForDisplay(codes: string[]): string {
-  return codes.join(' ');
+  return codes.join('\n');
 }
 
 /**
