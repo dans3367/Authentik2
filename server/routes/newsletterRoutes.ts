@@ -506,7 +506,7 @@ newsletterRoutes.get("/page-data", newsletterListRateLimiter, authenticateToken,
     const userCols = { id: true, firstName: true, lastName: true } as const;
     const withRelations = {
       user: { columns: userCols },
-      tenant: { columns: { id: true, name: true } as const },
+      tenant: { columns: { id: true, name: true, slug: true } as const },
       shop: { columns: { id: true, name: true } as const },
     };
 
@@ -636,7 +636,7 @@ newsletterRoutes.get("/", newsletterListRateLimiter, authenticateToken, requireT
       offset,
       with: {
         user: { columns: { id: true, firstName: true, lastName: true } },
-        tenant: { columns: { id: true, name: true } },
+        tenant: { columns: { id: true, name: true, slug: true } },
         shop: { columns: { id: true, name: true } },
       }
     });

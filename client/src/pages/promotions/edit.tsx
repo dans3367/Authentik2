@@ -1080,10 +1080,6 @@ export default function EditPromotionPage() {
                                 </a>
                               </div>
                             )}
-                            <hr style={{ margin: '32px 0 16px', border: 'none', borderTop: `1px solid ${theme.border}` }} />
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: theme.bodyColor, opacity: 0.75, textAlign: 'center' }}>
-                              This is a special promotion for valued subscribers.
-                            </p>
                           </div>
                         </div>
                       </div>

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, Megaphone, MoreVertical, Eye, Edit, Trash2, Mail, Gift, FileText, Users, TrendingUp, Target, Settings, LayoutDashboard } from 'lucide-react';
+import { Plus, Calendar, Megaphone, MoreVertical, Eye, Edit, Trash2, Mail, Gift, FileText, Users, TrendingUp, Target, Settings, LayoutDashboard, Monitor, Smartphone } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
@@ -160,6 +160,7 @@ export default function PromotionsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [previewPromotion, setPreviewPromotion] = useState<Promotion | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
 
   // Set breadcrumbs in header
   useSetBreadcrumbs([
@@ -203,16 +204,21 @@ export default function PromotionsPage() {
     return raw;
   }, [emailDesign]);
 
+  const tenantSlug: string | null = (promotionsData as any)?.tenantSlug ?? null;
+
   const wrappedPreviewHtml = useMemo(() => {
     if (!previewPromotion) return '';
-    const hasTerms = !!(previewPromotion.termsContent && previewPromotion.termsContent.replace(/<[^>]*>/g, '').trim());
+    // Preview always shows the Terms link so admins can see the final layout and
+    // click through to verify the legal page renders correctly.
+    const termsUrl = tenantSlug
+      ? `${window.location.origin}/p/${encodeURIComponent(tenantSlug)}/${encodeURIComponent(previewPromotion.id)}/terms`
+      : null;
     const themedBody = renderPromotionEmailWrapper({
       type: previewPromotion.type,
       title: previewPromotion.title || '',
       description: previewPromotion.description || '',
       contentHtml: previewPromotion.content || '',
-      termsUrl: hasTerms ? '#' : null,
-      footerNote: 'This is a special promotion for valued subscribers.',
+      termsUrl,
     });
     return wrapInEmailPreview(themedBody, {
       companyName: emailDesign?.companyName || '',
@@ -228,7 +234,7 @@ export default function PromotionsPage() {
       fontFamily: emailDesign?.fontFamily,
       socialLinks: parsedSocialLinks,
     });
-  }, [previewPromotion, emailDesign, parsedSocialLinks]);
+  }, [previewPromotion, emailDesign, parsedSocialLinks, tenantSlug]);
 
   const promotions = (promotionsData as any)?.promotions || [];
   const promotionTypeOptions = getPromotionTypeOptions(t);
@@ -486,39 +492,83 @@ export default function PromotionsPage() {
             </DialogDescription>
           </DialogHeader>
 
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-muted-foreground">Preview:</span>
+              <div className="flex bg-muted/50 p-1 rounded-md">
+                <Button
+                  variant={previewDevice === 'desktop' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setPreviewDevice('desktop')}
+                  type="button"
+                >
+                  <Monitor className="w-3.5 h-3.5 mr-1.5" />
+                  Desktop
+                </Button>
+                <Button
+                  variant={previewDevice === 'mobile' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setPreviewDevice('mobile')}
+                  type="button"
+                >
+                  <Smartphone className="w-3.5 h-3.5 mr-1.5" />
+                  Mobile
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <div className="flex-1 overflow-y-auto">
-            <div className="mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl">
-              <div className="bg-white text-slate-900 shadow-2xl mx-auto rounded overflow-hidden max-w-[600px] w-full">
-                <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
-                  <div className="flex gap-2 mb-1">
-                    <span className="font-semibold text-right w-20">{t('promotionsPage.preview.promotion', 'Promotion')}</span>
-                    <span className="text-gray-900 font-semibold truncate">
-                      {previewPromotion?.title}
-                    </span>
+            <div className={`transition-all duration-300 mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl ${previewDevice === 'mobile' ? 'max-w-[400px]' : 'w-full'}`}>
+              <div className="shadow-2xl mx-auto rounded-lg overflow-hidden max-w-[600px] w-full border border-gray-200 dark:border-gray-700">
+
+                {/* Browser chrome */}
+                <div className="bg-gray-200 dark:bg-gray-700 px-3 py-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-300 dark:border-gray-600">
+                  <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-red-400" />
+                    <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                    <div className="w-3 h-3 rounded-full bg-green-400" />
                   </div>
-                  <div className="flex gap-2 mb-1">
-                    <span className="font-semibold text-right w-20">{t('promotionsPage.preview.type', 'Type')}</span>
-                    <span className="text-gray-900 capitalize">
-                      {previewPromotion?.type ? promotionTypeOptions[previewPromotion.type] : ''}
-                    </span>
+                  <div className="flex-1 bg-white dark:bg-gray-600 rounded px-2 py-0.5 text-center truncate text-gray-600 dark:text-gray-300">
+                    {previewPromotion?.title || t('promotionsPage.preview.title', 'Email Preview')}
                   </div>
-                  {previewPromotion?.description && (
-                    <div className="flex gap-2">
-                      <span className="font-semibold text-right w-20">{t('promotionsPage.preview.descriptionLabel', 'Description')}</span>
-                      <span className="text-gray-700 line-clamp-2">
-                        {previewPromotion.description}
-                      </span>
-                    </div>
-                  )}
                 </div>
 
-                <iframe
-                  srcDoc={wrappedPreviewHtml}
-                  title="Promotion email preview"
-                  sandbox="allow-same-origin"
-                  className="w-full border-0"
-                  style={{ minHeight: '640px', background: '#fff' }}
-                />
+                <div className="bg-white text-slate-900">
+                  {/* Simulated email header */}
+                  <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
+                    <div className="flex gap-2 mb-1">
+                      <span className="font-semibold text-right w-20">{t('promotionsPage.preview.promotion', 'Promotion')}</span>
+                      <span className="text-gray-900 font-semibold truncate">
+                        {previewPromotion?.title}
+                      </span>
+                    </div>
+                    <div className="flex gap-2 mb-1">
+                      <span className="font-semibold text-right w-20">{t('promotionsPage.preview.type', 'Type')}</span>
+                      <span className="text-gray-900 capitalize">
+                        {previewPromotion?.type ? promotionTypeOptions[previewPromotion.type] : ''}
+                      </span>
+                    </div>
+                    {previewPromotion?.description && (
+                      <div className="flex gap-2">
+                        <span className="font-semibold text-right w-20">{t('promotionsPage.preview.descriptionLabel', 'Description')}</span>
+                        <span className="text-gray-700 line-clamp-2">
+                          {previewPromotion.description}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <iframe
+                    srcDoc={wrappedPreviewHtml}
+                    title="Promotion email preview"
+                    sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                    className="w-full border-0"
+                    style={{ minHeight: '640px', background: '#fff' }}
+                  />
+                </div>
               </div>
             </div>
           </div>

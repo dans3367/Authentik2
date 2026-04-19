@@ -1,17 +1,26 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
-import { 
-  promotions, 
-  createPromotionSchema, 
+import {
+  promotions,
+  tenants,
+  createPromotionSchema,
   updatePromotionSchema,
-  type Promotion 
+  type Promotion
 } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { storage } from '../storage';
 
 export const promotionRoutes = Router();
+
+async function getTenantSlug(tenantId: string): Promise<string | null> {
+  const row = await db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+    columns: { slug: true },
+  });
+  return row?.slug ?? null;
+}
 
 // Get all promotions
 promotionRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
@@ -48,8 +57,11 @@ promotionRoutes.get("/", authenticateToken, requireTenant, async (req: any, res)
       count: sql<number>`count(*)`,
     }).from(promotions).where(whereClause);
 
+    const tenantSlug = await getTenantSlug(req.user.tenantId);
+
     res.json({
       promotions: tenantPromotions,
+      tenantSlug,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -85,7 +97,9 @@ promotionRoutes.get("/:id", authenticateToken, requireTenant, async (req: any, r
       return res.status(404).json({ message: 'Promotion not found' });
     }
 
-    res.json(promotion);
+    const tenantSlug = await getTenantSlug(req.user.tenantId);
+
+    res.json({ ...promotion, tenantSlug });
   } catch (error) {
     console.error('Get promotion error:', error);
     res.status(500).json({ message: 'Failed to get promotion' });

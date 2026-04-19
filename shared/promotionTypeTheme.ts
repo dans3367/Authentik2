@@ -39,7 +39,7 @@ export function renderPromotionEmailWrapper(params: {
   const { title, description, contentHtml, termsUrl, footerNote } = params;
   const termsBlock = termsUrl
     ? `<div style="margin-top:24px;padding-top:16px;border-top:1px solid ${theme.border};text-align:center;font-size:12px;line-height:1.5;color:${theme.bodyColor};">
-        <a href="${termsUrl}" style="color:${theme.accent};text-decoration:underline;">Terms and Conditions</a>
+        <a href="${termsUrl}" target="_blank" rel="noopener noreferrer" style="color:${theme.accent};text-decoration:underline;">Terms and Conditions</a>
       </div>`
     : '';
   const footerBlock = footerNote

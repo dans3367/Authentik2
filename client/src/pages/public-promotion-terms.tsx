@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, ArrowLeft, Globe, ExternalLink, Sun, Moon, ScrollText } from "lucide-react";
+import { Loader2, ArrowLeft, Globe, Sun, Moon, ScrollText } from "lucide-react";
 
 interface Branding {
   companyName: string;
@@ -87,7 +87,11 @@ export default function PublicPromotionTerms() {
 
   useEffect(() => {
     if (data && contentRef.current) {
-      contentRef.current.innerHTML = data.promotion.termsContent || '';
+      const raw = data.promotion.termsContent || '';
+      const hasContent = raw.replace(/<[^>]*>/g, '').trim().length > 0;
+      contentRef.current.innerHTML = hasContent
+        ? raw
+        : `<p><em>Terms &amp; Conditions for this promotion have not been published yet. Please check back soon.</em></p>`;
     }
   }, [data]);
 
@@ -251,17 +255,6 @@ export default function PublicPromotionTerms() {
                     <a href={branding.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm font-medium transition-colors">LinkedIn</a>
                   )}
                 </div>
-              )}
-              {branding.website && (
-                <a
-                  href={branding.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors mb-3"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  {branding.website.replace(/^https?:\/\//, "")}
-                </a>
               )}
               {branding.footerText && (
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{branding.footerText}</p>

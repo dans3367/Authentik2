@@ -392,7 +392,8 @@ export default function NewsletterPage() {
     const isScheduled = newsletter.status === 'scheduled';
     const isCurrentUserReviewer = newsletter.reviewerId === currentUserId;
     const tenantSlug = (newsletter as any)?.tenant?.slug;
-    const articlePreviewUrl = tenantSlug ? `/n/preview/${tenantSlug}/${newsletter.id}` : null;
+    const publishToBlog = (newsletter as any)?.publishToBlog !== false;
+    const articlePreviewUrl = tenantSlug && publishToBlog ? `/n/preview/${tenantSlug}/${newsletter.id}` : null;
     const isDeleting = deleteMutation.isPending && deleteMutation.variables === newsletter.id;
     const isDeploying = deployMutation.isPending && deployMutation.variables === newsletter.id;
     const isSubmittingForReview = submitForReviewMutation.isPending && submitForReviewMutation.variables === newsletter.id;

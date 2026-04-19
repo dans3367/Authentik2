@@ -378,6 +378,15 @@ function Router() {
           <Route path="/n/preview/:tenantSlug/:newsletterId" component={PublicNewsletterView} />
           <Route path="/n/:tenantSlug/:newsletterSlug" component={PublicNewsletterView} />
           <Route path="/n/:tenantSlug" component={PublicNewsletterHub} />
+        </Switch>
+      </Suspense>
+    );
+  }
+
+  if (currentLocation.startsWith('/p/')) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Switch>
           <Route path="/p/:tenantSlug/:promotionId/terms" component={PublicPromotionTerms} />
         </Switch>
       </Suspense>

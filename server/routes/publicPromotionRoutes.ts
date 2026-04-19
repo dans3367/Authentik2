@@ -80,12 +80,13 @@ publicPromotionRoutes.get('/:tenantSlug/:promotionId/terms', async (req, res) =>
       ),
     });
 
-    if (!promotion || !promotion.termsContent || !promotion.termsContent.replace(/<[^>]*>/g, '').trim()) {
-      return res.status(404).json({ message: 'Terms not found' });
+    if (!promotion) {
+      return res.status(404).json({ message: 'Promotion not found' });
     }
 
     const branding = await getBrandingForTenant(tenant.id, tenant.name);
-    const sanitizedTerms = sanitizeEmailHtml(promotion.termsContent);
+    const hasTerms = !!promotion.termsContent && promotion.termsContent.replace(/<[^>]*>/g, '').trim().length > 0;
+    const sanitizedTerms = hasTerms ? sanitizeEmailHtml(promotion.termsContent!) : '';
 
     res.json({
       tenant: { name: tenant.name, slug: tenant.slug },
