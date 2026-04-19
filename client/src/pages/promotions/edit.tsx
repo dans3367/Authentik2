@@ -3,7 +3,7 @@ import { useLocation, useRoute } from 'wouter';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Loader2, Megaphone, Save, Upload, Wand2, Code, Copy, Check, Trash2, Mail, FileText, Gift, TrendingUp, Calendar, Eye, LayoutDashboard, AlertCircle, Ticket, ScrollText } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Megaphone, Save, Upload, Wand2, Code, Copy, Check, Trash2, Mail, FileText, Gift, TrendingUp, Calendar, Eye, LayoutDashboard, AlertCircle, Ticket, ScrollText, Palette, CheckCircle2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +17,6 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { generatePromotionalCodes, parseUserCodes, validatePromotionalCodes, formatCodesForDisplay, CODE_GENERATION_PRESETS, type CodeFormat } from '@/utils/codeGeneration';
-import { getPromotionTypeTheme } from '@shared/promotionTypeTheme';
 import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import RichTextEditor from '@/components/LazyRichTextEditor';
 import { cn } from '@/lib/utils';
@@ -46,23 +45,19 @@ const getCodeFormatOptions = (t: any) => [
   { value: 'numeric', label: t('promotionsPage.createPage.codeFormats.numeric') },
 ];
 
-const promotionTypeColors: Record<string, string> = {
-  newsletter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  survey: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  birthday: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
-  announcement: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-  sale: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-  event: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
-};
 
-const promotionTypeBorderColors: Record<string, string> = {
-  newsletter: 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950',
-  survey: 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950',
-  birthday: 'border-pink-300 dark:border-pink-700 bg-pink-50 dark:bg-pink-950',
-  announcement: 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-950',
-  sale: 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950',
-  event: 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950',
-};
+const DESIGN_TEMPLATES = [
+  { id: 'template-1', label: 'Classic Minimal', color: 'bg-white dark:bg-slate-950', textColor: 'text-slate-900 dark:text-slate-100', borderColor: 'border-slate-200 dark:border-slate-800' },
+  { id: 'template-2', label: 'Modern Vibrant', color: 'bg-blue-100 dark:bg-blue-900/40', textColor: 'text-blue-900 dark:text-blue-100', borderColor: 'border-blue-400 dark:border-blue-700' },
+  { id: 'template-3', label: 'Elegant Dark', color: 'bg-zinc-800 dark:bg-zinc-950', textColor: 'text-zinc-100 dark:text-zinc-100', borderColor: 'border-zinc-600 dark:border-zinc-800' },
+  { id: 'template-4', label: 'Playful Brand', color: 'bg-rose-100 dark:bg-rose-900/40', textColor: 'text-rose-900 dark:text-rose-100', borderColor: 'border-rose-400 dark:border-rose-700' },
+  { id: 'template-5', label: 'Premium Gold', color: 'bg-amber-100 dark:bg-amber-900/40', textColor: 'text-amber-900 dark:text-amber-100', borderColor: 'border-amber-400 dark:border-amber-600' },
+  { id: 'template-6', label: 'Fresh Green', color: 'bg-green-100 dark:bg-green-900/40', textColor: 'text-green-900 dark:text-green-100', borderColor: 'border-green-400 dark:border-green-700' },
+  { id: 'template-7', label: 'Sweet Pink', color: 'bg-pink-100 dark:bg-pink-900/40', textColor: 'text-pink-900 dark:text-pink-100', borderColor: 'border-pink-400 dark:border-pink-700' },
+  { id: 'template-8', label: 'Royal Purple', color: 'bg-purple-100 dark:bg-purple-900/40', textColor: 'text-purple-900 dark:text-purple-100', borderColor: 'border-purple-400 dark:border-purple-700' },
+  { id: 'template-9', label: 'Warm Orange', color: 'bg-orange-100 dark:bg-orange-900/40', textColor: 'text-orange-900 dark:text-orange-100', borderColor: 'border-orange-400 dark:border-orange-700' },
+  { id: 'template-10', label: 'Deep Indigo', color: 'bg-indigo-100 dark:bg-indigo-900/40', textColor: 'text-indigo-900 dark:text-indigo-100', borderColor: 'border-indigo-400 dark:border-indigo-700' }
+] as const;
 
 // Step definitions
 const STEPS = [
@@ -97,6 +92,8 @@ export default function EditPromotionPage() {
     content: '',
     termsContent: '',
     type: 'newsletter' as string,
+    designTemplate: 'template-1',
+    borderStyle: 'solid',
     targetAudience: 'all',
     isActive: true,
     maxUses: '',
@@ -107,7 +104,7 @@ export default function EditPromotionPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Code generation state
-  const [codeGenerationMode, setCodeGenerationMode] = useState<'upload' | 'generate' | 'single'>('generate');
+  const [codeGenerationMode, setCodeGenerationMode] = useState<'upload' | 'unique' | 'single'>('single');
   const [userCodesInput, setUserCodesInput] = useState('');
   const [singleCodeInput, setSingleCodeInput] = useState('');
   const [generateOptions, setGenerateOptions] = useState({
@@ -117,6 +114,7 @@ export default function EditPromotionPage() {
     prefix: '',
     suffix: '',
   });
+  const [previewCodes, setPreviewCodes] = useState<string[]>([]);
 
   const updateField = useCallback((field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -164,12 +162,21 @@ export default function EditPromotionPage() {
       const validFrom = promotionData.validFrom ? new Date(promotionData.validFrom).toISOString().split('T')[0] : '';
       const validTo = promotionData.validTo ? new Date(promotionData.validTo).toISOString().split('T')[0] : '';
 
+      let parsedMetadata: any = {};
+      try {
+        if (promotionData.metadata) {
+          parsedMetadata = JSON.parse(promotionData.metadata);
+        }
+      } catch (e) {}
+
       setFormData({
         title: promotionData.title || '',
         description: promotionData.description || '',
         content: promotionData.content || '',
         termsContent: promotionData.termsContent || '',
         type: promotionData.type || 'newsletter',
+        designTemplate: parsedMetadata.designTemplate || 'template-1',
+        borderStyle: parsedMetadata.borderStyle || 'solid',
         targetAudience: promotionData.targetAudience || 'all',
         isActive: promotionData.isActive ?? true,
         maxUses: promotionData.maxUses ? String(promotionData.maxUses) : '',
@@ -225,13 +232,13 @@ export default function EditPromotionPage() {
     }
   };
 
-  const handleGenerateCodes = () => {
+  const handleGeneratePreviewCodes = () => {
     try {
-      const codes = generatePromotionalCodes(generateOptions);
-      setFormData(prev => ({ ...prev, promotionalCodes: codes }));
+      const codes = generatePromotionalCodes({ ...generateOptions, count: 10 });
+      setPreviewCodes(codes);
       toast({
         title: t('promotionsPage.toasts.success'),
-        description: t('promotionsPage.toasts.codesGenerated', { count: codes.length }),
+        description: 'Generated 10 preview codes',
       });
     } catch (error: any) {
       toast({
@@ -339,6 +346,11 @@ export default function EditPromotionPage() {
     }
 
     const trimmedTerms = formData.termsContent.replace(/<[^>]*>/g, '').trim();
+    const metadataObj = { 
+      designTemplate: formData.designTemplate,
+      borderStyle: formData.borderStyle
+    };
+
     const submitData = {
       ...formData,
       maxUses: formData.maxUses ? parseInt(formData.maxUses) : undefined,
@@ -346,6 +358,7 @@ export default function EditPromotionPage() {
       validTo: formData.validTo ? new Date(formData.validTo + 'T23:59:59') : undefined,
       promotionalCodes: formData.promotionalCodes.length > 0 ? formData.promotionalCodes : undefined,
       termsContent: trimmedTerms ? formData.termsContent : null,
+      metadata: JSON.stringify(metadataObj),
     };
 
     if (submitData.validFrom && submitData.validTo && submitData.validFrom >= submitData.validTo) {
@@ -431,8 +444,7 @@ export default function EditPromotionPage() {
       <div className="mb-8">
         <div className="flex items-center gap-3">
           <div className={cn(
-            "w-10 h-10 rounded-xl flex items-center justify-center",
-            promotionTypeColors[formData.type]
+            "w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10 text-primary"
           )}>
             <TypeIcon className="h-5 w-5" />
           </div>
@@ -561,15 +573,20 @@ export default function EditPromotionPage() {
                             type="button"
                             onClick={() => updateField('type', option.value)}
                             className={cn(
-                              "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center",
+                              "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center relative",
                               isSelected
-                                ? promotionTypeBorderColors[option.value] + " ring-2 ring-offset-2 ring-primary/30"
+                                ? "border-primary bg-primary/5"
                                 : "border-border hover:border-primary/30 hover:bg-muted/50"
                             )}
                           >
+                            {isSelected && (
+                              <div className="absolute -top-2 -right-2 bg-background rounded-full">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 fill-green-100 dark:fill-green-900/50" />
+                              </div>
+                            )}
                             <div className={cn(
                               "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-                              isSelected ? promotionTypeColors[option.value] : "bg-muted text-muted-foreground"
+                              isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                             )}>
                               <Icon className="h-5 w-5" />
                             </div>
@@ -577,6 +594,85 @@ export default function EditPromotionPage() {
                           </button>
                         );
                       })}
+                    </div>
+                  </div>
+
+                  {/* Design Templates */}
+                  <div className="space-y-3 pt-2">
+                    <Label className="text-sm font-medium">Design Template</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      {DESIGN_TEMPLATES.map((option) => {
+                        const isSelected = formData.designTemplate === option.id;
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => updateField('designTemplate', option.id)}
+                            className={cn(
+                              "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center relative",
+                              isSelected
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-primary/30 hover:bg-muted/50"
+                            )}
+                          >
+                            {isSelected && (
+                              <div className="absolute -top-2 -right-2 bg-background rounded-full shadow-sm z-10">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 fill-green-100 dark:fill-green-900/50" />
+                              </div>
+                            )}
+                            <div className={cn(
+                              "w-full h-12 rounded-lg flex items-center justify-center transition-colors mb-1 shadow-sm",
+                              option.color
+                            )}>
+                              <Palette className="h-5 w-5 opacity-60" />
+                            </div>
+                            <span className="text-xs font-medium">{option.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Border Style */}
+                  <div className="space-y-3 pt-2">
+                    <Label className="text-sm font-medium">Border Style</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => updateField('borderStyle', 'solid')}
+                        className={cn(
+                          "flex items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all relative",
+                          formData.borderStyle === 'solid'
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border hover:border-primary/30 hover:bg-muted/50 text-muted-foreground"
+                        )}
+                      >
+                        {formData.borderStyle === 'solid' && (
+                          <div className="absolute -top-2 -right-2 bg-background rounded-full shadow-sm z-10">
+                            <CheckCircle2 className="h-5 w-5 text-green-500 fill-green-100 dark:fill-green-900/50" />
+                          </div>
+                        )}
+                        <div className="w-5 h-5 rounded border-[3px] border-solid border-current"></div>
+                        <span className="text-sm font-medium">Solid</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateField('borderStyle', 'dotted')}
+                        className={cn(
+                          "flex items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all relative",
+                          formData.borderStyle === 'dotted'
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border hover:border-primary/30 hover:bg-muted/50 text-muted-foreground"
+                        )}
+                      >
+                        {formData.borderStyle === 'dotted' && (
+                          <div className="absolute -top-2 -right-2 bg-background rounded-full shadow-sm z-10">
+                            <CheckCircle2 className="h-5 w-5 text-green-500 fill-green-100 dark:fill-green-900/50" />
+                          </div>
+                        )}
+                        <div className="w-5 h-5 rounded border-[3px] border-dotted border-current"></div>
+                        <span className="text-sm font-medium">Dotted</span>
+                      </button>
                     </div>
                   </div>
 
@@ -716,15 +812,15 @@ export default function EditPromotionPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <Tabs value={codeGenerationMode} onValueChange={(v: string) => setCodeGenerationMode(v as 'upload' | 'generate' | 'single')}>
+                <Tabs value={codeGenerationMode} onValueChange={(v: string) => setCodeGenerationMode(v as 'upload' | 'unique' | 'single')}>
                   <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="generate" className="flex items-center gap-2">
-                      <Wand2 className="h-4 w-4" />
-                      {t('promotionsPage.createPage.generateCodes')}
-                    </TabsTrigger>
                     <TabsTrigger value="single" className="flex items-center gap-2">
                       <Ticket className="h-4 w-4" />
                       Single Code
+                    </TabsTrigger>
+                    <TabsTrigger value="unique" className="flex items-center gap-2">
+                      <Wand2 className="h-4 w-4" />
+                      Unique Codes
                     </TabsTrigger>
                     <TabsTrigger value="upload" className="flex items-center gap-2">
                       <Upload className="h-4 w-4" />
@@ -732,7 +828,7 @@ export default function EditPromotionPage() {
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="generate" className="space-y-5 mt-4">
+                  <TabsContent value="unique" className="space-y-5 mt-4">
                     {/* Quick Presets */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Quick presets</Label>
@@ -762,41 +858,11 @@ export default function EditPromotionPage() {
 
                     <Separator />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="codeCount" className="text-sm font-medium">
-                          {t('promotionsPage.createPage.numberOfCodes')}
-                        </Label>
-                        <Input
-                          id="codeCount"
-                          type="number"
-                          min="1"
-                          max="10000"
-                          value={generateOptions.count}
-                          onChange={(e) => setGenerateOptions({
-                            ...generateOptions,
-                            count: parseInt(e.target.value) || 1
-                          })}
-                          className="h-11"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="codeLength" className="text-sm font-medium">
-                          {t('promotionsPage.createPage.codeLength')}
-                        </Label>
-                        <Input
-                          id="codeLength"
-                          type="number"
-                          min="4"
-                          max="20"
-                          value={generateOptions.length}
-                          onChange={(e) => setGenerateOptions({
-                            ...generateOptions,
-                            length: parseInt(e.target.value) || 8
-                          })}
-                          className="h-11"
-                        />
-                      </div>
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground flex gap-2">
+                      <AlertCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                      <span>
+                        A unique code is generated for every email sent and stored on the recipient's email tracking record. Use preview codes below to confirm the format.
+                      </span>
                     </div>
 
                     <div className="space-y-2">
@@ -866,12 +932,31 @@ export default function EditPromotionPage() {
 
                     <Button
                       type="button"
-                      onClick={handleGenerateCodes}
+                      onClick={handleGeneratePreviewCodes}
                       className="w-full h-11"
                     >
                       <Wand2 className="h-4 w-4 mr-2" />
-                      Generate {generateOptions.count} Codes
+                      Generate Preview Codes
                     </Button>
+
+                    {previewCodes.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Preview codes</Label>
+                          <Badge variant="secondary" className="font-mono">
+                            {previewCodes.length} samples
+                          </Badge>
+                        </div>
+                        <div className="bg-muted/50 p-3 rounded-lg border max-h-40 overflow-y-auto">
+                          <pre className="text-xs font-mono whitespace-pre-wrap break-all">
+                            {previewCodes.join('\n')}
+                          </pre>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Samples only. Actual codes are generated per recipient when the promotion sends.
+                        </p>
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="single" className="space-y-4 mt-4">
@@ -1003,15 +1088,14 @@ export default function EditPromotionPage() {
                   {/* Title & Type */}
                   <div className="flex items-start gap-4">
                     <div className={cn(
-                      "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0",
-                      promotionTypeColors[formData.type]
+                      "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 bg-primary/10 text-primary"
                     )}>
                       <TypeIcon className="h-6 w-6" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-semibold">{formData.title || 'Untitled Promotion'}</h3>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge className={promotionTypeColors[formData.type]}>
+                        <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-none shadow-none">
                           {promotionTypeOptions.find(opt => opt.value === formData.type)?.label}
                         </Badge>
                         {formData.isActive ? (
@@ -1033,58 +1117,68 @@ export default function EditPromotionPage() {
                   <Separator />
 
                   {/* Email-accurate content preview */}
-                  {(() => {
-                    const theme = getPromotionTypeTheme(formData.type);
-                    return (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                            {t('promotionsPage.createPage.previewContent')}
-                          </Label>
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            as it will appear in email
-                          </span>
-                        </div>
-                        <div className="rounded-lg border bg-[#f3f4f6] dark:bg-gray-900 p-4">
-                          <div
-                            style={{
-                              maxWidth: 600,
-                              margin: '20px auto',
-                              padding: '32px 24px',
-                              background: `linear-gradient(135deg, ${theme.bgStart} 0%, ${theme.bgEnd} 100%)`,
-                              borderRadius: 12,
-                              border: `2px solid ${theme.border}`,
-                              fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-                            }}
-                          >
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 16px', color: theme.titleColor }}>
-                              {formData.title || 'Untitled Promotion'}
-                            </h2>
-                            {formData.description && (
-                              <p style={{ margin: '0 0 20px', color: theme.bodyColor, fontSize: '1rem', lineHeight: 1.5 }}>
-                                {formData.description}
-                              </p>
-                            )}
-                            <div
-                              style={{ color: theme.bodyColor, fontSize: '1rem', lineHeight: 1.6 }}
-                              dangerouslySetInnerHTML={{
-                                __html: formData.content && formData.content !== '<p></p>'
-                                  ? formData.content
-                                  : '<p style="color:#94a3b8;font-style:italic;">No content provided</p>',
-                              }}
-                            />
-                            {hasTerms && (
-                              <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${theme.border}`, textAlign: 'center', fontSize: 12, lineHeight: 1.5, color: theme.bodyColor }}>
-                                <a href="#" onClick={(e) => e.preventDefault()} style={{ color: theme.accent, textDecoration: 'underline' }}>
-                                  Terms and Conditions
-                                </a>
-                              </div>
-                            )}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                        {t('promotionsPage.createPage.previewContent')}
+                      </Label>
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        as it will appear in email
+                      </span>
+                    </div>
+                    <div className="rounded-lg border bg-[#f3f4f6] dark:bg-gray-900 p-4">
+                      <div className={cn(
+                        "max-w-[600px] mx-auto my-5 px-6 py-8 rounded-xl border-[3px] transition-all",
+                        DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.borderColor || "border-border",
+                        formData.borderStyle === 'dotted' ? "border-dotted" : "border-solid",
+                        DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.color || "",
+                        DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.textColor || "text-foreground"
+                      )}>
+                        <h2 className="text-2xl font-bold mb-4">
+                          {formData.title || 'Untitled Promotion'}
+                        </h2>
+                        {formData.description && (
+                          <p className="mb-5 text-base leading-relaxed opacity-80">
+                            {formData.description}
+                          </p>
+                        )}
+                        <div
+                          className="text-base leading-relaxed opacity-90 [&_*]:!text-inherit"
+                          dangerouslySetInnerHTML={{
+                            __html: formData.content && formData.content !== '<p></p>'
+                              ? formData.content
+                              : '<p style="font-style:italic;" class="opacity-50 text-sm">No content provided</p>',
+                          }}
+                        />
+                        {currentStepIndex >= 2 && (
+                          <div className={cn(
+                            "mt-6 mb-2 mx-auto max-w-[200px] p-3 rounded backdrop-blur-sm border border-dashed border-current text-center transition-all",
+                            DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.color ? "bg-background/20 opacity-90" : "bg-muted/50 text-foreground"
+                          )}>
+                            <span className="text-[10px] uppercase tracking-wider font-bold opacity-70 mb-1 block">Promo Code</span>
+                            <code className="text-base font-mono font-bold tracking-widest drop-shadow-sm">
+                              {codeGenerationMode === 'single'
+                                ? (singleCodeInput || 'YOURCODE')
+                                : codeGenerationMode === 'upload'
+                                  ? (userCodesInput.split('\n')[0] || 'YOURCODE').toUpperCase()
+                                  : `${generateOptions.prefix}${generateOptions.format === 'numeric' ? '0'.repeat(generateOptions.length) : 'X'.repeat(generateOptions.length)}${generateOptions.suffix}`
+                              }
+                            </code>
                           </div>
-                        </div>
+                        )}
+                        {hasTerms && (
+                          <div className={cn(
+                            "mt-6 pt-4 text-center text-xs opacity-70 border-t",
+                            DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.borderColor || "border-border"
+                          )}>
+                            <a href="#" onClick={(e) => e.preventDefault()} className="underline hover:opacity-100 transition-opacity">
+                              Terms and Conditions
+                            </a>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })()}
+                    </div>
+                  </div>
 
                   <Separator />
 
@@ -1215,13 +1309,15 @@ export default function EditPromotionPage() {
             <CardContent className="space-y-3">
               {/* Mini preview card */}
               <div className={cn(
-                "rounded-xl border-2 p-4 transition-colors",
-                promotionTypeBorderColors[formData.type] || "border-border"
+                "rounded-xl border-[3px] p-4 transition-all overflow-hidden",
+                DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.borderColor || "border-border",
+                formData.borderStyle === 'dotted' ? "border-dotted" : "border-solid",
+                DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.color || "",
+                DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.textColor || "text-foreground"
               )}>
                 <div className="flex items-center gap-3 mb-3">
                   <div className={cn(
-                    "w-9 h-9 rounded-lg flex items-center justify-center",
-                    promotionTypeColors[formData.type]
+                    "w-9 h-9 rounded-lg flex items-center justify-center opacity-80 bg-background/20"
                   )}>
                     <TypeIcon className="h-4 w-4" />
                   </div>
@@ -1229,28 +1325,48 @@ export default function EditPromotionPage() {
                     <p className="font-semibold text-sm truncate">
                       {formData.title || t('promotionsPage.createPage.titlePlaceholder')}
                     </p>
-                    <Badge className={cn("text-[10px] px-1.5 py-0", promotionTypeColors[formData.type])}>
+                    <Badge className="text-[10px] px-1.5 py-0 bg-background/20 text-inherit border-none shadow-none hover:bg-background/30">
                       {promotionTypeOptions.find(opt => opt.value === formData.type)?.label}
                     </Badge>
                   </div>
                 </div>
 
                 {formData.description && (
-                  <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{formData.description}</p>
+                  <p className="text-xs mb-2 line-clamp-2 opacity-80">{formData.description}</p>
                 )}
 
                 {formData.content && formData.content !== '<p></p>' && (
                   <div
-                    className="text-xs text-muted-foreground prose prose-xs dark:prose-invert max-w-none line-clamp-3 mb-2"
+                    className="text-xs max-w-none line-clamp-3 mb-2 opacity-90 [&_*]:!text-inherit"
                     dangerouslySetInnerHTML={{ __html: formData.content }}
                   />
                 )}
 
-                <div className="flex items-center justify-end pt-2 border-t mt-2">
+                {currentStepIndex >= 2 && (
+                  <div className={cn(
+                    "mt-3 mb-2 p-2 rounded backdrop-blur-sm border border-dashed border-current text-center transition-all",
+                    DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.color ? "bg-background/20 opacity-90" : "bg-muted/50 text-foreground"
+                  )}>
+                    <span className="text-[9px] uppercase tracking-wider font-bold opacity-70 mb-1 block">Code Example</span>
+                    <code className="text-sm font-mono font-bold tracking-widest drop-shadow-sm">
+                      {codeGenerationMode === 'single'
+                        ? (singleCodeInput || 'YOURCODE')
+                        : codeGenerationMode === 'upload'
+                          ? (userCodesInput.split('\n')[0] || 'YOURCODE').toUpperCase()
+                          : `${generateOptions.prefix}${generateOptions.format === 'numeric' ? '0'.repeat(generateOptions.length) : 'X'.repeat(generateOptions.length)}${generateOptions.suffix}`
+                      }
+                    </code>
+                  </div>
+                )}
+
+                <div className={cn(
+                  "flex items-center justify-end pt-2 border-t mt-2",
+                  DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.borderColor || "border-border"
+                )}>
                   {formData.isActive ? (
-                    <span className="text-[10px] text-green-600 font-medium">Active</span>
+                    <span className="text-[10px] text-green-600 font-medium bg-green-100 dark:bg-green-900/50 px-1.5 py-0.5 rounded">Active</span>
                   ) : (
-                    <span className="text-[10px] text-muted-foreground">Inactive</span>
+                    <span className="text-[10px] opacity-70">Inactive</span>
                   )}
                 </div>
               </div>

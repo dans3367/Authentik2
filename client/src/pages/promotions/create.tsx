@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Loader2, Calendar, Megaphone, Save, Upload, Wand2, Code, Copy, Check, Mail, FileText, Gift, TrendingUp, Trash2, LayoutDashboard, Eye, AlertCircle, Ticket, ScrollText } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Calendar, Megaphone, Save, Upload, Wand2, Code, Copy, Check, CheckCircle2, Mail, FileText, Gift, TrendingUp, Trash2, LayoutDashboard, Eye, AlertCircle, Ticket, ScrollText, Palette } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +17,6 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { generatePromotionalCodes, parseUserCodes, validatePromotionalCodes, formatCodesForDisplay, CODE_GENERATION_PRESETS, type CodeFormat } from '@/utils/codeGeneration';
-import { getPromotionTypeTheme } from '@shared/promotionTypeTheme';
 import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import RichTextEditor from '@/components/LazyRichTextEditor';
 import { cn } from '@/lib/utils';
@@ -46,23 +45,18 @@ const getCodeFormatOptions = (t: any) => [
   { value: 'numeric', label: t('promotionsPage.createPage.codeFormats.numeric') },
 ];
 
-const promotionTypeColors: Record<string, string> = {
-  newsletter: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  survey: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  birthday: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
-  announcement: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-  sale: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-  event: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
-};
-
-const promotionTypeBorderColors: Record<string, string> = {
-  newsletter: 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950',
-  survey: 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950',
-  birthday: 'border-pink-300 dark:border-pink-700 bg-pink-50 dark:bg-pink-950',
-  announcement: 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-950',
-  sale: 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950',
-  event: 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950',
-};
+const DESIGN_TEMPLATES = [
+  { id: 'template-1', label: 'Classic Minimal', color: 'bg-white dark:bg-slate-950', textColor: 'text-slate-900 dark:text-slate-100', borderColor: 'border-slate-200 dark:border-slate-800' },
+  { id: 'template-2', label: 'Modern Vibrant', color: 'bg-blue-100 dark:bg-blue-900/40', textColor: 'text-blue-900 dark:text-blue-100', borderColor: 'border-blue-400 dark:border-blue-700' },
+  { id: 'template-3', label: 'Elegant Dark', color: 'bg-zinc-800 dark:bg-zinc-950', textColor: 'text-zinc-100 dark:text-zinc-100', borderColor: 'border-zinc-600 dark:border-zinc-800' },
+  { id: 'template-4', label: 'Playful Brand', color: 'bg-rose-100 dark:bg-rose-900/40', textColor: 'text-rose-900 dark:text-rose-100', borderColor: 'border-rose-400 dark:border-rose-700' },
+  { id: 'template-5', label: 'Premium Gold', color: 'bg-amber-100 dark:bg-amber-900/40', textColor: 'text-amber-900 dark:text-amber-100', borderColor: 'border-amber-400 dark:border-amber-600' },
+  { id: 'template-6', label: 'Fresh Green', color: 'bg-green-100 dark:bg-green-900/40', textColor: 'text-green-900 dark:text-green-100', borderColor: 'border-green-400 dark:border-green-700' },
+  { id: 'template-7', label: 'Sweet Pink', color: 'bg-pink-100 dark:bg-pink-900/40', textColor: 'text-pink-900 dark:text-pink-100', borderColor: 'border-pink-400 dark:border-pink-700' },
+  { id: 'template-8', label: 'Royal Purple', color: 'bg-purple-100 dark:bg-purple-900/40', textColor: 'text-purple-900 dark:text-purple-100', borderColor: 'border-purple-400 dark:border-purple-700' },
+  { id: 'template-9', label: 'Warm Orange', color: 'bg-orange-100 dark:bg-orange-900/40', textColor: 'text-orange-900 dark:text-orange-100', borderColor: 'border-orange-400 dark:border-orange-700' },
+  { id: 'template-10', label: 'Deep Indigo', color: 'bg-indigo-100 dark:bg-indigo-900/40', textColor: 'text-indigo-900 dark:text-indigo-100', borderColor: 'border-indigo-400 dark:border-indigo-700' }
+] as const;
 
 // Step definitions
 const STEPS = [
@@ -94,6 +88,8 @@ export default function CreatePromotionPage() {
     content: '',
     termsContent: '',
     type: 'newsletter' as string,
+    designTemplate: 'template-1',
+    borderStyle: 'solid',
     targetAudience: 'all',
     isActive: true,
     maxUses: '',
@@ -272,8 +268,13 @@ export default function CreatePromotionPage() {
     }
 
     const trimmedTerms = formData.termsContent.replace(/<[^>]*>/g, '').trim();
+    const metadataObj = { 
+      designTemplate: formData.designTemplate,
+      borderStyle: formData.borderStyle
+    };
     const submitData = {
       ...formData,
+      metadata: JSON.stringify(metadataObj),
       maxUses: formData.maxUses ? parseInt(formData.maxUses) : undefined,
       validFrom: formData.validFrom ? new Date(formData.validFrom + 'T00:00:00') : undefined,
       validTo: formData.validTo ? new Date(formData.validTo + 'T23:59:59') : undefined,
@@ -451,15 +452,20 @@ export default function CreatePromotionPage() {
                             type="button"
                             onClick={() => updateField('type', option.value)}
                             className={cn(
-                              "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center",
+                              "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center relative",
                               isSelected
-                                ? promotionTypeBorderColors[option.value] + " ring-2 ring-offset-2 ring-primary/30"
+                                ? "border-primary bg-primary/5"
                                 : "border-border hover:border-primary/30 hover:bg-muted/50"
                             )}
                           >
+                            {isSelected && (
+                              <div className="absolute -top-2 -right-2 bg-background rounded-full">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 fill-green-100 dark:fill-green-900/50" />
+                              </div>
+                            )}
                             <div className={cn(
                               "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-                              isSelected ? promotionTypeColors[option.value] : "bg-muted text-muted-foreground"
+                              isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                             )}>
                               <Icon className="h-5 w-5" />
                             </div>
@@ -467,6 +473,85 @@ export default function CreatePromotionPage() {
                           </button>
                         );
                       })}
+                    </div>
+                  </div>
+
+                  {/* Design Templates */}
+                  <div className="space-y-3 pt-2">
+                    <Label className="text-sm font-medium">Design Template</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      {DESIGN_TEMPLATES.map((option) => {
+                        const isSelected = formData.designTemplate === option.id;
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => updateField('designTemplate', option.id)}
+                            className={cn(
+                              "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center relative",
+                              isSelected
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-primary/30 hover:bg-muted/50"
+                            )}
+                          >
+                            {isSelected && (
+                              <div className="absolute -top-2 -right-2 bg-background rounded-full shadow-sm z-10">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 fill-green-100 dark:fill-green-900/50" />
+                              </div>
+                            )}
+                            <div className={cn(
+                              "w-full h-12 rounded-lg flex items-center justify-center transition-colors mb-1 shadow-sm",
+                              option.color
+                            )}>
+                              <Palette className="h-5 w-5 opacity-60" />
+                            </div>
+                            <span className="text-xs font-medium">{option.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Border Style */}
+                  <div className="space-y-3 pt-2">
+                    <Label className="text-sm font-medium">Border Style</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => updateField('borderStyle', 'solid')}
+                        className={cn(
+                          "flex items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all relative",
+                          formData.borderStyle === 'solid'
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border hover:border-primary/30 hover:bg-muted/50 text-muted-foreground"
+                        )}
+                      >
+                        {formData.borderStyle === 'solid' && (
+                          <div className="absolute -top-2 -right-2 bg-background rounded-full shadow-sm z-10">
+                            <CheckCircle2 className="h-5 w-5 text-green-500 fill-green-100 dark:fill-green-900/50" />
+                          </div>
+                        )}
+                        <div className="w-5 h-5 rounded border-[3px] border-solid border-current"></div>
+                        <span className="text-sm font-medium">Solid</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateField('borderStyle', 'dotted')}
+                        className={cn(
+                          "flex items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all relative",
+                          formData.borderStyle === 'dotted'
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border hover:border-primary/30 hover:bg-muted/50 text-muted-foreground"
+                        )}
+                      >
+                        {formData.borderStyle === 'dotted' && (
+                          <div className="absolute -top-2 -right-2 bg-background rounded-full shadow-sm z-10">
+                            <CheckCircle2 className="h-5 w-5 text-green-500 fill-green-100 dark:fill-green-900/50" />
+                          </div>
+                        )}
+                        <div className="w-5 h-5 rounded border-[3px] border-dotted border-current"></div>
+                        <span className="text-sm font-medium">Dotted</span>
+                      </button>
                     </div>
                   </div>
 
@@ -923,58 +1008,68 @@ export default function CreatePromotionPage() {
                   <Separator />
 
                   {/* Email-accurate content preview */}
-                  {(() => {
-                    const theme = getPromotionTypeTheme(formData.type);
-                    return (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                            {t('promotionsPage.createPage.previewContent')}
-                          </Label>
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            as it will appear in email
-                          </span>
-                        </div>
-                        <div className="rounded-lg border bg-[#f3f4f6] dark:bg-gray-900 p-4">
-                          <div
-                            style={{
-                              maxWidth: 600,
-                              margin: '20px auto',
-                              padding: '32px 24px',
-                              background: `linear-gradient(135deg, ${theme.bgStart} 0%, ${theme.bgEnd} 100%)`,
-                              borderRadius: 12,
-                              border: `2px solid ${theme.border}`,
-                              fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-                            }}
-                          >
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 16px', color: theme.titleColor }}>
-                              {formData.title || 'Untitled Promotion'}
-                            </h2>
-                            {formData.description && (
-                              <p style={{ margin: '0 0 20px', color: theme.bodyColor, fontSize: '1rem', lineHeight: 1.5 }}>
-                                {formData.description}
-                              </p>
-                            )}
-                            <div
-                              style={{ color: theme.bodyColor, fontSize: '1rem', lineHeight: 1.6 }}
-                              dangerouslySetInnerHTML={{
-                                __html: formData.content && formData.content !== '<p></p>'
-                                  ? formData.content
-                                  : '<p style="color:#94a3b8;font-style:italic;">No content provided</p>',
-                              }}
-                            />
-                            {hasTerms && (
-                              <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${theme.border}`, textAlign: 'center', fontSize: 12, lineHeight: 1.5, color: theme.bodyColor }}>
-                                <a href="#" onClick={(e) => e.preventDefault()} style={{ color: theme.accent, textDecoration: 'underline' }}>
-                                  Terms and Conditions
-                                </a>
-                              </div>
-                            )}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                        {t('promotionsPage.createPage.previewContent')}
+                      </Label>
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        as it will appear in email
+                      </span>
+                    </div>
+                    <div className="rounded-lg border bg-[#f3f4f6] dark:bg-gray-900 p-4">
+                      <div className={cn(
+                        "max-w-[600px] mx-auto my-5 px-6 py-8 rounded-xl border-[3px] transition-all",
+                        DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.borderColor || "border-border",
+                        formData.borderStyle === 'dotted' ? "border-dotted" : "border-solid",
+                        DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.color || "",
+                        DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.textColor || "text-foreground"
+                      )}>
+                        <h2 className="text-2xl font-bold mb-4">
+                          {formData.title || 'Untitled Promotion'}
+                        </h2>
+                        {formData.description && (
+                          <p className="mb-5 text-base leading-relaxed opacity-80">
+                            {formData.description}
+                          </p>
+                        )}
+                        <div
+                          className="text-base leading-relaxed opacity-90 [&_*]:!text-inherit"
+                          dangerouslySetInnerHTML={{
+                            __html: formData.content && formData.content !== '<p></p>'
+                              ? formData.content
+                              : '<p style="font-style:italic;" class="opacity-50 text-sm">No content provided</p>',
+                          }}
+                        />
+                        {currentStepIndex >= 2 && (
+                          <div className={cn(
+                            "mt-6 mb-2 mx-auto max-w-[200px] p-3 rounded backdrop-blur-sm border border-dashed border-current text-center transition-all",
+                            DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.color ? "bg-background/20 opacity-90" : "bg-muted/50 text-foreground"
+                          )}>
+                            <span className="text-[10px] uppercase tracking-wider font-bold opacity-70 mb-1 block">Promo Code</span>
+                            <code className="text-base font-mono font-bold tracking-widest drop-shadow-sm">
+                              {codeGenerationMode === 'single'
+                                ? (singleCodeInput || 'YOURCODE')
+                                : codeGenerationMode === 'upload'
+                                  ? (userCodesInput.split('\n')[0] || 'YOURCODE').toUpperCase()
+                                  : `${generateOptions.prefix}${generateOptions.format === 'numeric' ? '0'.repeat(generateOptions.length) : 'X'.repeat(generateOptions.length)}${generateOptions.suffix}`
+                              }
+                            </code>
                           </div>
-                        </div>
+                        )}
+                        {hasTerms && (
+                          <div className={cn(
+                            "mt-6 pt-4 text-center text-xs opacity-70 border-t",
+                            DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.borderColor || "border-border"
+                          )}>
+                            <a href="#" onClick={(e) => e.preventDefault()} className="underline hover:opacity-100 transition-opacity">
+                              Terms and Conditions
+                            </a>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })()}
+                    </div>
+                  </div>
 
                   <Separator />
 
@@ -1074,13 +1169,15 @@ export default function CreatePromotionPage() {
             <CardContent className="space-y-3">
               {/* Mini preview card */}
               <div className={cn(
-                "rounded-xl border-2 p-4 transition-colors",
-                promotionTypeBorderColors[formData.type] || "border-border"
+                "rounded-xl border-[3px] p-4 transition-all relative overflow-hidden",
+                DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.borderColor || "border-border",
+                formData.borderStyle === 'dotted' ? "border-dotted" : "border-solid",
+                DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.color || "",
+                DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.textColor || "text-foreground"
               )}>
                 <div className="flex items-center gap-3 mb-3">
                   <div className={cn(
-                    "w-9 h-9 rounded-lg flex items-center justify-center",
-                    promotionTypeColors[formData.type]
+                    "w-9 h-9 rounded-lg flex items-center justify-center opacity-80 bg-background/20"
                   )}>
                     <TypeIcon className="h-4 w-4" />
                   </div>
@@ -1088,28 +1185,48 @@ export default function CreatePromotionPage() {
                     <p className="font-semibold text-sm truncate">
                       {formData.title || t('promotionsPage.createPage.titlePlaceholder')}
                     </p>
-                    <Badge className={cn("text-[10px] px-1.5 py-0", promotionTypeColors[formData.type])}>
+                    <Badge className="text-[10px] px-1.5 py-0 bg-background/20 text-inherit border-none shadow-none hover:bg-background/30">
                       {promotionTypeOptions.find(opt => opt.value === formData.type)?.label}
                     </Badge>
                   </div>
                 </div>
 
                 {formData.description && (
-                  <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{formData.description}</p>
+                  <p className="text-xs mb-2 line-clamp-2 opacity-80">{formData.description}</p>
                 )}
 
                 {formData.content && formData.content !== '<p></p>' && (
                   <div
-                    className="text-xs text-muted-foreground prose prose-xs dark:prose-invert max-w-none line-clamp-3 mb-2"
+                    className="text-xs max-w-none line-clamp-3 mb-2 opacity-90 [&_*]:!text-inherit"
                     dangerouslySetInnerHTML={{ __html: formData.content }}
                   />
                 )}
 
-                <div className="flex items-center justify-end pt-2 border-t mt-2">
+                {currentStepIndex >= 2 && (
+                  <div className={cn(
+                    "mt-3 mb-2 p-2 rounded backdrop-blur-sm border border-dashed border-current text-center transition-all",
+                    DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.color ? "bg-background/20 opacity-90" : "bg-muted/50 text-foreground"
+                  )}>
+                    <span className="text-[9px] uppercase tracking-wider font-bold opacity-70 mb-1 block">Code Example</span>
+                    <code className="text-sm font-mono font-bold tracking-widest drop-shadow-sm">
+                      {codeGenerationMode === 'single'
+                        ? (singleCodeInput || 'YOURCODE')
+                        : codeGenerationMode === 'upload'
+                          ? (userCodesInput.split('\n')[0] || 'YOURCODE').toUpperCase()
+                          : `${generateOptions.prefix}${generateOptions.format === 'numeric' ? '0'.repeat(generateOptions.length) : 'X'.repeat(generateOptions.length)}${generateOptions.suffix}`
+                      }
+                    </code>
+                  </div>
+                )}
+
+                <div className={cn(
+                  "flex items-center justify-end pt-2 border-t mt-2",
+                  DESIGN_TEMPLATES.find(t => t.id === formData.designTemplate)?.borderColor || "border-border"
+                )}>
                   {formData.isActive ? (
-                    <span className="text-[10px] text-green-600 font-medium">Active</span>
+                    <span className="text-[10px] text-green-600 font-medium bg-green-100 dark:bg-green-900/50 px-1.5 py-0.5 rounded">Active</span>
                   ) : (
-                    <span className="text-[10px] text-muted-foreground">Inactive</span>
+                    <span className="text-[10px] opacity-70">Inactive</span>
                   )}
                 </div>
               </div>
