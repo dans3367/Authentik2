@@ -12,6 +12,7 @@ import { emailAttachmentUpload, validateAttachmentSize, filesToBase64Attachments
 import { fromZonedTime } from 'date-fns-tz';
 import { wrapNewsletterContent } from '../../utils/newsletterEmailWrapper';
 import { replaceEmailPlaceholders } from '../../utils/emailPlaceholders';
+import { appendPromotionTermsLink } from '../../utils/promotionTerms';
 import { sanitizeEmailHtml, sanitizeFontFamily, escapeHtml, isValidHttpUrl, maskEmail, renderBirthdayTemplate, enqueuePromotionalEmailJob } from './emailUtils';
 import { resolveShopId } from '../../utils/defaultShop';
 import multer from 'multer';
@@ -1162,6 +1163,13 @@ async function autoSendBirthdayCard(contact: any, tenantId: string) {
     const { enhancedEmailService } = await import('../../emailService');
     const shouldSplitEmail = settings.splitPromotionalEmail && settings.promotion;
 
+    // Resolve tenant slug once for the Terms & Conditions link on promotional content
+    const tenantRow = await db.query.tenants.findFirst({
+      where: eq(tenants.id, tenantId),
+      columns: { slug: true },
+    });
+    const tenantSlug = tenantRow?.slug || '';
+
     const unsubUrl = unsubscribeToken
       ? `${process.env.APP_URL || 'http://localhost:5002'}/api/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}&type=customer_engagement`
       : undefined;
@@ -1223,7 +1231,8 @@ async function autoSendBirthdayCard(contact: any, tenantId: string) {
       // Queue promotional email with 20s delay
       const safePromoTitle = sanitizeEmailHtml(settings.promotion?.title || 'Special Birthday Offer!');
       const safePromoDescription = settings.promotion?.description ? sanitizeEmailHtml(settings.promotion.description) : '';
-      const safePromoContent = sanitizeEmailHtml(settings.promotion?.content || '');
+      const rawPromoContent = sanitizeEmailHtml(settings.promotion?.content || '');
+      const safePromoContent = appendPromotionTermsLink(rawPromoContent, settings.promotion || null, tenantSlug);
 
       const htmlPromo = `
         <html><body style="margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
@@ -1245,13 +1254,16 @@ async function autoSendBirthdayCard(contact: any, tenantId: string) {
       console.log(`[AutoBirthday] Split flow complete for ${contact.email} — birthday card sent, promo queued`);
     } else {
       // COMBINED FLOW: birthday card with promo embedded
+      const combinedPromoContent = settings.promotion?.content
+        ? appendPromotionTermsLink(settings.promotion.content, settings.promotion, tenantSlug)
+        : settings.promotion?.content;
       const htmlContent = renderBirthdayTemplate(settings.emailTemplate as any, {
         recipientName,
         message: settings.customMessage || 'Wishing you a wonderful birthday!',
         brandName: companyName,
         customThemeData: settings.customThemeData ? JSON.parse(settings.customThemeData) : null,
         senderName: resolvedSenderName,
-        promotionContent: settings.promotion?.content,
+        promotionContent: combinedPromoContent,
         promotionTitle: settings.promotion?.title,
         promotionDescription: settings.promotion?.description || undefined,
         unsubscribeToken,

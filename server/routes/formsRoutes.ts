@@ -1,13 +1,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { sql, eq, and } from 'drizzle-orm';
-import { forms, formResponses, masterEmailDesign, companies, emailContacts, promotions, unsubscribeTokens, templates } from '@shared/schema';
+import { forms, formResponses, masterEmailDesign, companies, emailContacts, promotions, unsubscribeTokens, templates, tenants } from '@shared/schema';
 import crypto from 'crypto';
 import { EmailService } from '../emailService';
 import { authenticateToken, requireRole, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { sanitizeString } from '../utils/sanitization';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
 import { replaceEmailPlaceholders } from '../utils/emailPlaceholders';
+import { appendPromotionTermsLink } from '../utils/promotionTerms';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 import { verifyTurnstileToken } from '../utils/turnstile';
@@ -73,8 +74,17 @@ async function sendPromotionEmailIfEnabled(
     const resolvedContent = replaceEmailPlaceholders(promotion.content, contactInfo, companyName);
     const resolvedTitle = replaceEmailPlaceholders(promotion.title, contactInfo, companyName);
 
+    // Append "Terms and Conditions" link pointing to the blog-style terms page if configured
+    const tenant = await db.query.tenants.findFirst({
+      where: eq(tenants.id, form.tenantId),
+      columns: { slug: true },
+    });
+    const contentWithTerms = tenant?.slug
+      ? appendPromotionTermsLink(resolvedContent, promotion, tenant.slug)
+      : resolvedContent;
+
     // Wrap promotion content in the tenant's branded email design
-    let wrappedContent = await wrapNewsletterContent(form.tenantId, resolvedContent);
+    let wrappedContent = await wrapNewsletterContent(form.tenantId, contentWithTerms);
 
     // Generate unsubscribe token for the contact
     let unsubscribeUrl: string | undefined;

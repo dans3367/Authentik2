@@ -2364,6 +2364,7 @@ export const promotions = pgTable("promotions", {
   title: text("title").notNull(),
   description: text("description"),
   content: text("content").notNull(), // HTML content of the promotion
+  termsContent: text("terms_content"), // HTML content of the legal terms, shown via a public blog-style page
   type: text("type").notNull().default('newsletter'), // newsletter, survey, birthday, announcement, sale, event
   targetAudience: text("target_audience").notNull().default('all'), // all, subscribers, customers, prospects, vip
   isActive: boolean("is_active").default(true),
@@ -2406,6 +2407,7 @@ export const createPromotionSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   content: z.string().min(1, "Content is required"),
+  termsContent: z.string().optional(),
   type: z.enum(['newsletter', 'survey', 'birthday', 'announcement', 'sale', 'event']).default('newsletter'),
   targetAudience: z.enum(['all', 'subscribers', 'customers', 'prospects', 'vip']).default('all'),
   isActive: z.boolean().default(true),
@@ -2420,6 +2422,7 @@ export const updatePromotionSchema = z.object({
   title: z.string().min(1, "Title is required").optional(),
   description: z.string().optional(),
   content: z.string().min(1, "Content is required").optional(),
+  termsContent: z.string().optional().nullable(),
   type: z.enum(['newsletter', 'survey', 'birthday', 'announcement', 'sale', 'event']).optional(),
   targetAudience: z.enum(['all', 'subscribers', 'customers', 'prospects', 'vip']).optional(),
   isActive: z.boolean().optional(),

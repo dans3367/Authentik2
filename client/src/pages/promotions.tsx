@@ -15,6 +15,7 @@ import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { wrapInEmailPreview } from '@/utils/email-preview-wrapper';
+import { renderPromotionEmailWrapper } from '@shared/promotionTypeTheme';
 
 interface Promotion {
   id: string;
@@ -29,6 +30,7 @@ interface Promotion {
   validFrom?: string;
   validTo?: string;
   promotionalCodes?: string[];
+  termsContent?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -203,7 +205,16 @@ export default function PromotionsPage() {
 
   const wrappedPreviewHtml = useMemo(() => {
     if (!previewPromotion) return '';
-    return wrapInEmailPreview(previewPromotion.content || '', {
+    const hasTerms = !!(previewPromotion.termsContent && previewPromotion.termsContent.replace(/<[^>]*>/g, '').trim());
+    const themedBody = renderPromotionEmailWrapper({
+      type: previewPromotion.type,
+      title: previewPromotion.title || '',
+      description: previewPromotion.description || '',
+      contentHtml: previewPromotion.content || '',
+      termsUrl: hasTerms ? '#' : null,
+      footerNote: 'This is a special promotion for valued subscribers.',
+    });
+    return wrapInEmailPreview(themedBody, {
       companyName: emailDesign?.companyName || '',
       headerMode: emailDesign?.headerMode,
       primaryColor: emailDesign?.primaryColor,

@@ -6,12 +6,21 @@
  */
 
 import { db } from '../db';
-import { birthdaySettings, companies, emailActivity, emailContacts, unsubscribeTokens } from '@shared/schema';
+import { birthdaySettings, companies, emailActivity, emailContacts, tenants, unsubscribeTokens } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import { tasks } from '@trigger.dev/sdk/v3';
 import { renderBirthdayTemplate, sanitizeEmailHtml } from '../routes/email';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
+import { appendPromotionTermsLink } from '../utils/promotionTerms';
+
+async function resolveTenantSlug(tenantId: string): Promise<string> {
+  const row = await db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+    columns: { slug: true },
+  });
+  return row?.slug || '';
+}
 
 export interface BirthdayTestRequest {
     userEmail: string;
@@ -244,7 +253,9 @@ async function sendSplitBirthdayEmails(
     // Sanitize promotion fields to prevent XSS/HTML injection
     const safePromoTitle = sanitizeEmailHtml(promotion?.title || 'Special Birthday Offer!');
     const safePromoDescription = promotion?.description ? sanitizeEmailHtml(promotion.description) : '';
-    const safePromoContent = sanitizeEmailHtml(promotion?.content || '');
+    const rawPromoContent = sanitizeEmailHtml(promotion?.content || '');
+    const tenantSlug = await resolveTenantSlug(tenantId);
+    const safePromoContent = appendPromotionTermsLink(rawPromoContent, promotion || null, tenantSlug);
 
     const promoSubject = sanitizeEmailHtml(promotion?.title || 'Special Birthday Offer! (Test)');
     const htmlPromo = buildPromotionalEmailHtml(safePromoTitle, safePromoDescription, safePromoContent, unsubscribeUrl);
@@ -309,13 +320,18 @@ async function sendCombinedBirthdayEmail(
 ): Promise<BirthdayTestResult> {
     const { userEmail, recipientName, resolvedTemplate, resolvedMessage, resolvedCustomThemeData, resolvedSenderName, companyName, unsubscribeToken, unsubscribeUrl, contactId, promotion } = params;
 
+    const tenantSlug = await resolveTenantSlug(tenantId);
+    const combinedPromoContent = promotion?.content
+        ? appendPromotionTermsLink(promotion.content, promotion, tenantSlug)
+        : promotion?.content;
+
     const htmlContent = renderBirthdayTemplate(resolvedTemplate as any, {
         recipientName,
         message: resolvedMessage,
         brandName: companyName,
         customThemeData: resolvedCustomThemeData ? (typeof resolvedCustomThemeData === 'string' ? JSON.parse(resolvedCustomThemeData) : resolvedCustomThemeData) : null,
         senderName: resolvedSenderName,
-        promotionContent: promotion?.content,
+        promotionContent: combinedPromoContent,
         promotionTitle: promotion?.title,
         promotionDescription: promotion?.description,
         unsubscribeToken,

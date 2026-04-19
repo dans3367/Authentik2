@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Loader2, Calendar, Megaphone, Save, Upload, Wand2, Code, Copy, Check, Mail, FileText, Gift, TrendingUp, Users, Trash2, LayoutDashboard, Eye, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Calendar, Megaphone, Save, Upload, Wand2, Code, Copy, Check, Mail, FileText, Gift, TrendingUp, Trash2, LayoutDashboard, Eye, AlertCircle, Ticket, ScrollText } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { generatePromotionalCodes, parseUserCodes, validatePromotionalCodes, formatCodesForDisplay, CODE_GENERATION_PRESETS, type CodeFormat } from '@/utils/codeGeneration';
+import { getPromotionTypeTheme } from '@shared/promotionTypeTheme';
 import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import RichTextEditor from '@/components/LazyRichTextEditor';
 import { cn } from '@/lib/utils';
@@ -37,14 +38,6 @@ const getPromotionTypeOptions = (t: any) => [
   { value: 'announcement', label: t('promotionsPage.types.announcement'), description: 'Important announcements', icon: Megaphone },
   { value: 'sale', label: t('promotionsPage.types.sale'), description: 'Sales & discounts', icon: TrendingUp },
   { value: 'event', label: t('promotionsPage.types.event'), description: 'Events & webinars', icon: Calendar },
-];
-
-const getTargetAudienceOptions = (t: any) => [
-  { value: 'all', label: t('promotionsPage.createPage.targetOptions.all'), icon: Users },
-  { value: 'subscribers', label: t('promotionsPage.createPage.targetOptions.subscribers'), icon: Mail },
-  { value: 'customers', label: t('promotionsPage.createPage.targetOptions.customers'), icon: Users },
-  { value: 'prospects', label: t('promotionsPage.createPage.targetOptions.prospects'), icon: Eye },
-  { value: 'vip', label: t('promotionsPage.createPage.targetOptions.vip'), icon: TrendingUp },
 ];
 
 const getCodeFormatOptions = (t: any) => [
@@ -76,6 +69,7 @@ const STEPS = [
   { id: 'details', label: 'Details', icon: Megaphone },
   { id: 'content', label: 'Content', icon: FileText },
   { id: 'codes', label: 'Codes', icon: Code },
+  { id: 'terms', label: 'Terms', icon: ScrollText },
   { id: 'review', label: 'Review', icon: Check },
 ] as const;
 
@@ -98,6 +92,7 @@ export default function CreatePromotionPage() {
     title: '',
     description: '',
     content: '',
+    termsContent: '',
     type: 'newsletter' as string,
     targetAudience: 'all',
     isActive: true,
@@ -109,8 +104,9 @@ export default function CreatePromotionPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Code generation state
-  const [codeGenerationMode, setCodeGenerationMode] = useState<'upload' | 'generate'>('generate');
+  const [codeGenerationMode, setCodeGenerationMode] = useState<'upload' | 'generate' | 'single'>('generate');
   const [userCodesInput, setUserCodesInput] = useState('');
+  const [singleCodeInput, setSingleCodeInput] = useState('');
   const [generateOptions, setGenerateOptions] = useState({
     count: 10,
     length: 8,
@@ -201,9 +197,16 @@ export default function CreatePromotionPage() {
     }
   };
 
+  const handleSingleCodeChange = (value: string) => {
+    const normalized = value.trim().toUpperCase();
+    setSingleCodeInput(value.toUpperCase());
+    setFormData(prev => ({ ...prev, promotionalCodes: normalized ? [normalized] : [] }));
+  };
+
   const handleClearCodes = () => {
     setFormData(prev => ({ ...prev, promotionalCodes: [] }));
     setUserCodesInput('');
+    setSingleCodeInput('');
   };
 
   // Step validation
@@ -268,12 +271,14 @@ export default function CreatePromotionPage() {
       }
     }
 
+    const trimmedTerms = formData.termsContent.replace(/<[^>]*>/g, '').trim();
     const submitData = {
       ...formData,
       maxUses: formData.maxUses ? parseInt(formData.maxUses) : undefined,
       validFrom: formData.validFrom ? new Date(formData.validFrom + 'T00:00:00') : undefined,
       validTo: formData.validTo ? new Date(formData.validTo + 'T23:59:59') : undefined,
       promotionalCodes: formData.promotionalCodes.length > 0 ? formData.promotionalCodes : undefined,
+      termsContent: trimmedTerms ? formData.termsContent : undefined,
     };
 
     if (submitData.validFrom && submitData.validTo && submitData.validFrom >= submitData.validTo) {
@@ -293,7 +298,6 @@ export default function CreatePromotionPage() {
   };
 
   const promotionTypeOptions = getPromotionTypeOptions(t);
-  const targetAudienceOptions = getTargetAudienceOptions(t);
   const codeFormatOptions = getCodeFormatOptions(t);
 
   // Completion status per step
@@ -301,8 +305,11 @@ export default function CreatePromotionPage() {
     details: !!(formData.title.trim() && formData.type),
     content: !!(formData.content.trim() && formData.content !== '<p></p>'),
     codes: true, // always valid (codes are optional)
+    terms: true, // always valid (terms are optional)
     review: true,
   }), [formData]);
+
+  const hasTerms = !!(formData.termsContent.replace(/<[^>]*>/g, '').trim());
 
   const TypeIcon = promotionTypeIcons[formData.type] || Megaphone;
 
@@ -463,33 +470,6 @@ export default function CreatePromotionPage() {
                     </div>
                   </div>
 
-                  <Separator />
-
-                  {/* Target Audience */}
-                  <div className="space-y-2">
-                    <Label htmlFor="targetAudience" className="text-sm font-medium">
-                      {t('promotionsPage.createPage.targetAudience')}
-                    </Label>
-                    <Select value={formData.targetAudience} onValueChange={(value) => updateField('targetAudience', value)}>
-                      <SelectTrigger className="h-11">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {targetAudienceOptions.map((option) => {
-                          const Icon = option.icon;
-                          return (
-                            <SelectItem key={option.value} value={option.value}>
-                              <div className="flex items-center gap-2">
-                                <Icon className="h-4 w-4 text-muted-foreground" />
-                                {option.label}
-                              </div>
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
                   {/* Active Toggle */}
                   <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
                     <div className="space-y-0.5">
@@ -626,11 +606,15 @@ export default function CreatePromotionPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <Tabs value={codeGenerationMode} onValueChange={(v: string) => setCodeGenerationMode(v as 'upload' | 'generate')}>
-                  <TabsList className="grid w-full grid-cols-2">
+                <Tabs value={codeGenerationMode} onValueChange={(v: string) => setCodeGenerationMode(v as 'upload' | 'generate' | 'single')}>
+                  <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="generate" className="flex items-center gap-2">
                       <Wand2 className="h-4 w-4" />
                       {t('promotionsPage.createPage.generateCodes')}
+                    </TabsTrigger>
+                    <TabsTrigger value="single" className="flex items-center gap-2">
+                      <Ticket className="h-4 w-4" />
+                      Single Code
                     </TabsTrigger>
                     <TabsTrigger value="upload" className="flex items-center gap-2">
                       <Upload className="h-4 w-4" />
@@ -780,6 +764,25 @@ export default function CreatePromotionPage() {
                     </Button>
                   </TabsContent>
 
+                  <TabsContent value="single" className="space-y-4 mt-4">
+                    <div className="space-y-3">
+                      <Label htmlFor="singleCode" className="text-sm font-medium">
+                        Promotional Code
+                      </Label>
+                      <Input
+                        id="singleCode"
+                        value={singleCodeInput}
+                        onChange={(e) => handleSingleCodeChange(e.target.value)}
+                        placeholder="e.g. SUMMER2025"
+                        maxLength={50}
+                        className="h-11 font-mono text-sm uppercase"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Use a single shared code that every recipient can redeem.
+                      </p>
+                    </div>
+                  </TabsContent>
+
                   <TabsContent value="upload" className="space-y-4 mt-4">
                     <div className="space-y-3">
                       <Label htmlFor="userCodes" className="text-sm font-medium">
@@ -844,7 +847,38 @@ export default function CreatePromotionPage() {
             </Card>
           )}
 
-          {/* Step 4: Review */}
+          {/* Step 4: Terms */}
+          {currentStep === 'terms' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ScrollText className="h-5 w-5 text-primary" />
+                  Terms &amp; Conditions
+                </CardTitle>
+                <CardDescription>
+                  Optional legal terms. When provided, a "Terms and Conditions" link is appended to the promotional email, linking to a branded page on your blog.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <Label htmlFor="termsContent" className="text-sm font-medium">
+                    Legal Terms
+                  </Label>
+                  <RichTextEditor
+                    value={formData.termsContent}
+                    onChange={(html) => updateField('termsContent', html)}
+                    placeholder="Eligibility, restrictions, expiry details, etc."
+                    className="min-h-[360px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave blank to skip. Recipients will see a "Terms and Conditions" link at the bottom of the promotion email only when terms are set.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 5: Review */}
           {currentStep === 'review' && (
             <div className="space-y-6">
               <Card>
@@ -888,29 +922,68 @@ export default function CreatePromotionPage() {
 
                   <Separator />
 
-                  {/* Content Preview */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                      {t('promotionsPage.createPage.previewContent')}
-                    </Label>
-                    <div className="p-4 rounded-lg border bg-card">
-                      <div
-                        className="prose prose-sm dark:prose-invert max-w-none"
-                        dangerouslySetInnerHTML={{ __html: formData.content || '<p class="text-muted-foreground">No content provided</p>' }}
-                      />
-                    </div>
-                  </div>
+                  {/* Email-accurate content preview */}
+                  {(() => {
+                    const theme = getPromotionTypeTheme(formData.type);
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                            {t('promotionsPage.createPage.previewContent')}
+                          </Label>
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            as it will appear in email
+                          </span>
+                        </div>
+                        <div className="rounded-lg border bg-[#f3f4f6] dark:bg-gray-900 p-4">
+                          <div
+                            style={{
+                              maxWidth: 600,
+                              margin: '20px auto',
+                              padding: '32px 24px',
+                              background: `linear-gradient(135deg, ${theme.bgStart} 0%, ${theme.bgEnd} 100%)`,
+                              borderRadius: 12,
+                              border: `2px solid ${theme.border}`,
+                              fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+                            }}
+                          >
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 16px', color: theme.titleColor }}>
+                              {formData.title || 'Untitled Promotion'}
+                            </h2>
+                            {formData.description && (
+                              <p style={{ margin: '0 0 20px', color: theme.bodyColor, fontSize: '1rem', lineHeight: 1.5 }}>
+                                {formData.description}
+                              </p>
+                            )}
+                            <div
+                              style={{ color: theme.bodyColor, fontSize: '1rem', lineHeight: 1.6 }}
+                              dangerouslySetInnerHTML={{
+                                __html: formData.content && formData.content !== '<p></p>'
+                                  ? formData.content
+                                  : '<p style="color:#94a3b8;font-style:italic;">No content provided</p>',
+                              }}
+                            />
+                            {hasTerms && (
+                              <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${theme.border}`, textAlign: 'center', fontSize: 12, lineHeight: 1.5, color: theme.bodyColor }}>
+                                <a href="#" onClick={(e) => e.preventDefault()} style={{ color: theme.accent, textDecoration: 'underline' }}>
+                                  Terms and Conditions
+                                </a>
+                              </div>
+                            )}
+                            <hr style={{ margin: '32px 0 16px', border: 'none', borderTop: `1px solid ${theme.border}` }} />
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: theme.bodyColor, opacity: 0.75, textAlign: 'center' }}>
+                              This is a special promotion for valued subscribers.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <Separator />
 
                   {/* Details Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Audience</p>
-                      <p className="text-sm font-medium">
-                        {targetAudienceOptions.find(opt => opt.value === formData.targetAudience)?.label}
-                      </p>
-                    </div>
                     {formData.maxUses && (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Max Uses</p>
@@ -935,7 +1008,35 @@ export default function CreatePromotionPage() {
                         <p className="text-sm font-medium">{formData.promotionalCodes.length} codes</p>
                       </div>
                     )}
+                    {hasTerms && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Terms</p>
+                        <p className="text-sm font-medium flex items-center gap-1">
+                          <ScrollText className="h-3.5 w-3.5" /> Attached
+                        </p>
+                      </div>
+                    )}
                   </div>
+
+                  {hasTerms && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                          Terms &amp; Conditions preview
+                        </Label>
+                        <div className="p-4 rounded-lg border bg-card max-h-48 overflow-y-auto">
+                          <div
+                            className="prose prose-sm dark:prose-invert max-w-none"
+                            dangerouslySetInnerHTML={{ __html: formData.termsContent }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          A "Terms and Conditions" link will appear at the bottom of the promotional email.
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1008,10 +1109,7 @@ export default function CreatePromotionPage() {
                   />
                 )}
 
-                <div className="flex items-center justify-between pt-2 border-t mt-2">
-                  <span className="text-[10px] text-muted-foreground">
-                    {targetAudienceOptions.find(opt => opt.value === formData.targetAudience)?.label}
-                  </span>
+                <div className="flex items-center justify-end pt-2 border-t mt-2">
                   {formData.isActive ? (
                     <span className="text-[10px] text-green-600 font-medium">Active</span>
                   ) : (
@@ -1027,6 +1125,7 @@ export default function CreatePromotionPage() {
                   { label: 'Title set', done: !!formData.title.trim() },
                   { label: 'Content written', done: !!(formData.content.trim() && formData.content !== '<p></p>') },
                   { label: 'Codes added', done: formData.promotionalCodes.length > 0, optional: true },
+                  { label: 'Terms attached', done: hasTerms, optional: true },
                   { label: 'Schedule set', done: !!(formData.validFrom || formData.validTo), optional: true },
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2">

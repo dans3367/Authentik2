@@ -81,6 +81,7 @@ const CommunicationsServiceAgreementPage = lazy(() => import("@/pages/communicat
 const PublicFormPage = lazy(() => import("@/pages/public-form"));
 const PublicNewsletterHub = lazy(() => import("@/pages/public-newsletter"));
 const PublicNewsletterView = lazy(() => import("@/pages/public-newsletter-view"));
+const PublicPromotionTerms = lazy(() => import("@/pages/public-promotion-terms"));
 
 // Redirect components for legacy routes
 function BirthdaysRedirect() {
@@ -377,6 +378,7 @@ function Router() {
           <Route path="/n/preview/:tenantSlug/:newsletterId" component={PublicNewsletterView} />
           <Route path="/n/:tenantSlug/:newsletterSlug" component={PublicNewsletterView} />
           <Route path="/n/:tenantSlug" component={PublicNewsletterHub} />
+          <Route path="/p/:tenantSlug/:promotionId/terms" component={PublicPromotionTerms} />
         </Switch>
       </Suspense>
     );
