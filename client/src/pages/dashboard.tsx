@@ -33,6 +33,58 @@ import { useDashboardHighlights } from "@/hooks/useStats";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EditorPickerModal } from "@/components/EditorPickerModal";
 
+function Sparkline({
+  data,
+  className,
+  trend,
+}: {
+  data: number[];
+  className?: string;
+  trend: "up" | "down" | "flat";
+}) {
+  if (!data || data.length < 2) {
+    return <span className="h-7 w-[84px] flex-none" aria-hidden />;
+  }
+  const w = 84;
+  const h = 28;
+  const pad = 2;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const stepX = w / (data.length - 1);
+  const points = data.map((v, i) => {
+    const x = i * stepX;
+    const y = h - pad - ((v - min) / range) * (h - pad * 2);
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+  const color =
+    trend === "down"
+      ? "var(--bad)"
+      : trend === "up"
+        ? "var(--good)"
+        : "var(--ink-4)";
+  return (
+    <svg
+      className={className}
+      viewBox={`0 0 ${w} ${h}`}
+      width={w}
+      height={h}
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <polyline
+        points={points.join(" ")}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.85"
+      />
+    </svg>
+  );
+}
+
 function getGreeting(t: (key: string) => string): { text: string; emoji: string } {
   const hour = new Date().getHours();
   if (hour < 12) return { text: t("dashboard.greeting.morning"), emoji: "☀️" };
@@ -122,37 +174,21 @@ export default function Dashboard() {
       label: t("dashboard.highlights.contacts"),
       icon: Users,
       metric: highlights?.totalContacts,
-      color: "text-blue-600 dark:text-blue-400",
-      bgIcon: "bg-blue-500/10 dark:bg-blue-500/20",
-      ring: "ring-blue-500/20",
-      accentBar: "bg-blue-500",
     },
     {
       label: t("dashboard.highlights.emailsSent"),
       icon: Mail,
       metric: highlights?.emailsSentThisMonth,
-      color: "text-emerald-600 dark:text-emerald-400",
-      bgIcon: "bg-emerald-500/10 dark:bg-emerald-500/20",
-      ring: "ring-emerald-500/20",
-      accentBar: "bg-emerald-500",
     },
     {
       label: t("dashboard.highlights.newsletters"),
       icon: Newspaper,
       metric: highlights?.newslettersSent,
-      color: "text-violet-600 dark:text-violet-400",
-      bgIcon: "bg-violet-500/10 dark:bg-violet-500/20",
-      ring: "ring-violet-500/20",
-      accentBar: "bg-violet-500",
     },
     {
       label: t("dashboard.highlights.appointments"),
       icon: CalendarCheck,
       metric: highlights?.upcomingAppointments,
-      color: "text-amber-600 dark:text-amber-400",
-      bgIcon: "bg-amber-500/10 dark:bg-amber-500/20",
-      ring: "ring-amber-500/20",
-      accentBar: "bg-amber-500",
     },
   ];
 
@@ -259,55 +295,74 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {statCards.map((stat, index) => (
-            <div
-              key={index}
-              className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-4 sm:p-5 hover:shadow-lg hover:shadow-black/[0.03] dark:hover:shadow-black/20 hover:border-border/80 transition-all duration-300"
-              data-testid={`stat-card-${index}`}
-            >
-              <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${stat.accentBar} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-9 h-9 rounded-xl ${stat.bgIcon} flex items-center justify-center`}>
-                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                </div>
-                {!highlightsLoading && stat.metric?.change !== null && stat.metric?.change !== undefined && (
-                  <span
-                    className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-2 py-1 rounded-lg ${stat.metric.change >= 0
-                        ? "text-emerald-700 bg-emerald-500/10 dark:text-emerald-400 dark:bg-emerald-500/15"
-                        : "text-red-700 bg-red-500/10 dark:text-red-400 dark:bg-red-500/15"
-                      }`}
-                  >
-                    {stat.metric.change >= 0 ? (
-                      <TrendingUp className="w-3 h-3" />
-                    ) : (
-                      <TrendingDown className="w-3 h-3" />
-                    )}
-                    {stat.metric.change >= 0 ? "+" : ""}
-                    {stat.metric.change}%
-                  </span>
-                )}
-              </div>
-
-              {highlightsLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-8 w-20" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-              ) : (
-                <div>
-                  <span className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-none block">
-                    {(stat.metric?.value ?? 0).toLocaleString()}
-                  </span>
-                  <span className="text-[11px] font-medium text-muted-foreground/70 mt-1.5 block uppercase tracking-wider">
+        {/* Stat Cards — Editorial Precision: single panel, hairline dividers, serif numerals */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 rounded-[10px] border border-border bg-card overflow-hidden shadow-[0_1px_0_rgba(20,16,10,.02),0_1px_2px_rgba(20,16,10,.03)]">
+          {statCards.map((stat, index) => {
+            const change = stat.metric?.change;
+            const hasChange = change !== null && change !== undefined;
+            const isUp = hasChange && change >= 0;
+            const borders = [
+              "border-r border-b lg:border-b-0",
+              "border-b lg:border-b-0 lg:border-r",
+              "border-r",
+              "",
+            ][index];
+            return (
+              <div
+                key={index}
+                className={`relative flex flex-col gap-2.5 p-4 sm:p-5 min-w-0 border-border ${borders}`}
+                data-testid={`stat-card-${index}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                     {stat.label}
                   </span>
+                  <stat.icon
+                    className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0"
+                    strokeWidth={1.5}
+                  />
                 </div>
-              )}
-            </div>
-          ))}
+
+                {highlightsLoading ? (
+                  <Skeleton className="h-9 w-28" />
+                ) : (
+                  <div className="serif flex items-baseline gap-1 text-[32px] sm:text-[38px] leading-none tracking-[-0.02em] text-foreground">
+                    {(stat.metric?.value ?? 0).toLocaleString()}
+                  </div>
+                )}
+
+                <div className="flex items-end justify-between gap-3 min-h-[28px]">
+                  {hasChange ? (
+                    <span
+                      className={`mono inline-flex items-center gap-1 text-[11px] font-medium ${
+                        isUp
+                          ? "text-[color:var(--good)]"
+                          : "text-[color:var(--bad)]"
+                      }`}
+                    >
+                      {isUp ? (
+                        <TrendingUp className="w-2.5 h-2.5" strokeWidth={2} />
+                      ) : (
+                        <TrendingDown className="w-2.5 h-2.5" strokeWidth={2} />
+                      )}
+                      {isUp ? "+" : ""}
+                      {change}%
+                      <span className="text-muted-foreground/60">· vs prev.</span>
+                    </span>
+                  ) : (
+                    <span />
+                  )}
+                  {!highlightsLoading && stat.metric?.sparkline && stat.metric.sparkline.length > 1 && (
+                    <Sparkline
+                      data={stat.metric.sparkline}
+                      trend={isUp ? "up" : hasChange ? "down" : "flat"}
+                      className="h-7 w-[84px] flex-none"
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Bento Grid - Row 1 */}
@@ -315,7 +370,7 @@ export default function Dashboard() {
           hasActiveNewsletter && tenantId ? (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               <div className="lg:col-span-8">
-                <UpcomingScheduledEmailsCard />
+                <UpcomingAppointmentsCard />
               </div>
               <div className="lg:col-span-4">
                 <LiveStatsCard tenantId={tenantId} shopId={selectedShopId} />
@@ -327,7 +382,7 @@ export default function Dashboard() {
                 <NewsletterCard />
               </div>
               <div className="lg:col-span-4">
-                <UpcomingAppointmentsCard />
+                <UpcomingScheduledEmailsCard />
               </div>
             </div>
           )
@@ -353,9 +408,9 @@ export default function Dashboard() {
           <div className="lg:col-span-12">
             {activeNewslettersResolved ? (
               hasActiveNewsletter && tenantId ? (
-                <UpcomingAppointmentsCard />
-              ) : (
                 <UpcomingScheduledEmailsCard />
+              ) : (
+                <UpcomingAppointmentsCard />
               )
             ) : (
               <Skeleton className="h-[240px] rounded-2xl w-full" />

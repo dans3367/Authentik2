@@ -72,32 +72,33 @@ export default function CardsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-800">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Page Header */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="space-y-1.5">
+              <p className="mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Cards
+              </p>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground leading-none">
                 {t('navigation.cards') || 'e-Cards'}
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-sm text-muted-foreground">
                 Manage your birthday and e-cards
               </p>
             </div>
-            
+
             {/* Segmented Control */}
-            <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-1 shadow-sm">
+            <div className="inline-flex rounded-[10px] border border-border bg-muted p-1 shadow-sm">
               <Button
                 variant={cardType === "birthday" ? "default" : "ghost"}
                 onClick={() => handleCardTypeChange("birthday")}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all
-                  ${cardType === "birthday"
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
-                  }
-                `}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-md font-medium h-auto ${
+                  cardType === "birthday"
+                    ? ""
+                    : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-background"
+                }`}
               >
                 <Gift className="h-4 w-4" />
                 <span>{t('cards.selector.birthday') || 'Birthday Cards'}</span>
@@ -105,13 +106,11 @@ export default function CardsPage() {
               <Button
                 variant={cardType === "ecard" ? "default" : "ghost"}
                 onClick={() => handleCardTypeChange("ecard")}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all
-                  ${cardType === "ecard"
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
-                  }
-                `}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-md font-medium h-auto ${
+                  cardType === "ecard"
+                    ? ""
+                    : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-background"
+                }`}
               >
                 <Snowflake className="h-4 w-4" />
                 <span>{t('cards.selector.ecard') || 'E-Cards'}</span>
@@ -119,7 +118,6 @@ export default function CardsPage() {
             </div>
           </div>
 
-          {/* Add minimal spacer after the header section */}
           <div className="h-3"></div>
         </div>
 

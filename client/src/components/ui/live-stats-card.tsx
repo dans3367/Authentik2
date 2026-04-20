@@ -14,7 +14,20 @@ import {
   Ban,
   XCircle,
   Inbox,
+  Pause,
+  Play,
 } from "lucide-react";
+
+const PAUSED_STORAGE_KEY = "liveStatsCard.paused";
+
+function readPausedPreference(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(PAUSED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 type EventConfig = {
   icon: React.ElementType;
@@ -105,11 +118,41 @@ interface LiveStatsCardProps {
 }
 
 export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
-  const activeItems = useConvexQuery(
+  const liveActiveItems = useConvexQuery(
     api.newsletterListItems.listByTenant,
     { tenantId, shopId: shopId ?? undefined, archived: false, emailType: "newsletter" },
   );
-  const recentEvents = useTenantRecentEvents(tenantId, 30);
+  const liveRecentEvents = useTenantRecentEvents(tenantId, 30);
+
+  const [paused, setPaused] = useState<boolean>(readPausedPreference);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(PAUSED_STORAGE_KEY, String(paused));
+    } catch {
+      /* ignore storage errors (private mode, quota) */
+    }
+  }, [paused]);
+
+  // Frozen snapshot of the live data. Captured continuously when running;
+  // when paused, we stop refreshing it so the UI freezes. The snapshot is
+  // still populated on mount even if pause is active, so a page refresh
+  // always shows the latest data (then holds).
+  type Frozen = {
+    activeItems: typeof liveActiveItems;
+    recentEvents: typeof liveRecentEvents;
+  };
+  const [frozen, setFrozen] = useState<Frozen | null>(null);
+
+  useEffect(() => {
+    if (liveActiveItems === undefined || liveRecentEvents === undefined) return;
+    if (!paused || frozen === null) {
+      setFrozen({ activeItems: liveActiveItems, recentEvents: liveRecentEvents });
+    }
+  }, [paused, liveActiveItems, liveRecentEvents, frozen]);
+
+  const activeItems = paused ? frozen?.activeItems : liveActiveItems;
+  const recentEvents = paused ? frozen?.recentEvents : liveRecentEvents;
 
   const titleByNewsletter = useMemo(() => {
     const map = new Map<string, string>();
@@ -134,6 +177,7 @@ export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
   const [flashId, setFlashId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (paused) return; // no flash animation while frozen
     if (!events || events.length === 0) return;
     const topId = events[0]._id;
     if (lastTopIdRef.current !== null && lastTopIdRef.current !== topId) {
@@ -144,7 +188,7 @@ export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
       return () => clearTimeout(timeout);
     }
     lastTopIdRef.current = topId;
-  }, [events]);
+  }, [events, paused]);
 
   const isLoading = !activeItems || !recentEvents;
 
@@ -158,14 +202,40 @@ export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
             real-time events · autoscrolling
           </p>
         </div>
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-100/80 dark:bg-rose-950/40">
-          <span className="relative flex w-1.5 h-1.5">
-            <span className="animate-ping absolute inline-flex w-full h-full rounded-full bg-rose-500 opacity-75" />
-            <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-rose-500" />
-          </span>
-          <span className="text-[10px] font-mono font-bold tracking-wider text-rose-600 dark:text-rose-400">
-            LIVE
-          </span>
+        <div className="inline-flex items-center gap-2">
+          {paused ? (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted">
+              <span className="inline-flex w-1.5 h-1.5 rounded-full bg-muted-foreground/70" />
+              <span className="text-[10px] font-mono font-bold tracking-wider text-muted-foreground">
+                PAUSED
+              </span>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-100/80 dark:bg-rose-950/40">
+              <span className="relative flex w-1.5 h-1.5">
+                <span className="animate-ping absolute inline-flex w-full h-full rounded-full bg-rose-500 opacity-75" />
+                <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-rose-500" />
+              </span>
+              <span className="text-[10px] font-mono font-bold tracking-wider text-rose-600 dark:text-rose-400">
+                LIVE
+              </span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setPaused((p) => !p)}
+            aria-label={paused ? "Resume live updates" : "Pause live updates"}
+            aria-pressed={paused}
+            title={paused ? "Resume live updates" : "Pause live updates"}
+            className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-border/60 bg-background text-muted-foreground hover:text-foreground hover:border-border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            data-testid="live-stats-pause-toggle"
+          >
+            {paused ? (
+              <Play className="w-3.5 h-3.5" strokeWidth={2} />
+            ) : (
+              <Pause className="w-3.5 h-3.5" strokeWidth={2} />
+            )}
+          </button>
         </div>
       </div>
 

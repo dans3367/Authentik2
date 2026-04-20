@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 export interface StatMetric {
   value: number;
   change: number | null;
+  sparkline: number[];
 }
 
 export interface HighlightStats {

@@ -1246,17 +1246,22 @@ export function BirthdayCardsContent() {
 
         {/* Themes Tab */}
         {activeTab === "themes" && (
-          <Card className="w-11/12">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5" />
+          <Card className="w-full max-w-6xl border-border shadow-[0_1px_0_rgba(20,16,10,.02),0_1px_2px_rgba(20,16,10,.03)]">
+            <CardHeader className="border-b border-border py-4">
+              <CardTitle className="flex items-center gap-2 text-[13px] font-semibold tracking-[-0.005em]">
+                <Palette className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                 {t('birthdays.tabs.themes') || 'Birthday Card Themes'}
               </CardTitle>
+              <p className="mono text-[11.5px] text-muted-foreground mt-1">
+                Select a template · opens the card designer
+              </p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-5">
               <div>
-                <Label className="text-sm">Choose a Template</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-2">
+                <Label className="text-[11.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                  Choose a Template
+                </Label>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-3">
                   {[
                     { id: 'default', name: 'Default' },
                     { id: 'confetti', name: 'Confetti' },
@@ -1285,7 +1290,11 @@ export function BirthdayCardsContent() {
                           setDesignerOpen(true);
                         }}
                         disabled={updateSettingsMutation.isPending}
-                        className={`relative rounded-xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${isSelected ? 'ring-2 ring-blue-600 border-blue-600' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`}
+                        className={`relative rounded-[10px] border p-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                          isSelected
+                            ? 'border-primary ring-1 ring-primary'
+                            : 'border-border hover:border-[color:var(--line-2)]'
+                        }`}
                       >
                         <div className="relative h-40 rounded-lg overflow-hidden">
                           {/* Default theme with header image */}
@@ -1400,15 +1409,17 @@ export function BirthdayCardsContent() {
                             </div>
                           </div>
                         </div>
-                        <div className="mt-2 flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{tpl.name}</span>
+                        <div className="mt-2.5 flex items-center justify-between gap-2">
+                          <span className="text-[13px] font-semibold tracking-[-0.005em] text-foreground truncate">
+                            {tpl.name}
+                          </span>
+                          {isSelected && (
+                            <span className="mono inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-primary shrink-0">
+                              <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklab,var(--accent-coral)_18%,transparent)]" />
+                              Active
+                            </span>
+                          )}
                         </div>
-                        {isSelected && (
-                          <div className="mt-1 flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_0_2px_rgba(34,197,94,0.2)]" />
-                            <span className="text-xs font-semibold text-green-600 dark:text-green-400">Active</span>
-                          </div>
-                        )}
                       </button>
                     );
                   })}
