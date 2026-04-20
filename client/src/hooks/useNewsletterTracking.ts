@@ -34,6 +34,19 @@ export function useTenantNewsletterStats(tenantId: string | undefined) {
 }
 
 /**
+ * Get recent events across all newsletters for a tenant (live activity feed).
+ */
+export function useTenantRecentEvents(
+  tenantId: string | undefined,
+  limit?: number,
+) {
+  return useQuery(
+    api.newsletterTracking.getTenantRecentEvents,
+    tenantId ? { tenantId, limit } : "skip",
+  );
+}
+
+/**
  * Get individual email sends for a newsletter (paginated list).
  */
 export function useNewsletterSends(

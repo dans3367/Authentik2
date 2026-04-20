@@ -1,7 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useLocation } from "wouter";
+import { useQuery as useConvexQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { useAppSelector } from "@/store";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
+import { LiveStatsCard } from "@/components/ui/live-stats-card";
 import { HighlightsCard } from "@/components/ui/highlights-card";
 import { UpcomingBirthdaysCard } from "@/components/ui/upcoming-birthdays-card";
 import { UpcomingAppointmentsCard } from "@/components/ui/upcoming-appointments-card";
@@ -53,6 +57,32 @@ export default function Dashboard() {
   const { data: highlights, isLoading: highlightsLoading } = useDashboardHighlights();
   const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false);
   const [showEditorPicker, setShowEditorPicker] = useState(false);
+
+  const tenantId = (user as any)?.tenantId as string | undefined;
+  const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
+  const activeNewsletters = useConvexQuery(
+    api.newsletterListItems.listByTenant,
+    tenantId
+      ? {
+          tenantId,
+          shopId: selectedShopId ?? undefined,
+          archived: false,
+          emailType: "newsletter",
+        }
+      : "skip",
+  );
+  // Stale-while-revalidate: keep the last resolved value during shop changes
+  // so the dashboard doesn't flash back to the "empty" layout while Convex
+  // re-queries for the newly selected shop.
+  const lastActiveRef = useRef<typeof activeNewsletters>(undefined);
+  useEffect(() => {
+    if (activeNewsletters !== undefined) {
+      lastActiveRef.current = activeNewsletters;
+    }
+  }, [activeNewsletters]);
+  const effectiveActive = activeNewsletters ?? lastActiveRef.current;
+  const activeNewslettersResolved = effectiveActive !== undefined;
+  const hasActiveNewsletter = !!effectiveActive && effectiveActive.length > 0;
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -280,15 +310,33 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Bento Grid - Row 1: Newsletter Hero + Appointments */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-8">
-            <NewsletterCard />
+        {/* Bento Grid - Row 1 */}
+        {activeNewslettersResolved ? (
+          hasActiveNewsletter && tenantId ? (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div className="lg:col-span-8">
+                <UpcomingScheduledEmailsCard />
+              </div>
+              <div className="lg:col-span-4">
+                <LiveStatsCard tenantId={tenantId} shopId={selectedShopId} />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div className="lg:col-span-8">
+                <NewsletterCard />
+              </div>
+              <div className="lg:col-span-4">
+                <UpcomingAppointmentsCard />
+              </div>
+            </div>
+          )
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <Skeleton className="lg:col-span-8 h-[260px] rounded-2xl" />
+            <Skeleton className="lg:col-span-4 h-[260px] rounded-2xl" />
           </div>
-          <div className="lg:col-span-4">
-            <UpcomingAppointmentsCard />
-          </div>
-        </div>
+        )}
 
         {/* Bento Grid - Row 2: Highlights + Birthdays */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -300,10 +348,18 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Bento Grid - Row 3: Scheduled Emails */}
+        {/* Bento Grid - Row 3 */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <div className="lg:col-span-12">
-            <UpcomingScheduledEmailsCard />
+            {activeNewslettersResolved ? (
+              hasActiveNewsletter && tenantId ? (
+                <UpcomingAppointmentsCard />
+              ) : (
+                <UpcomingScheduledEmailsCard />
+              )
+            ) : (
+              <Skeleton className="h-[240px] rounded-2xl w-full" />
+            )}
           </div>
         </div>
       </div>

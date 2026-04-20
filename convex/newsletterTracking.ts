@@ -468,6 +468,26 @@ export const getTenantNewsletterStats = query({
 });
 
 /**
+ * Get recent events across all newsletters for a tenant (live activity feed).
+ * Returns the most recent N events ordered by creation time desc.
+ * Client is responsible for filtering out events from archived/deleted newsletters.
+ */
+export const getTenantRecentEvents = query({
+  args: {
+    tenantId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 25;
+    return await ctx.db
+      .query("newsletterEvents")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", args.tenantId))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+/**
  * Get individual email sends for a newsletter (paginated).
  */
 export const getNewsletterSends = query({

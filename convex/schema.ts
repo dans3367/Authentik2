@@ -42,6 +42,7 @@ export default defineSchema({
     occurredAt: v.number(), // timestamp ms
   })
     .index("by_newsletter", ["newsletterId"])
+    .index("by_tenant", ["tenantId"])
     .index("by_tenant_newsletter", ["tenantId", "newsletterId"])
     .index("by_send", ["newsletterSendId"])
     .index("by_type", ["newsletterId", "eventType"])

@@ -1,0 +1,253 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery as useConvexQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useTenantRecentEvents } from "@/hooks/useNewsletterTracking";
+import {
+  X,
+  AlertTriangle,
+  Mail,
+  MousePointer,
+  Send,
+  CheckCircle2,
+  Ban,
+  XCircle,
+  Inbox,
+} from "lucide-react";
+
+type EventConfig = {
+  icon: React.ElementType;
+  iconColor: string;
+  bubbleBg: string;
+  verb: string;
+};
+
+const EVENT_CONFIG: Record<string, EventConfig> = {
+  unsubscribed: {
+    icon: X,
+    iconColor: "text-neutral-500 dark:text-neutral-400",
+    bubbleBg: "bg-neutral-200/70 dark:bg-neutral-800/60",
+    verb: "unsubscribed from",
+  },
+  bounced: {
+    icon: AlertTriangle,
+    iconColor: "text-rose-500 dark:text-rose-400",
+    bubbleBg: "bg-rose-100/80 dark:bg-rose-950/40",
+    verb: "bounced from",
+  },
+  opened: {
+    icon: Mail,
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    bubbleBg: "bg-emerald-100/70 dark:bg-emerald-950/40",
+    verb: "opened",
+  },
+  clicked: {
+    icon: MousePointer,
+    iconColor: "text-rose-500 dark:text-rose-400",
+    bubbleBg: "bg-rose-100/70 dark:bg-rose-950/40",
+    verb: "clicked in",
+  },
+  delivered: {
+    icon: CheckCircle2,
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    bubbleBg: "bg-emerald-100/70 dark:bg-emerald-950/40",
+    verb: "delivered to",
+  },
+  sent: {
+    icon: Send,
+    iconColor: "text-sky-600 dark:text-sky-400",
+    bubbleBg: "bg-sky-100/70 dark:bg-sky-950/40",
+    verb: "sent to",
+  },
+  complained: {
+    icon: Ban,
+    iconColor: "text-rose-500 dark:text-rose-400",
+    bubbleBg: "bg-rose-100/70 dark:bg-rose-950/40",
+    verb: "complained about",
+  },
+  failed: {
+    icon: XCircle,
+    iconColor: "text-red-500 dark:text-red-400",
+    bubbleBg: "bg-red-100/70 dark:bg-red-950/40",
+    verb: "failed for",
+  },
+  suppressed: {
+    icon: Ban,
+    iconColor: "text-orange-500 dark:text-orange-400",
+    bubbleBg: "bg-orange-100/70 dark:bg-orange-950/40",
+    verb: "suppressed for",
+  },
+  queued: {
+    icon: Inbox,
+    iconColor: "text-neutral-500 dark:text-neutral-400",
+    bubbleBg: "bg-neutral-100 dark:bg-neutral-900",
+    verb: "queued for",
+  },
+};
+
+function formatRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 5) return "just now";
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  return `${day}d ago`;
+}
+
+interface LiveStatsCardProps {
+  tenantId: string;
+  shopId?: string | null;
+}
+
+export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
+  const activeItems = useConvexQuery(
+    api.newsletterListItems.listByTenant,
+    { tenantId, shopId: shopId ?? undefined, archived: false, emailType: "newsletter" },
+  );
+  const recentEvents = useTenantRecentEvents(tenantId, 30);
+
+  const titleByNewsletter = useMemo(() => {
+    const map = new Map<string, string>();
+    (activeItems ?? []).forEach((i) =>
+      map.set(i.newsletterId, i.title || i.subject || "Untitled"),
+    );
+    return map;
+  }, [activeItems]);
+
+  const activeIds = useMemo(() => {
+    if (!activeItems) return null;
+    return new Set(activeItems.map((i) => i.newsletterId));
+  }, [activeItems]);
+
+  const events = useMemo(() => {
+    if (!recentEvents || !activeIds) return null;
+    return recentEvents.filter((e) => activeIds.has(e.newsletterId));
+  }, [recentEvents, activeIds]);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const lastTopIdRef = useRef<string | null>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!events || events.length === 0) return;
+    const topId = events[0]._id;
+    if (lastTopIdRef.current !== null && lastTopIdRef.current !== topId) {
+      scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      setFlashId(topId);
+      const timeout = setTimeout(() => setFlashId(null), 1500);
+      lastTopIdRef.current = topId;
+      return () => clearTimeout(timeout);
+    }
+    lastTopIdRef.current = topId;
+  }, [events]);
+
+  const isLoading = !activeItems || !recentEvents;
+
+  return (
+    <Card className="h-full max-h-[540px] rounded-2xl border-border/60 overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
+        <div className="space-y-0.5">
+          <h3 className="text-base font-bold tracking-tight">Live activity</h3>
+          <p className="text-[11px] font-mono text-muted-foreground/70 tracking-tight">
+            real-time events · autoscrolling
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-100/80 dark:bg-rose-950/40">
+          <span className="relative flex w-1.5 h-1.5">
+            <span className="animate-ping absolute inline-flex w-full h-full rounded-full bg-rose-500 opacity-75" />
+            <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-rose-500" />
+          </span>
+          <span className="text-[10px] font-mono font-bold tracking-wider text-rose-600 dark:text-rose-400">
+            LIVE
+          </span>
+        </div>
+      </div>
+
+      <div className="border-t border-border/60" />
+
+      {/* Event list */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto divide-y divide-border/60 scroll-smooth"
+        data-testid="live-stats-feed"
+      >
+        {isLoading ? (
+          <div className="p-4 space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : events && events.length > 0 ? (
+          events.map((event) => {
+            const cfg = EVENT_CONFIG[event.eventType] ?? EVENT_CONFIG.queued;
+            const Icon = cfg.icon;
+            const title = titleByNewsletter.get(event.newsletterId) ?? "Newsletter";
+            const clickedPath =
+              event.eventType === "clicked" && event.metadata?.link
+                ? (() => {
+                    try {
+                      return new URL(String(event.metadata.link)).pathname;
+                    } catch {
+                      return String(event.metadata.link);
+                    }
+                  })()
+                : null;
+            return (
+              <div
+                key={event._id}
+                className={`flex items-start gap-3 px-5 py-3.5 transition-colors duration-1000 ${
+                  flashId === event._id ? "bg-rose-50/60 dark:bg-rose-950/20" : ""
+                }`}
+                data-testid={`live-event-${event.eventType}`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full ${cfg.bubbleBg} flex items-center justify-center flex-shrink-0 mt-0.5`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${cfg.iconColor}`} strokeWidth={2.25} />
+                </div>
+                <p className="flex-1 text-[13px] leading-snug text-foreground">
+                  <span className="font-bold">{event.recipientEmail}</span>
+                  <span className="text-muted-foreground"> {cfg.verb} </span>
+                  <span className="font-bold">{title}</span>
+                  {clickedPath && (
+                    <span className="text-muted-foreground/70 font-mono">
+                      {" "}
+                      {clickedPath}
+                    </span>
+                  )}
+                </p>
+                <span className="text-[11px] font-mono text-muted-foreground/60 flex-shrink-0 whitespace-nowrap pt-0.5">
+                  {formatRelativeTime(event.occurredAt)}
+                </span>
+              </div>
+            );
+          })
+        ) : (
+          <div className="flex flex-col items-center justify-center text-center px-5 py-12">
+            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-3">
+              <Inbox className="w-4 h-4 text-muted-foreground/60" />
+            </div>
+            <p className="text-xs font-medium text-muted-foreground/80">
+              No activity yet
+            </p>
+            <p className="text-[11px] font-mono text-muted-foreground/50 mt-1">
+              events will appear here
+            </p>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}

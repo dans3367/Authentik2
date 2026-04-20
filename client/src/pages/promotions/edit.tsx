@@ -253,6 +253,21 @@ export default function EditPromotionPage() {
     setFormData(prev => ({ ...prev, promotionalCodes: normalized ? [normalized] : [] }));
   };
 
+  const handleCodeModeChange = (mode: 'upload' | 'unique' | 'single') => {
+    setCodeGenerationMode(mode);
+    setFormData(prev => {
+      if (mode === 'single') {
+        const normalized = singleCodeInput.trim().toUpperCase();
+        return { ...prev, promotionalCodes: normalized ? [normalized] : [] };
+      }
+      if (mode === 'upload') {
+        const codes = parseUserCodes(userCodesInput);
+        return { ...prev, promotionalCodes: codes.length > 0 ? validatePromotionalCodes(codes).valid : [] };
+      }
+      return { ...prev, promotionalCodes: [] };
+    });
+  };
+
   // Step validation
   const validateStep = useCallback((step: StepId): boolean => {
     const errors: Record<string, string> = {};
@@ -775,7 +790,7 @@ export default function EditPromotionPage() {
                 </div>
 
                 {formData.codesEnabled && (
-                <Tabs value={codeGenerationMode} onValueChange={(v: string) => setCodeGenerationMode(v as 'upload' | 'unique' | 'single')}>
+                <Tabs value={codeGenerationMode} onValueChange={(v: string) => handleCodeModeChange(v as 'upload' | 'unique' | 'single')}>
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="single" className="flex items-center gap-2">
                       <Ticket className="h-4 w-4" />
@@ -1091,13 +1106,17 @@ export default function EditPromotionPage() {
                         <p className="text-sm font-medium">{new Date(formData.validTo).toLocaleDateString()}</p>
                       </div>
                     )}
-                    {formData.codesEnabled && formData.promotionalCodes.length > 0 && (
+                    {formData.codesEnabled && (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Promo Codes</p>
                         <p className="text-sm font-medium">
-                          {formData.promotionalCodes.length === 1
-                            ? 'Single shared code'
-                            : codeCountLabel}
+                          {codeGenerationMode === 'single'
+                            ? (singleCodeInput ? `Single shared code: ${singleCodeInput}` : 'Single shared code')
+                            : codeGenerationMode === 'unique'
+                              ? 'Unique code per recipient'
+                              : formData.promotionalCodes.length > 0
+                                ? `${codeCountLabel} (custom list)`
+                                : 'No custom codes added'}
                         </p>
                       </div>
                     )}
