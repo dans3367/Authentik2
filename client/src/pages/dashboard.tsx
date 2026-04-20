@@ -10,6 +10,7 @@ import { HighlightsCard } from "@/components/ui/highlights-card";
 import { UpcomingBirthdaysCard } from "@/components/ui/upcoming-birthdays-card";
 import { UpcomingAppointmentsCard } from "@/components/ui/upcoming-appointments-card";
 import { UpcomingScheduledEmailsCard } from "@/components/ui/upcoming-scheduled-emails-card";
+import { NewsletterStatsCard } from "@/components/ui/newsletter-stats-card";
 import { Button } from "@/components/ui/button";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import {
@@ -262,10 +263,9 @@ export default function Dashboard() {
               data-testid="text-dashboard-title"
             >
               {greeting.text}, {firstName}
-              <span className="ml-2 inline-block">{greeting.emoji}</span>
             </h1>
             <p
-              className="text-sm text-muted-foreground/80 max-w-md"
+              className="text-sm text-muted-foreground/80 whitespace-nowrap"
               data-testid="text-dashboard-welcome"
             >
               {t("dashboard.welcomeMessage")}
@@ -365,27 +365,24 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* Bento Grid - Row 1 */}
+        {/* Bento Grid - Row 1: Newsletter stats + Live stats */}
         {activeNewslettersResolved ? (
-          hasActiveNewsletter && tenantId ? (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-8">
-                <UpcomingAppointmentsCard />
-              </div>
-              <div className="lg:col-span-4">
-                <LiveStatsCard tenantId={tenantId} shopId={selectedShopId} />
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-8">
+              {hasActiveNewsletter && tenantId ? (
+                <NewsletterStatsCard />
+              ) : (
                 <NewsletterCard />
-              </div>
-              <div className="lg:col-span-4">
-                <UpcomingScheduledEmailsCard />
-              </div>
+              )}
             </div>
-          )
+            <div className="lg:col-span-4">
+              {tenantId ? (
+                <LiveStatsCard tenantId={tenantId} shopId={selectedShopId} />
+              ) : (
+                <Skeleton className="h-full w-full rounded-2xl" />
+              )}
+            </div>
+          </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <Skeleton className="lg:col-span-8 h-[260px] rounded-2xl" />
@@ -393,28 +390,23 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Bento Grid - Row 2: Highlights + Birthdays */}
+        {/* Bento Grid - Row 2: Upcoming Scheduled Emails + Upcoming Appointments */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="lg:col-span-5">
+            <UpcomingScheduledEmailsCard />
+          </div>
+          <div className="lg:col-span-7">
+            <UpcomingAppointmentsCard />
+          </div>
+        </div>
+
+        {/* Bento Grid - Row 3: Highlights + Birthdays */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <div className="lg:col-span-5">
             <HighlightsCard />
           </div>
           <div className="lg:col-span-7">
             <UpcomingBirthdaysCard />
-          </div>
-        </div>
-
-        {/* Bento Grid - Row 3 */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-12">
-            {activeNewslettersResolved ? (
-              hasActiveNewsletter && tenantId ? (
-                <UpcomingScheduledEmailsCard />
-              ) : (
-                <UpcomingAppointmentsCard />
-              )
-            ) : (
-              <Skeleton className="h-[240px] rounded-2xl w-full" />
-            )}
           </div>
         </div>
       </div>

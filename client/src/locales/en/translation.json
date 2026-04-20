@@ -109,10 +109,13 @@
       "unsubscribedTitle": "Unsubscribed from birthday emails"
     },
     "appointments": {
-      "title": "Upcoming Schedule",
+      "title": "Upcoming Appointments",
       "scheduleClear": "Schedule is clear",
       "noAppointmentsDesc": "No appointments for the next 7 days",
       "scheduleNew": "Schedule New Appointment",
+      "agendaView": "agenda view",
+      "events_one": "{{count}} event",
+      "events_other": "{{count}} events",
       "today": "Today",
       "tomorrow": "Tomorrow",
       "detailsTitle": "Appointment Details",

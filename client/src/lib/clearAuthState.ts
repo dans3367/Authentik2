@@ -53,7 +53,7 @@ export async function clearAllAuthState(): Promise<void> {
 
   // 4. Clear localStorage (except non-auth items like theme preference)
   try {
-    const keysToPreserve = ['theme', 'i18nextLng', 'menuExpanded'];
+    const keysToPreserve = ['theme', 'i18nextLng', 'menuExpanded', 'liveStatsCard.paused'];
     const preserved: Record<string, string | null> = {};
     keysToPreserve.forEach(key => {
       preserved[key] = localStorage.getItem(key);
@@ -106,7 +106,7 @@ export function clearClientCaches(): void {
   } catch (e) { /* ignore */ }
 
   try {
-    const keysToPreserve = ['theme', 'i18nextLng', 'menuExpanded'];
+    const keysToPreserve = ['theme', 'i18nextLng', 'menuExpanded', 'liveStatsCard.paused'];
     const preserved: Record<string, string | null> = {};
     keysToPreserve.forEach(key => {
       preserved[key] = localStorage.getItem(key);

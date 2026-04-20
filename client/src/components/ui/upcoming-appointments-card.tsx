@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAppSelector } from "@/store";
@@ -13,7 +13,6 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import {
-  CalendarClock,
   Calendar,
   Clock,
   MapPin,
@@ -22,7 +21,7 @@ import {
   Timer,
   CalendarPlus,
   CalendarDays,
-  ArrowRight,
+  Plus,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
@@ -47,6 +46,25 @@ interface Appointment {
   updatedAt?: Date;
 }
 
+type StatusKey = Appointment["status"];
+
+const STATUS_DOT: Record<StatusKey, string> = {
+  scheduled: "border-[color:var(--accent-coral)]",
+  confirmed: "border-[color:var(--good)]",
+  cancelled: "border-[color:var(--bad)]",
+  completed: "border-[color:var(--ink-4)]",
+  no_show: "border-[color:var(--warn)]",
+};
+
+const STATUS_BADGE: Record<StatusKey, string> = {
+  scheduled:
+    "bg-[color:var(--accent-coral)]/10 text-[color:var(--accent-coral)]",
+  confirmed: "bg-[color:var(--good)]/10 text-[color:var(--good)]",
+  cancelled: "bg-[color:var(--bad)]/10 text-[color:var(--bad)]",
+  completed: "bg-muted text-muted-foreground",
+  no_show: "bg-[color:var(--warn)]/15 text-[color:var(--warn)]",
+};
+
 export function UpcomingAppointmentsCard() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
@@ -66,15 +84,27 @@ export function UpcomingAppointmentsCard() {
 
   const appointments = appointmentsData?.appointments || [];
 
-  const upcomingAppointments = appointments
-    .filter((appointment) => {
-      const appointmentDate = new Date(appointment.appointmentDate);
-      const now = new Date();
-      const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      return appointmentDate >= now && appointmentDate <= sevenDaysFromNow;
-    })
-    .sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime())
-    .slice(0, 5);
+  const upcomingAppointments = useMemo(() => {
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return appointments
+      .filter((a) => {
+        const d = new Date(a.appointmentDate);
+        return d >= now && d <= sevenDaysFromNow;
+      })
+      .sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime());
+  }, [appointments]);
+
+  const dayGroups = useMemo(() => {
+    const groups = new Map<string, { date: Date; items: Appointment[] }>();
+    for (const a of upcomingAppointments) {
+      const d = new Date(a.appointmentDate);
+      const key = d.toDateString();
+      if (!groups.has(key)) groups.set(key, { date: d, items: [] });
+      groups.get(key)!.items.push(a);
+    }
+    return Array.from(groups.values());
+  }, [upcomingAppointments]);
 
   const getCustomerName = (customer?: AppointmentCustomer) => {
     if (!customer) return t("dashboard.appointments.unknownCustomer");
@@ -84,47 +114,57 @@ export function UpcomingAppointmentsCard() {
     return customer.email;
   };
 
-  const getStatusConfig = (status: Appointment["status"]) => {
-    switch (status) {
-      case "scheduled":
-        return { color: "bg-blue-500/10 text-blue-700 dark:text-blue-400", dot: "bg-blue-500" };
-      case "confirmed":
-        return { color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400", dot: "bg-emerald-500" };
-      case "cancelled":
-        return { color: "bg-red-500/10 text-red-700 dark:text-red-400", dot: "bg-red-500" };
-      case "completed":
-        return { color: "bg-gray-500/10 text-gray-700 dark:text-gray-400", dot: "bg-gray-500" };
-      case "no_show":
-        return { color: "bg-amber-500/10 text-amber-700 dark:text-amber-400", dot: "bg-amber-500" };
-      default:
-        return { color: "bg-gray-500/10 text-gray-700 dark:text-gray-400", dot: "bg-gray-500" };
+  const formatTime = (date: Date) => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).formatToParts(new Date(date));
+    let hm = "";
+    let ap = "";
+    for (const p of parts) {
+      if (p.type === "hour" || p.type === "minute" || p.type === "literal") hm += p.value;
+      if (p.type === "dayPeriod") ap = p.value.toUpperCase();
     }
+    return { hm: hm.trim(), ap };
   };
-
-  const formatTime = (date: Date) =>
-    new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(date));
 
   const formatFullDateTime = (date: Date) =>
     new Intl.DateTimeFormat("en-US", {
-      weekday: "long", year: "numeric", month: "long", day: "numeric",
-      hour: "numeric", minute: "2-digit", hour12: true,
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
     }).format(new Date(date));
+
+  const formatDuration = (minutes?: number) => {
+    if (!minutes) return null;
+    if (minutes < 60) return `${minutes}m`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
+  };
 
   const getDayLabel = (date: Date) => {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const appointmentDate = new Date(date);
-    if (appointmentDate.toDateString() === today.toDateString()) return t("dashboard.appointments.today");
-    if (appointmentDate.toDateString() === tomorrow.toDateString()) return t("dashboard.appointments.tomorrow");
-    return new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(appointmentDate);
+    if (date.toDateString() === today.toDateString()) return t("dashboard.appointments.today");
+    if (date.toDateString() === tomorrow.toDateString()) return t("dashboard.appointments.tomorrow");
+    return new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date);
   };
 
-  const getRelativeDay = (date: Date) => {
-    const today = new Date();
-    const appointmentDate = new Date(date);
-    return appointmentDate.toDateString() === today.toDateString();
-  };
+  const getDayTag = (date: Date) =>
+    new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    })
+      .format(date)
+      .replace(",", " ·");
 
   const handleViewAppointment = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
@@ -151,26 +191,32 @@ export function UpcomingAppointmentsCard() {
     );
   }
 
+  const totalCount = upcomingAppointments.length;
+
   return (
-    <Card className="h-full rounded-2xl border-border/50">
-      <CardHeader className="pb-2 px-5 pt-5">
+    <Card className="h-full rounded-2xl border-border/50 overflow-hidden flex flex-col">
+      <CardHeader className="px-5 pt-5 pb-4 border-b border-border/40">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base font-bold flex items-center gap-2.5 tracking-tight">
-            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-              <CalendarDays className="h-4 w-4 text-primary" />
+          <CardTitle className="text-base font-semibold flex items-center gap-2.5 tracking-tight">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <CalendarDays className="h-3.5 w-3.5 text-primary" />
             </div>
             {t("dashboard.appointments.title")}
+            {totalCount > 0 && (
+              <span className="text-[11px] font-mono font-medium text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">
+                {totalCount}
+              </span>
+            )}
           </CardTitle>
-          {upcomingAppointments.length > 0 && (
-            <span className="text-[10px] font-bold text-muted-foreground/50 bg-muted/60 px-2 py-1 rounded-lg">
-              {upcomingAppointments.length}
-            </span>
-          )}
+          <span className="text-[11px] font-mono text-muted-foreground/70 uppercase tracking-wide">
+            {t("dashboard.appointments.agendaView")}
+          </span>
         </div>
       </CardHeader>
-      <CardContent className="px-5 pb-5 pt-2">
-        {upcomingAppointments.length === 0 ? (
-          <div className="text-center py-8 space-y-3">
+
+      <CardContent className="px-0 py-0 flex-1 min-h-0 flex flex-col">
+        {totalCount === 0 ? (
+          <div className="text-center py-10 px-5 space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto">
               <Calendar className="h-6 w-6 text-muted-foreground/40" />
             </div>
@@ -184,72 +230,94 @@ export function UpcomingAppointmentsCard() {
             </div>
           </div>
         ) : (
-          <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
-            {upcomingAppointments.map((appointment) => {
-              const statusConfig = getStatusConfig(appointment.status);
-              const dayLabel = getDayLabel(appointment.appointmentDate);
-              const isToday = getRelativeDay(appointment.appointmentDate);
+          <div className="max-h-[360px] overflow-y-auto">
+            {dayGroups.map((group) => (
+              <div key={group.date.toDateString()} className="pt-2">
+                <div className="flex items-baseline gap-3 px-5 py-2 sticky top-0 bg-card/95 backdrop-blur z-10">
+                  <span className="text-lg font-semibold tracking-tight text-foreground">
+                    {getDayLabel(group.date)}
+                  </span>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70">
+                    {getDayTag(group.date)}
+                  </span>
+                  <span className="ml-auto text-[10px] font-mono text-muted-foreground/70">
+                    {t("dashboard.appointments.events", { count: group.items.length })}
+                  </span>
+                </div>
 
-              return (
-                <button
-                  key={appointment.id}
-                  type="button"
-                  className={`flex items-center gap-3 cursor-pointer group w-full text-left p-3 rounded-xl transition-all duration-200 ${
-                    isToday
-                      ? "bg-primary/[0.04] dark:bg-primary/[0.08] border border-primary/10 hover:border-primary/20"
-                      : "hover:bg-muted/40 border border-transparent"
-                  }`}
-                  aria-label={`View appointment: ${appointment.title}`}
-                  onClick={() => handleViewAppointment(appointment)}
-                >
-                  {/* Time indicator */}
-                  <div className="flex flex-col items-center flex-shrink-0 w-12">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? "text-primary" : "text-muted-foreground/50"}`}>
-                      {dayLabel}
-                    </span>
-                    <span className="text-sm font-bold text-foreground/80 leading-tight">
-                      {formatTime(appointment.appointmentDate)}
-                    </span>
-                  </div>
+                <div className="relative pl-[72px] pr-5 pb-3 pt-1">
+                  <div className="absolute left-[52px] top-3 bottom-3 w-px bg-border/70" />
+                  {group.items.map((appointment) => {
+                    const { hm, ap } = formatTime(appointment.appointmentDate);
+                    const dot = STATUS_DOT[appointment.status] ?? STATUS_DOT.scheduled;
+                    const badge = STATUS_BADGE[appointment.status] ?? STATUS_BADGE.scheduled;
+                    const duration = formatDuration(appointment.duration);
+                    const customerName = getCustomerName(appointment.customer);
 
-                  {/* Vertical line */}
-                  <div className={`w-px h-10 flex-shrink-0 ${isToday ? "bg-primary/30" : "bg-border/60"}`} />
+                    return (
+                      <button
+                        key={appointment.id}
+                        type="button"
+                        className="relative w-full text-left grid grid-cols-[1fr_auto] gap-3 items-center rounded-lg border border-transparent hover:bg-muted/40 hover:border-border/60 transition-colors px-3 py-2.5 mb-1"
+                        onClick={() => handleViewAppointment(appointment)}
+                        aria-label={`View appointment: ${appointment.title}`}
+                      >
+                        <span
+                          className={`absolute -left-[24px] top-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full bg-card border-2 ${dot}`}
+                          aria-hidden
+                        />
+                        <span className="absolute -left-[72px] top-1/2 -translate-y-1/2 w-11 text-right font-mono leading-tight">
+                          <span className="block text-xs text-foreground/80">{hm}</span>
+                          <span className="block text-[10px] text-muted-foreground/70">{ap}</span>
+                        </span>
 
-                  {/* Details */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-foreground/90 truncate group-hover:text-primary transition-colors leading-tight">
-                      {appointment.title}
-                    </h3>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <Badge className={`${statusConfig.color} text-[9px] px-1.5 py-0 h-[18px] rounded-md capitalize border-0 font-semibold`}>
-                        <span className={`w-1 h-1 rounded-full ${statusConfig.dot} mr-1`} />
-                        {appointment.status.replace("_", " ")}
-                      </Badge>
-                      <span className="text-[10px] text-muted-foreground/50 truncate">
-                        {getCustomerName(appointment.customer)}
-                      </span>
-                    </div>
-                  </div>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold tracking-tight truncate">
+                            {appointment.title}
+                          </span>
+                          <span className="flex items-center gap-2 mt-1 text-xs text-muted-foreground min-w-0">
+                            <Badge
+                              className={`${badge} text-[10px] font-mono font-medium lowercase px-1.5 py-0 h-[18px] rounded-md border-0 gap-1`}
+                            >
+                              <span className="w-1 h-1 rounded-full bg-current" />
+                              {appointment.status.replace("_", " ")}
+                            </Badge>
+                            <span className="truncate">{customerName}</span>
+                          </span>
+                        </span>
 
-                  <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 group-hover:translate-x-0.5 transition-all duration-200 flex-shrink-0" />
-                </button>
-              );
-            })}
+                        {duration && (
+                          <span className="text-[11px] font-mono text-muted-foreground/70 flex-none">
+                            {duration}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        <Button
-          variant="outline"
-          className="w-full mt-3 border-dashed border-border/60 py-4 h-auto text-xs font-semibold rounded-xl hover:bg-muted/30 transition-colors"
+        <button
+          type="button"
+          className="flex items-center justify-between gap-2 px-5 py-3 mt-auto border-t border-border/40 hover:bg-muted/40 transition-colors"
           onClick={() => setLocation("/reminders")}
           data-testid="button-schedule-appointment"
         >
-          <CalendarPlus className="h-3.5 w-3.5 mr-2 text-primary" />
-          {t("dashboard.appointments.scheduleNew")}
-        </Button>
+          <span className="flex items-center gap-2.5">
+            <span className="w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
+              <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+            </span>
+            <span className="text-sm font-semibold">
+              {t("dashboard.appointments.scheduleNew")}
+            </span>
+          </span>
+          <CalendarPlus className="h-4 w-4 text-muted-foreground/60" />
+        </button>
       </CardContent>
 
-      {/* Appointment Details Sheet */}
       <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           {selectedAppointment && (
@@ -322,7 +390,7 @@ export function UpcomingAppointmentsCard() {
                       )}
                       <div>
                         <p className="text-[11px] text-muted-foreground mb-0.5">{t("dashboard.appointments.status")}</p>
-                        <Badge className={getStatusConfig(selectedAppointment.status).color}>
+                        <Badge className={STATUS_BADGE[selectedAppointment.status] ?? STATUS_BADGE.scheduled}>
                           {t(`dashboard.appointments.status_${selectedAppointment.status}`)}
                         </Badge>
                       </div>

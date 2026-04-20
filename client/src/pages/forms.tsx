@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Calendar, User, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText, ClipboardList, FileQuestion, Mail } from 'lucide-react';
+import { Plus, Loader2, Calendar, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText, ClipboardList, FileQuestion, Mail, MessageSquare, CheckCircle2, TrendingUp } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/store';
@@ -245,6 +245,21 @@ export default function Forms2() {
 
   const forms: Form[] = formsData?.forms || [];
 
+  const summary = useMemo(() => {
+    const total = forms.length;
+    const active = forms.filter(f => f.isActive).length;
+    const responses = forms.reduce((sum, f) => sum + (f.responseCount || 0), 0);
+    const avgPerForm = total ? Math.round(responses / total) : 0;
+    return { total, active, responses, avgPerForm };
+  }, [forms]);
+
+  const formattedDate = new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
   // Delete form mutation
   const deleteFormMutation = useMutation({
     mutationFn: async (formId: string) => {
@@ -344,9 +359,9 @@ export default function Forms2() {
     }
 
     return (
-      <Card key={form.id} className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300 group overflow-hidden rounded-none">
+      <Card key={form.id} className="bg-card border border-border rounded-[10px] shadow-[0_1px_0_rgba(20,16,10,.02),0_1px_2px_rgba(20,16,10,.03)] hover:shadow-[0_4px_16px_rgba(20,16,10,.06)] transition-shadow duration-200 group overflow-hidden">
         {/* Theme Preview Header */}
-        <div className={`h-20 relative flex items-center justify-center overflow-hidden ${themeData.preview} rounded-none`}>
+        <div className={`h-20 relative flex items-center justify-center overflow-hidden ${themeData.preview}`}>
           <div className="text-center px-4">
             {getThemePreviewContent(themeData.id)}
           </div>
@@ -420,66 +435,67 @@ export default function Forms2() {
           </div>
         </div>
 
-        <CardHeader className="pb-3">
-          <CardTitle className="text-gray-900 dark:text-gray-100 text-lg font-semibold">
+        <CardHeader className="pb-3 pt-4">
+          <CardTitle className="text-foreground text-[15px] font-semibold leading-snug tracking-[-0.005em] line-clamp-2">
             {form.title}
           </CardTitle>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+            <span className="mono inline-flex items-center gap-1.5 text-[10.5px] font-medium px-1.5 py-0.5 rounded border border-border text-muted-foreground">
               {themeData.name}
             </span>
-            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${form.isActive
-              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-              : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+            <span className={`mono inline-flex items-center gap-1.5 text-[10.5px] font-medium px-1.5 py-0.5 rounded border ${form.isActive
+              ? 'border-[color:var(--good)]/30 text-[color:var(--good)] bg-[color:var(--good)]/5'
+              : 'border-border text-muted-foreground/70'
               }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${form.isActive ? 'bg-[color:var(--good)]' : 'bg-muted-foreground/40'}`} />
               {form.isActive ? 'Active' : 'Inactive'}
             </span>
             {form.shopId && shopsMap.get(form.shopId) && (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200/60 dark:border-amber-700/40">
+              <span className="mono inline-flex items-center text-[10.5px] font-medium px-1.5 py-0.5 rounded border border-[color:var(--accent-warm)]/30 text-[color:var(--accent-warm)] bg-[color:var(--accent-warm)]/5">
                 {shopsMap.get(form.shopId)}
               </span>
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-3 pt-0">
+        <CardContent className="space-y-3 pt-0 pb-4">
           {form.description && (
-            <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2">
+            <p className="text-muted-foreground text-[12.5px] leading-relaxed line-clamp-2">
               {form.description}
             </p>
           )}
 
           {/* Tags */}
           {form.tags && form.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
+            <div className="flex flex-wrap gap-1">
               {form.tags.slice(0, 3).map((tagId) => (
                 <span
                   key={tagId}
-                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                  className="mono inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground"
                 >
-                  Tag {tagId.slice(0, 8)}
+                  {tagId.slice(0, 8)}
                 </span>
               ))}
               {form.tags.length > 3 && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                <span className="mono inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground/70">
                   +{form.tags.length - 3}
                 </span>
               )}
             </div>
           )}
 
-          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-            <div className="flex items-center space-x-4">
-              <span className="flex items-center">
-                <User className="mr-1 h-3 w-3" />
+          <div className="flex items-center justify-between pt-1 border-t border-border/60">
+            <div className="mono flex items-center gap-3 text-[11px] text-muted-foreground pt-2">
+              <span className="inline-flex items-center gap-1">
+                <FileText className="h-3 w-3" strokeWidth={1.5} />
                 {elementCount} field{elementCount !== 1 ? 's' : ''}
               </span>
-              <span className="flex items-center">
-                <Calendar className="mr-1 h-3 w-3" />
-                {new Date(form.createdAt).toLocaleDateString()}
+              <span className="inline-flex items-center gap-1">
+                <Calendar className="h-3 w-3" strokeWidth={1.5} />
+                {new Date(form.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
               </span>
             </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {form.responseCount} response{form.responseCount !== 1 ? 's' : ''}
+            <span className="mono text-[11px] text-foreground pt-2">
+              {form.responseCount} <span className="text-muted-foreground/60">resp.</span>
             </span>
           </div>
         </CardContent>
@@ -494,15 +510,57 @@ export default function Forms2() {
     }
   }, [isInitialized, formsError, setLocation]);
 
+  // Shared header used across loading / error / loaded states
+  const renderPageHead = () => (
+    <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 pt-1">
+      <div className="space-y-1.5">
+        <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-[0.15em]">
+          {formattedDate}
+        </p>
+        <h1
+          className="text-2xl sm:text-3xl lg:text-[2rem] font-extrabold tracking-tight leading-none"
+          data-testid="text-forms-title"
+        >
+          Your <em className="serif font-normal italic">forms</em>.
+        </h1>
+        <p className="text-sm text-muted-foreground/80">
+          Create and manage custom forms to collect information and responses.
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        {lastRefreshedAt && (
+          <span className="mono text-[11px] text-muted-foreground/70 mr-1">
+            Refreshed {formatRefreshTime(lastRefreshedAt)}
+          </span>
+        )}
+        <Button
+          variant="outline"
+          onClick={handleRefresh}
+          disabled={formsLoading}
+          className="h-9 rounded-[10px]"
+        >
+          <RefreshCw className={`mr-2 h-3.5 w-3.5 ${formsLoading ? 'animate-spin' : ''}`} strokeWidth={1.75} />
+          Refresh
+        </Button>
+        {canCreateForms && (
+          <Link href="/forms/add">
+            <Button className="h-9 rounded-[10px] bg-primary text-primary-foreground hover:bg-primary/90">
+              <Plus className="mr-2 h-3.5 w-3.5" strokeWidth={2} />
+              New form
+            </Button>
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+
   // Show loading while authentication is being determined
   if (!isInitialized || authLoading) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-500" />
-            <span className="ml-4 text-gray-600 dark:text-gray-400">Authenticating...</span>
-          </div>
+      <div className="container mx-auto p-4 lg:p-6 space-y-5 lg:space-y-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="ml-3 text-sm text-muted-foreground">Authenticating…</span>
         </div>
       </div>
     );
@@ -511,15 +569,13 @@ export default function Forms2() {
   // Permission denied - no forms.view access
   if (!canViewForms) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
-        <div className="max-w-7xl mx-auto">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
-            <CardContent className="text-center py-12">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Access Denied</h2>
-              <p className="text-gray-600 dark:text-gray-400">You don't have permission to view forms.</p>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="container mx-auto p-4 lg:p-6 space-y-5 lg:space-y-6">
+        <Card className="rounded-[10px] border border-border bg-card">
+          <CardContent className="text-center py-12">
+            <h2 className="text-lg font-semibold text-foreground mb-1.5">Access denied</h2>
+            <p className="text-sm text-muted-foreground">You don't have permission to view forms.</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -527,39 +583,11 @@ export default function Forms2() {
   // Show loading while forms are being fetched
   if (formsLoading) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">Forms</h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Create and manage custom forms to collect information and responses
-              </p>
-            </div>
-            <div className="flex space-x-3">
-              <Button
-                variant="outline"
-                onClick={() => refetch()}
-                disabled={formsLoading}
-                className="flex items-center"
-              >
-                <RefreshCw className={`mr-2 h-4 w-4 ${formsLoading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-              {canCreateForms && (
-                <Link href="/forms/add">
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Form
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center justify-center min-h-[400px]">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-500" />
-            <span className="ml-4 text-gray-600 dark:text-gray-400">Loading forms...</span>
-          </div>
+      <div className="container mx-auto p-4 lg:p-6 space-y-5 lg:space-y-6">
+        {renderPageHead()}
+        <div className="flex items-center justify-center min-h-[300px]">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="ml-3 text-sm text-muted-foreground">Loading forms…</span>
         </div>
       </div>
     );
@@ -568,196 +596,180 @@ export default function Forms2() {
   // Show error state if forms failed to load
   if (formsError) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">Forms</h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Create and manage custom forms to collect information and responses
-              </p>
-            </div>
-            <div className="flex space-x-3">
-              <Button
-                variant="outline"
-                onClick={() => refetch()}
-                disabled={formsLoading}
-                className="flex items-center"
-              >
-                <RefreshCw className={`mr-2 h-4 w-4 ${formsLoading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-              {canCreateForms && (
-                <Link href="/forms/add">
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Form
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </div>
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
-            <CardContent className="text-center py-12">
-              <p className="text-red-600 dark:text-red-400 mb-4">Failed to load forms</p>
-              <Button onClick={() => refetch()} variant="outline">Try Again</Button>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="container mx-auto p-4 lg:p-6 space-y-5 lg:space-y-6">
+        {renderPageHead()}
+        <Card className="rounded-[10px] border border-border bg-card">
+          <CardContent className="text-center py-12">
+            <p className="text-[color:var(--bad)] text-sm mb-4">Failed to load forms</p>
+            <Button onClick={() => refetch()} variant="outline" className="rounded-[10px]">Try again</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
+  const summaryCards = [
+    {
+      label: 'Total forms',
+      icon: FileText,
+      value: summary.total,
+      unit: null as string | null,
+    },
+    {
+      label: 'Active',
+      icon: CheckCircle2,
+      value: summary.active,
+      unit: summary.total > 0 ? `/ ${summary.total}` : null,
+    },
+    {
+      label: 'Total responses',
+      icon: MessageSquare,
+      value: summary.responses,
+      unit: null,
+    },
+    {
+      label: 'Avg. per form',
+      icon: TrendingUp,
+      value: summary.avgPerForm,
+      unit: null,
+    },
+  ];
+
+  const categorySections: Array<{
+    key: string;
+    title: string;
+    sub: string;
+    icon: typeof ClipboardList;
+    filter: (f: Form) => boolean;
+    emptyLabel: string;
+  }> = [
+    {
+      key: 'intake',
+      title: 'Intake forms',
+      sub: 'sign-ups · newsletters · lead capture',
+      icon: ClipboardList,
+      filter: (f) => !f.category || f.category === 'intake',
+      emptyLabel: 'No intake forms yet',
+    },
+    {
+      key: 'survey',
+      title: 'Survey forms',
+      sub: 'questionnaires · reviews · feedback',
+      icon: FileQuestion,
+      filter: (f) => f.category === 'survey',
+      emptyLabel: 'No survey forms yet',
+    },
+    {
+      key: 'email-signup',
+      title: 'Email signup forms',
+      sub: 'email collection · communication consent',
+      icon: Mail,
+      filter: (f) => f.category === 'email-signup',
+      emptyLabel: 'No email signup forms yet',
+    },
+  ];
+
   return (
-    <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">Forms</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Create and manage custom forms to collect information and responses
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {lastRefreshedAt && (
-              <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">
-                Last refreshed at {formatRefreshTime(lastRefreshedAt)}
-              </span>
-            )}
-            <Button
-              variant="outline"
-              onClick={handleRefresh}
-              disabled={formsLoading}
-              className="flex items-center"
+    <div className="container mx-auto p-4 lg:p-6 space-y-5 lg:space-y-6 overflow-y-auto">
+      {renderPageHead()}
+
+      {/* Summary stat panel — single bordered frame, hairline dividers, serif numerals */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 rounded-[10px] border border-border bg-card overflow-hidden shadow-[0_1px_0_rgba(20,16,10,.02),0_1px_2px_rgba(20,16,10,.03)]">
+        {summaryCards.map((stat, index) => {
+          const borders = [
+            "border-r border-b lg:border-b-0",
+            "border-b lg:border-b-0 lg:border-r",
+            "border-r",
+            "",
+          ][index];
+          return (
+            <div
+              key={stat.label}
+              className={`relative flex flex-col gap-2.5 p-4 sm:p-5 min-w-0 border-border ${borders}`}
+              data-testid={`forms-stat-${index}`}
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${formsLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+              <div className="flex items-center justify-between">
+                <span className="text-[11.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                  {stat.label}
+                </span>
+                <stat.icon className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" strokeWidth={1.5} />
+              </div>
+              <div className="serif flex items-baseline gap-1.5 text-[32px] sm:text-[38px] leading-none tracking-[-0.02em] text-foreground">
+                {(stat.value ?? 0).toLocaleString()}
+                {stat.unit && (
+                  <span className="mono text-[13px] font-medium text-muted-foreground not-italic">
+                    {stat.unit}
+                  </span>
+                )}
+              </div>
+              <div className="min-h-[12px]" />
+            </div>
+          );
+        })}
+      </div>
+
+      {forms.length === 0 ? (
+        <Card className="rounded-[10px] border border-border bg-card">
+          <CardContent className="text-center py-16 flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+              <FileText className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">No forms created yet</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Start collecting information and responses.</p>
+            </div>
             {canCreateForms && (
-              <Link href="/forms/add">
-                <Button className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Form
+              <Link href="/forms/add" className="mt-1">
+                <Button className="rounded-[10px] bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Plus className="mr-2 h-3.5 w-3.5" strokeWidth={2} />
+                  Create your first form
                 </Button>
               </Link>
             )}
-          </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-5">
+          {categorySections.map((section) => {
+            const sectionForms = forms.filter(section.filter);
+            return (
+              <div
+                key={section.key}
+                className="rounded-[10px] border border-border bg-card overflow-hidden shadow-[0_1px_0_rgba(20,16,10,.02),0_1px_2px_rgba(20,16,10,.03)]"
+              >
+                <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-border">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <section.icon className="h-4 w-4 text-muted-foreground/70 shrink-0" strokeWidth={1.5} />
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-semibold tracking-[-0.005em] text-foreground">
+                        {section.title}
+                      </div>
+                      <div className="mono text-[11px] text-muted-foreground/80 mt-0.5 truncate">
+                        {section.sub}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="mono text-[10.5px] font-medium text-muted-foreground border border-border rounded px-1.5 py-0.5 bg-muted/40 shrink-0">
+                    {sectionForms.length} {sectionForms.length === 1 ? 'form' : 'forms'}
+                  </span>
+                </div>
+                <div className="p-4 sm:p-5">
+                  {sectionForms.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+                      <section.icon className="h-6 w-6 opacity-40" strokeWidth={1.25} />
+                      <p className="text-xs">{section.emptyLabel}</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {sectionForms.map((form) => renderFormCard(form))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
-
-        {forms.length === 0 ? (
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
-            <CardContent className="text-center py-12">
-              <p className="text-gray-600 dark:text-gray-300 mb-4">No forms created yet</p>
-              {canCreateForms && (
-                <Link href="/forms/add">
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600">Create your first form</Button>
-                </Link>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-10">
-            {/* Intake Forms Section */}
-            {(() => {
-              const intakeForms = forms.filter(f => !f.category || f.category === 'intake');
-              return (
-                <div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                      <ClipboardList className="h-5 w-5" />
-                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Intake Forms</h2>
-                    </div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Sign-ups, newsletters, lead capture
-                    </span>
-                    <span className="ml-auto text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
-                      {intakeForms.length} form{intakeForms.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  {intakeForms.length === 0 ? (
-                    <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 border-dashed">
-                      <CardContent className="text-center py-8">
-                        <ClipboardList className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-gray-500 dark:text-gray-400 text-sm">No intake forms yet</p>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {intakeForms.map((form) => renderFormCard(form))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Survey Forms Section */}
-            {(() => {
-              const surveyForms = forms.filter(f => f.category === 'survey');
-              return (
-                <div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
-                      <FileQuestion className="h-5 w-5" />
-                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Survey Forms</h2>
-                    </div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Questionnaires, reviews, feedback
-                    </span>
-                    <span className="ml-auto text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
-                      {surveyForms.length} form{surveyForms.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  {surveyForms.length === 0 ? (
-                    <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 border-dashed">
-                      <CardContent className="text-center py-8">
-                        <FileQuestion className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-gray-500 dark:text-gray-400 text-sm">No survey forms yet</p>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {surveyForms.map((form) => renderFormCard(form))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Email Signup Forms Section */}
-            {(() => {
-              const emailSignupForms = forms.filter(f => f.category === 'email-signup');
-              return (
-                <div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                      <Mail className="h-5 w-5" />
-                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Email Signup Forms</h2>
-                    </div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Email collection with communication consent
-                    </span>
-                    <span className="ml-auto text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
-                      {emailSignupForms.length} form{emailSignupForms.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  {emailSignupForms.length === 0 ? (
-                    <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 border-dashed">
-                      <CardContent className="text-center py-8">
-                        <Mail className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-gray-500 dark:text-gray-400 text-sm">No email signup forms yet</p>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {emailSignupForms.map((form) => renderFormCard(form))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Form Preview Modal */}
       {previewForm && (
