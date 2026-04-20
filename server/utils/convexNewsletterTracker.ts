@@ -72,7 +72,7 @@ export async function trackNewsletterEvent(params: {
     newsletterId: string;
     recipientEmail: string;
     providerMessageId?: string;
-    eventType: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed' | 'failed' | 'suppressed';
+    eventType: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed' | 'failed' | 'suppressed' | 'reacted';
     metadata?: Record<string, any>;
 }): Promise<void> {
     try {

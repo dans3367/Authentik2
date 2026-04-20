@@ -16,6 +16,7 @@ import {
   Inbox,
   Pause,
   Play,
+  Smile,
 } from "lucide-react";
 
 const PAUSED_STORAGE_KEY = "liveStatsCard.paused";
@@ -97,7 +98,35 @@ const EVENT_CONFIG: Record<string, EventConfig> = {
     bubbleBg: "bg-neutral-100 dark:bg-neutral-900",
     verb: "queued for",
   },
+  reacted: {
+    icon: Smile,
+    iconColor: "text-amber-500 dark:text-amber-400",
+    bubbleBg: "bg-amber-100/70 dark:bg-amber-950/40",
+    verb: "reacted to",
+  },
 };
+
+const REACTION_EMOJI_BY_TYPE: Record<string, string> = {
+  love_it: "❤️",
+  liked_it: "👍",
+  cool: "😎",
+  dont_agree: "🤔",
+  dislike: "👎",
+};
+
+const REACTION_ENDPOINT_PATH = "/api/newsletter-reactions/react";
+
+function parseReactionEmojiFromLink(link: string | undefined | null): string | null {
+  if (!link) return null;
+  try {
+    const url = new URL(String(link), window.location.origin);
+    if (url.pathname !== REACTION_ENDPOINT_PATH) return null;
+    const type = url.searchParams.get("type");
+    return (type && REACTION_EMOJI_BY_TYPE[type]) || null;
+  } catch {
+    return null;
+  }
+}
 
 function formatRelativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
@@ -261,16 +290,30 @@ export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
           </div>
         ) : events && events.length > 0 ? (
           events.map((event) => {
-            const cfg = EVENT_CONFIG[event.eventType] ?? EVENT_CONFIG.queued;
+            const linkFromMetadata =
+              event.metadata && typeof event.metadata.link === "string"
+                ? event.metadata.link
+                : null;
+            const reactionEmojiFromMetadata =
+              event.eventType === "reacted" && event.metadata?.emoji
+                ? String(event.metadata.emoji)
+                : null;
+            const reactionEmojiFromClick =
+              event.eventType === "clicked"
+                ? parseReactionEmojiFromLink(linkFromMetadata)
+                : null;
+            const reactionEmoji = reactionEmojiFromMetadata ?? reactionEmojiFromClick;
+            const effectiveType = reactionEmoji ? "reacted" : event.eventType;
+            const cfg = EVENT_CONFIG[effectiveType] ?? EVENT_CONFIG.queued;
             const Icon = cfg.icon;
             const title = titleByNewsletter.get(event.newsletterId) ?? "Newsletter";
             const clickedPath =
-              event.eventType === "clicked" && event.metadata?.link
+              event.eventType === "clicked" && linkFromMetadata && !reactionEmojiFromClick
                 ? (() => {
                     try {
-                      return new URL(String(event.metadata.link)).pathname;
+                      return new URL(linkFromMetadata, window.location.origin).pathname;
                     } catch {
-                      return String(event.metadata.link);
+                      return linkFromMetadata;
                     }
                   })()
                 : null;
@@ -285,12 +328,29 @@ export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
                 <div
                   className={`w-8 h-8 rounded-full ${cfg.bubbleBg} flex items-center justify-center flex-shrink-0 mt-0.5`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${cfg.iconColor}`} strokeWidth={2.25} />
+                  {reactionEmoji ? (
+                    <span className="text-base leading-none" aria-hidden>
+                      {reactionEmoji}
+                    </span>
+                  ) : (
+                    <Icon className={`w-3.5 h-3.5 ${cfg.iconColor}`} strokeWidth={2.25} />
+                  )}
                 </div>
                 <p className="flex-1 text-[13px] leading-snug text-foreground">
                   <span className="font-bold">{event.recipientEmail}</span>
-                  <span className="text-muted-foreground"> {cfg.verb} </span>
-                  <span className="font-bold">{title}</span>
+                  {reactionEmoji ? (
+                    <>
+                      <span className="text-muted-foreground"> reacted </span>
+                      <span aria-hidden>{reactionEmoji}</span>
+                      <span className="text-muted-foreground"> in </span>
+                      <span className="font-bold">{title}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-muted-foreground"> {cfg.verb} </span>
+                      <span className="font-bold">{title}</span>
+                    </>
+                  )}
                   {clickedPath && (
                     <span className="text-muted-foreground/70 font-mono">
                       {" "}

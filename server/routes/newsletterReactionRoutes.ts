@@ -12,6 +12,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { newsletters, newsletterReactions, emailContacts, NEWSLETTER_REACTION_TYPES } from '@shared/schema';
 import type { NewsletterReactionType } from '@shared/schema';
+import { trackNewsletterEvent } from '../utils/convexNewsletterTracker';
 
 export const newsletterReactionRoutes = Router();
 
@@ -342,6 +343,15 @@ newsletterReactionRoutes.get('/react', async (req, res) => {
         }
 
         const meta = REACTION_META[reactionType];
+        // Publish to the live activity feed (Convex) — non-blocking.
+        trackNewsletterEvent({
+            tenantId,
+            newsletterId,
+            recipientEmail,
+            eventType: 'reacted',
+            metadata: { reactionType, emoji: meta.emoji, label: meta.label },
+        }).catch((e) => console.error('[Newsletter Reactions] Convex publish failed:', e));
+
         const updatedMsg = result.isUpdate ? ' Your previous reaction has been updated.' : '';
         return res.send(buildReactionPage(
             'success',
@@ -397,6 +407,14 @@ newsletterReactionRoutes.post('/confirm', async (req, res) => {
         }
 
         const meta = REACTION_META[reactionType];
+        trackNewsletterEvent({
+            tenantId,
+            newsletterId,
+            recipientEmail,
+            eventType: 'reacted',
+            metadata: { reactionType, emoji: meta.emoji, label: meta.label },
+        }).catch((e) => console.error('[Newsletter Reactions] Convex publish failed:', e));
+
         const updatedMsg = result.isUpdate ? ' Your previous reaction has been updated.' : '';
         return res.send(buildReactionPage(
             'success',
