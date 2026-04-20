@@ -14,6 +14,27 @@ import { NewsletterStatsCard } from "@/components/ui/newsletter-stats-card";
 import { Button } from "@/components/ui/button";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  defaultDropAnimationSideEffects,
+  type DragEndEvent,
+  type DragStartEvent,
+  type DropAnimation,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  rectSortingStrategy,
+  useSortable,
+  arrayMove,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   LayoutDashboard,
   Sparkles,
   Mail,
@@ -28,11 +49,188 @@ import {
   ArrowUpRight,
   Send,
   UserPlus,
+  GripVertical,
+  Settings2,
+  Check,
+  RotateCcw,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDashboardHighlights } from "@/hooks/useStats";
+import { useDashboardLayout } from "@/hooks/useDashboardLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EditorPickerModal } from "@/components/EditorPickerModal";
+
+const CARD_ORDER_KEY = "dashboard.cardOrder";
+const CARD_SIZES_KEY = "dashboard.cardSizes";
+const GRID_GAP_PX = 16; // tailwind gap-4
+const MIN_COL_SPAN = 3;
+const MAX_COL_SPAN = 12;
+
+const DEFAULT_CARD_ORDER = [
+  "mainSlot",
+  "liveStats",
+  "scheduledEmails",
+  "appointments",
+  "highlights",
+  "birthdays",
+] as const;
+type CardId = (typeof DEFAULT_CARD_ORDER)[number];
+
+const DEFAULT_CARD_SIZES: Record<CardId, number> = {
+  mainSlot: 8,
+  liveStats: 4,
+  scheduledEmails: 5,
+  appointments: 7,
+  highlights: 5,
+  birthdays: 7,
+};
+
+function readCardOrder(): CardId[] {
+  if (typeof window === "undefined") return [...DEFAULT_CARD_ORDER];
+  try {
+    const raw = window.localStorage.getItem(CARD_ORDER_KEY);
+    if (!raw) return [...DEFAULT_CARD_ORDER];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [...DEFAULT_CARD_ORDER];
+    const valid = parsed.filter(
+      (id): id is CardId =>
+        typeof id === "string" && (DEFAULT_CARD_ORDER as readonly string[]).includes(id),
+    );
+    const missing = DEFAULT_CARD_ORDER.filter((id) => !valid.includes(id));
+    return [...valid, ...missing];
+  } catch {
+    return [...DEFAULT_CARD_ORDER];
+  }
+}
+
+function readCardSizes(): Record<CardId, number> {
+  if (typeof window === "undefined") return { ...DEFAULT_CARD_SIZES };
+  try {
+    const raw = window.localStorage.getItem(CARD_SIZES_KEY);
+    if (!raw) return { ...DEFAULT_CARD_SIZES };
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return { ...DEFAULT_CARD_SIZES };
+    const result: Record<CardId, number> = { ...DEFAULT_CARD_SIZES };
+    for (const id of DEFAULT_CARD_ORDER) {
+      const val = (parsed as Record<string, unknown>)[id];
+      if (typeof val === "number" && Number.isFinite(val)) {
+        result[id] = Math.max(MIN_COL_SPAN, Math.min(MAX_COL_SPAN, Math.round(val)));
+      }
+    }
+    return result;
+  } catch {
+    return { ...DEFAULT_CARD_SIZES };
+  }
+}
+
+function SortableCard({
+  id,
+  colSpan,
+  gridRef,
+  onResize,
+  editMode,
+  children,
+}: {
+  id: CardId;
+  colSpan: number;
+  gridRef: React.RefObject<HTMLDivElement>;
+  onResize: (id: CardId, nextSpan: number) => void;
+  editMode: boolean;
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id, disabled: !editMode });
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0 : 1,
+    gridColumn: `span ${colSpan} / span ${colSpan}`,
+  };
+
+  const onResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!editMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const grid = gridRef.current;
+    if (!grid) return;
+    const gridWidth = grid.getBoundingClientRect().width;
+    const step = (gridWidth + GRID_GAP_PX) / 12;
+    if (!Number.isFinite(step) || step <= 0) return;
+    const startX = e.clientX;
+    const startSpan = colSpan;
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const onMove = (ev: PointerEvent) => {
+      const deltaCols = Math.round((ev.clientX - startX) / step);
+      const next = Math.max(
+        MIN_COL_SPAN,
+        Math.min(MAX_COL_SPAN, startSpan + deltaCols),
+      );
+      onResize(id, next);
+    };
+    const onUp = (ev: PointerEvent) => {
+      try {
+        handle.releasePointerCapture(ev.pointerId);
+      } catch {
+        /* ignore */
+      }
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointercancel", onUp);
+    };
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative group rounded-2xl ${
+        editMode
+          ? "outline-dashed outline-2 outline-offset-4 outline-primary/40"
+          : ""
+      }`}
+    >
+      {editMode && (
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          aria-label="Drag to reorder card"
+          title="Drag to reorder"
+          className="absolute -top-2 -left-2 z-20 w-7 h-7 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors cursor-grab active:cursor-grabbing touch-none"
+          data-testid={`dashboard-drag-handle-${id}`}
+        >
+          <GripVertical className="w-3.5 h-3.5" strokeWidth={2} />
+        </button>
+      )}
+      {children}
+      {editMode && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize card"
+          aria-valuenow={colSpan}
+          aria-valuemin={MIN_COL_SPAN}
+          aria-valuemax={MAX_COL_SPAN}
+          onPointerDown={onResizePointerDown}
+          className="hidden lg:block absolute top-3 bottom-3 -right-1 w-1.5 rounded-full bg-primary/60 hover:bg-primary transition-colors cursor-col-resize z-20 touch-none"
+          data-testid={`dashboard-resize-handle-${id}`}
+        />
+      )}
+    </div>
+  );
+}
+
+const DROP_ANIMATION: DropAnimation = {
+  duration: 220,
+  easing: "cubic-bezier(0.2, 0, 0, 1)",
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: { active: { opacity: "0.4" } },
+  }),
+};
 
 function Sparkline({
   data,
@@ -144,6 +342,128 @@ export default function Dashboard() {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
+
+  const [cardOrder, setCardOrder] = useState<CardId[]>(readCardOrder);
+  const [cardSizes, setCardSizes] = useState<Record<CardId, number>>(readCardSizes);
+  const [activeCardId, setActiveCardId] = useState<CardId | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  const { layout: serverLayout, isFetched: layoutFetched, saveLayout } = useDashboardLayout();
+
+  // One-time hydration from server into local state (server is source of truth across browsers).
+  const hydratedFromServerRef = useRef(false);
+  useEffect(() => {
+    if (!layoutFetched || hydratedFromServerRef.current) return;
+    hydratedFromServerRef.current = true;
+    if (!serverLayout) return;
+
+    if (Array.isArray(serverLayout.cardOrder) && serverLayout.cardOrder.length > 0) {
+      const valid = serverLayout.cardOrder.filter(
+        (id): id is CardId =>
+          typeof id === "string" && (DEFAULT_CARD_ORDER as readonly string[]).includes(id),
+      );
+      const missing = DEFAULT_CARD_ORDER.filter((id) => !valid.includes(id));
+      setCardOrder([...valid, ...missing]);
+    }
+
+    if (serverLayout.cardSizes && typeof serverLayout.cardSizes === "object") {
+      setCardSizes((curr) => {
+        const next = { ...curr };
+        for (const id of DEFAULT_CARD_ORDER) {
+          const val = serverLayout.cardSizes?.[id];
+          if (typeof val === "number" && Number.isFinite(val)) {
+            next[id] = Math.max(MIN_COL_SPAN, Math.min(MAX_COL_SPAN, Math.round(val)));
+          }
+        }
+        return next;
+      });
+    }
+  }, [layoutFetched, serverLayout]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CARD_ORDER_KEY, JSON.stringify(cardOrder));
+    } catch {
+      /* ignore storage errors (private mode, quota) */
+    }
+  }, [cardOrder]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CARD_SIZES_KEY, JSON.stringify(cardSizes));
+    } catch {
+      /* ignore storage errors (private mode, quota) */
+    }
+  }, [cardSizes]);
+
+  // Baseline of the last layout we saved to the server. Used on "Done" to skip
+  // the PATCH when nothing actually changed during the edit session.
+  const savedLayoutRef = useRef<{
+    cardOrder: CardId[];
+    cardSizes: Record<CardId, number>;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!hydratedFromServerRef.current || savedLayoutRef.current) return;
+    savedLayoutRef.current = {
+      cardOrder: [...cardOrder],
+      cardSizes: { ...cardSizes },
+    };
+  }, [cardOrder, cardSizes]);
+
+  const handleCardResize = (id: CardId, nextSpan: number) => {
+    setCardSizes((curr) => (curr[id] === nextSpan ? curr : { ...curr, [id]: nextSpan }));
+  };
+
+  const handleResetLayout = () => {
+    setCardOrder([...DEFAULT_CARD_ORDER]);
+    setCardSizes({ ...DEFAULT_CARD_SIZES });
+  };
+
+  const handleToggleEditMode = () => {
+    if (editMode) {
+      const saved = savedLayoutRef.current;
+      const orderChanged =
+        !saved ||
+        saved.cardOrder.length !== cardOrder.length ||
+        saved.cardOrder.some((id, i) => id !== cardOrder[i]);
+      const sizesChanged =
+        !saved ||
+        DEFAULT_CARD_ORDER.some((id) => saved.cardSizes[id] !== cardSizes[id]);
+      if (orderChanged || sizesChanged) {
+        saveLayout({ cardOrder, cardSizes });
+        savedLayoutRef.current = {
+          cardOrder: [...cardOrder],
+          cardSizes: { ...cardSizes },
+        };
+      }
+    }
+    setEditMode((v) => !v);
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveCardId(event.active.id as CardId);
+  };
+
+  const handleDragCancel = () => setActiveCardId(null);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveCardId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setCardOrder((curr) => {
+      const oldIdx = curr.indexOf(active.id as CardId);
+      const newIdx = curr.indexOf(over.id as CardId);
+      if (oldIdx < 0 || newIdx < 0) return curr;
+      return arrayMove(curr, oldIdx, newIdx);
+    });
+  };
 
   useSetBreadcrumbs([{ label: t("sidebar.dashboard", "Dashboard"), icon: LayoutDashboard }]);
 
@@ -273,6 +593,43 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Layout edit-mode toggle */}
+        <div className="flex items-center justify-end gap-2">
+          {editMode && (
+            <button
+              type="button"
+              onClick={handleResetLayout}
+              aria-label="Reset dashboard layout to defaults"
+              title="Reset layout to defaults"
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-border/60 bg-card text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+              data-testid="dashboard-reset-layout"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Reset</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleToggleEditMode}
+            aria-pressed={editMode}
+            aria-label={editMode ? "Save layout and exit edit mode" : "Edit dashboard layout"}
+            title={editMode ? "Save and exit edit mode" : "Edit dashboard layout"}
+            className={`inline-flex items-center gap-2 h-9 px-3 rounded-lg border text-xs font-semibold transition-colors ${
+              editMode
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-card border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+            }`}
+            data-testid="dashboard-edit-layout-toggle"
+          >
+            {editMode ? (
+              <Check className="w-4 h-4" />
+            ) : (
+              <Settings2 className="w-4 h-4" />
+            )}
+            <span>{editMode ? "Done" : "Edit layout"}</span>
+          </button>
+        </div>
+
         {/* Quick Actions Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
           {quickActions.map((action) => (
@@ -365,50 +722,78 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* Bento Grid - Row 1: Newsletter stats + Live stats */}
+        {/* Reorderable Bento Grid */}
         {activeNewslettersResolved ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <div className="lg:col-span-8">
-              {hasActiveNewsletter && tenantId ? (
-                <NewsletterStatsCard />
-              ) : (
-                <NewsletterCard />
-              )}
-            </div>
-            <div className="lg:col-span-4">
-              {tenantId ? (
-                <LiveStatsCard tenantId={tenantId} shopId={selectedShopId} />
-              ) : (
-                <Skeleton className="h-full w-full rounded-2xl" />
-              )}
-            </div>
-          </div>
+          (() => {
+            const cardRegistry: Record<CardId, { render: () => React.ReactNode }> = {
+              mainSlot: {
+                render: () =>
+                  hasActiveNewsletter && tenantId ? (
+                    <NewsletterStatsCard />
+                  ) : (
+                    <NewsletterCard />
+                  ),
+              },
+              liveStats: {
+                render: () =>
+                  tenantId ? (
+                    <LiveStatsCard tenantId={tenantId} shopId={selectedShopId} />
+                  ) : (
+                    <Skeleton className="h-full w-full min-h-[260px] rounded-2xl" />
+                  ),
+              },
+              scheduledEmails: { render: () => <UpcomingScheduledEmailsCard /> },
+              appointments: { render: () => <UpcomingAppointmentsCard /> },
+              highlights: { render: () => <HighlightsCard /> },
+              birthdays: { render: () => <UpcomingBirthdaysCard /> },
+            };
+            return (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+              >
+                <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
+                  <div
+                    ref={gridRef}
+                    className="grid grid-cols-1 lg:grid-cols-12 gap-4"
+                  >
+                    {cardOrder.map((id) => (
+                      <SortableCard
+                        key={id}
+                        id={id}
+                        colSpan={cardSizes[id] ?? DEFAULT_CARD_SIZES[id]}
+                        gridRef={gridRef}
+                        onResize={handleCardResize}
+                        editMode={editMode}
+                      >
+                        {cardRegistry[id].render()}
+                      </SortableCard>
+                    ))}
+                  </div>
+                </SortableContext>
+                <DragOverlay dropAnimation={DROP_ANIMATION}>
+                  {activeCardId ? (
+                    <div className="rounded-2xl shadow-2xl ring-1 ring-border/60 cursor-grabbing h-full">
+                      {cardRegistry[activeCardId].render()}
+                    </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            );
+          })()
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <Skeleton className="lg:col-span-8 h-[260px] rounded-2xl" />
             <Skeleton className="lg:col-span-4 h-[260px] rounded-2xl" />
+            <Skeleton className="lg:col-span-5 h-[260px] rounded-2xl" />
+            <Skeleton className="lg:col-span-7 h-[260px] rounded-2xl" />
+            <Skeleton className="lg:col-span-5 h-[260px] rounded-2xl" />
+            <Skeleton className="lg:col-span-7 h-[260px] rounded-2xl" />
           </div>
         )}
-
-        {/* Bento Grid - Row 2: Upcoming Scheduled Emails + Upcoming Appointments */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-5">
-            <UpcomingScheduledEmailsCard />
-          </div>
-          <div className="lg:col-span-7">
-            <UpcomingAppointmentsCard />
-          </div>
-        </div>
-
-        {/* Bento Grid - Row 3: Highlights + Birthdays */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-5">
-            <HighlightsCard />
-          </div>
-          <div className="lg:col-span-7">
-            <UpcomingBirthdaysCard />
-          </div>
-        </div>
       </div>
       <EditorPickerModal open={showEditorPicker} onOpenChange={setShowEditorPicker} />
     </>

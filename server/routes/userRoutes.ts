@@ -9,6 +9,68 @@ import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
 export const userRoutes = Router();
 
+// Get current user's dashboard layout
+userRoutes.get("/dashboard-layout", authenticateToken, async (req: any, res) => {
+  try {
+    const user = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, req.user.id),
+      columns: { dashboardLayout: true },
+    });
+    res.json({ layout: user?.dashboardLayout ?? null });
+  } catch (error) {
+    console.error('Get dashboard layout error:', error);
+    res.status(500).json({ message: 'Failed to get dashboard layout' });
+  }
+});
+
+// Update current user's dashboard layout (self-service)
+userRoutes.patch("/dashboard-layout", authenticateToken, async (req: any, res) => {
+  try {
+    const { cardOrder, cardSizes } = req.body ?? {};
+    const layout: { cardOrder?: string[]; cardSizes?: Record<string, number> } = {};
+
+    if (Array.isArray(cardOrder)) {
+      const cleaned = cardOrder
+        .filter((v: unknown): v is string => typeof v === 'string' && v.length <= 64)
+        .slice(0, 50);
+      layout.cardOrder = cleaned;
+    }
+
+    if (cardSizes && typeof cardSizes === 'object' && !Array.isArray(cardSizes)) {
+      const sizes: Record<string, number> = {};
+      for (const [k, v] of Object.entries(cardSizes)) {
+        if (typeof k !== 'string' || k.length > 64) continue;
+        if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+        sizes[k] = Math.max(1, Math.min(12, Math.round(v)));
+      }
+      layout.cardSizes = sizes;
+    }
+
+    if (layout.cardOrder === undefined && layout.cardSizes === undefined) {
+      return res.status(400).json({ message: 'cardOrder or cardSizes is required' });
+    }
+
+    // Merge with existing layout so a partial update (e.g. only sizes) does not wipe the other field
+    const existing = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, req.user.id),
+      columns: { dashboardLayout: true },
+    });
+    const merged = {
+      ...(existing?.dashboardLayout ?? {}),
+      ...layout,
+    };
+
+    await db.update(betterAuthUser)
+      .set({ dashboardLayout: merged, updatedAt: new Date() })
+      .where(eq(betterAuthUser.id, req.user.id));
+
+    res.json({ layout: merged });
+  } catch (error) {
+    console.error('Update dashboard layout error:', error);
+    res.status(500).json({ message: 'Failed to update dashboard layout' });
+  }
+});
+
 // Update current user's profile (self-service)
 userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
   console.log('📝 [Profile] Update request received:', {

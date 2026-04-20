@@ -45,6 +45,11 @@ export const betterAuthUser = pgTable("better_auth_user", {
   // Company name captured during signup, read by tenant provisioning.
   // Cleared once the tenant/company is created.
   pendingCompanyName: text("pending_company_name"),
+  // Per-user dashboard layout: { cardOrder: string[], cardSizes: Record<string, number> }
+  dashboardLayout: jsonb("dashboard_layout").$type<{
+    cardOrder?: string[];
+    cardSizes?: Record<string, number>;
+  }>(),
 });
 
 export const betterAuthSession = pgTable("better_auth_session", {
