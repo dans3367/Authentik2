@@ -26,8 +26,12 @@ userRoutes.get("/dashboard-layout", authenticateToken, async (req: any, res) => 
 // Update current user's dashboard layout (self-service)
 userRoutes.patch("/dashboard-layout", authenticateToken, async (req: any, res) => {
   try {
-    const { cardOrder, cardSizes } = req.body ?? {};
-    const layout: { cardOrder?: string[]; cardSizes?: Record<string, number> } = {};
+    const { cardOrder, cardSizes, cardVisibility } = req.body ?? {};
+    const layout: {
+      cardOrder?: string[];
+      cardSizes?: Record<string, number>;
+      cardVisibility?: Record<string, boolean>;
+    } = {};
 
     if (Array.isArray(cardOrder)) {
       const cleaned = cardOrder
@@ -46,8 +50,22 @@ userRoutes.patch("/dashboard-layout", authenticateToken, async (req: any, res) =
       layout.cardSizes = sizes;
     }
 
-    if (layout.cardOrder === undefined && layout.cardSizes === undefined) {
-      return res.status(400).json({ message: 'cardOrder or cardSizes is required' });
+    if (cardVisibility && typeof cardVisibility === 'object' && !Array.isArray(cardVisibility)) {
+      const visibility: Record<string, boolean> = {};
+      for (const [k, v] of Object.entries(cardVisibility)) {
+        if (typeof k !== 'string' || k.length > 64) continue;
+        if (typeof v !== 'boolean') continue;
+        visibility[k] = v;
+      }
+      layout.cardVisibility = visibility;
+    }
+
+    if (
+      layout.cardOrder === undefined &&
+      layout.cardSizes === undefined &&
+      layout.cardVisibility === undefined
+    ) {
+      return res.status(400).json({ message: 'cardOrder, cardSizes, or cardVisibility is required' });
     }
 
     // Merge with existing layout so a partial update (e.g. only sizes) does not wipe the other field

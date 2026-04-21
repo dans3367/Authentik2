@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 export type DashboardLayout = {
   cardOrder?: string[];
   cardSizes?: Record<string, number>;
+  cardVisibility?: Record<string, boolean>;
 };
 
 type LayoutResponse = { layout: DashboardLayout | null };

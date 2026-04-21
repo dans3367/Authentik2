@@ -53,15 +53,23 @@ import {
   Settings2,
   Check,
   RotateCcw,
+  Eye,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDashboardHighlights } from "@/hooks/useStats";
 import { useDashboardLayout } from "@/hooks/useDashboardLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EditorPickerModal } from "@/components/EditorPickerModal";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 
 const CARD_ORDER_KEY = "dashboard.cardOrder";
 const CARD_SIZES_KEY = "dashboard.cardSizes";
+const CARD_VISIBILITY_KEY = "dashboard.cardVisibility";
 const GRID_GAP_PX = 16; // tailwind gap-4
 const MIN_COL_SPAN = 3;
 const MAX_COL_SPAN = 12;
@@ -83,6 +91,24 @@ const DEFAULT_CARD_SIZES: Record<CardId, number> = {
   appointments: 7,
   highlights: 5,
   birthdays: 7,
+};
+
+const DEFAULT_CARD_VISIBILITY: Record<CardId, boolean> = {
+  mainSlot: true,
+  liveStats: true,
+  scheduledEmails: true,
+  appointments: true,
+  highlights: true,
+  birthdays: true,
+};
+
+const CARD_LABELS: Record<CardId, string> = {
+  mainSlot: "Newsletter stats",
+  liveStats: "Live activity",
+  scheduledEmails: "Scheduled emails",
+  appointments: "Upcoming appointments",
+  highlights: "Highlights",
+  birthdays: "Upcoming birthdays",
 };
 
 function readCardOrder(): CardId[] {
@@ -120,6 +146,24 @@ function readCardSizes(): Record<CardId, number> {
     return result;
   } catch {
     return { ...DEFAULT_CARD_SIZES };
+  }
+}
+
+function readCardVisibility(): Record<CardId, boolean> {
+  if (typeof window === "undefined") return { ...DEFAULT_CARD_VISIBILITY };
+  try {
+    const raw = window.localStorage.getItem(CARD_VISIBILITY_KEY);
+    if (!raw) return { ...DEFAULT_CARD_VISIBILITY };
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return { ...DEFAULT_CARD_VISIBILITY };
+    const result: Record<CardId, boolean> = { ...DEFAULT_CARD_VISIBILITY };
+    for (const id of DEFAULT_CARD_ORDER) {
+      const val = (parsed as Record<string, unknown>)[id];
+      if (typeof val === "boolean") result[id] = val;
+    }
+    return result;
+  } catch {
+    return { ...DEFAULT_CARD_VISIBILITY };
   }
 }
 
@@ -345,6 +389,9 @@ export default function Dashboard() {
 
   const [cardOrder, setCardOrder] = useState<CardId[]>(readCardOrder);
   const [cardSizes, setCardSizes] = useState<Record<CardId, number>>(readCardSizes);
+  const [cardVisibility, setCardVisibility] = useState<Record<CardId, boolean>>(
+    readCardVisibility,
+  );
   const [activeCardId, setActiveCardId] = useState<CardId | null>(null);
   const [editMode, setEditMode] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -379,6 +426,17 @@ export default function Dashboard() {
         return next;
       });
     }
+
+    if (serverLayout.cardVisibility && typeof serverLayout.cardVisibility === "object") {
+      setCardVisibility((curr) => {
+        const next = { ...curr };
+        for (const id of DEFAULT_CARD_ORDER) {
+          const val = serverLayout.cardVisibility?.[id];
+          if (typeof val === "boolean") next[id] = val;
+        }
+        return next;
+      });
+    }
   }, [layoutFetched, serverLayout]);
 
   useEffect(() => {
@@ -397,11 +455,20 @@ export default function Dashboard() {
     }
   }, [cardSizes]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CARD_VISIBILITY_KEY, JSON.stringify(cardVisibility));
+    } catch {
+      /* ignore storage errors (private mode, quota) */
+    }
+  }, [cardVisibility]);
+
   // Baseline of the last layout we saved to the server. Used on "Done" to skip
   // the PATCH when nothing actually changed during the edit session.
   const savedLayoutRef = useRef<{
     cardOrder: CardId[];
     cardSizes: Record<CardId, number>;
+    cardVisibility: Record<CardId, boolean>;
   } | null>(null);
 
   useEffect(() => {
@@ -409,16 +476,22 @@ export default function Dashboard() {
     savedLayoutRef.current = {
       cardOrder: [...cardOrder],
       cardSizes: { ...cardSizes },
+      cardVisibility: { ...cardVisibility },
     };
-  }, [cardOrder, cardSizes]);
+  }, [cardOrder, cardSizes, cardVisibility]);
 
   const handleCardResize = (id: CardId, nextSpan: number) => {
     setCardSizes((curr) => (curr[id] === nextSpan ? curr : { ...curr, [id]: nextSpan }));
   };
 
+  const handleToggleCardVisibility = (id: CardId) => {
+    setCardVisibility((curr) => ({ ...curr, [id]: !curr[id] }));
+  };
+
   const handleResetLayout = () => {
     setCardOrder([...DEFAULT_CARD_ORDER]);
     setCardSizes({ ...DEFAULT_CARD_SIZES });
+    setCardVisibility({ ...DEFAULT_CARD_VISIBILITY });
   };
 
   const handleToggleEditMode = () => {
@@ -431,11 +504,17 @@ export default function Dashboard() {
       const sizesChanged =
         !saved ||
         DEFAULT_CARD_ORDER.some((id) => saved.cardSizes[id] !== cardSizes[id]);
-      if (orderChanged || sizesChanged) {
-        saveLayout({ cardOrder, cardSizes });
+      const visibilityChanged =
+        !saved ||
+        DEFAULT_CARD_ORDER.some(
+          (id) => saved.cardVisibility[id] !== cardVisibility[id],
+        );
+      if (orderChanged || sizesChanged || visibilityChanged) {
+        saveLayout({ cardOrder, cardSizes, cardVisibility });
         savedLayoutRef.current = {
           cardOrder: [...cardOrder],
           cardSizes: { ...cardSizes },
+          cardVisibility: { ...cardVisibility },
         };
       }
     }
@@ -596,6 +675,53 @@ export default function Dashboard() {
         {/* Layout edit-mode toggle */}
         <div className="flex items-center justify-end gap-2">
           {editMode && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Show or hide dashboard cards"
+                  title="Show or hide cards"
+                  className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-border/60 bg-card text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                  data-testid="dashboard-cards-visibility"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>Cards</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-3">
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-[0.12em] px-2 pb-1">
+                    Visible cards
+                  </p>
+                  {DEFAULT_CARD_ORDER.map((id) => {
+                    const visible = cardVisibility[id] ?? true;
+                    const visibleCount = DEFAULT_CARD_ORDER.filter(
+                      (cid) => cardVisibility[cid] ?? true,
+                    ).length;
+                    const disableOff = visible && visibleCount <= 1;
+                    return (
+                      <label
+                        key={id}
+                        className="flex items-center justify-between gap-3 px-2 py-1.5 rounded-md hover:bg-muted/40 cursor-pointer"
+                      >
+                        <span className="text-sm text-foreground truncate">
+                          {CARD_LABELS[id]}
+                        </span>
+                        <Switch
+                          checked={visible}
+                          disabled={disableOff}
+                          onCheckedChange={() => handleToggleCardVisibility(id)}
+                          aria-label={`Show ${CARD_LABELS[id]}`}
+                          data-testid={`dashboard-card-visibility-${id}`}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+          {editMode && (
             <button
               type="button"
               onClick={handleResetLayout}
@@ -747,6 +873,9 @@ export default function Dashboard() {
               highlights: { render: () => <HighlightsCard /> },
               birthdays: { render: () => <UpcomingBirthdaysCard /> },
             };
+            const visibleCardOrder = cardOrder.filter(
+              (id) => cardVisibility[id] ?? true,
+            );
             return (
               <DndContext
                 sensors={sensors}
@@ -755,12 +884,12 @@ export default function Dashboard() {
                 onDragEnd={handleDragEnd}
                 onDragCancel={handleDragCancel}
               >
-                <SortableContext items={cardOrder} strategy={rectSortingStrategy}>
+                <SortableContext items={visibleCardOrder} strategy={rectSortingStrategy}>
                   <div
                     ref={gridRef}
                     className="grid grid-cols-1 lg:grid-cols-12 gap-4"
                   >
-                    {cardOrder.map((id) => (
+                    {visibleCardOrder.map((id) => (
                       <SortableCard
                         key={id}
                         id={id}
