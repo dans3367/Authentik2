@@ -58,7 +58,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import ContactViewDrawer from "@/components/ContactViewDrawer";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NextUpAppointments } from "@/components/NextUpAppointments";
@@ -69,7 +68,7 @@ import {
   AppointmentStats,
   AppointmentFormDialog,
   AppointmentEditDialog,
-  AppointmentDetailsSheet,
+  AppointmentDetailsContainer,
   ReminderScheduleDialog,
   AppointmentCard,
 } from "@/components/appointments";
@@ -98,21 +97,6 @@ const STATUS_TRANSLATION_KEYS: Record<string, string> = {
   completed: 'reminders.appointments.completed',
   no_show: 'reminders.appointments.noShow',
 };
-
-interface AppointmentNote {
-  id: string;
-  appointmentId: string;
-  userId: string;
-  content: string;
-  createdAt: Date;
-  updatedAt: Date;
-  user?: {
-    id: string;
-    name: string;
-    firstName?: string;
-    lastName?: string;
-  };
-}
 
 export default function RemindersPage() {
   const { toast } = useToast();
@@ -158,30 +142,14 @@ export default function RemindersPage() {
   const [editingAppointment, setEditingAppointment] = useState<AppointmentWithCustomer | null>(null);
   const [viewAppointmentPanelOpen, setViewAppointmentPanelOpen] = useState(false);
   const [viewingAppointment, setViewingAppointment] = useState<AppointmentWithCustomer | null>(null);
-  const [customerProfilePanelOpen, setCustomerProfilePanelOpen] = useState(false);
   const [scheduleReminderModalOpen, setScheduleReminderModalOpen] = useState(false);
   const [scheduleReminderAppointment, setScheduleReminderAppointment] = useState<AppointmentWithCustomer | null>(null);
   const [cancelAppointmentId, setCancelAppointmentId] = useState<string>("");
   const [cancelConfirmModalOpen, setCancelConfirmModalOpen] = useState(false);
   const [pastDateConfirmModalOpen, setPastDateConfirmModalOpen] = useState(false);
 
-  // Notes state
-  const [newNoteContent, setNewNoteContent] = useState("");
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-  const [editingNoteContent, setEditingNoteContent] = useState("");
-
-  // Email dialog state
-  const [rescheduleEmailDialogOpen, setRescheduleEmailDialogOpen] = useState(false);
-  const [pendingStatusChange, setPendingStatusChange] = useState<{
-    appointmentId: string;
-    status: Appointment['status'];
-    updateLocal: boolean;
-  } | null>(null);
+  // Email dialog state (edit-flow thank-you only; view-flow dialogs live in AppointmentDetailsContainer)
   const [thankYouEmailDialogOpen, setThankYouEmailDialogOpen] = useState(false);
-  const [pendingCompletedChange, setPendingCompletedChange] = useState<{
-    appointmentId: string;
-    updateLocal: boolean;
-  } | null>(null);
   const [pendingEditCompleted, setPendingEditCompleted] = useState<{
     appointment: AppointmentWithCustomer;
     reminderEnabled: boolean;
@@ -274,21 +242,6 @@ export default function RemindersPage() {
     },
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-  });
-
-  const {
-    data: notesData,
-    isLoading: notesLoading,
-    refetch: refetchNotes
-  } = useQuery<{ notes: AppointmentNote[] }>({
-    queryKey: ['/api/appointment-notes', viewingAppointment?.id],
-    queryFn: async () => {
-      if (!viewingAppointment?.id) return { notes: [] };
-      const response = await apiRequest('GET', `/api/appointment-notes/${viewingAppointment.id}`);
-      return response.json();
-    },
-    enabled: !!viewingAppointment?.id,
-    staleTime: 1 * 60 * 1000,
   });
 
   // Derived data
@@ -457,51 +410,6 @@ export default function RemindersPage() {
     }
   });
 
-  const createNoteMutation = useMutation({
-    mutationFn: async ({ appointmentId, content }: { appointmentId: string; content: string }) => {
-      const response = await apiRequest('POST', '/api/appointment-notes', { appointmentId, content });
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({ title: t('reminders.toasts.success'), description: 'Note added successfully' });
-      setNewNoteContent("");
-      refetchNotes();
-    },
-    onError: (error: any) => {
-      toast({ title: t('reminders.toasts.error'), description: error?.message || 'Failed to add note', variant: 'destructive' });
-    }
-  });
-
-  const updateNoteMutation = useMutation({
-    mutationFn: async ({ noteId, content }: { noteId: string; content: string }) => {
-      const response = await apiRequest('PATCH', `/api/appointment-notes/${noteId}`, { content });
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({ title: t('reminders.toasts.success'), description: 'Note updated successfully' });
-      setEditingNoteId(null);
-      setEditingNoteContent("");
-      refetchNotes();
-    },
-    onError: (error: any) => {
-      toast({ title: t('reminders.toasts.error'), description: error?.message || 'Failed to update note', variant: 'destructive' });
-    }
-  });
-
-  const deleteNoteMutation = useMutation({
-    mutationFn: async (noteId: string) => {
-      const response = await apiRequest('DELETE', `/api/appointment-notes/${noteId}`);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({ title: t('reminders.toasts.success'), description: 'Note deleted successfully' });
-      refetchNotes();
-    },
-    onError: (error: any) => {
-      toast({ title: t('reminders.toasts.error'), description: error?.message || 'Failed to delete note', variant: 'destructive' });
-    }
-  });
-
   const updateAppointmentMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Appointment> }) => {
       const response = await apiRequest('PATCH', `/api/appointments/${id}`, data);
@@ -526,15 +434,6 @@ export default function RemindersPage() {
     onError: (error: any) => {
       toast({ title: t('reminders.toasts.error'), description: error?.message || t('reminders.toasts.appointmentUpdateError'), variant: "destructive" });
     },
-  });
-
-  const sendRescheduleEmailMutation = useMutation({
-    mutationFn: async (appointmentId: string) => {
-      const response = await apiRequest("POST", `/api/appointments/${appointmentId}/send-reschedule-email`);
-      return response.json();
-    },
-    onSuccess: () => { toast({ title: "Email Sent", description: "Reschedule invitation email sent to customer" }); },
-    onError: (error: any) => { toast({ title: t("reminders.toasts.error"), description: error.message || "Failed to send reschedule email", variant: "destructive" }); },
   });
 
   const sendThankYouEmailMutation = useMutation({
@@ -851,112 +750,47 @@ export default function RemindersPage() {
     createScheduledReminderMutation.mutate({ appointmentId, data });
   };
 
-  const handleStatusChange = (appointmentId: string, status: Appointment['status']) => {
-    if (status === 'cancelled' || status === 'no_show') {
-      setPendingStatusChange({ appointmentId, status, updateLocal: true });
-      setRescheduleEmailDialogOpen(true);
-      return;
-    }
-    if (status === 'completed') {
-      setPendingCompletedChange({ appointmentId, updateLocal: true });
-      setThankYouEmailDialogOpen(true);
-      return;
-    }
-    updateAppointmentMutation.mutate(
-      { id: appointmentId, data: { status } },
-      { onSuccess: (data: any) => {
-        if (data?.appointment) setViewingAppointment(prev => prev ? { ...prev, ...data.appointment } : null);
-        else setViewingAppointment(prev => prev ? { ...prev, status } : null);
-      }}
-    );
-  };
-
-  const handleRescheduleEmailConfirm = (sendEmail: boolean) => {
-    if (!pendingStatusChange) return;
-    const { appointmentId, status, updateLocal } = pendingStatusChange;
-    updateAppointmentMutation.mutate(
-      { id: appointmentId, data: { status } },
-      {
-        onSuccess: (data: any) => {
-          if (updateLocal) {
-            if (data?.appointment) setViewingAppointment(prev => prev ? { ...prev, ...data.appointment } : null);
-            else setViewingAppointment(prev => prev ? { ...prev, status } : null);
-          }
-          if (sendEmail) sendRescheduleEmailMutation.mutate(appointmentId);
-          setRescheduleEmailDialogOpen(false);
-          setPendingStatusChange(null);
-        }
-      }
-    );
-  };
-
   const handleThankYouEmailConfirm = (sendEmail: boolean) => {
-    // Handle edit-dialog completed flow
-    if (pendingEditCompleted) {
-      const { appointment, reminderEnabled, reminderData: editReminderData } = pendingEditCompleted;
-      updateAppointmentMutation.mutate(
-        { id: appointment.id, data: {
-          title: appointment.title,
-          description: appointment.description,
-          appointmentDate: appointment.appointmentDate,
-          duration: appointment.duration,
-          location: appointment.location,
-          serviceType: appointment.serviceType,
-          status: 'completed',
-          notes: appointment.notes,
-        }},
-        {
-          onSuccess: (data: any) => {
-            if (sendEmail) sendThankYouEmailMutation.mutate(appointment.id);
-            // Handle reminder from edit dialog
-            const existingReminder = reminders.find(r => r.appointmentId === appointment.id && r.status === 'pending');
-            if (reminderEnabled) {
-              const appointmentDate = new Date(appointment.appointmentDate);
-              let scheduledFor: Date;
-              if (editReminderData.reminderTiming === 'custom' && editReminderData.customMinutesBefore) {
-                scheduledFor = new Date(appointmentDate.getTime() - editReminderData.customMinutesBefore * 60 * 1000);
-              } else {
-                const minutes = TIMING_MAP[editReminderData.reminderTiming] || 60;
-                scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
-              }
-              if (existingReminder) deleteReminderMutation.mutate(existingReminder.id);
-              createScheduledReminderMutation.mutate({
-                appointmentId: appointment.id,
-                data: { reminderType: editReminderData.reminderType, reminderTiming: editReminderData.reminderTiming, customMinutesBefore: editReminderData.customMinutesBefore, scheduledFor, timezone: editReminderData.timezone, content: editReminderData.content },
-              });
-            } else if (existingReminder) {
-              deleteReminderMutation.mutate(existingReminder.id);
-            }
-            setThankYouEmailDialogOpen(false);
-            setPendingEditCompleted(null);
-          },
-          onError: () => {
-            setThankYouEmailDialogOpen(false);
-            setPendingEditCompleted(null);
-          }
-        }
-      );
-      return;
-    }
-
-    // Handle details-sheet status-only change
-    if (!pendingCompletedChange) return;
-    const { appointmentId, updateLocal } = pendingCompletedChange;
+    if (!pendingEditCompleted) return;
+    const { appointment, reminderEnabled, reminderData: editReminderData } = pendingEditCompleted;
     updateAppointmentMutation.mutate(
-      { id: appointmentId, data: { status: 'completed' } },
+      { id: appointment.id, data: {
+        title: appointment.title,
+        description: appointment.description,
+        appointmentDate: appointment.appointmentDate,
+        duration: appointment.duration,
+        location: appointment.location,
+        serviceType: appointment.serviceType,
+        status: 'completed',
+        notes: appointment.notes,
+      }},
       {
-        onSuccess: (data: any) => {
-          if (updateLocal) {
-            if (data?.appointment) setViewingAppointment(prev => prev ? { ...prev, ...data.appointment } : null);
-            else setViewingAppointment(prev => prev ? { ...prev, status: 'completed' } : null);
+        onSuccess: () => {
+          if (sendEmail) sendThankYouEmailMutation.mutate(appointment.id);
+          const existingReminder = reminders.find(r => r.appointmentId === appointment.id && r.status === 'pending');
+          if (reminderEnabled) {
+            const appointmentDate = new Date(appointment.appointmentDate);
+            let scheduledFor: Date;
+            if (editReminderData.reminderTiming === 'custom' && editReminderData.customMinutesBefore) {
+              scheduledFor = new Date(appointmentDate.getTime() - editReminderData.customMinutesBefore * 60 * 1000);
+            } else {
+              const minutes = TIMING_MAP[editReminderData.reminderTiming] || 60;
+              scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
+            }
+            if (existingReminder) deleteReminderMutation.mutate(existingReminder.id);
+            createScheduledReminderMutation.mutate({
+              appointmentId: appointment.id,
+              data: { reminderType: editReminderData.reminderType, reminderTiming: editReminderData.reminderTiming, customMinutesBefore: editReminderData.customMinutesBefore, scheduledFor, timezone: editReminderData.timezone, content: editReminderData.content },
+            });
+          } else if (existingReminder) {
+            deleteReminderMutation.mutate(existingReminder.id);
           }
-          if (sendEmail) sendThankYouEmailMutation.mutate(appointmentId);
           setThankYouEmailDialogOpen(false);
-          setPendingCompletedChange(null);
+          setPendingEditCompleted(null);
         },
         onError: () => {
           setThankYouEmailDialogOpen(false);
-          setPendingCompletedChange(null);
+          setPendingEditCompleted(null);
         }
       }
     );
@@ -1655,66 +1489,17 @@ export default function RemindersPage() {
           </DialogContent>
         </Dialog>
 
-        {/* View Appointment Sheet */}
-        <AppointmentDetailsSheet
+        {/* View Appointment Details */}
+        <AppointmentDetailsContainer
+          appointment={viewingAppointment}
           open={viewAppointmentPanelOpen}
           onOpenChange={setViewAppointmentPanelOpen}
-          appointment={viewingAppointment}
-          reminders={reminders}
-          notes={notesData?.notes || []}
-          notesLoading={notesLoading}
-          onEdit={(apt) => { setViewAppointmentPanelOpen(false); handleEditAppointment(apt); }}
-          onStatusChange={handleStatusChange}
-          onViewCustomerProfile={() => setCustomerProfilePanelOpen(true)}
+          onEdit={(apt) => handleEditAppointment(apt)}
           onCreateNewAppointment={handleCreateNewFromPast}
-          onSendReminder={(id) => sendReminderMutation.mutate({ appointmentIds: [id], reminderType: 'email' })}
-          isSendingReminder={sendReminderMutation.isPending}
-          newNoteContent={newNoteContent}
-          onNewNoteContentChange={setNewNoteContent}
-          onCreateNote={() => {
-            if (newNoteContent.trim() && viewingAppointment?.id) {
-              createNoteMutation.mutate({ appointmentId: viewingAppointment.id, content: newNoteContent.trim() });
-            }
-          }}
-          isCreatingNote={createNoteMutation.isPending}
-          editingNoteId={editingNoteId}
-          editingNoteContent={editingNoteContent}
-          onEditNote={(noteId, content) => { setEditingNoteId(noteId); setEditingNoteContent(content); }}
-          onUpdateNote={() => {
-            if (editingNoteContent.trim() && editingNoteId) {
-              updateNoteMutation.mutate({ noteId: editingNoteId, content: editingNoteContent.trim() });
-            }
-          }}
-          isUpdatingNote={updateNoteMutation.isPending}
-          onCancelEditNote={() => { setEditingNoteId(null); setEditingNoteContent(""); }}
-          onDeleteNote={(noteId) => deleteNoteMutation.mutate(noteId)}
-          isDeletingNote={deleteNoteMutation.isPending}
+          onAppointmentChange={(apt) => setViewingAppointment(apt)}
         />
 
-        {/* Reschedule Email Confirmation */}
-        <AlertDialog open={rescheduleEmailDialogOpen} onOpenChange={setRescheduleEmailDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5 text-amber-500" />Send Reschedule Invitation?
-              </AlertDialogTitle>
-              <AlertDialogDescription className="space-y-2">
-                <p>Would you like to send a friendly email to the customer inviting them to reschedule their appointment?</p>
-                <p className="text-sm text-muted-foreground">The email will include the original appointment details and encourage them to book a new time.</p>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-              <AlertDialogCancel onClick={() => handleRescheduleEmailConfirm(false)} disabled={updateAppointmentMutation.isPending}>
-                No, Just Update Status
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={() => handleRescheduleEmailConfirm(true)} disabled={updateAppointmentMutation.isPending || sendRescheduleEmailMutation.isPending} className="bg-amber-500 hover:bg-amber-600">
-                <Send className="h-4 w-4 mr-2" />Yes, Send Email
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Thank-You Email Confirmation */}
+        {/* Thank-You Email Confirmation (edit-flow) */}
         <AlertDialog open={thankYouEmailDialogOpen} onOpenChange={setThankYouEmailDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -1737,12 +1522,6 @@ export default function RemindersPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Customer Profile Drawer */}
-        <ContactViewDrawer
-          contactId={viewingAppointment?.customer?.id || null}
-          open={customerProfilePanelOpen}
-          onOpenChange={setCustomerProfilePanelOpen}
-        />
       </div>
     </div>
   );

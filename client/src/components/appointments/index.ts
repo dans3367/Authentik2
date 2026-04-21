@@ -9,6 +9,8 @@ export type { ScheduleReminderData } from './ReminderScheduleDialog';
 
 export { AppointmentDetailsSheet } from './AppointmentDetailsSheet';
 
+export { AppointmentDetailsContainer } from './AppointmentDetailsContainer';
+
 export { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
 export { AppointmentCard } from './AppointmentCard';

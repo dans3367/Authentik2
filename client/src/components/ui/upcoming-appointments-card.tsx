@@ -3,50 +3,24 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAppSelector } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
-import {
   Calendar,
-  Clock,
-  MapPin,
-  User,
-  Mail,
-  Timer,
   CalendarPlus,
   CalendarDays,
   Plus,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
+import { AppointmentDetailsContainer } from "@/components/appointments";
+import type { AppointmentWithCustomer } from "@/utils/appointment-utils";
 
-interface AppointmentCustomer {
-  id: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-}
-
-interface Appointment {
-  id: string;
-  title: string;
-  description?: string;
-  appointmentDate: Date;
-  duration?: number;
-  location?: string;
-  status: "scheduled" | "confirmed" | "cancelled" | "completed" | "no_show";
-  customer?: AppointmentCustomer;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-type StatusKey = Appointment["status"];
+type StatusKey =
+  | "scheduled"
+  | "confirmed"
+  | "cancelled"
+  | "completed"
+  | "no_show";
 
 const STATUS_DOT: Record<StatusKey, string> = {
   scheduled: "border-[color:var(--accent-coral)]",
@@ -69,10 +43,10 @@ export function UpcomingAppointmentsCard() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
   const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithCustomer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  const { data: appointmentsData, isLoading } = useQuery<{ appointments: Appointment[] }>({
+  const { data: appointmentsData, isLoading } = useQuery<{ appointments: AppointmentWithCustomer[] }>({
     queryKey: ["/api/appointments/upcoming-dashboard", { shopId: selectedShopId }],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/appointments");
@@ -96,7 +70,7 @@ export function UpcomingAppointmentsCard() {
   }, [appointments]);
 
   const dayGroups = useMemo(() => {
-    const groups = new Map<string, { date: Date; items: Appointment[] }>();
+    const groups = new Map<string, { date: Date; items: AppointmentWithCustomer[] }>();
     for (const a of upcomingAppointments) {
       const d = new Date(a.appointmentDate);
       const key = d.toDateString();
@@ -106,7 +80,7 @@ export function UpcomingAppointmentsCard() {
     return Array.from(groups.values());
   }, [upcomingAppointments]);
 
-  const getCustomerName = (customer?: AppointmentCustomer) => {
+  const getCustomerName = (customer?: AppointmentWithCustomer["customer"]) => {
     if (!customer) return t("dashboard.appointments.unknownCustomer");
     if (customer.firstName && customer.lastName) return `${customer.firstName} ${customer.lastName}`;
     if (customer.firstName) return customer.firstName;
@@ -129,18 +103,7 @@ export function UpcomingAppointmentsCard() {
     return { hm: hm.trim(), ap };
   };
 
-  const formatFullDateTime = (date: Date) =>
-    new Intl.DateTimeFormat("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date(date));
-
-  const formatDuration = (minutes?: number) => {
+  const formatDuration = (minutes?: number | null) => {
     if (!minutes) return null;
     if (minutes < 60) return `${minutes}m`;
     const h = Math.floor(minutes / 60);
@@ -166,7 +129,7 @@ export function UpcomingAppointmentsCard() {
       .format(date)
       .replace(",", " ·");
 
-  const handleViewAppointment = (appointment: Appointment) => {
+  const handleViewAppointment = (appointment: AppointmentWithCustomer) => {
     setSelectedAppointment(appointment);
     setDetailsOpen(true);
   };
@@ -249,8 +212,9 @@ export function UpcomingAppointmentsCard() {
                   <div className="absolute left-[52px] top-3 bottom-3 w-px bg-border/70" />
                   {group.items.map((appointment) => {
                     const { hm, ap } = formatTime(appointment.appointmentDate);
-                    const dot = STATUS_DOT[appointment.status] ?? STATUS_DOT.scheduled;
-                    const badge = STATUS_BADGE[appointment.status] ?? STATUS_BADGE.scheduled;
+                    const statusKey = appointment.status as StatusKey;
+                    const dot = STATUS_DOT[statusKey] ?? STATUS_DOT.scheduled;
+                    const badge = STATUS_BADGE[statusKey] ?? STATUS_BADGE.scheduled;
                     const duration = formatDuration(appointment.duration);
                     const customerName = getCustomerName(appointment.customer);
 
@@ -318,108 +282,11 @@ export function UpcomingAppointmentsCard() {
         </button>
       </CardContent>
 
-      <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          {selectedAppointment && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Calendar className="h-4 w-4 text-primary" />
-                  </div>
-                  {t("dashboard.appointments.detailsTitle")}
-                </SheetTitle>
-                <SheetDescription>{t("dashboard.appointments.detailsDescription")}</SheetDescription>
-              </SheetHeader>
-
-              <div className="mt-6 space-y-5">
-                <div className="space-y-2.5">
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <User className="h-3.5 w-3.5" />
-                    {t("dashboard.appointments.customer")}
-                  </h3>
-                  <div className="bg-muted/40 p-4 rounded-xl space-y-2.5">
-                    <div>
-                      <p className="text-[11px] text-muted-foreground mb-0.5">{t("dashboard.appointments.name")}</p>
-                      <p className="font-semibold text-sm text-foreground">{getCustomerName(selectedAppointment.customer)}</p>
-                    </div>
-                    {selectedAppointment.customer?.email && (
-                      <div>
-                        <p className="text-[11px] text-muted-foreground mb-0.5">{t("dashboard.appointments.email")}</p>
-                        <p className="text-sm flex items-center gap-1.5 text-foreground">
-                          <Mail className="h-3 w-3 text-muted-foreground" />
-                          {selectedAppointment.customer.email}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2.5">
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {t("dashboard.appointments.details")}
-                  </h3>
-                  <div className="bg-muted/40 p-4 rounded-xl space-y-3">
-                    <div>
-                      <p className="text-[11px] text-muted-foreground mb-0.5">{t("dashboard.appointments.title_label")}</p>
-                      <p className="font-semibold text-sm text-foreground">{selectedAppointment.title}</p>
-                    </div>
-                    {selectedAppointment.description && (
-                      <div>
-                        <p className="text-[11px] text-muted-foreground mb-0.5">{t("dashboard.appointments.description_label")}</p>
-                        <p className="text-sm text-foreground">{selectedAppointment.description}</p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-[11px] text-muted-foreground mb-0.5">{t("dashboard.appointments.dateTime")}</p>
-                      <p className="text-sm font-medium flex items-center gap-1.5 text-foreground">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        {formatFullDateTime(selectedAppointment.appointmentDate)}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {selectedAppointment.duration && (
-                        <div>
-                          <p className="text-[11px] text-muted-foreground mb-0.5">{t("dashboard.appointments.duration")}</p>
-                          <p className="text-sm flex items-center gap-1.5 text-foreground">
-                            <Timer className="h-3 w-3 text-muted-foreground" />
-                            {t("dashboard.appointments.durationMin", { count: selectedAppointment.duration })}
-                          </p>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-[11px] text-muted-foreground mb-0.5">{t("dashboard.appointments.status")}</p>
-                        <Badge className={STATUS_BADGE[selectedAppointment.status] ?? STATUS_BADGE.scheduled}>
-                          {t(`dashboard.appointments.status_${selectedAppointment.status}`)}
-                        </Badge>
-                      </div>
-                    </div>
-                    {selectedAppointment.location && (
-                      <div>
-                        <p className="text-[11px] text-muted-foreground mb-0.5">{t("dashboard.appointments.location")}</p>
-                        <p className="text-sm flex items-center gap-1.5 text-foreground">
-                          <MapPin className="h-3 w-3 text-muted-foreground" />
-                          {selectedAppointment.location}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-4 border-t">
-                  <Button className="flex-1" onClick={() => { setDetailsOpen(false); setLocation("/reminders"); }}>
-                    {t("dashboard.appointments.viewFullDetails")}
-                  </Button>
-                  <Button variant="outline" onClick={() => setDetailsOpen(false)}>
-                    {t("dashboard.appointments.close")}
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+      <AppointmentDetailsContainer
+        appointment={selectedAppointment}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+      />
     </Card>
   );
 }

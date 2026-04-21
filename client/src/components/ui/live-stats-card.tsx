@@ -163,10 +163,9 @@ export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
     }
   }, [paused]);
 
-  // Frozen snapshot of the live data. Captured continuously when running;
-  // when paused, we stop refreshing it so the UI freezes. The snapshot is
-  // still populated on mount even if pause is active, so a page refresh
-  // always shows the latest data (then holds).
+  // Frozen snapshot captured only while paused. When running, we read the
+  // live values directly. On mount with pause active, we capture the first
+  // ready snapshot so a refresh still shows data (then holds).
   type Frozen = {
     activeItems: typeof liveActiveItems;
     recentEvents: typeof liveRecentEvents;
@@ -174,14 +173,17 @@ export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
   const [frozen, setFrozen] = useState<Frozen | null>(null);
 
   useEffect(() => {
-    if (liveActiveItems === undefined || liveRecentEvents === undefined) return;
-    if (!paused || frozen === null) {
-      setFrozen({ activeItems: liveActiveItems, recentEvents: liveRecentEvents });
+    if (!paused) {
+      if (frozen !== null) setFrozen(null);
+      return;
     }
-  }, [paused, liveActiveItems, liveRecentEvents, frozen]);
+    if (frozen !== null) return;
+    if (liveActiveItems === undefined || liveRecentEvents === undefined) return;
+    setFrozen({ activeItems: liveActiveItems, recentEvents: liveRecentEvents });
+  }, [paused, frozen, liveActiveItems, liveRecentEvents]);
 
-  const activeItems = paused ? frozen?.activeItems : liveActiveItems;
-  const recentEvents = paused ? frozen?.recentEvents : liveRecentEvents;
+  const activeItems = paused ? (frozen?.activeItems ?? liveActiveItems) : liveActiveItems;
+  const recentEvents = paused ? (frozen?.recentEvents ?? liveRecentEvents) : liveRecentEvents;
 
   const titleByNewsletter = useMemo(() => {
     const map = new Map<string, string>();

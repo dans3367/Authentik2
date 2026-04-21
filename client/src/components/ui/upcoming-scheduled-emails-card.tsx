@@ -121,13 +121,6 @@ export function UpcomingScheduledEmailsCard() {
   const formatDate = (dateStr: string) =>
     new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(dateStr));
 
-  const getDayLabel = (dateStr: string) => {
-    const days = getDaysUntil(dateStr);
-    if (days === 0) return t("dashboard.scheduledEmails.today");
-    if (days === 1) return t("dashboard.scheduledEmails.tomorrow");
-    return t("dashboard.scheduledEmails.inDays", { count: days });
-  };
-
   if (isLoading) {
     return (
       <Card className="h-full rounded-2xl border-border/50">
@@ -207,62 +200,79 @@ export function UpcomingScheduledEmailsCard() {
               </span>
             </div>
 
-            {/* Horizontal card layout for full-width */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2.5">
+            <ul className="flex flex-col gap-1.5">
               {scheduled.map((email, index) => {
                 const days = getDaysUntil(email.scheduledAt);
                 const isToday = days === 0;
                 const config = statusConfig[email.status] || statusConfig.pending;
+                const clickable = !!email.contactId;
 
                 return (
-                  <div
-                    key={email.id}
-                    onClick={() => email.contactId ? setLocation(`/email-contacts/view/${email.contactId}/scheduled`) : undefined}
-                    className={`group flex flex-col p-4 rounded-xl transition-all duration-200 ${
-                      email.contactId ? "cursor-pointer" : ""
-                    } ${
-                      isToday
-                        ? "bg-gradient-to-b from-cyan-500/[0.06] to-blue-500/[0.03] dark:from-cyan-500/10 dark:to-blue-500/[0.05] border border-cyan-200/40 dark:border-cyan-500/15 hover:shadow-md"
-                        : "bg-muted/20 hover:bg-muted/40 border border-border/30 hover:border-border/60"
-                    }`}
-                  >
-                    {/* Top: Avatar + Status */}
-                    <div className="flex items-center justify-between mb-3">
+                  <li key={email.id}>
+                    <button
+                      type="button"
+                      disabled={!clickable}
+                      onClick={() =>
+                        clickable &&
+                        setLocation(`/email-contacts/view/${email.contactId}/scheduled`)
+                      }
+                      className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                        clickable ? "cursor-pointer" : "cursor-default"
+                      } ${
+                        isToday
+                          ? "bg-gradient-to-r from-cyan-500/[0.06] to-transparent dark:from-cyan-500/10 border-cyan-200/40 dark:border-cyan-500/15 hover:from-cyan-500/[0.1]"
+                          : "bg-muted/20 border-border/30 hover:bg-muted/40 hover:border-border/60"
+                      }`}
+                    >
                       <div
-                        className={`w-8 h-8 rounded-lg bg-gradient-to-br ${avatarColors[index % avatarColors.length]} flex items-center justify-center shadow-sm`}
+                        className={`shrink-0 w-9 h-9 rounded-lg bg-gradient-to-br ${avatarColors[index % avatarColors.length]} flex items-center justify-center shadow-sm`}
                       >
-                        <span className="text-white text-[10px] font-bold">{getInitials(email)}</span>
+                        <span className="text-white text-[11px] font-bold">
+                          {getInitials(email)}
+                        </span>
                       </div>
-                      <Badge className={`${config.color} text-[9px] px-1.5 py-0 h-[18px] rounded-md capitalize border-0 font-semibold`}>
-                        <span className={`w-1 h-1 rounded-full ${config.dot} mr-1`} />
-                        {t(`dashboard.scheduledEmails.${email.status}`)}
-                      </Badge>
-                    </div>
 
-                    {/* Subject */}
-                    <p className="text-sm font-semibold text-foreground/90 truncate leading-tight mb-1">
-                      {email.subject || t("dashboard.scheduledEmails.noSubject", "No subject")}
-                    </p>
-
-                    {/* Recipient */}
-                    <p className="text-[11px] text-muted-foreground/50 truncate mb-3">
-                      {getContactName(email)}
-                    </p>
-
-                    {/* Bottom: Time */}
-                    <div className="mt-auto pt-2.5 border-t border-border/30 flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-                        <Clock className="h-3 w-3" />
-                        <span className="font-medium">{formatTime(email.scheduledAt)}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="text-sm font-semibold text-foreground/90 truncate leading-tight">
+                            {email.subject ||
+                              t("dashboard.scheduledEmails.noSubject", "No subject")}
+                          </p>
+                          <Badge
+                            className={`${config.color} shrink-0 text-[9px] px-1.5 py-0 h-[18px] rounded-md capitalize border-0 font-semibold`}
+                          >
+                            <span
+                              className={`w-1 h-1 rounded-full ${config.dot} mr-1`}
+                            />
+                            {t(`dashboard.scheduledEmails.${email.status}`)}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground/60 truncate mt-0.5">
+                          {getContactName(email)}
+                        </p>
                       </div>
-                      <span className={`text-[10px] font-semibold ${isToday ? "text-cyan-600 dark:text-cyan-400" : "text-muted-foreground/40"}`}>
-                        {getDayLabel(email.scheduledAt)}
-                      </span>
-                    </div>
-                  </div>
+
+                      <div className="shrink-0 flex flex-col items-end gap-0.5 font-mono">
+                        <span
+                          className={`text-[11px] font-semibold leading-none ${
+                            isToday
+                              ? "text-cyan-600 dark:text-cyan-400"
+                              : "text-foreground/70"
+                          }`}
+                        >
+                          {formatTime(email.scheduledAt)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground/50 leading-none">
+                          {isToday
+                            ? t("dashboard.scheduledEmails.today")
+                            : formatDate(email.scheduledAt)}
+                        </span>
+                      </div>
+                    </button>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
 
             <Button
               variant="outline"
