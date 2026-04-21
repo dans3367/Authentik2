@@ -49,6 +49,7 @@ interface AppointmentFormDialogProps {
   onSubmit: (data: NewAppointmentData, reminderEnabled: boolean, reminderData: ReminderData) => void;
   isSubmitting: boolean;
   validateEmailReminder: (email: string) => Promise<string | null>;
+  hideTrigger?: boolean;
 }
 
 export function AppointmentFormDialog({
@@ -59,6 +60,7 @@ export function AppointmentFormDialog({
   onSubmit,
   isSubmitting,
   validateEmailReminder,
+  hideTrigger = false,
 }: AppointmentFormDialogProps) {
   const { t } = useTranslation();
 
@@ -186,12 +188,14 @@ export function AppointmentFormDialog({
   return (
   <>
   <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogTrigger asChild>
-      <Button>
-        <CalendarPlus className="h-4 w-4 mr-2" />
-        {t('reminders.appointments.newAppointment')}
-      </Button>
-    </DialogTrigger>
+    {!hideTrigger && (
+      <DialogTrigger asChild>
+        <Button>
+          <CalendarPlus className="h-4 w-4 mr-2" />
+          {t('reminders.appointments.newAppointment')}
+        </Button>
+      </DialogTrigger>
+    )}
     <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
       <DialogHeader>
         <DialogTitle>{t('reminders.appointments.createAppointment')}</DialogTitle>

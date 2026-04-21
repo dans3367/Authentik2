@@ -10,9 +10,12 @@ import {
   CalendarDays,
   Plus,
 } from "lucide-react";
-import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { AppointmentDetailsContainer } from "@/components/appointments";
+import {
+  AppointmentDetailsContainer,
+  CreateAppointmentDialog,
+} from "@/components/appointments";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AppointmentWithCustomer } from "@/utils/appointment-utils";
 
 type StatusKey =
@@ -40,14 +43,14 @@ const STATUS_BADGE: Record<StatusKey, string> = {
 };
 
 export function UpcomingAppointmentsCard() {
-  const [, setLocation] = useLocation();
   const { t } = useTranslation();
   const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithCustomer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data: appointmentsData, isLoading } = useQuery<{ appointments: AppointmentWithCustomer[] }>({
-    queryKey: ["/api/appointments/upcoming-dashboard", { shopId: selectedShopId }],
+    queryKey: ["/api/appointments", "upcoming-dashboard", { shopId: selectedShopId }],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/appointments");
       return response.json();
@@ -208,34 +211,49 @@ export function UpcomingAppointmentsCard() {
                   </span>
                 </div>
 
-                <div className="relative pl-[72px] pr-5 pb-3 pt-1">
-                  <div className="absolute left-[52px] top-3 bottom-3 w-px bg-border/70" />
-                  {group.items.map((appointment) => {
+                <div className="pt-1 pb-3">
+                  {group.items.map((appointment, idx) => {
                     const { hm, ap } = formatTime(appointment.appointmentDate);
                     const statusKey = appointment.status as StatusKey;
                     const dot = STATUS_DOT[statusKey] ?? STATUS_DOT.scheduled;
                     const badge = STATUS_BADGE[statusKey] ?? STATUS_BADGE.scheduled;
                     const duration = formatDuration(appointment.duration);
                     const customerName = getCustomerName(appointment.customer);
+                    const isFirst = idx === 0;
+                    const isLast = idx === group.items.length - 1;
 
                     return (
                       <button
                         key={appointment.id}
                         type="button"
-                        className="relative w-full text-left grid grid-cols-[1fr_auto] gap-3 items-center rounded-lg border border-transparent hover:bg-muted/40 hover:border-border/60 transition-colors px-3 py-2.5 mb-1"
+                        className="relative w-full text-left flex items-center gap-4 px-5 py-2.5 hover:bg-muted/40 transition-colors"
                         onClick={() => handleViewAppointment(appointment)}
                         aria-label={`View appointment: ${appointment.title}`}
                       >
-                        <span
-                          className={`absolute -left-[24px] top-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full bg-card border-2 ${dot}`}
-                          aria-hidden
-                        />
-                        <span className="absolute -left-[72px] top-1/2 -translate-y-1/2 w-11 text-right font-mono leading-tight">
+                        {!isFirst && (
+                          <span
+                            className="absolute left-[84px] top-0 h-1/2 w-px bg-border"
+                            aria-hidden
+                          />
+                        )}
+                        {!isLast && (
+                          <span
+                            className="absolute left-[84px] top-1/2 h-1/2 w-px bg-border"
+                            aria-hidden
+                          />
+                        )}
+
+                        <span className="w-11 font-mono leading-tight text-right flex-none">
                           <span className="block text-xs text-foreground/80">{hm}</span>
                           <span className="block text-[10px] text-muted-foreground/70">{ap}</span>
                         </span>
 
-                        <span className="min-w-0">
+                        <span
+                          className={`relative w-[9px] h-[9px] rounded-full bg-card border-2 ${dot} flex-none z-[1]`}
+                          aria-hidden
+                        />
+
+                        <span className="flex-1 min-w-0">
                           <span className="block text-sm font-semibold tracking-tight truncate">
                             {appointment.title}
                           </span>
@@ -264,28 +282,43 @@ export function UpcomingAppointmentsCard() {
           </div>
         )}
 
-        <button
-          type="button"
-          className="flex items-center justify-between gap-2 px-5 py-3 mt-auto border-t border-border/40 hover:bg-muted/40 transition-colors"
-          onClick={() => setLocation("/reminders")}
-          data-testid="button-schedule-appointment"
-        >
-          <span className="flex items-center gap-2.5">
-            <span className="w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
-              <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-            </span>
-            <span className="text-sm font-semibold">
-              {t("dashboard.appointments.scheduleNew")}
-            </span>
-          </span>
-          <CalendarPlus className="h-4 w-4 text-muted-foreground/60" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center justify-between gap-2 px-5 py-3 mt-auto border-t border-border/40 hover:bg-muted/40 transition-colors"
+              onClick={() => setCreateOpen(true)}
+              data-testid="button-schedule-appointment"
+            >
+              <span className="flex items-center gap-2.5">
+                <span className="w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
+                  <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                </span>
+                <span className="text-sm font-semibold">
+                  {t("dashboard.appointments.scheduleNew")}
+                </span>
+              </span>
+              <CalendarPlus className="h-4 w-4 text-muted-foreground/60" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="center">
+            {t("dashboard.appointments.scheduleNewTooltip", {
+              defaultValue: "Create a new appointment",
+            })}
+          </TooltipContent>
+        </Tooltip>
       </CardContent>
 
       <AppointmentDetailsContainer
         appointment={selectedAppointment}
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
+      />
+
+      <CreateAppointmentDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        hideTrigger
       />
     </Card>
   );

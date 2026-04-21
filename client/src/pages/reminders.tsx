@@ -30,7 +30,6 @@ import {
   Send,
   MoreVertical,
   CalendarPlus,
-  AlertTriangle,
   MapPin,
   Timer,
   LayoutDashboard,
@@ -47,7 +46,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,13 +64,12 @@ import { NextUpAppointments } from "@/components/NextUpAppointments";
 import {
   DeleteConfirmDialog,
   AppointmentStats,
-  AppointmentFormDialog,
   AppointmentEditDialog,
   AppointmentDetailsContainer,
   ReminderScheduleDialog,
   AppointmentCard,
+  CreateAppointmentDialog,
 } from "@/components/appointments";
-import type { NewAppointmentData, ReminderData } from "@/components/appointments";
 import type { EditReminderData } from "@/components/appointments";
 import type { ScheduleReminderData } from "@/components/appointments";
 
@@ -146,7 +143,6 @@ export default function RemindersPage() {
   const [scheduleReminderAppointment, setScheduleReminderAppointment] = useState<AppointmentWithCustomer | null>(null);
   const [cancelAppointmentId, setCancelAppointmentId] = useState<string>("");
   const [cancelConfirmModalOpen, setCancelConfirmModalOpen] = useState(false);
-  const [pastDateConfirmModalOpen, setPastDateConfirmModalOpen] = useState(false);
 
   // Email dialog state (edit-flow thank-you only; view-flow dialogs live in AppointmentDetailsContainer)
   const [thankYouEmailDialogOpen, setThankYouEmailDialogOpen] = useState(false);
@@ -160,9 +156,6 @@ export default function RemindersPage() {
   const [pendingAppointmentIds, setPendingAppointmentIds] = useState<Set<string>>(new Set());
   const [pendingReminderAppointmentIds, setPendingReminderAppointmentIds] = useState<Set<string>>(new Set());
   const isMountedRef = useRef(true);
-
-  // Temporary state for past-date appointment creation
-  const pendingCreateRef = useRef<{ data: NewAppointmentData; reminderEnabled: boolean; reminderData: ReminderData } | null>(null);
 
   // Debounce search queries
   useEffect(() => {
@@ -445,91 +438,6 @@ export default function RemindersPage() {
     onError: (error: any) => { toast({ title: t("reminders.toasts.error"), description: error.message || "Failed to send thank-you email", variant: "destructive" }); },
   });
 
-  const createAppointmentMutation = useMutation({
-    mutationFn: async (params: { appointmentData: any; createReminder: boolean; reminderSettings: any }) => {
-      const response = await apiRequest('POST', '/api/appointments', params.appointmentData);
-      return response.json();
-    },
-    onMutate: async (params) => {
-      const { appointmentData } = params;
-      const selectedCustomer = customers.find(c => c.id === appointmentData.customerId);
-      if (!selectedCustomer) throw new Error('Selected customer not found.');
-
-      await queryClient.cancelQueries({ queryKey: ['/api/appointments', { shopId: selectedShopId }] });
-      const previousAppointments = queryClient.getQueryData<{ appointments: Appointment[] }>(['/api/appointments', { shopId: selectedShopId }]);
-
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-      const optimisticAppointment: AppointmentWithCustomer = {
-        id: tempId,
-        customerId: appointmentData.customerId,
-        title: appointmentData.title,
-        description: appointmentData.description,
-        appointmentDate: new Date(appointmentData.appointmentDate),
-        duration: appointmentData.duration,
-        location: appointmentData.location,
-        serviceType: appointmentData.serviceType,
-        status: appointmentData.status || 'scheduled',
-        notes: appointmentData.notes,
-        reminderSent: false,
-        confirmationReceived: false,
-        customer: selectedCustomer,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      if (isMountedRef.current) setPendingAppointmentIds(prev => new Set(prev).add(tempId));
-      queryClient.setQueryData<{ appointments: AppointmentWithCustomer[] }>(
-        ['/api/appointments', { shopId: selectedShopId }],
-        (old) => ({ appointments: old?.appointments ? [optimisticAppointment, ...old.appointments] : [optimisticAppointment] })
-      );
-      return { previousAppointments, tempId };
-    },
-    onSuccess: (data, variables, context) => {
-      toast({ title: t('reminders.toasts.success'), description: t('reminders.toasts.appointmentCreated') });
-      if (context?.tempId && isMountedRef.current) {
-        setPendingAppointmentIds(prev => { const next = new Set(prev); next.delete(context.tempId); return next; });
-      }
-
-      if (data?.appointment) {
-        queryClient.setQueryData<{ appointments: AppointmentWithCustomer[] }>(
-          ['/api/appointments', { shopId: selectedShopId }],
-          (old) => {
-            if (!old?.appointments) return old;
-            return { appointments: old.appointments.map(apt => apt.id === context?.tempId ? { ...data.appointment, customer: data.appointment.customer || apt.customer } : apt) };
-          }
-        );
-      } else {
-        queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === '/api/appointments' });
-      }
-
-      // Schedule reminder if enabled
-      if (variables.createReminder && data.appointment) {
-        const appointmentDate = new Date(data.appointment.appointmentDate);
-        const rs = variables.reminderSettings;
-        let scheduledFor: Date;
-        if (rs.reminderTiming === 'now') {
-          scheduledFor = new Date();
-        } else if (rs.reminderTiming === 'custom' && rs.customMinutesBefore) {
-          scheduledFor = new Date(appointmentDate.getTime() - rs.customMinutesBefore * 60 * 1000);
-        } else {
-          const minutes = TIMING_MAP[rs.reminderTiming] || 60;
-          scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
-        }
-        createScheduledReminderMutation.mutate({
-          appointmentId: data.appointment.id,
-          data: { reminderType: rs.reminderType, reminderTiming: rs.reminderTiming, customMinutesBefore: rs.customMinutesBefore, scheduledFor, timezone: rs.timezone, content: rs.content },
-        });
-      }
-    },
-    onError: (error: any, _variables, context) => {
-      if (context?.previousAppointments) queryClient.setQueryData(['/api/appointments', { shopId: selectedShopId }], context.previousAppointments);
-      if (context?.tempId && isMountedRef.current) {
-        setPendingAppointmentIds(prev => { const next = new Set(prev); next.delete(context.tempId); return next; });
-      }
-      toast({ title: t('reminders.toasts.error'), description: error?.message || t('reminders.toasts.appointmentCreateError'), variant: "destructive" });
-    },
-  });
-
   const sendReminderMutation = useMutation({
     mutationFn: async ({ appointmentIds, reminderType = 'email' }: { appointmentIds: string[]; reminderType?: string }) => {
       const response = await apiRequest('POST', '/api/appointment-reminders/send', { appointmentIds, reminderType });
@@ -606,67 +514,6 @@ export default function RemindersPage() {
   const handleEditAppointment = (appointment: AppointmentWithCustomer) => {
     setEditingAppointment(appointment);
     setEditAppointmentModalOpen(true);
-  };
-
-  const handleCreateAppointment = async (data: NewAppointmentData, reminderEnabled: boolean, reminderData: ReminderData) => {
-    // Validate customer exists
-    const selectedCustomer = customers.find(c => c.id === data.customerId);
-    if (!selectedCustomer) {
-      toast({ title: t('reminders.toasts.validationError'), description: 'Selected customer not found.', variant: "destructive" });
-      return;
-    }
-
-    // Validate reminder timing not in the past
-    if (reminderEnabled && reminderData.reminderTiming !== 'now') {
-      const appointmentDate = new Date(data.appointmentDate);
-      let scheduledFor: Date;
-      if (reminderData.reminderTiming === 'custom' && reminderData.customMinutesBefore) {
-        scheduledFor = new Date(appointmentDate.getTime() - reminderData.customMinutesBefore * 60 * 1000);
-      } else {
-        const minutes = TIMING_MAP[reminderData.reminderTiming] || 60;
-        scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
-      }
-      if (scheduledFor < new Date()) {
-        toast({ title: t('reminders.toasts.validationError'), description: "Reminder time cannot be in the past", variant: "destructive" });
-        return;
-      }
-    }
-
-    // Validate email suppression
-    if (reminderEnabled && reminderData.reminderType === 'email') {
-      const errorMessage = await validateEmailReminder(selectedCustomer.email);
-      if (errorMessage) {
-        toast({ title: t('reminders.toasts.validationError'), description: errorMessage, variant: "destructive" });
-        return;
-      }
-    }
-
-    // Check if appointment date is in the past
-    if (new Date(data.appointmentDate) < new Date()) {
-      pendingCreateRef.current = { data, reminderEnabled, reminderData };
-      setPastDateConfirmModalOpen(true);
-      return;
-    }
-
-    createAppointmentMutation.mutate({
-      appointmentData: data,
-      createReminder: reminderEnabled,
-      reminderSettings: reminderData
-    });
-    setNewAppointmentModalOpen(false);
-  };
-
-  const confirmPastDateAppointment = () => {
-    setPastDateConfirmModalOpen(false);
-    if (!pendingCreateRef.current) return;
-    const { data, reminderEnabled, reminderData } = pendingCreateRef.current;
-    pendingCreateRef.current = null;
-    createAppointmentMutation.mutate({
-      appointmentData: data,
-      createReminder: reminderEnabled,
-      reminderSettings: reminderData
-    });
-    setNewAppointmentModalOpen(false);
   };
 
   const handleUpdateAppointment = async (appointment: AppointmentWithCustomer, reminderEnabled: boolean, reminderData: EditReminderData) => {
@@ -1105,14 +952,15 @@ export default function RemindersPage() {
                       Last refreshed: {lastRefreshedAt.toLocaleTimeString()}
                     </span>
                   )}
-                  <AppointmentFormDialog
+                  <CreateAppointmentDialog
                     open={newAppointmentModalOpen}
                     onOpenChange={setNewAppointmentModalOpen}
-                    customers={customers}
-                    userTimezone={userTimezone}
-                    onSubmit={handleCreateAppointment}
-                    isSubmitting={createAppointmentMutation.isPending}
-                    validateEmailReminder={validateEmailReminder}
+                    onOptimisticAdd={(tempId) => {
+                      if (isMountedRef.current) setPendingAppointmentIds(prev => new Set(prev).add(tempId));
+                    }}
+                    onOptimisticResolve={(tempId) => {
+                      if (isMountedRef.current) setPendingAppointmentIds(prev => { const next = new Set(prev); next.delete(tempId); return next; });
+                    }}
                   />
                 </div>
               </div>
@@ -1457,37 +1305,6 @@ export default function RemindersPage() {
           onConfirm={confirmCancelAppointment}
           isDeleting={cancelAppointmentMutation.isPending}
         />
-
-        {/* Past Date Warning */}
-        <Dialog open={pastDateConfirmModalOpen} onOpenChange={setPastDateConfirmModalOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                <AlertTriangle className="h-5 w-5" />Past Date Warning
-              </DialogTitle>
-              <DialogDescription>
-                You are scheduling an appointment for a date in the past. Are you sure you want to continue?
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
-                <p className="font-medium">{pendingCreateRef.current?.data.title || 'Untitled Appointment'}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Scheduled for: {pendingCreateRef.current?.data.appointmentDate ? formatDateTime(pendingCreateRef.current.data.appointmentDate) : ''}
-                </p>
-                <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />This date is in the past
-                </p>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setPastDateConfirmModalOpen(false)}>Cancel</Button>
-                <Button onClick={confirmPastDateAppointment} disabled={createAppointmentMutation.isPending}>
-                  {createAppointmentMutation.isPending ? 'Creating...' : 'Create Anyway'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
 
         {/* View Appointment Details */}
         <AppointmentDetailsContainer
