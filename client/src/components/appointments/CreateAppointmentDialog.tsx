@@ -68,6 +68,21 @@ export function CreateAppointmentDialog({
   const customers: Customer[] = customersData?.contacts || [];
   const { providers } = useAssignableUsers();
 
+  // "All Shops" mode (selectedShopId === null) requires the user to pick a shop
+  // at create time. Otherwise the x-shop-id header from the global selector
+  // already scopes the POST.
+  const requireShopSelection = !selectedShopId;
+  const { data: shopsData } = useQuery<{ shops: Array<{ id: string; name: string }> }>({
+    queryKey: ["/api/shops", { limit: 100 }],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/shops?limit=100");
+      return response.json();
+    },
+    enabled: requireShopSelection && open,
+    staleTime: 5 * 60 * 1000,
+  });
+  const shops = shopsData?.shops ?? [];
+
   const createScheduledReminderMutation = useMutation({
     mutationFn: async ({
       appointmentId,
@@ -116,8 +131,15 @@ export function CreateAppointmentDialog({
       appointmentData: any;
       createReminder: boolean;
       reminderSettings: any;
+      overrideShopId?: string | null;
     }) => {
-      const response = await apiRequest("POST", "/api/appointments", params.appointmentData);
+      const { overrideShopId, ...rest } = params;
+      const response = await apiRequest(
+        "POST",
+        "/api/appointments",
+        params.appointmentData,
+        overrideShopId ? { headers: { "x-shop-id": overrideShopId } } : undefined,
+      );
       return response.json();
     },
     onMutate: async (params) => {
@@ -125,12 +147,16 @@ export function CreateAppointmentDialog({
       const selectedCustomer = customers.find((c) => c.id === appointmentData.customerId);
       if (!selectedCustomer) throw new Error("Selected customer not found.");
 
+      // Optimistic cache uses the effective shopId (either the globally
+      // selected shop, or the shop picked in the dialog when in "All" mode).
+      const effectiveShopId = params.overrideShopId ?? selectedShopId;
+
       await queryClient.cancelQueries({
-        queryKey: ["/api/appointments", { shopId: selectedShopId }],
+        queryKey: ["/api/appointments", { shopId: effectiveShopId }],
       });
       const previousAppointments = queryClient.getQueryData<{
         appointments: Appointment[];
-      }>(["/api/appointments", { shopId: selectedShopId }]);
+      }>(["/api/appointments", { shopId: effectiveShopId }]);
 
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
       const selectedProvider = appointmentData.providerId
@@ -158,14 +184,14 @@ export function CreateAppointmentDialog({
 
       onOptimisticAdd?.(tempId);
       queryClient.setQueryData<{ appointments: AppointmentWithCustomer[] }>(
-        ["/api/appointments", { shopId: selectedShopId }],
+        ["/api/appointments", { shopId: effectiveShopId }],
         (old) => ({
           appointments: old?.appointments
             ? [optimisticAppointment, ...old.appointments]
             : [optimisticAppointment],
         })
       );
-      return { previousAppointments, tempId };
+      return { previousAppointments, tempId, effectiveShopId };
     },
     onSuccess: (data, variables, context) => {
       toast({
@@ -176,7 +202,7 @@ export function CreateAppointmentDialog({
 
       if (data?.appointment) {
         queryClient.setQueryData<{ appointments: AppointmentWithCustomer[] }>(
-          ["/api/appointments", { shopId: selectedShopId }],
+          ["/api/appointments", { shopId: context?.effectiveShopId ?? selectedShopId }],
           (old) => {
             if (!old?.appointments) return old;
             return {
@@ -239,7 +265,7 @@ export function CreateAppointmentDialog({
     onError: (error: any, _variables, context) => {
       if (context?.previousAppointments) {
         queryClient.setQueryData(
-          ["/api/appointments", { shopId: selectedShopId }],
+          ["/api/appointments", { shopId: context.effectiveShopId ?? selectedShopId }],
           context.previousAppointments
         );
       }
@@ -326,6 +352,10 @@ export function CreateAppointmentDialog({
       }
     }
 
+    // Strip shopId from the body payload — server picks up shop via x-shop-id
+    // header (overridden below when the user picked a shop in the dialog).
+    const { shopId: pickedShopId, ...appointmentPayload } = data;
+
     if (new Date(data.appointmentDate) < new Date()) {
       pendingCreateRef.current = { data, reminderEnabled, reminderData };
       setPastDateConfirmOpen(true);
@@ -333,9 +363,10 @@ export function CreateAppointmentDialog({
     }
 
     createAppointmentMutation.mutate({
-      appointmentData: data,
+      appointmentData: appointmentPayload,
       createReminder: reminderEnabled,
       reminderSettings: reminderData,
+      overrideShopId: pickedShopId ?? null,
     });
     onOpenChange(false);
   };
@@ -345,10 +376,12 @@ export function CreateAppointmentDialog({
     if (!pendingCreateRef.current) return;
     const { data, reminderEnabled, reminderData } = pendingCreateRef.current;
     pendingCreateRef.current = null;
+    const { shopId: pickedShopId, ...appointmentPayload } = data;
     createAppointmentMutation.mutate({
-      appointmentData: data,
+      appointmentData: appointmentPayload,
       createReminder: reminderEnabled,
       reminderSettings: reminderData,
+      overrideShopId: pickedShopId ?? null,
     });
     onOpenChange(false);
   };
@@ -360,6 +393,8 @@ export function CreateAppointmentDialog({
         onOpenChange={onOpenChange}
         customers={customers}
         providers={providers}
+        shops={shops}
+        requireShopSelection={requireShopSelection}
         userTimezone={userTimezone}
         onSubmit={handleCreateAppointment}
         isSubmitting={createAppointmentMutation.isPending}

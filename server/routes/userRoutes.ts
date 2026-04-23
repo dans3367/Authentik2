@@ -3,7 +3,7 @@ import { authenticateToken, requirePermission, requirePlanFeature, getEffectiveP
 import { validatePasswordStrength } from '../middleware/security-enhanced';
 import { storage } from '../storage';
 import { db } from '../db';
-import { betterAuthUser, betterAuthSession, subscriptionPlans, createUserSchema } from '@shared/schema';
+import { betterAuthUser, betterAuthSession, subscriptionPlans, shops, createUserSchema } from '@shared/schema';
 import { sql, eq, and, count } from 'drizzle-orm';
 import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
@@ -86,6 +86,53 @@ userRoutes.patch("/dashboard-layout", authenticateToken, async (req: any, res) =
   } catch (error) {
     console.error('Update dashboard layout error:', error);
     res.status(500).json({ message: 'Failed to update dashboard layout' });
+  }
+});
+
+// Get current user's remembered shop selection (null = "All Shops")
+userRoutes.get("/shop-preference", authenticateToken, async (req: any, res) => {
+  try {
+    const user = await db.query.betterAuthUser.findFirst({
+      where: eq(betterAuthUser.id, req.user.id),
+      columns: { lastSelectedShopId: true },
+    });
+    res.json({ shopId: user?.lastSelectedShopId ?? null });
+  } catch (error) {
+    console.error('Get shop preference error:', error);
+    res.status(500).json({ message: 'Failed to get shop preference' });
+  }
+});
+
+// Update current user's remembered shop selection.
+// Body: { shopId: string | null }. Non-null values must belong to the caller's tenant.
+userRoutes.patch("/shop-preference", authenticateToken, async (req: any, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { shopId } = req.body ?? {};
+
+    if (shopId !== null && typeof shopId !== 'string') {
+      return res.status(400).json({ message: 'shopId must be a string or null' });
+    }
+
+    if (shopId) {
+      const shop = await db
+        .select({ id: shops.id })
+        .from(shops)
+        .where(and(eq(shops.id, shopId), eq(shops.tenantId, tenantId)))
+        .limit(1);
+      if (shop.length === 0) {
+        return res.status(400).json({ message: 'Shop not found or does not belong to your organization' });
+      }
+    }
+
+    await db.update(betterAuthUser)
+      .set({ lastSelectedShopId: shopId ?? null, updatedAt: new Date() })
+      .where(eq(betterAuthUser.id, req.user.id));
+
+    res.json({ shopId: shopId ?? null });
+  } catch (error) {
+    console.error('Update shop preference error:', error);
+    res.status(500).json({ message: 'Failed to update shop preference' });
   }
 });
 

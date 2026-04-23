@@ -56,7 +56,7 @@ const EmailAnalyticsPage = lazy(() => import("@/pages/email-analytics"));
 const BirthdaysPage = lazy(() => import("@/pages/birthdays"));
 const ECardsPage = lazy(() => import("@/pages/e-cards"));
 const CardsPage = lazy(() => import("@/pages/cards"));
-const RemindersPage = lazy(() => import("@/pages/reminders"));
+const AppointmentsPage = lazy(() => import("@/pages/appointments"));
 const ConfirmAppointmentPage = lazy(() => import("@/pages/confirm-appointment"));
 const PromotionsPage = lazy(() => import("@/pages/promotions"));
 const EmailComposePage = lazy(() => import("@/pages/email-compose"));
@@ -454,7 +454,7 @@ function Router() {
                   <Route path="/cards" component={CardsPage} />
                   <Route path="/birthdays" component={BirthdaysRedirect} />
                   <Route path="/e-cards" component={ECardsRedirect} />
-                  <Route path="/reminders" component={RemindersPage} />
+                  <Route path="/appointments" component={AppointmentsPage} />
                   <Route path="/shops" component={ShopsPage} />
                   <Route path="/shops/new" component={NewShopPage} />
                   <Route path="/shops/tags" component={ShopTagsPage} />

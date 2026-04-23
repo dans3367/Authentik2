@@ -98,7 +98,7 @@ const getNavigation = (userRole?: string, t?: any, canManageUsers?: boolean, max
     { name: t?.('navigation.templates') || "Templates", href: "/templates", icon: FileText },
 
     { name: t?.('navigation.cards') || "e-Cards", href: "/cards", icon: Gift },
-    { name: t?.('navigation.reminders') || "Appointments", href: "/reminders", icon: Bell },
+    { name: t?.('navigation.reminders') || "Appointments", href: "/appointments", icon: Bell },
     { name: t?.('navigation.contacts') || "Contacts", href: "/email-contacts", icon: UserCheck },
     { name: t?.('navigation.segmentation') || "Segmentation", href: "/segmentation", icon: Target },
     { name: t?.('navigation.analytics') || "Analytics", href: "/analytics", icon: BarChart3 },

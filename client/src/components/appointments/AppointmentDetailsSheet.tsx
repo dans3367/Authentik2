@@ -27,6 +27,7 @@ import {
   Loader2,
   BellOff,
   Building2,
+  UserCircle2,
 } from "lucide-react";
 import { getCustomerName, formatDateTime } from "@/utils/appointment-utils";
 import type { AppointmentWithCustomer, Customer, AppointmentReminder } from "@/utils/appointment-utils";
@@ -285,6 +286,22 @@ export function AppointmentDetailsSheet({
                           </p>
                         </div>
                       )}
+
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">
+                          {t('reminders.appointments.provider', { defaultValue: 'Provider' })}
+                        </p>
+                        <p className="text-sm text-foreground flex items-center gap-1.5">
+                          <UserCircle2 className="h-3 w-3 text-muted-foreground" />
+                          {appointment.provider
+                            ? (appointment.provider.name || appointment.provider.email)
+                            : (
+                              <span className="text-muted-foreground italic">
+                                {t('reminders.appointments.unassigned', { defaultValue: 'Unassigned' })}
+                              </span>
+                            )}
+                        </p>
+                      </div>
 
                       {appointment.serviceType && (
                         <div className="col-span-2 space-y-1">

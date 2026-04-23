@@ -39,6 +39,7 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  options?: { headers?: Record<string, string> },
 ): Promise<Response> {
   // Determine the base URL dynamically based on access method
   const getApiBaseURL = () => {
@@ -75,6 +76,7 @@ export async function apiRequest(
     const headers: Record<string, string> = {
       ...(data ? { "Content-Type": "application/json" } : {}),
       ...(selectedShopId ? { "x-shop-id": selectedShopId } : {}),
+      ...(options?.headers ?? {}),
     };
 
     const res = await fetch(fullUrl, {

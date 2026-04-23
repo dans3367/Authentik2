@@ -417,7 +417,7 @@ export function AppointmentDetailsContainer({
     if (onEdit) {
       onEdit(apt);
     } else {
-      setLocation("/reminders");
+      setLocation("/appointments");
     }
   };
 
@@ -426,7 +426,7 @@ export function AppointmentDetailsContainer({
     if (onCreateNewAppointment) {
       onCreateNewAppointment(apt);
     } else {
-      setLocation("/reminders");
+      setLocation("/appointments");
     }
   };
 

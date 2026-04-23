@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
 import { useLocation } from "wouter";
 import { useQuery as useConvexQuery } from "convex/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../convex/_generated/api";
 import { useAppSelector } from "@/store";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
@@ -54,6 +55,7 @@ import {
   Check,
   RotateCcw,
   Eye,
+  RefreshCw,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDashboardHighlights } from "@/hooks/useStats";
@@ -394,7 +396,19 @@ export default function Dashboard() {
   );
   const [activeCardId, setActiveCardId] = useState<CardId | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries();
+    } finally {
+      window.setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   const { layout: serverLayout, isFetched: layoutFetched, saveLayout } = useDashboardLayout();
 
@@ -617,7 +631,7 @@ export default function Dashboard() {
     {
       label: t("dashboard.quickActions.bookAppointment"),
       icon: CalendarPlus,
-      onClick: () => setLocation("/reminders"),
+      onClick: () => setLocation("/appointments"),
       accent: "hover:border-amber-500/40 hover:bg-amber-500/5 dark:hover:bg-amber-500/10",
       iconBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
     },
@@ -736,6 +750,18 @@ export default function Dashboard() {
           )}
           <button
             type="button"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            aria-label="Refresh dashboard data"
+            title="Refresh dashboard data"
+            className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-border/60 bg-card text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            data-testid="dashboard-refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </button>
+          <button
+            type="button"
             onClick={handleToggleEditMode}
             aria-pressed={editMode}
             aria-label={editMode ? "Save layout and exit edit mode" : "Edit dashboard layout"}
@@ -806,7 +832,7 @@ export default function Dashboard() {
                   />
                 </div>
 
-                {highlightsLoading ? (
+                {highlightsLoading || isRefreshing ? (
                   <Skeleton className="h-9 w-28" />
                 ) : (
                   <div className="serif flex items-baseline gap-1 text-[32px] sm:text-[38px] leading-none tracking-[-0.02em] text-foreground">
@@ -815,7 +841,7 @@ export default function Dashboard() {
                 )}
 
                 <div className="flex items-end justify-between gap-3 min-h-[28px]">
-                  {hasChange ? (
+                  {hasChange && !isRefreshing ? (
                     <span
                       className={`mono inline-flex items-center gap-1 text-[11px] font-medium ${
                         isUp
@@ -835,7 +861,7 @@ export default function Dashboard() {
                   ) : (
                     <span />
                   )}
-                  {!highlightsLoading && stat.metric?.sparkline && stat.metric.sparkline.length > 1 && (
+                  {!highlightsLoading && !isRefreshing && stat.metric?.sparkline && stat.metric.sparkline.length > 1 && (
                     <Sparkline
                       data={stat.metric.sparkline}
                       trend={isUp ? "up" : hasChange ? "down" : "flat"}
@@ -849,7 +875,7 @@ export default function Dashboard() {
         </div>
 
         {/* Reorderable Bento Grid */}
-        {activeNewslettersResolved ? (
+        {activeNewslettersResolved && !isRefreshing ? (
           (() => {
             const cardRegistry: Record<CardId, { render: () => React.ReactNode }> = {
               mainSlot: {

@@ -51,6 +51,9 @@ export const betterAuthUser = pgTable("better_auth_user", {
     cardSizes?: Record<string, number>;
     cardVisibility?: Record<string, boolean>;
   }>(),
+  // Per-user remembered shop selection (from the header selector). Null = "All Shops".
+  // Survives logout/login via server read on session load.
+  lastSelectedShopId: varchar("last_selected_shop_id"),
 });
 
 export const betterAuthSession = pgTable("better_auth_session", {

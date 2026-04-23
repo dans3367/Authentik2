@@ -27,6 +27,7 @@ const PROVIDER_UNASSIGNED = "__unassigned__";
 export interface NewAppointmentData {
   customerId: string;
   providerId: string | null;
+  shopId?: string | null;
   title: string;
   description: string;
   appointmentDate: Date;
@@ -35,6 +36,11 @@ export interface NewAppointmentData {
   serviceType: string;
   status: Appointment['status'];
   notes: string;
+}
+
+export interface ShopOption {
+  id: string;
+  name: string;
 }
 
 export interface ReminderData {
@@ -50,6 +56,8 @@ interface AppointmentFormDialogProps {
   onOpenChange: (open: boolean) => void;
   customers: Customer[];
   providers?: AppointmentProvider[];
+  shops?: ShopOption[];
+  requireShopSelection?: boolean;
   userTimezone: string;
   onSubmit: (data: NewAppointmentData, reminderEnabled: boolean, reminderData: ReminderData) => void;
   isSubmitting: boolean;
@@ -62,6 +70,8 @@ export function AppointmentFormDialog({
   onOpenChange,
   customers,
   providers = [],
+  shops = [],
+  requireShopSelection = false,
   userTimezone,
   onSubmit,
   isSubmitting,
@@ -73,6 +83,7 @@ export function AppointmentFormDialog({
   const [appointmentData, setAppointmentData] = useState<NewAppointmentData>({
     customerId: "",
     providerId: null,
+    shopId: null,
     title: "",
     description: "",
     appointmentDate: new Date(),
@@ -86,6 +97,7 @@ export function AppointmentFormDialog({
   const [errors, setErrors] = useState<{
     customerId?: boolean;
     title?: boolean;
+    shopId?: boolean;
     customMinutesBefore?: boolean;
   }>({});
 
@@ -116,6 +128,7 @@ export function AppointmentFormDialog({
       setAppointmentData({
         customerId: "",
         providerId: null,
+        shopId: null,
         title: "",
         description: "",
         appointmentDate: new Date(),
@@ -156,6 +169,9 @@ export function AppointmentFormDialog({
     }
     if (!appointmentData.title) {
       newErrors.title = true;
+    }
+    if (requireShopSelection && !appointmentData.shopId) {
+      newErrors.shopId = true;
     }
     if (reminderEnabled && reminderData.reminderTiming === 'custom' && !reminderData.customMinutesBefore) {
       newErrors.customMinutesBefore = true;
@@ -282,6 +298,47 @@ export function AppointmentFormDialog({
             </PopoverContent>
           </Popover>
         </div>
+
+        {requireShopSelection && (
+          <div>
+            <Label className={errors.shopId ? "text-red-500 dark:text-red-400" : ""}>
+              {t('reminders.appointments.shop', { defaultValue: 'Shop' })}{' '}
+              <span className="text-red-500 dark:text-red-400">*</span>
+            </Label>
+            <Select
+              value={appointmentData.shopId ?? ""}
+              onValueChange={(value) => {
+                setAppointmentData(prev => ({ ...prev, shopId: value }));
+                setErrors(prev => ({ ...prev, shopId: false }));
+              }}
+            >
+              <SelectTrigger
+                className={cn(
+                  "focus-visible:ring-0 focus:ring-0",
+                  errors.shopId && "border-red-500 dark:border-red-400",
+                )}
+              >
+                <SelectValue
+                  placeholder={t('reminders.appointments.selectShop', {
+                    defaultValue: 'Select a shop',
+                  })}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {shops.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t('reminders.appointments.shopHelp', {
+                defaultValue: 'You have "All Shops" selected — pick which shop this appointment belongs to.',
+              })}
+            </p>
+          </div>
+        )}
 
         <div>
           <Label>{t('reminders.appointments.provider', { defaultValue: 'Provider' })}</Label>
