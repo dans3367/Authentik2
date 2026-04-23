@@ -5,6 +5,7 @@ import { AlertTriangle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { useAssignableUsers } from "@/hooks/useAssignableUsers";
 import { useAppSelector } from "@/store";
 import {
   Dialog,
@@ -65,6 +66,7 @@ export function CreateAppointmentDialog({
     },
   });
   const customers: Customer[] = customersData?.contacts || [];
+  const { providers } = useAssignableUsers();
 
   const createScheduledReminderMutation = useMutation({
     mutationFn: async ({
@@ -131,9 +133,13 @@ export function CreateAppointmentDialog({
       }>(["/api/appointments", { shopId: selectedShopId }]);
 
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      const selectedProvider = appointmentData.providerId
+        ? providers.find((p) => p.id === appointmentData.providerId) ?? null
+        : null;
       const optimisticAppointment: AppointmentWithCustomer = {
         id: tempId,
         customerId: appointmentData.customerId,
+        providerId: appointmentData.providerId ?? null,
         title: appointmentData.title,
         description: appointmentData.description,
         appointmentDate: new Date(appointmentData.appointmentDate),
@@ -145,6 +151,7 @@ export function CreateAppointmentDialog({
         reminderSent: false,
         confirmationReceived: false,
         customer: selectedCustomer,
+        provider: selectedProvider,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -352,6 +359,7 @@ export function CreateAppointmentDialog({
         open={open}
         onOpenChange={onOpenChange}
         customers={customers}
+        providers={providers}
         userTimezone={userTimezone}
         onSubmit={handleCreateAppointment}
         isSubmitting={createAppointmentMutation.isPending}

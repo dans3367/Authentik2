@@ -221,6 +221,49 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
   }
 });
 
+// Lightweight list of assignable users in the tenant (id/name/email/role only).
+// Used for provider/assignee dropdowns (e.g. appointments). Available to any
+// authenticated member of the tenant — no users-management plan/permission gate.
+// Returns ALL tenant users (Owner, Administrator, Manager, Employee — active and inactive)
+// so any team member can be assigned as the provider for an appointment.
+userRoutes.get("/assignable", authenticateToken, async (req: any, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const rows = await db
+      .select({
+        id: betterAuthUser.id,
+        name: betterAuthUser.name,
+        email: betterAuthUser.email,
+        role: betterAuthUser.role,
+        isActive: betterAuthUser.isActive,
+      })
+      .from(betterAuthUser)
+      .where(eq(betterAuthUser.tenantId, tenantId));
+
+    // Order by role hierarchy (Owner → Administrator → Manager → Employee),
+    // then name/email for stable display.
+    const roleOrder: Record<string, number> = {
+      Owner: 0,
+      Administrator: 1,
+      Manager: 2,
+      Employee: 3,
+    };
+    rows.sort((a, b) => {
+      const ra = roleOrder[a.role ?? ''] ?? 99;
+      const rb = roleOrder[b.role ?? ''] ?? 99;
+      if (ra !== rb) return ra - rb;
+      const an = (a.name || a.email || '').toLowerCase();
+      const bn = (b.name || b.email || '').toLowerCase();
+      return an.localeCompare(bn);
+    });
+
+    res.json({ users: rows });
+  } catch (error) {
+    console.error('Get assignable users error:', error);
+    res.status(500).json({ message: 'Failed to get assignable users' });
+  }
+});
+
 // Get users for tenant
 userRoutes.get("/", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.view'), async (req: any, res) => {
   try {

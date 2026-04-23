@@ -2494,6 +2494,7 @@ export const appointments = pgTable("appointments", {
   shopId: varchar("shop_id").references(() => shops.id, { onDelete: 'set null' }),
   customerId: varchar("customer_id").notNull().references(() => emailContacts.id, { onDelete: 'cascade' }),
   userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }), // Who created the appointment
+  providerId: varchar("provider_id").references(() => betterAuthUser.id, { onDelete: 'set null' }), // User assigned to perform/own this appointment
   title: text("title").notNull(),
   description: text("description"),
   appointmentDate: timestamp("appointment_date").notNull(),
@@ -2592,6 +2593,12 @@ export const appointmentRelations = relations(appointments, ({ one, many }) => (
   user: one(betterAuthUser, {
     fields: [appointments.userId],
     references: [betterAuthUser.id],
+    relationName: "appointmentCreator",
+  }),
+  provider: one(betterAuthUser, {
+    fields: [appointments.providerId],
+    references: [betterAuthUser.id],
+    relationName: "appointmentProvider",
   }),
   reminders: many(appointmentReminders),
   notes: many(appointmentNotes),
@@ -2731,6 +2738,7 @@ export type InsertInngestEvent = InsertTriggerTask;
 // Appointment schemas
 export const createAppointmentSchema = z.object({
   customerId: z.string().uuid("Please select a valid customer"),
+  providerId: z.string().min(1).optional().nullable(),
   title: z.string().min(1, "Appointment title is required"),
   description: z.string().optional(),
   appointmentDate: z.coerce.date().refine(
@@ -2749,6 +2757,7 @@ export const createAppointmentSchema = z.object({
 });
 
 export const updateAppointmentSchema = z.object({
+  providerId: z.string().min(1).optional().nullable(),
   title: z.string().min(1, "Appointment title is required").optional(),
   description: z.string().optional(),
   appointmentDate: z.coerce.date().refine(

@@ -9,6 +9,7 @@ import {
   emailContacts,
   companies,
   shops,
+  betterAuthUser,
   createAppointmentSchema,
   updateAppointmentSchema,
   createAppointmentReminderSchema,
@@ -138,6 +139,7 @@ router.get('/', async (req: Request, res: Response) => {
         id: appointments.id,
         customerId: appointments.customerId,
         userId: appointments.userId,
+        providerId: appointments.providerId,
         title: appointments.title,
         description: appointments.description,
         appointmentDate: appointments.appointmentDate,
@@ -169,6 +171,12 @@ router.get('/', async (req: Request, res: Response) => {
           country: emailContacts.country,
           phoneNumber: emailContacts.phoneNumber,
         },
+        // Provider (assigned user) details
+        provider: {
+          id: betterAuthUser.id,
+          name: betterAuthUser.name,
+          email: betterAuthUser.email,
+        },
         // Shop details
         shop: {
           id: shops.id,
@@ -177,6 +185,7 @@ router.get('/', async (req: Request, res: Response) => {
       })
       .from(appointments)
       .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
+      .leftJoin(betterAuthUser, eq(appointments.providerId, betterAuthUser.id))
       .leftJoin(shops, eq(appointments.shopId, shops.id));
 
     // Apply search filter across multiple fields (case-insensitive)
@@ -312,6 +321,21 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Customer not found or does not belong to your organization' });
     }
 
+    // Verify provider belongs to this tenant (if provided)
+    if (validatedData.providerId) {
+      const provider = await db
+        .select({ id: betterAuthUser.id })
+        .from(betterAuthUser)
+        .where(and(
+          eq(betterAuthUser.id, validatedData.providerId),
+          eq(betterAuthUser.tenantId, tenantId),
+        ))
+        .limit(1);
+      if (provider.length === 0) {
+        return res.status(400).json({ error: 'Provider not found or does not belong to your organization' });
+      }
+    }
+
     // Generate confirmation token
     const confirmationToken = uuidv4();
 
@@ -353,6 +377,17 @@ router.post('/', async (req: Request, res: Response) => {
       appointmentCustomer = customerData[0] || null;
     }
 
+    // Fetch provider details if assigned
+    let appointmentProvider = null;
+    if (newAppointment[0].providerId) {
+      const providerData = await db
+        .select({ id: betterAuthUser.id, name: betterAuthUser.name, email: betterAuthUser.email })
+        .from(betterAuthUser)
+        .where(and(eq(betterAuthUser.id, newAppointment[0].providerId), eq(betterAuthUser.tenantId, tenantId)))
+        .limit(1);
+      appointmentProvider = providerData[0] || null;
+    }
+
     // Log activity for appointment creation
     const customerName = appointmentCustomer
       ? `${appointmentCustomer.firstName || ''} ${appointmentCustomer.lastName || ''}`.trim() || appointmentCustomer.email
@@ -381,7 +416,7 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     res.status(201).json({
-      appointment: { ...newAppointment[0], customer: appointmentCustomer },
+      appointment: { ...newAppointment[0], customer: appointmentCustomer, provider: appointmentProvider },
       message: 'Appointment created successfully'
     });
   } catch (error) {
@@ -420,6 +455,21 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
+    // Verify provider (if being set) belongs to this tenant
+    if (validatedData.providerId) {
+      const provider = await db
+        .select({ id: betterAuthUser.id })
+        .from(betterAuthUser)
+        .where(and(
+          eq(betterAuthUser.id, validatedData.providerId),
+          eq(betterAuthUser.tenantId, tenantId),
+        ))
+        .limit(1);
+      if (provider.length === 0) {
+        return res.status(400).json({ error: 'Provider not found or does not belong to your organization' });
+      }
+    }
+
     // Check if appointment date/time is being changed - if so, cancel pending reminders
     const existing = existingAppointment[0];
     const isDateChanging = validatedData.appointmentDate &&
@@ -453,7 +503,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     // Log activity for appointment update
     const changes = computeChanges(existing, updatedAppointment[0], [
       'title', 'description', 'appointmentDate', 'duration', 'location',
-      'serviceType', 'status', 'notes', 'customerId'
+      'serviceType', 'status', 'notes', 'customerId', 'providerId'
     ]);
 
     try {
@@ -504,7 +554,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     // Whitelist of allowed fields for PATCH updates - prevents mass assignment attacks
     const allowedFields = [
       'title', 'description', 'appointmentDate', 'duration', 'location',
-      'serviceType', 'status', 'notes', 'customerId', 'reminderSettings'
+      'serviceType', 'status', 'notes', 'customerId', 'reminderSettings', 'providerId'
     ];
 
     // Build sanitized update data with only allowed fields
@@ -544,6 +594,26 @@ router.patch('/:id', async (req: Request, res: Response) => {
       updateData.appointmentDate = new Date(updateData.appointmentDate);
       if (isNaN(updateData.appointmentDate.getTime())) {
         return res.status(400).json({ error: 'Invalid appointmentDate format' });
+      }
+    }
+
+    // Normalise providerId: empty string → null (unassign)
+    if ('providerId' in updateData) {
+      if (updateData.providerId === '' || updateData.providerId === undefined) {
+        updateData.providerId = null;
+      }
+      if (updateData.providerId) {
+        const provider = await db
+          .select({ id: betterAuthUser.id })
+          .from(betterAuthUser)
+          .where(and(
+            eq(betterAuthUser.id, updateData.providerId),
+            eq(betterAuthUser.tenantId, tenantId),
+          ))
+          .limit(1);
+        if (provider.length === 0) {
+          return res.status(400).json({ error: 'Provider not found or does not belong to your organization' });
+        }
       }
     }
 
@@ -594,7 +664,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     // Log activity for appointment update
     const changes = computeChanges(existing, updatedAppointment[0], [
       'title', 'description', 'appointmentDate', 'duration', 'location',
-      'serviceType', 'status', 'notes', 'customerId'
+      'serviceType', 'status', 'notes', 'customerId', 'providerId'
     ]);
 
     try {

@@ -13,11 +13,21 @@ export interface Customer {
   phoneNumber?: string | null;
 }
 
+// Minimal assignable-user shape used for provider dropdowns
+export interface AppointmentProvider {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  role?: string | null;
+  isActive?: boolean | null;
+}
+
 // Appointment interface for utilities (matches API response with null values)
 export interface Appointment {
   id: string;
   tenantId?: string;
   userId?: string;
+  providerId?: string | null;
   customerId: string;
   title: string;
   description?: string | null;
@@ -66,6 +76,7 @@ export const TIMING_MAP: Record<string, number> = {
 // Appointment with customer and shop relation
 export interface AppointmentWithCustomer extends Appointment {
   customer?: Customer;
+  provider?: AppointmentProvider | null;
   shop?: { id: string; name: string } | null;
 }
 

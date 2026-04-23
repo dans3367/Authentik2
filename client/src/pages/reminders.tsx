@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from 'react-i18next';
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { useAssignableUsers } from "@/hooks/useAssignableUsers";
 import { useAppSelector } from "@/store";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -101,6 +102,7 @@ export default function RemindersPage() {
   const { user } = useReduxAuth();
   const userTimezone = user?.timezone || 'America/Chicago';
   const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
+  const { providers } = useAssignableUsers();
 
   const [appointmentsTab, setAppointmentsTab] = useState<"upcoming" | "past">("upcoming");
 
@@ -568,6 +570,7 @@ export default function RemindersPage() {
         serviceType: appointment.serviceType,
         status: appointment.status,
         notes: appointment.notes,
+        providerId: appointment.providerId ?? null,
       },
     });
 
@@ -610,6 +613,7 @@ export default function RemindersPage() {
         serviceType: appointment.serviceType,
         status: 'completed',
         notes: appointment.notes,
+        providerId: appointment.providerId ?? null,
       }},
       {
         onSuccess: () => {
@@ -1290,6 +1294,7 @@ export default function RemindersPage() {
           onOpenChange={setEditAppointmentModalOpen}
           appointment={editingAppointment}
           customers={customers}
+          providers={providers}
           reminders={reminders}
           userTimezone={userTimezone}
           onSubmit={handleUpdateAppointment}

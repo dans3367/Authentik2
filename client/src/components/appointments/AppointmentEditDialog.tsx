@@ -10,7 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle } from "lucide-react";
 import { TIMEZONE_OPTIONS } from "@/utils/appointment-utils";
-import type { AppointmentWithCustomer, Customer, Appointment, AppointmentReminder } from "@/utils/appointment-utils";
+import type { AppointmentWithCustomer, Customer, Appointment, AppointmentReminder, AppointmentProvider } from "@/utils/appointment-utils";
+
+const PROVIDER_UNASSIGNED = "__unassigned__";
 import {
   toLocalDateString,
   toLocalTimeString,
@@ -30,6 +32,7 @@ interface AppointmentEditDialogProps {
   onOpenChange: (open: boolean) => void;
   appointment: AppointmentWithCustomer | null;
   customers: Customer[];
+  providers?: AppointmentProvider[];
   reminders: AppointmentReminder[];
   userTimezone: string;
   onSubmit: (appointment: AppointmentWithCustomer, reminderEnabled: boolean, reminderData: EditReminderData) => void;
@@ -42,6 +45,7 @@ export function AppointmentEditDialog({
   onOpenChange,
   appointment: initialAppointment,
   customers,
+  providers = [],
   reminders,
   userTimezone,
   onSubmit,
@@ -136,6 +140,45 @@ export function AppointmentEditDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 overflow-y-auto flex-1">
+          <div>
+            <Label>{t('reminders.appointments.provider', { defaultValue: 'Provider' })}</Label>
+            <Select
+              value={editingAppointment.providerId ?? PROVIDER_UNASSIGNED}
+              onValueChange={(value) =>
+                setEditingAppointment(prev => prev ? {
+                  ...prev,
+                  providerId: value === PROVIDER_UNASSIGNED ? null : value,
+                  provider: value === PROVIDER_UNASSIGNED
+                    ? null
+                    : providers.find(p => p.id === value) ?? prev.provider ?? null,
+                } : null)
+              }
+            >
+              <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                <SelectValue placeholder={t('reminders.appointments.selectProvider', { defaultValue: 'Select a provider (optional)' })} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={PROVIDER_UNASSIGNED}>
+                  {t('reminders.appointments.unassigned', { defaultValue: 'Unassigned' })}
+                </SelectItem>
+                {providers.map((p) => {
+                  const label = p.name || p.email || p.id;
+                  const suffix = [p.role, p.isActive === false ? 'inactive' : null]
+                    .filter(Boolean)
+                    .join(' · ');
+                  return (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span>{label}</span>
+                      {suffix && (
+                        <span className="ml-2 text-xs text-muted-foreground">({suffix})</span>
+                      )}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <Label>{t('reminders.appointments.title')}</Label>
             <Input

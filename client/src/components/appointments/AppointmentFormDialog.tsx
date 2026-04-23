@@ -16,13 +16,17 @@ import {
   toLocalDateString,
   toLocalTimeString,
   mergeDateAndTime,
-  TIMEZONE_OPTIONS
+  TIMEZONE_OPTIONS,
+  type AppointmentProvider,
 } from "@/utils/appointment-utils";
 import type { Customer } from "@/hooks/useAppointments";
 import type { Appointment } from "@shared/schema";
 
+const PROVIDER_UNASSIGNED = "__unassigned__";
+
 export interface NewAppointmentData {
   customerId: string;
+  providerId: string | null;
   title: string;
   description: string;
   appointmentDate: Date;
@@ -45,6 +49,7 @@ interface AppointmentFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customers: Customer[];
+  providers?: AppointmentProvider[];
   userTimezone: string;
   onSubmit: (data: NewAppointmentData, reminderEnabled: boolean, reminderData: ReminderData) => void;
   isSubmitting: boolean;
@@ -56,6 +61,7 @@ export function AppointmentFormDialog({
   open,
   onOpenChange,
   customers,
+  providers = [],
   userTimezone,
   onSubmit,
   isSubmitting,
@@ -66,6 +72,7 @@ export function AppointmentFormDialog({
 
   const [appointmentData, setAppointmentData] = useState<NewAppointmentData>({
     customerId: "",
+    providerId: null,
     title: "",
     description: "",
     appointmentDate: new Date(),
@@ -108,6 +115,7 @@ export function AppointmentFormDialog({
     if (!open) {
       setAppointmentData({
         customerId: "",
+        providerId: null,
         title: "",
         description: "",
         appointmentDate: new Date(),
@@ -273,6 +281,45 @@ export function AppointmentFormDialog({
               </Command>
             </PopoverContent>
           </Popover>
+        </div>
+
+        <div>
+          <Label>{t('reminders.appointments.provider', { defaultValue: 'Provider' })}</Label>
+          <Select
+            value={appointmentData.providerId ?? PROVIDER_UNASSIGNED}
+            onValueChange={(value) =>
+              setAppointmentData(prev => ({
+                ...prev,
+                providerId: value === PROVIDER_UNASSIGNED ? null : value,
+              }))
+            }
+          >
+            <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+              <SelectValue placeholder={t('reminders.appointments.selectProvider', { defaultValue: 'Select a provider (optional)' })} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={PROVIDER_UNASSIGNED}>
+                {t('reminders.appointments.unassigned', { defaultValue: 'Unassigned' })}
+              </SelectItem>
+              {providers.map((p) => {
+                const label = p.name || p.email || p.id;
+                const suffix = [p.role, p.isActive === false ? 'inactive' : null]
+                  .filter(Boolean)
+                  .join(' · ');
+                return (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span>{label}</span>
+                    {suffix && (
+                      <span className="ml-2 text-xs text-muted-foreground">({suffix})</span>
+                    )}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">
+            {t('reminders.appointments.providerHelp', { defaultValue: 'Assign this appointment to a team member.' })}
+          </p>
         </div>
 
         <div>
