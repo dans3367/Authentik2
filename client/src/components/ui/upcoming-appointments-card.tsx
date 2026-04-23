@@ -4,12 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAppSelector } from "@/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Calendar,
-  CalendarPlus,
-  CalendarDays,
-  Plus,
-} from "lucide-react";
+import { Calendar, CalendarDays, CalendarPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   AppointmentDetailsContainer,
@@ -282,31 +277,28 @@ export function UpcomingAppointmentsCard() {
           </div>
         )}
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className="flex items-center justify-between gap-2 px-5 py-3 mt-auto border-t border-border/40 hover:bg-muted/40 transition-colors"
-              onClick={() => setCreateOpen(true)}
-              data-testid="button-schedule-appointment"
-            >
-              <span className="flex items-center gap-2.5">
-                <span className="w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
-                  <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                </span>
-                <span className="text-sm font-semibold">
-                  {t("dashboard.appointments.scheduleNew")}
-                </span>
-              </span>
-              <CalendarPlus className="h-4 w-4 text-muted-foreground/60" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" align="center">
-            {t("dashboard.appointments.scheduleNewTooltip", {
-              defaultValue: "Create a new appointment",
-            })}
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex items-center justify-end px-5 py-3 mt-auto border-t border-border/40">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors"
+                onClick={() => setCreateOpen(true)}
+                data-testid="button-schedule-appointment"
+                aria-label={t("dashboard.appointments.scheduleNewTooltip", {
+                  defaultValue: "Create a new appointment",
+                })}
+              >
+                <CalendarPlus className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="center">
+              {t("dashboard.appointments.scheduleNewTooltip", {
+                defaultValue: "Create a new appointment",
+              })}
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </CardContent>
 
       <AppointmentDetailsContainer

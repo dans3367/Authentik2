@@ -87,8 +87,8 @@ type CardId = (typeof DEFAULT_CARD_ORDER)[number];
 const DEFAULT_CARD_SIZES: Record<CardId, number> = {
   mainSlot: 8,
   liveStats: 4,
-  scheduledEmails: 5,
-  appointments: 7,
+  scheduledEmails: 6,
+  appointments: 6,
   highlights: 5,
   birthdays: 7,
 };
@@ -917,8 +917,8 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <Skeleton className="lg:col-span-8 h-[260px] rounded-2xl" />
             <Skeleton className="lg:col-span-4 h-[260px] rounded-2xl" />
-            <Skeleton className="lg:col-span-5 h-[260px] rounded-2xl" />
-            <Skeleton className="lg:col-span-7 h-[260px] rounded-2xl" />
+            <Skeleton className="lg:col-span-6 h-[260px] rounded-2xl" />
+            <Skeleton className="lg:col-span-6 h-[260px] rounded-2xl" />
             <Skeleton className="lg:col-span-5 h-[260px] rounded-2xl" />
             <Skeleton className="lg:col-span-7 h-[260px] rounded-2xl" />
           </div>

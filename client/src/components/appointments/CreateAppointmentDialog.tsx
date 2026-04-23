@@ -184,6 +184,17 @@ export function CreateAppointmentDialog({
             };
           }
         );
+        queryClient.invalidateQueries({
+          predicate: (query) => {
+            if (query.queryKey[0] !== "/api/appointments") return false;
+            const second = query.queryKey[1];
+            const isPrimaryKey =
+              typeof second === "object" &&
+              second !== null &&
+              !Array.isArray(second);
+            return !isPrimaryKey;
+          },
+        });
         onCreated?.(data.appointment);
       } else {
         queryClient.invalidateQueries({
