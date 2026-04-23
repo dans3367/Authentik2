@@ -235,6 +235,10 @@ export function CreateAppointmentDialog({
         });
       }
 
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === "/api/stats/highlights",
+      });
+
       if (variables.createReminder && data.appointment) {
         const appointmentDate = new Date(data.appointment.appointmentDate);
         const rs = variables.reminderSettings;
