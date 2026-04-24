@@ -404,9 +404,9 @@ export default function Dashboard() {
     if (isRefreshing) return;
     setIsRefreshing(true);
     try {
-      await queryClient.invalidateQueries();
+      await queryClient.refetchQueries({ type: "active" });
     } finally {
-      window.setTimeout(() => setIsRefreshing(false), 500);
+      setIsRefreshing(false);
     }
   };
 
