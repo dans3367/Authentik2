@@ -7,7 +7,6 @@ import { api } from "../../../convex/_generated/api";
 import { useAppSelector } from "@/store";
 import { NewsletterCard } from "@/components/ui/newsletter-card";
 import { LiveStatsCard } from "@/components/ui/live-stats-card";
-import { HighlightsCard } from "@/components/ui/highlights-card";
 import { UpcomingBirthdaysCard } from "@/components/ui/upcoming-birthdays-card";
 import { UpcomingAppointmentsCard } from "@/components/ui/upcoming-appointments-card";
 import { UpcomingScheduledEmailsCard } from "@/components/ui/upcoming-scheduled-emails-card";
@@ -81,7 +80,6 @@ const DEFAULT_CARD_ORDER = [
   "liveStats",
   "scheduledEmails",
   "appointments",
-  "highlights",
   "birthdays",
 ] as const;
 type CardId = (typeof DEFAULT_CARD_ORDER)[number];
@@ -91,7 +89,6 @@ const DEFAULT_CARD_SIZES: Record<CardId, number> = {
   liveStats: 4,
   scheduledEmails: 6,
   appointments: 6,
-  highlights: 5,
   birthdays: 7,
 };
 
@@ -100,7 +97,6 @@ const DEFAULT_CARD_VISIBILITY: Record<CardId, boolean> = {
   liveStats: true,
   scheduledEmails: true,
   appointments: true,
-  highlights: true,
   birthdays: true,
 };
 
@@ -109,7 +105,6 @@ const CARD_LABELS: Record<CardId, string> = {
   liveStats: "Live activity",
   scheduledEmails: "Scheduled emails",
   appointments: "Upcoming appointments",
-  highlights: "Highlights",
   birthdays: "Upcoming birthdays",
 };
 
@@ -896,7 +891,6 @@ export default function Dashboard() {
               },
               scheduledEmails: { render: () => <UpcomingScheduledEmailsCard /> },
               appointments: { render: () => <UpcomingAppointmentsCard /> },
-              highlights: { render: () => <HighlightsCard /> },
               birthdays: { render: () => <UpcomingBirthdaysCard /> },
             };
             const visibleCardOrder = cardOrder.filter(
@@ -945,8 +939,7 @@ export default function Dashboard() {
             <Skeleton className="lg:col-span-4 h-[260px] rounded-2xl" />
             <Skeleton className="lg:col-span-6 h-[260px] rounded-2xl" />
             <Skeleton className="lg:col-span-6 h-[260px] rounded-2xl" />
-            <Skeleton className="lg:col-span-5 h-[260px] rounded-2xl" />
-            <Skeleton className="lg:col-span-7 h-[260px] rounded-2xl" />
+            <Skeleton className="lg:col-span-12 h-[260px] rounded-2xl" />
           </div>
         )}
       </div>
