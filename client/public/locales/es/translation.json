@@ -241,7 +241,10 @@
       "notes": "Notas",
       "notesPlaceholder": "Notas adicionales sobre la cita",
       "saveChanges": "Guardar Cambios",
-      "saving": "Guardando..."
+      "saving": "Guardando...",
+      "shop": "Tienda",
+      "provider": "Proveedor",
+      "unassigned": "Sin asignar"
     },
     "overview": {
       "title": "Resumen",
@@ -274,9 +277,16 @@
       "push": "Push (próximamente)",
       "timing": "Momento",
       "sendNow": "Enviar inmediatamente",
-      "24hBefore": "24 horas antes de la cita",
-      "1hBefore": "1 hora antes de la cita",
+      "5mBefore": "5 minutos antes de la cita",
       "30mBefore": "30 minutos antes de la cita",
+      "1hBefore": "1 hora antes de la cita",
+      "5hBefore": "5 horas antes de la cita",
+      "10hBefore": "10 horas antes de la cita",
+      "24hBefore": "24 horas antes de la cita",
+      "customTime": "Tiempo personalizado antes de la cita",
+      "customMinutesLabel": "Minutos personalizados antes",
+      "customMinutesPlaceholder": "Ingresa los minutos (1-10080)",
+      "customMinutesHelp": "Ingresa cuántos minutos antes de la cita enviar el recordatorio (máx. 1 semana = 10080 minutos)",
       "customDateTime": "Fecha y hora personalizada",
       "customDateTimeLabel": "Fecha y Hora Personalizada",
       "message": "Mensaje (opcional)",
@@ -374,7 +384,59 @@
       "noNotes": "Aún no hay notas. Agrega tu primera nota arriba.",
       "editAppointment": "Editar Cita",
       "createNewAppointment": "Crear Nueva Cita",
+      "sendReminder": "Enviar Recordatorio",
       "close": "Cerrar"
+    },
+    "board": {
+      "totalAppointments": "Total de Citas",
+      "thisMonth": "este mes",
+      "vsLastMonth": "vs. mes anterior",
+      "allAppointments": "Todas las Citas",
+      "selectMonth": "Seleccionar mes",
+      "currentSuffix": " (actual)",
+      "stats": {
+        "upcoming": "Próximas",
+        "today": "Hoy",
+        "confirmed": "Confirmadas",
+        "notConfirmed": "Sin confirmar",
+        "remindersSent": "Recordatorios enviados",
+        "remindersNotSent": "Recordatorios sin enviar"
+      },
+      "bookingsLast7Days": "Reservas · Últimos 7 Días",
+      "avg": "prom.",
+      "currentMonthOnly": "Solo mes actual",
+      "appointmentsList": "Lista de citas",
+      "searchPlaceholder": "Buscar contactos o tipos...",
+      "filters": "Filtros",
+      "provider": "Proveedor",
+      "clear": "Limpiar",
+      "noProviders": "No se encontraron proveedores.",
+      "unassigned": "Sin asignar",
+      "unnamedProvider": "Proveedor sin nombre",
+      "selectedCount": "{{count}} seleccionados",
+      "showingAllProviders": "Mostrando todos los proveedores",
+      "tabs": {
+        "all": "Todas",
+        "today": "Hoy",
+        "scheduled": "Programadas",
+        "confirmed": "Confirmadas",
+        "reminders": "Recordatorios"
+      },
+      "noMatch": "Ninguna cita coincide con esta vista.",
+      "table": {
+        "contact": "Contacto",
+        "when": "Cuándo",
+        "type": "Tipo",
+        "provider": "Proveedor",
+        "status": "Estado"
+      },
+      "todayBadge": "Hoy",
+      "showing": "Mostrando",
+      "of": "de",
+      "showMore": "Mostrar más",
+      "exportCsv": "Exportar CSV",
+      "manageTemplates": "Administrar plantillas",
+      "viewFullCalendar": "Ver calendario completo"
     }
   },
   "birthdays": {
@@ -3865,7 +3927,8 @@
     },
     "tabs": {
       "profile": "Perfil",
-      "appointments": "Citas"
+      "appointments": "Citas",
+      "activity": "Actividad"
     },
     "contactInfo": {
       "title": "Información de Contacto",

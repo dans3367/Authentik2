@@ -279,7 +279,7 @@ export function AppointmentDetailsSheet({
 
                       {appointment.shop?.name && (
                         <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">Shop</p>
+                          <p className="text-xs text-muted-foreground">{t('reminders.appointments.shop')}</p>
                           <p className="text-sm text-foreground flex items-center gap-1.5">
                             <Building2 className="h-3 w-3 text-muted-foreground" />
                             {appointment.shop.name}
@@ -289,7 +289,7 @@ export function AppointmentDetailsSheet({
 
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground">
-                          {t('reminders.appointments.provider', { defaultValue: 'Provider' })}
+                          {t('reminders.appointments.provider')}
                         </p>
                         <p className="text-sm text-foreground flex items-center gap-1.5">
                           <UserCircle2 className="h-3 w-3 text-muted-foreground" />
@@ -297,7 +297,7 @@ export function AppointmentDetailsSheet({
                             ? (appointment.provider.name || appointment.provider.email)
                             : (
                               <span className="text-muted-foreground italic">
-                                {t('reminders.appointments.unassigned', { defaultValue: 'Unassigned' })}
+                                {t('reminders.appointments.unassigned')}
                               </span>
                             )}
                         </p>

@@ -15,6 +15,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
+import ContactRecentActivity from "@/components/ContactRecentActivity";
 import SendEmailModal from "@/components/SendEmailModal";
 import ManageContactTagsModal from "@/components/ManageContactTagsModal";
 import CustomerAppointmentsTab from "@/components/CustomerAppointmentsTab";
@@ -396,10 +397,11 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                 );
               })()}
 
-              {/* Tabs for Profile and Appointments */}
+              {/* Tabs for Profile, Activity, and Appointments */}
               <Tabs defaultValue="profile" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="profile">{t('contactDrawer.tabs.profile')}</TabsTrigger>
+                  <TabsTrigger value="activity">{t('contactDrawer.tabs.activity')}</TabsTrigger>
                   <TabsTrigger value="appointments">{t('contactDrawer.tabs.appointments')}</TabsTrigger>
                 </TabsList>
 
@@ -675,36 +677,6 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                     </CardContent>
                   </Card>
 
-                  {/* Activity Timeline */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <Calendar className="w-4 h-4" />
-                        {t('contactDrawer.timeline.title')}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.timeline.addedDate')}</label>
-                        <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.addedDate)}</p>
-                      </div>
-
-                      <Separator />
-
-                      <div>
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.timeline.lastActivity')}</label>
-                        <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.lastActivity || null)}</p>
-                      </div>
-
-                      <Separator />
-
-                      <div>
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('contactDrawer.timeline.lastUpdated')}</label>
-                        <p className="text-sm text-gray-900 dark:text-white">{formatDateShort(contact.updatedAt)}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
                   {/* Consent Information */}
                   <Card>
                     <CardHeader>
@@ -831,6 +803,13 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                       </Button>
                     </CardContent>
                   </Card>
+                </TabsContent>
+
+                <TabsContent value="activity" className="mt-4">
+                  <ContactRecentActivity
+                    contactId={contact.id}
+                    addedDate={contact.addedDate as unknown as string | Date | null}
+                  />
                 </TabsContent>
 
                 <TabsContent value="appointments" className="mt-4">

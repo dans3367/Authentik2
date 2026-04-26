@@ -72,6 +72,7 @@ import {
 } from "@/components/appointments";
 import type { EditReminderData } from "@/components/appointments";
 import type { ScheduleReminderData } from "@/components/appointments";
+import type { NewAppointmentData } from "@/components/appointments";
 
 // Import extracted utilities
 import {
@@ -136,6 +137,8 @@ export default function RemindersPage() {
 
   // Modal state
   const [newAppointmentModalOpen, setNewAppointmentModalOpen] = useState(false);
+  const [newAppointmentDefaults, setNewAppointmentDefaults] = useState<Partial<NewAppointmentData> | undefined>(undefined);
+  const [newAppointmentSeedCustomer, setNewAppointmentSeedCustomer] = useState<AppointmentWithCustomer['customer']>(undefined);
   const [editAppointmentModalOpen, setEditAppointmentModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<AppointmentWithCustomer | null>(null);
   const [viewAppointmentPanelOpen, setViewAppointmentPanelOpen] = useState(false);
@@ -684,6 +687,17 @@ export default function RemindersPage() {
 
   const handleCreateNewFromPast = (appointment: AppointmentWithCustomer) => {
     setViewAppointmentPanelOpen(false);
+    setNewAppointmentDefaults({
+      customerId: appointment.customerId,
+      providerId: appointment.providerId ?? null,
+      shopId: appointment.shop?.id ?? null,
+      duration: appointment.duration,
+      location: appointment.location ?? "",
+      serviceType: appointment.serviceType ?? "",
+      status: 'scheduled',
+      notes: "",
+    });
+    setNewAppointmentSeedCustomer(appointment.customer);
     setNewAppointmentModalOpen(true);
   };
 
@@ -934,6 +948,21 @@ export default function RemindersPage() {
           onSchedule={handleScheduleReminder}
           isScheduling={createScheduledReminderMutation.isPending}
           validateEmailReminder={validateEmailReminder}
+        />
+
+        {/* Create Appointment Dialog (also used for "Create New" from past appointments) */}
+        <CreateAppointmentDialog
+          open={newAppointmentModalOpen}
+          onOpenChange={(open) => {
+            setNewAppointmentModalOpen(open);
+            if (!open) {
+              setNewAppointmentDefaults(undefined);
+              setNewAppointmentSeedCustomer(undefined);
+            }
+          }}
+          defaults={newAppointmentDefaults}
+          seedCustomer={newAppointmentSeedCustomer}
+          hideTrigger
         />
 
         {/* Edit Appointment Dialog */}

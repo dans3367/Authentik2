@@ -14,18 +14,19 @@ export const SUPPORTED_LANGUAGES = {
 
 export function useLanguage() {
   const { i18n, t } = useTranslation();
-  const { user } = useReduxAuth();
+  const { user, refetch } = useReduxAuth();
   const { toast } = useToast();
   const [isChanging, setIsChanging] = useState(false);
 
   const currentLanguage = i18n.language as SupportedLanguage;
 
-  // Initialize language from user preference or localStorage
+  // Sync i18n with the user's stored language preference (and localStorage fallback).
+  // Intentionally excludes currentLanguage from deps: including it created a loop
+  // where the post-mutation session cache (still stale) reverted the user's selection.
   useEffect(() => {
     const initializeLanguage = async () => {
       let targetLanguage: SupportedLanguage = 'en';
 
-      // Priority: 1. User database preference, 2. localStorage, 3. browser default
       if (user?.language && Object.keys(SUPPORTED_LANGUAGES).includes(user.language)) {
         targetLanguage = user.language as SupportedLanguage;
       } else {
@@ -35,13 +36,13 @@ export function useLanguage() {
         }
       }
 
-      if (currentLanguage !== targetLanguage) {
+      if (i18n.language !== targetLanguage) {
         await i18n.changeLanguage(targetLanguage);
       }
     };
 
     initializeLanguage();
-  }, [user?.language, currentLanguage, i18n]);
+  }, [user?.language, i18n]);
 
   // Mutation to update language preference in the database
   const updateLanguageMutation = useMutation({
@@ -51,7 +52,8 @@ export function useLanguage() {
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      await refetch?.();
       toast({
         title: t('toast.success'),
         description: t('toast.languageChanged'),

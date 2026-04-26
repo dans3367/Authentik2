@@ -439,7 +439,10 @@
       "notes": "Notes",
       "notesPlaceholder": "Additional notes about the appointment",
       "saveChanges": "Save Changes",
-      "saving": "Saving..."
+      "saving": "Saving...",
+      "shop": "Shop",
+      "provider": "Provider",
+      "unassigned": "Unassigned"
     },
     "overview": {
       "title": "Overview",
@@ -578,6 +581,57 @@
       "createNewAppointment": "Create New Appointment",
       "sendReminder": "Send Reminder",
       "close": "Close"
+    },
+    "board": {
+      "totalAppointments": "Total Appointments",
+      "thisMonth": "this month",
+      "vsLastMonth": "vs. last month",
+      "allAppointments": "All Appointments",
+      "selectMonth": "Select month",
+      "currentSuffix": " (current)",
+      "stats": {
+        "upcoming": "Upcoming",
+        "today": "Today",
+        "confirmed": "Confirmed",
+        "notConfirmed": "Not confirmed",
+        "remindersSent": "Reminders sent",
+        "remindersNotSent": "Reminders not sent"
+      },
+      "bookingsLast7Days": "Bookings · Last 7 Days",
+      "avg": "avg",
+      "currentMonthOnly": "Current month only",
+      "appointmentsList": "Appointments list",
+      "searchPlaceholder": "Search contacts or types...",
+      "filters": "Filters",
+      "provider": "Provider",
+      "clear": "Clear",
+      "noProviders": "No providers found.",
+      "unassigned": "Unassigned",
+      "unnamedProvider": "Unnamed provider",
+      "selectedCount": "{{count}} selected",
+      "showingAllProviders": "Showing all providers",
+      "tabs": {
+        "all": "All",
+        "today": "Today",
+        "scheduled": "Scheduled",
+        "confirmed": "Confirmed",
+        "reminders": "Reminders"
+      },
+      "noMatch": "No appointments match this view.",
+      "table": {
+        "contact": "Contact",
+        "when": "When",
+        "type": "Type",
+        "provider": "Provider",
+        "status": "Status"
+      },
+      "todayBadge": "Today",
+      "showing": "Showing",
+      "of": "of",
+      "showMore": "Show more",
+      "exportCsv": "Export CSV",
+      "manageTemplates": "Manage templates",
+      "viewFullCalendar": "View full calendar"
     }
   },
   "birthdays": {
@@ -3926,7 +3980,8 @@
     },
     "tabs": {
       "profile": "Profile",
-      "appointments": "Appointments"
+      "appointments": "Appointments",
+      "activity": "Activity"
     },
     "contactInfo": {
       "title": "Contact Information",

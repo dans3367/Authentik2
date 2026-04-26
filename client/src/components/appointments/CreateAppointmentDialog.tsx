@@ -35,6 +35,8 @@ interface CreateAppointmentDialogProps {
   onOptimisticResolve?: (tempId: string) => void;
   onCreated?: (appointment: AppointmentWithCustomer) => void;
   hideTrigger?: boolean;
+  defaults?: Partial<NewAppointmentData>;
+  seedCustomer?: Customer | null;
 }
 
 export function CreateAppointmentDialog({
@@ -44,6 +46,8 @@ export function CreateAppointmentDialog({
   onOptimisticResolve,
   onCreated,
   hideTrigger = false,
+  defaults,
+  seedCustomer,
 }: CreateAppointmentDialogProps) {
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -404,6 +408,8 @@ export function CreateAppointmentDialog({
         isSubmitting={createAppointmentMutation.isPending}
         validateEmailReminder={validateEmailReminder}
         hideTrigger={hideTrigger}
+        defaults={defaults}
+        seedCustomer={seedCustomer}
       />
 
       <Dialog open={pastDateConfirmOpen} onOpenChange={setPastDateConfirmOpen}>

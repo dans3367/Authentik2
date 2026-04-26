@@ -765,16 +765,20 @@ export default function EmailContacts() {
                             {getStatusBadge(contact.status)}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               {contact.tags.slice(0, 2).map((tag) => (
-                                <Badge key={tag.id} variant="outline" className="text-xs" style={{ backgroundColor: tag.color + '20', borderColor: tag.color }}>
+                                <span
+                                  key={tag.id}
+                                  className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium"
+                                  style={{ backgroundColor: tag.color + '33', color: tag.color }}
+                                >
                                   {tag.name}
-                                </Badge>
+                                </span>
                               ))}
                               {contact.tags.length > 2 && (
-                                <Badge variant="outline" className="text-xs">
+                                <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                                   +{contact.tags.length - 2}
-                                </Badge>
+                                </span>
                               )}
                             </div>
                           </TableCell>
@@ -1010,22 +1014,21 @@ export default function EmailContacts() {
                             {contact.tags.length > 0 && (
                               <div>
                                 <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">{t('emailContacts.table.tags')}</span>
-                                <div className="flex items-center gap-1 flex-wrap">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   {contact.tags.slice(0, 3).map((tag) => (
-                                    <Badge
+                                    <span
                                       key={tag.id}
-                                      variant="outline"
-                                      className="text-xs"
-                                      style={{ backgroundColor: tag.color + '20', borderColor: tag.color }}
+                                      className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium"
+                                      style={{ backgroundColor: tag.color + '33', color: tag.color }}
                                       data-testid={`badge-tag-card-${tag.id}`}
                                     >
                                       {tag.name}
-                                    </Badge>
+                                    </span>
                                   ))}
                                   {contact.tags.length > 3 && (
-                                    <Badge variant="outline" className="text-xs">
+                                    <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                                       +{contact.tags.length - 3}
-                                    </Badge>
+                                    </span>
                                   )}
                                 </div>
                               </div>

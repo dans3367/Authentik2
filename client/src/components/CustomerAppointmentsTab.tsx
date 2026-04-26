@@ -61,6 +61,9 @@ import {
     Plus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAssignableUsers } from "@/hooks/useAssignableUsers";
+
+const PROVIDER_UNASSIGNED = "__unassigned__";
 
 interface Appointment {
     id: string;
@@ -88,6 +91,7 @@ export default function CustomerAppointmentsTab({
 }: CustomerAppointmentsTabProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const { providers } = useAssignableUsers();
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
     const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
     const [rescheduleEmailDialogOpen, setRescheduleEmailDialogOpen] = useState(false);
@@ -160,7 +164,17 @@ export default function CustomerAppointmentsTab({
     const [dialogStep, setDialogStep] = useState<"form" | "reminder">("form");
     const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
     const [createdAppointmentDate, setCreatedAppointmentDate] = useState<Date | null>(null);
-    const [newAppointment, setNewAppointment] = useState({
+    const [newAppointment, setNewAppointment] = useState<{
+        title: string;
+        description: string;
+        appointmentDate: string;
+        appointmentTime: string;
+        duration: number;
+        location: string;
+        serviceType: string;
+        notes: string;
+        providerId: string | null;
+    }>({
         title: "",
         description: "",
         appointmentDate: "",
@@ -169,6 +183,7 @@ export default function CustomerAppointmentsTab({
         location: "",
         serviceType: "",
         notes: "",
+        providerId: null,
     });
     const [formErrors, setFormErrors] = useState<{ title?: boolean; date?: boolean }>({});
     const [reminderData, setReminderData] = useState<{
@@ -195,6 +210,7 @@ export default function CustomerAppointmentsTab({
             location: "",
             serviceType: "",
             notes: "",
+            providerId: null,
         });
         setFormErrors({});
         setDialogStep("form");
@@ -351,6 +367,7 @@ export default function CustomerAppointmentsTab({
 
         createAppointmentMutation.mutate({
             customerId,
+            providerId: newAppointment.providerId,
             title: newAppointment.title.trim(),
             description: newAppointment.description.trim() || undefined,
             appointmentDate: appointmentDate.toISOString(),
@@ -600,6 +617,45 @@ export default function CustomerAppointmentsTab({
                                     placeholder="e.g. Follow-up consultation"
                                     className={formErrors.title ? "border-red-500" : ""}
                                 />
+                            </div>
+
+                            <div>
+                                <Label>Provider</Label>
+                                <Select
+                                    value={newAppointment.providerId ?? PROVIDER_UNASSIGNED}
+                                    onValueChange={(value) =>
+                                        setNewAppointment(prev => ({
+                                            ...prev,
+                                            providerId: value === PROVIDER_UNASSIGNED ? null : value,
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                                        <SelectValue placeholder="Select a provider (optional)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={PROVIDER_UNASSIGNED}>Unassigned</SelectItem>
+                                        {providers.map((p) => {
+                                            const label = p.name || p.email || p.id;
+                                            const suffix = [p.role, p.isActive === false ? "inactive" : null]
+                                                .filter(Boolean)
+                                                .join(" · ");
+                                            return (
+                                                <SelectItem key={p.id} value={p.id}>
+                                                    <span>{label}</span>
+                                                    {suffix && (
+                                                        <span className="ml-2 text-xs text-muted-foreground">
+                                                            ({suffix})
+                                                        </span>
+                                                    )}
+                                                </SelectItem>
+                                            );
+                                        })}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Assign this appointment to a team member.
+                                </p>
                             </div>
 
                             <div>

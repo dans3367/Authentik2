@@ -63,12 +63,14 @@ interface AppointmentFormDialogProps {
   isSubmitting: boolean;
   validateEmailReminder: (email: string) => Promise<string | null>;
   hideTrigger?: boolean;
+  defaults?: Partial<NewAppointmentData>;
+  seedCustomer?: Customer | null;
 }
 
 export function AppointmentFormDialog({
   open,
   onOpenChange,
-  customers,
+  customers: customersProp,
   providers = [],
   shops = [],
   requireShopSelection = false,
@@ -77,7 +79,17 @@ export function AppointmentFormDialog({
   isSubmitting,
   validateEmailReminder,
   hideTrigger = false,
+  defaults,
+  seedCustomer,
 }: AppointmentFormDialogProps) {
+  // Inject the seedCustomer into the customers list if it's not already present
+  // — fixes the case where the prefilled customerId points to a customer that
+  // isn't on the paginated first page returned by /api/email-contacts.
+  const customers = useMemo<Customer[]>(() => {
+    if (!seedCustomer) return customersProp;
+    if (customersProp.some(c => c.id === seedCustomer.id)) return customersProp;
+    return [seedCustomer, ...customersProp];
+  }, [customersProp, seedCustomer]);
   const { t } = useTranslation();
 
   const [appointmentData, setAppointmentData] = useState<NewAppointmentData>({
@@ -122,7 +134,7 @@ export function AppointmentFormDialog({
     }
   }, [userTimezone]);
 
-  // Reset form when dialog closes
+  // Reset form when dialog closes; seed with `defaults` when it opens
   useEffect(() => {
     if (!open) {
       setAppointmentData({
@@ -149,8 +161,10 @@ export function AppointmentFormDialog({
         content: '',
       });
       setReminderValidationError(null);
+    } else if (defaults) {
+      setAppointmentData(prev => ({ ...prev, ...defaults }));
     }
-  }, [open, userTimezone]);
+  }, [open, userTimezone, defaults]);
 
   const runEmailValidation = async (email?: string | null) => {
     if (!email) {

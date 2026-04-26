@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { format, isToday, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, subDays, isSameDay, isSameMonth } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AppointmentWithCustomer,
   getCustomerName,
@@ -50,7 +53,7 @@ function getInitials(name: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-type TabKey = "all" | "today" | "scheduled" | "confirmed" | "reminders";
+type TabKey = "all" | "today" | "scheduled" | "confirmed" | "notConfirmed" | "reminders" | "remindersNotSent";
 
 const STATUS_DOT: Record<string, string> = {
   scheduled: "bg-rose-500",
@@ -85,12 +88,46 @@ export function AppointmentsWeekBoard({
   onManageTemplates,
   onViewCalendar,
 }: AppointmentsWeekBoardProps) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<TabKey>("all");
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(8);
+  const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
 
   const now = useMemo(() => new Date(), [appointments]);
   const [selectedMonth, setSelectedMonth] = useState<string>(() => format(new Date(), "yyyy-MM"));
+
+  const providerOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    let hasUnassigned = false;
+    for (const a of appointments) {
+      if (a.provider?.id) {
+        const name = a.provider.name || a.provider.email || t('reminders.board.unnamedProvider');
+        if (!map.has(a.provider.id)) map.set(a.provider.id, { id: a.provider.id, name });
+      } else {
+        hasUnassigned = true;
+      }
+    }
+    const list = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return { list, hasUnassigned };
+  }, [appointments]);
+
+  const scopedAppointments = useMemo(() => {
+    if (selectedProviderIds.length === 0) return appointments;
+    const set = new Set(selectedProviderIds);
+    const includeUnassigned = set.has("unassigned");
+    return appointments.filter(a =>
+      a.providerId ? set.has(a.providerId) : includeUnassigned
+    );
+  }, [appointments, selectedProviderIds]);
+
+  const isProviderFiltered = selectedProviderIds.length > 0;
+
+  const toggleProvider = (id: string) => {
+    setSelectedProviderIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   const monthOptions = useMemo(() => {
     const keys = new Set<string>();
@@ -113,24 +150,33 @@ export function AppointmentsWeekBoard({
     return match?.date ?? startOfMonth(now);
   }, [monthOptions, selectedMonth, now]);
 
+  const isCurrentMonth = useMemo(
+    () => isSameMonth(selectedMonthDate, now),
+    [selectedMonthDate, now]
+  );
+
+  useEffect(() => {
+    if (!isCurrentMonth && tab !== "all") setTab("all");
+  }, [isCurrentMonth, tab]);
+
   const totalThisMonth = useMemo(() => {
     const s = startOfMonth(now);
     const e = endOfMonth(now);
-    return appointments.filter(a => {
+    return scopedAppointments.filter(a => {
       const d = new Date(a.appointmentDate);
       return d >= s && d <= e;
     }).length;
-  }, [appointments, now]);
+  }, [scopedAppointments, now]);
 
   const totalLastMonth = useMemo(() => {
     const lastMonth = subMonths(now, 1);
     const s = startOfMonth(lastMonth);
     const e = endOfMonth(lastMonth);
-    return appointments.filter(a => {
+    return scopedAppointments.filter(a => {
       const d = new Date(a.appointmentDate);
       return d >= s && d <= e;
     }).length;
-  }, [appointments, now]);
+  }, [scopedAppointments, now]);
 
   const pctDelta = totalLastMonth > 0
     ? Math.round(((totalThisMonth - totalLastMonth) / totalLastMonth) * 100)
@@ -139,7 +185,7 @@ export function AppointmentsWeekBoard({
   const monthAppointments = useMemo(() => {
     const monthStart = startOfMonth(selectedMonthDate);
     const monthEnd = endOfMonth(selectedMonthDate);
-    return appointments
+    return scopedAppointments
       .filter(a => {
         const d = new Date(a.appointmentDate);
         return d >= monthStart && d <= monthEnd;
@@ -147,7 +193,7 @@ export function AppointmentsWeekBoard({
       .sort(
         (a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime()
       );
-  }, [appointments, selectedMonthDate]);
+  }, [scopedAppointments, selectedMonthDate]);
 
   const upcomingCount = useMemo(
     () =>
@@ -169,8 +215,16 @@ export function AppointmentsWeekBoard({
     () => monthAppointments.filter(a => a.status === "confirmed").length,
     [monthAppointments]
   );
+  const notConfirmedCount = useMemo(
+    () => monthAppointments.filter(a => a.status !== "confirmed").length,
+    [monthAppointments]
+  );
   const remindersCount = useMemo(
     () => monthAppointments.filter(a => a.reminderSent).length,
+    [monthAppointments]
+  );
+  const remindersNotSentCount = useMemo(
+    () => monthAppointments.filter(a => !a.reminderSent).length,
     [monthAppointments]
   );
 
@@ -178,21 +232,23 @@ export function AppointmentsWeekBoard({
     const days: { label: string; date: Date; count: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = subDays(now, i);
-      const count = appointments.filter(a => isSameDay(new Date(a.appointmentDate), d)).length;
+      const count = scopedAppointments.filter(a => isSameDay(new Date(a.appointmentDate), d)).length;
       days.push({ label: format(d, "EEE"), date: d, count });
     }
     return days;
-  }, [appointments, now]);
+  }, [scopedAppointments, now]);
 
   const avgLast7 = last7Days.length > 0
     ? last7Days.reduce((sum, d) => sum + d.count, 0) / last7Days.length
     : 0;
 
   const filterItems: { key: TabKey; label: string; count: number; dotClass: string }[] = [
-    { key: "all", label: "Upcoming", count: upcomingCount, dotClass: "bg-rose-500" },
-    { key: "today", label: "Today", count: todayCount, dotClass: "bg-slate-400" },
-    { key: "confirmed", label: "Confirmed", count: confirmedCount, dotClass: "bg-emerald-500" },
-    { key: "reminders", label: "Reminders sent", count: remindersCount, dotClass: "bg-rose-500" },
+    { key: "all", label: t('reminders.board.stats.upcoming'), count: upcomingCount, dotClass: "bg-rose-500" },
+    { key: "today", label: t('reminders.board.stats.today'), count: todayCount, dotClass: "bg-slate-400" },
+    { key: "confirmed", label: t('reminders.board.stats.confirmed'), count: confirmedCount, dotClass: "bg-emerald-500" },
+    { key: "notConfirmed", label: t('reminders.board.stats.notConfirmed'), count: notConfirmedCount, dotClass: "bg-amber-500" },
+    { key: "reminders", label: t('reminders.board.stats.remindersSent'), count: remindersCount, dotClass: "bg-rose-500" },
+    { key: "remindersNotSent", label: t('reminders.board.stats.remindersNotSent'), count: remindersNotSentCount, dotClass: "bg-slate-400" },
   ];
 
   const tabCounts: Record<TabKey, number> = {
@@ -200,7 +256,9 @@ export function AppointmentsWeekBoard({
     today: todayCount,
     scheduled: scheduledCount,
     confirmed: confirmedCount,
+    notConfirmed: notConfirmedCount,
     reminders: remindersCount,
+    remindersNotSent: remindersNotSentCount,
   };
 
   const filtered = useMemo(() => {
@@ -209,7 +267,9 @@ export function AppointmentsWeekBoard({
       if (tab === "today" && !isToday(new Date(a.appointmentDate))) return false;
       if (tab === "scheduled" && a.status !== "scheduled") return false;
       if (tab === "confirmed" && a.status !== "confirmed") return false;
+      if (tab === "notConfirmed" && a.status === "confirmed") return false;
       if (tab === "reminders" && !a.reminderSent) return false;
+      if (tab === "remindersNotSent" && a.reminderSent) return false;
       if (!q) return true;
       return (
         getCustomerNameForSort(a.customer).toLowerCase().includes(q) ||
@@ -229,46 +289,56 @@ export function AppointmentsWeekBoard({
         <CardContent className="p-6 flex flex-col gap-6">
           <div>
             <p className="text-[11px] font-semibold tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
-              Total Appointments
+              {t('reminders.board.totalAppointments')}
             </p>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">
                 {totalThisMonth}
               </span>
-              <span className="text-sm text-slate-500 dark:text-slate-400">this month</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">{t('reminders.board.thisMonth')}</span>
             </div>
             {pctDelta !== null && (
               <div className="mt-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-medium">
                 <TrendingUp className="h-3 w-3" />
-                {pctDelta >= 0 ? `+${pctDelta}` : pctDelta}% vs. last month
+                {pctDelta >= 0 ? `+${pctDelta}` : pctDelta}% {t('reminders.board.vsLastMonth')}
               </div>
             )}
           </div>
 
           <div className="flex flex-col gap-1 -mx-2">
             {filterItems.map(item => {
-              const active =
-                (item.key === "all" && tab === "all") ||
-                (item.key === "today" && tab === "today") ||
-                (item.key === "confirmed" && tab === "confirmed") ||
-                (item.key === "reminders" && tab === "reminders");
+              const active = item.key === tab;
+              const disabled = !isCurrentMonth;
               return (
                 <button
                   key={item.key}
                   type="button"
                   onClick={() => setTab(item.key)}
+                  disabled={disabled}
                   className={`group flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    active
+                    disabled
+                      ? "text-slate-400 dark:text-slate-600 cursor-default"
+                      : active
                       ? "bg-rose-50 dark:bg-rose-950/30 text-slate-900 dark:text-slate-100"
                       : "hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
                   }`}
                 >
                   <span className="flex items-center gap-2">
-                    <span className={`h-1.5 w-1.5 rounded-full ${item.dotClass}`} />
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        disabled ? "bg-slate-300 dark:bg-slate-700" : item.dotClass
+                      }`}
+                    />
                     {item.label}
                   </span>
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300 tabular-nums">
-                    {item.count}
+                  <span
+                    className={`text-sm font-medium tabular-nums ${
+                      disabled
+                        ? "text-slate-400 dark:text-slate-600"
+                        : "text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    {isCurrentMonth ? item.count : "—"}
                   </span>
                 </button>
               );
@@ -277,17 +347,17 @@ export function AppointmentsWeekBoard({
 
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
             <p className="text-[11px] font-semibold tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400 mb-2">
-              All Appointments
+              {t('reminders.board.allAppointments')}
             </p>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-full h-9 rounded-lg">
-                <SelectValue placeholder="Select month" />
+                <SelectValue placeholder={t('reminders.board.selectMonth')} />
               </SelectTrigger>
               <SelectContent>
                 {monthOptions.map(m => (
                   <SelectItem key={m.value} value={m.value}>
                     {m.label}
-                    {isSameMonth(m.date, now) ? " (current)" : ""}
+                    {isSameMonth(m.date, now) ? t('reminders.board.currentSuffix') : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -296,19 +366,41 @@ export function AppointmentsWeekBoard({
 
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-baseline justify-between mb-2">
-              <span className="text-[11px] font-medium tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
-                Bookings · Last 7 Days
+              <span
+                className={`text-[11px] font-medium tracking-[0.15em] uppercase ${
+                  isCurrentMonth
+                    ? "text-slate-500 dark:text-slate-400"
+                    : "text-slate-400 dark:text-slate-600"
+                }`}
+              >
+                {t('reminders.board.bookingsLast7Days')}
               </span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
-                avg {avgLast7.toFixed(1)}
+              <span
+                className={`text-[11px] tabular-nums ${
+                  isCurrentMonth
+                    ? "text-slate-500 dark:text-slate-400"
+                    : "text-slate-400 dark:text-slate-600"
+                }`}
+              >
+                {t('reminders.board.avg')} {isCurrentMonth ? avgLast7.toFixed(1) : "—"}
               </span>
             </div>
-            <MiniLineChart data={last7Days.map(d => d.count)} />
-            <div className="mt-1 flex justify-between text-[10px] text-slate-400 dark:text-slate-500">
-              {last7Days.map((d, i) => (
-                <span key={i}>{d.label}</span>
-              ))}
-            </div>
+            {isCurrentMonth ? (
+              <>
+                <MiniLineChart data={last7Days.map(d => d.count)} />
+                <div className="mt-1 flex justify-between text-[10px] text-slate-400 dark:text-slate-500">
+                  {last7Days.map((d, i) => (
+                    <span key={i}>{d.label}</span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-[56px] flex items-center justify-center rounded-md border border-dashed border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] text-slate-400 dark:text-slate-600">
+                  {t('reminders.board.currentMonthOnly')}
+                </span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -320,7 +412,7 @@ export function AppointmentsWeekBoard({
             <div className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-slate-700 dark:text-slate-300" />
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                Appointments list
+                {t('reminders.board.appointmentsList')}
               </h2>
               <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-900 dark:bg-slate-100 px-1.5 text-[11px] font-medium text-white dark:text-slate-900 tabular-nums">
                 {monthAppointments.length}
@@ -330,53 +422,124 @@ export function AppointmentsWeekBoard({
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search patients or types..."
+                  placeholder={t('reminders.board.searchPlaceholder')}
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="pl-9 h-9 w-56 rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
                 />
               </div>
-              <Button variant="outline" size="sm" className="h-9 rounded-lg">
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 rounded-lg relative">
+                    <Filter className="h-4 w-4 mr-2" />
+                    {t('reminders.board.filters')}
+                    {isProviderFiltered && (
+                      <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-rose-500" />
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-72 p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-semibold tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
+                        {t('reminders.board.provider')}
+                      </p>
+                      {isProviderFiltered && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProviderIds([])}
+                          className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                        >
+                          {t('reminders.board.clear')}
+                        </button>
+                      )}
+                    </div>
+                    {providerOptions.list.length === 0 && !providerOptions.hasUnassigned ? (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {t('reminders.board.noProviders')}
+                      </p>
+                    ) : (
+                      <div className="max-h-64 overflow-y-auto -mx-1 pr-1">
+                        {providerOptions.hasUnassigned && (
+                          <label className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
+                            <Checkbox
+                              checked={selectedProviderIds.includes("unassigned")}
+                              onCheckedChange={() => toggleProvider("unassigned")}
+                            />
+                            <span className="text-sm text-slate-700 dark:text-slate-300 italic">
+                              {t('reminders.board.unassigned')}
+                            </span>
+                          </label>
+                        )}
+                        {providerOptions.list.map(p => (
+                          <label
+                            key={p.id}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={selectedProviderIds.includes(p.id)}
+                              onCheckedChange={() => toggleProvider(p.id)}
+                            />
+                            <span className="text-sm text-slate-700 dark:text-slate-300 truncate">
+                              {p.name}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {isProviderFiltered
+                        ? t('reminders.board.selectedCount', { count: selectedProviderIds.length })
+                        : t('reminders.board.showingAllProviders')}
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
           <div className="flex items-center gap-1 px-5 py-3 border-b border-slate-200 dark:border-slate-800 overflow-x-auto">
             <TabPill active={tab === "all"} onClick={() => setTab("all")} count={tabCounts.all}>
-              All
+              {t('reminders.board.tabs.all')}
             </TabPill>
-            <TabPill active={tab === "today"} onClick={() => setTab("today")} count={tabCounts.today}>
-              Today
+            <TabPill
+              active={tab === "today"}
+              onClick={() => setTab("today")}
+              count={tabCounts.today}
+              disabled={!isCurrentMonth}
+            >
+              {t('reminders.board.tabs.today')}
             </TabPill>
             <TabPill
               active={tab === "scheduled"}
               onClick={() => setTab("scheduled")}
               count={tabCounts.scheduled}
+              disabled={!isCurrentMonth}
             >
-              Scheduled
+              {t('reminders.board.tabs.scheduled')}
             </TabPill>
             <TabPill
               active={tab === "confirmed"}
               onClick={() => setTab("confirmed")}
               count={tabCounts.confirmed}
+              disabled={!isCurrentMonth}
             >
-              Confirmed
+              {t('reminders.board.tabs.confirmed')}
             </TabPill>
             <TabPill
               active={tab === "reminders"}
               onClick={() => setTab("reminders")}
               count={tabCounts.reminders}
+              disabled={!isCurrentMonth}
             >
-              Reminders
+              {t('reminders.board.tabs.reminders')}
             </TabPill>
           </div>
 
           {filtered.length === 0 ? (
             <div className="px-5 py-16 text-center">
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                No appointments match this view.
+                {t('reminders.board.noMatch')}
               </p>
             </div>
           ) : (
@@ -384,16 +547,19 @@ export function AppointmentsWeekBoard({
               <TableHeader>
                 <TableRow className="border-slate-200 dark:border-slate-800 hover:bg-transparent">
                   <TableHead className="text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
-                    Patient
+                    {t('reminders.board.table.contact')}
                   </TableHead>
                   <TableHead className="text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
-                    When
+                    {t('reminders.board.table.when')}
                   </TableHead>
                   <TableHead className="text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
-                    Type
+                    {t('reminders.board.table.type')}
                   </TableHead>
                   <TableHead className="text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
-                    Status
+                    {t('reminders.board.table.provider')}
+                  </TableHead>
+                  <TableHead className="text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
+                    {t('reminders.board.table.status')}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -436,7 +602,7 @@ export function AppointmentsWeekBoard({
                           </span>
                           {isToday(aptDate) && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-[10px] font-medium">
-                              Today
+                              {t('reminders.board.todayBadge')}
                             </span>
                           )}
                         </div>
@@ -448,11 +614,36 @@ export function AppointmentsWeekBoard({
                         {apt.serviceType || apt.title}
                       </TableCell>
                       <TableCell className="py-4">
+                        {apt.provider?.name || apt.provider?.email ? (
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-semibold ${
+                                AVATAR_PALETTE[
+                                  hashString(apt.provider.name || apt.provider.email || "") %
+                                    AVATAR_PALETTE.length
+                                ]
+                              }`}
+                            >
+                              {getInitials(apt.provider.name || apt.provider.email || "?")}
+                            </div>
+                            <span className="text-sm text-slate-700 dark:text-slate-300 truncate">
+                              {apt.provider.name || apt.provider.email}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm italic text-slate-400 dark:text-slate-500">
+                            {t('reminders.board.unassigned')}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-4">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${pillClass}`}
                         >
                           <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
-                          {apt.status.replace("_", " ")}
+                          {t(`reminders.appointments.${
+                            apt.status === 'no_show' ? 'noShow' : apt.status
+                          }`, { defaultValue: apt.status.replace("_", " ") })}
                         </span>
                       </TableCell>
                     </TableRow>
@@ -464,15 +655,15 @@ export function AppointmentsWeekBoard({
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-t border-slate-200 dark:border-slate-800 text-sm">
             <div className="text-slate-500 dark:text-slate-400">
-              Showing <span className="font-medium text-slate-700 dark:text-slate-300">{visible.length}</span>{" "}
-              of <span className="font-medium text-slate-700 dark:text-slate-300">{filtered.length}</span>
+              {t('reminders.board.showing')} <span className="font-medium text-slate-700 dark:text-slate-300">{visible.length}</span>{" "}
+              {t('reminders.board.of')} <span className="font-medium text-slate-700 dark:text-slate-300">{filtered.length}</span>
               {filtered.length > pageSize && (
                 <button
                   type="button"
                   onClick={() => setPageSize(p => p + 8)}
                   className="ml-3 text-slate-900 dark:text-slate-100 hover:underline"
                 >
-                  Show more
+                  {t('reminders.board.showMore')}
                 </button>
               )}
             </div>
@@ -484,7 +675,7 @@ export function AppointmentsWeekBoard({
                   className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Export CSV
+                  {t('reminders.board.exportCsv')}
                 </button>
               )}
               {onManageTemplates && (
@@ -494,7 +685,7 @@ export function AppointmentsWeekBoard({
                   className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
                 >
                   <FileText className="h-3.5 w-3.5" />
-                  Manage templates
+                  {t('reminders.board.manageTemplates')}
                 </button>
               )}
               {onViewCalendar && (
@@ -503,7 +694,7 @@ export function AppointmentsWeekBoard({
                   onClick={onViewCalendar}
                   className="inline-flex items-center gap-1.5 font-medium text-slate-900 dark:text-slate-100 hover:underline"
                 >
-                  View full calendar
+                  {t('reminders.board.viewFullCalendar')}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -519,19 +710,24 @@ function TabPill({
   active,
   count,
   onClick,
+  disabled = false,
   children,
 }: {
   active: boolean;
   count: number;
   onClick: () => void;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-        active
+        disabled
+          ? "text-slate-400 dark:text-slate-600 cursor-default"
+          : active
           ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900"
           : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
       }`}
@@ -539,12 +735,14 @@ function TabPill({
       {children}
       <span
         className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-md px-1.5 text-[11px] tabular-nums ${
-          active
+          disabled
+            ? "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600"
+            : active
             ? "bg-white/15 text-white dark:bg-slate-900/15 dark:text-slate-900"
             : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
         }`}
       >
-        {count}
+        {disabled ? "—" : count}
       </span>
     </button>
   );
