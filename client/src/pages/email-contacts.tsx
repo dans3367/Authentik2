@@ -769,14 +769,14 @@ export default function EmailContacts() {
                               {contact.tags.slice(0, 2).map((tag) => (
                                 <span
                                   key={tag.id}
-                                  className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium"
-                                  style={{ backgroundColor: tag.color + '33', color: tag.color }}
+                                  className="contact-tag"
+                                  style={{ ['--tag' as any]: tag.color }}
                                 >
                                   {tag.name}
                                 </span>
                               ))}
                               {contact.tags.length > 2 && (
-                                <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                <span className="contact-tag-muted">
                                   +{contact.tags.length - 2}
                                 </span>
                               )}
@@ -1018,15 +1018,15 @@ export default function EmailContacts() {
                                   {contact.tags.slice(0, 3).map((tag) => (
                                     <span
                                       key={tag.id}
-                                      className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium"
-                                      style={{ backgroundColor: tag.color + '33', color: tag.color }}
+                                      className="contact-tag"
+                                      style={{ ['--tag' as any]: tag.color }}
                                       data-testid={`badge-tag-card-${tag.id}`}
                                     >
                                       {tag.name}
                                     </span>
                                   ))}
                                   {contact.tags.length > 3 && (
-                                    <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                    <span className="contact-tag-muted">
                                       +{contact.tags.length - 3}
                                     </span>
                                   )}

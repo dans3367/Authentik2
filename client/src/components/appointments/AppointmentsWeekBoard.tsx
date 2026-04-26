@@ -293,11 +293,15 @@ export function AppointmentsWeekBoard({
             </p>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">
-                {totalThisMonth}
+                {isCurrentMonth ? totalThisMonth : monthAppointments.length}
               </span>
-              <span className="text-sm text-slate-500 dark:text-slate-400">{t('reminders.board.thisMonth')}</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                {isCurrentMonth
+                  ? t('reminders.board.thisMonth')
+                  : t('reminders.board.inMonth', { month: format(selectedMonthDate, 'MMMM') })}
+              </span>
             </div>
-            {pctDelta !== null && (
+            {isCurrentMonth && pctDelta !== null && (
               <div className="mt-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-medium">
                 <TrendingUp className="h-3 w-3" />
                 {pctDelta >= 0 ? `+${pctDelta}` : pctDelta}% {t('reminders.board.vsLastMonth')}

@@ -787,3 +787,42 @@
   color: hsl(0, 0%, 50%) !important;
 }
 
+/* Soft pastel contact tag — uses --tag (hex) for hue, color-mix to desaturate */
+.contact-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  line-height: 1.4;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  font-weight: 500;
+  background: color-mix(in oklch, var(--tag, #6b7280) 16%, white);
+  color: color-mix(in oklch, var(--tag, #6b7280) 70%, black);
+  white-space: nowrap;
+}
+
+.dark .contact-tag {
+  background: color-mix(in oklch, var(--tag, #6b7280) 28%, black);
+  color: color-mix(in oklch, var(--tag, #6b7280) 35%, white);
+}
+
+.contact-tag-muted {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  line-height: 1.4;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  font-weight: 500;
+  background: hsl(215, 16%, 94%);
+  color: hsl(215, 10%, 45%);
+  white-space: nowrap;
+}
+
+.dark .contact-tag-muted {
+  background: hsl(215, 20%, 18%);
+  color: hsl(215, 10%, 70%);
+}
+

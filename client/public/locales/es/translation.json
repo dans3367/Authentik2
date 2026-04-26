@@ -390,6 +390,7 @@
     "board": {
       "totalAppointments": "Total de Citas",
       "thisMonth": "este mes",
+      "inMonth": "en {{month}}",
       "vsLastMonth": "vs. mes anterior",
       "allAppointments": "Todas las Citas",
       "selectMonth": "Seleccionar mes",

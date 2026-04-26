@@ -585,6 +585,7 @@
     "board": {
       "totalAppointments": "Total Appointments",
       "thisMonth": "this month",
+      "inMonth": "in {{month}}",
       "vsLastMonth": "vs. last month",
       "allAppointments": "All Appointments",
       "selectMonth": "Select month",
