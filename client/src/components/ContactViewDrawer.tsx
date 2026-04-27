@@ -14,9 +14,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import EmailActivityTimeline from "@/components/EmailActivityTimeline";
 import ContactRecentActivity from "@/components/ContactRecentActivity";
 import SendEmailModal from "@/components/SendEmailModal";
+import ScheduleEmailModal from "@/components/ScheduleEmailModal";
 import ManageContactTagsModal from "@/components/ManageContactTagsModal";
 import CustomerAppointmentsTab from "@/components/CustomerAppointmentsTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -343,24 +343,27 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                     </Button>
                   }
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
+                <ScheduleEmailModal
+                  contactId={contact.id}
+                  contactEmail={contact.email}
+                  contactName={getFullName(contact)}
                   disabled={isSendEmailDisabled}
-                  onClick={() => {
-                    onOpenChange(false);
-                    setLocation(`/email-contacts/view/${contact.id}/schedule`);
-                  }}
-                >
-                  <Clock className="w-4 h-4 mr-2" />
-                  {t('contactDrawer.actions.scheduleSend')}
-                </Button>
+                  disabledReason={sendEmailDisabledReason}
+                  onScheduled={handleEmailSent}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <Clock className="w-4 h-4 mr-2" />
+                      {t('contactDrawer.actions.scheduleSend')}
+                    </Button>
+                  }
+                />
+
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
                     onOpenChange(false);
-                    setLocation(`/email-contacts/edit/${contact.id}`);
+                    setLocation(`/contacts/edit/${contact.id}`);
                   }}
                 >
                   <Edit className="w-4 h-4 mr-2" />
@@ -765,11 +768,6 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                       })}
                     </CardContent>
                   </Card>
-
-                  {/* Email Activity Timeline */}
-                  <div>
-                    <EmailActivityTimeline contactId={contact.id} pageSize={10} />
-                  </div>
 
                   {/* Quick Actions */}
                   <Card>

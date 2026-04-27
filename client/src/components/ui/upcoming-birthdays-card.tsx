@@ -195,7 +195,7 @@ export function UpcomingBirthdaysCard() {
                 return (
                   <div
                     key={contact.id}
-                    onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
+                    onClick={() => setLocation(`/contacts/view/${contact.id}`)}
                     className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 ${
                       isToday
                         ? "bg-gradient-to-r from-pink-500/[0.06] to-rose-500/[0.04] dark:from-pink-500/10 dark:to-rose-500/[0.06] border border-pink-200/40 dark:border-pink-500/15 hover:shadow-md"

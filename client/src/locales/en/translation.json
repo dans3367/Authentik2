@@ -1161,6 +1161,15 @@
       "emails": "emails",
       "active": "Active"
     },
+    "relative": {
+      "today": "today",
+      "dayAgo": "1 day ago",
+      "daysAgo": "{{count}} days ago",
+      "monthAgo": "1 month ago",
+      "monthsAgo": "{{count}} months ago",
+      "yearAgo": "1 year ago",
+      "yearsAgo": "{{count}} years ago"
+    },
     "statusBadges": {
       "active": "Active",
       "unsubscribed": "Unsubscribed",
@@ -3962,7 +3971,7 @@
     "notFoundDesc": "The contact you're looking for doesn't exist or you don't have permission to view it.",
     "actions": {
       "sendEmail": "Send Email",
-      "scheduleSend": "Schedule Send",
+      "scheduleSend": "Schedule Email",
       "edit": "Edit",
       "manageTags": "Manage Tags",
       "deleteContact": "Delete Contact",

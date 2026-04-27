@@ -114,7 +114,7 @@ export default function ScheduledEmailsTimelinePage() {
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Button variant="ghost" onClick={() => navigate(`/email-contacts/view/${id}`)} className="mb-2">
+            <Button variant="ghost" onClick={() => navigate(`/contacts/view/${id}`)} className="mb-2">
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Contact
             </Button>
             <h1 className="text-2xl font-bold">Scheduled Emails</h1>
@@ -122,7 +122,7 @@ export default function ScheduledEmailsTimelinePage() {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>Refresh</Button>
-            <Button onClick={() => navigate(`/email-contacts/view/${id}/schedule`)}>
+            <Button onClick={() => navigate(`/contacts/view/${id}/schedule`)}>
               <Clock className="w-4 h-4 mr-2" /> New Scheduled Email
             </Button>
           </div>

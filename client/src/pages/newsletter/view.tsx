@@ -2239,7 +2239,7 @@ export default function NewsletterViewPage() {
                                       const response = await apiRequest('GET', `/api/email-contacts?search=${encodeURIComponent(email.recipient)}&limit=1`);
                                       const data = await response.json();
                                       if (data.contacts && data.contacts.length > 0) {
-                                        navigate(`/email-contacts/view/${data.contacts[0].id}`);
+                                        navigate(`/contacts/view/${data.contacts[0].id}`);
                                       } else {
                                         toast({ title: "Contact Not Found", description: "This email was not found in your contacts.", variant: "destructive" });
                                       }

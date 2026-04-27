@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import EmailActivityTimeline from "@/components/EmailActivityTimeline";
 import SendEmailModal from "@/components/SendEmailModal";
+import ScheduleEmailModal from "@/components/ScheduleEmailModal";
 import ManageContactTagsModal from "@/components/ManageContactTagsModal";
 import CustomerAppointmentsTab from "@/components/CustomerAppointmentsTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -81,7 +82,7 @@ export default function CustomerViewPage() {
 
   // Get return URL from query parameters
   const urlParams = new URLSearchParams(window.location.search);
-  const returnUrl = urlParams.get('return') || '/email-contacts';
+  const returnUrl = urlParams.get('return') || '/contacts';
 
   const { data: response, isLoading, error } = useQuery({
     queryKey: ['/api/email-contacts', id],
@@ -342,19 +343,24 @@ export default function CustomerViewPage() {
             </Button>
           }
         />
-        <Button
-          variant="outline"
-          size="sm"
+        <ScheduleEmailModal
+          contactId={contact.id}
+          contactEmail={contact.email}
+          contactName={getFullName(contact)}
           disabled={isSendEmailDisabled}
-          onClick={() => setLocation(`/email-contacts/view/${contact.id}/schedule`)}
-        >
-          <Clock className="w-4 h-4 mr-2" />
-          Send Later
-        </Button>
+          disabledReason={sendEmailDisabledReason}
+          onScheduled={handleEmailSent}
+          trigger={
+            <Button variant="outline" size="sm">
+              <Clock className="w-4 h-4 mr-2" />
+              Send Later
+            </Button>
+          }
+        />
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setLocation(`/email-contacts/edit/${contact.id}`)}
+          onClick={() => setLocation(`/contacts/edit/${contact.id}`)}
         >
           <Edit className="w-4 h-4 mr-2" />
           Edit

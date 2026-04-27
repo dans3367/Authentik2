@@ -92,7 +92,7 @@ interface UpdateContactRequest {
 
 export default function EditEmailContact() {
   const [, setLocation] = useLocation();
-  const [match, params] = useRoute("/email-contacts/edit/:id");
+  const [match, params] = useRoute("/contacts/edit/:id");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -101,7 +101,7 @@ export default function EditEmailContact() {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
 
   if (!match || !params?.id) {
-    setLocation("/email-contacts");
+    setLocation("/contacts");
     return null;
   }
 
@@ -246,7 +246,7 @@ export default function EditEmailContact() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/email-contacts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/email-contacts", contactId] });
-      setLocation("/email-contacts");
+      setLocation("/contacts");
     },
     onError: (error: any) => {
       const is403 = error instanceof Error && error.message?.startsWith('403:');
@@ -343,7 +343,7 @@ export default function EditEmailContact() {
                 <p className="text-muted-foreground text-sm max-w-md">
                   You do not have permission to edit this contact. Contact your administrator to request access.
                 </p>
-                <Button variant="outline" onClick={() => setLocation("/email-contacts")}>
+                <Button variant="outline" onClick={() => setLocation("/contacts")}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Contacts
                 </Button>
@@ -362,7 +362,7 @@ export default function EditEmailContact() {
               <p className="text-muted-foreground mb-4">
                 The contact you're looking for doesn't exist or has been deleted.
               </p>
-              <Button onClick={() => setLocation("/email-contacts")}>
+              <Button onClick={() => setLocation("/contacts")}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Contacts
               </Button>
@@ -383,7 +383,7 @@ export default function EditEmailContact() {
       <div className="mb-8">
         <Button
           variant="ghost"
-          onClick={() => setLocation("/email-contacts")}
+          onClick={() => setLocation("/contacts")}
           className="mb-6 group hover:bg-white/60 dark:hover:bg-slate-800/60 backdrop-blur-sm border border-white/20 dark:border-slate-700/50"
         >
           <ArrowLeft className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-0.5" />
@@ -1055,7 +1055,7 @@ export default function EditEmailContact() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setLocation("/email-contacts")}
+                      onClick={() => setLocation("/contacts")}
                       className="border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       Cancel

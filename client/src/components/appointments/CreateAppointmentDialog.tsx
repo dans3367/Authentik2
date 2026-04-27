@@ -178,6 +178,12 @@ export function CreateAppointmentDialog({
         serviceType: appointmentData.serviceType,
         status: appointmentData.status || "scheduled",
         notes: appointmentData.notes,
+        recurrenceFrequency: appointmentData.recurrenceFrequency,
+        recurrenceInterval: appointmentData.recurrenceInterval,
+        recurrenceCount: appointmentData.recurrenceCount,
+        recurrenceEndDate: appointmentData.recurrenceEndDate,
+        recurrenceSeriesId: null,
+        recurrenceParentId: null,
         reminderSent: false,
         confirmationReceived: false,
         customer: selectedCustomer,
@@ -205,18 +211,21 @@ export function CreateAppointmentDialog({
       if (context?.tempId) onOptimisticResolve?.(context.tempId);
 
       if (data?.appointment) {
+        const createdAppointments = Array.isArray(data.appointments)
+          ? data.appointments
+          : [data.appointment];
         queryClient.setQueryData<{ appointments: AppointmentWithCustomer[] }>(
           ["/api/appointments", { shopId: context?.effectiveShopId ?? selectedShopId }],
           (old) => {
             if (!old?.appointments) return old;
             return {
-              appointments: old.appointments.map((apt) =>
+              appointments: old.appointments.flatMap((apt) =>
                 apt.id === context?.tempId
-                  ? {
-                      ...data.appointment,
-                      customer: data.appointment.customer || apt.customer,
-                    }
-                  : apt
+                  ? createdAppointments.map((created: AppointmentWithCustomer) => ({
+                      ...created,
+                      customer: created.customer || apt.customer,
+                    }))
+                  : [apt]
               ),
             };
           }

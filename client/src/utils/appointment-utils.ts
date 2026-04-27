@@ -45,6 +45,12 @@ export interface Appointment {
   confirmationToken?: string | null;
   declineReason?: string | null;
   reminderSettings?: string | null;
+  recurrenceFrequency?: 'none' | 'daily' | 'weekly' | 'monthly' | string | null;
+  recurrenceInterval?: number | null;
+  recurrenceCount?: number | null;
+  recurrenceEndDate?: Date | null;
+  recurrenceSeriesId?: string | null;
+  recurrenceParentId?: string | null;
   createdAt?: Date | null;
   updatedAt?: Date | null;
 }
@@ -400,3 +406,34 @@ export const TIMEZONE_OPTIONS = [
   { value: "Pacific/Auckland", label: "🇳🇿 Auckland (NZST)" },
   { value: "UTC", label: "🌐 UTC" },
 ];
+
+export function downloadAppointmentIcs(appointment: AppointmentWithCustomer) {
+  const start = new Date(appointment.appointmentDate);
+  const end = new Date(start.getTime() + (appointment.duration ?? 60) * 60_000);
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const escape = (s: string) => s.replace(/[\\;,]/g, (c) => '\\' + c).replace(/\n/g, '\\n');
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Authentik//Appointments//EN',
+    'BEGIN:VEVENT',
+    `UID:${appointment.id}@authentik`,
+    `DTSTAMP:${fmt(new Date())}`,
+    `DTSTART:${fmt(start)}`,
+    `DTEND:${fmt(end)}`,
+    `SUMMARY:${escape(appointment.title)}`,
+    appointment.location ? `LOCATION:${escape(appointment.location)}` : '',
+    appointment.description ? `DESCRIPTION:${escape(appointment.description)}` : '',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].filter(Boolean).join('\r\n');
+
+  const blob = new Blob([lines], { type: 'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `appointment-${appointment.id}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}

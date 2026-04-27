@@ -23,6 +23,7 @@ import type {
   AppointmentReminder,
   AppointmentWithCustomer,
 } from "@/utils/appointment-utils";
+import { downloadAppointmentIcs } from "@/utils/appointment-utils";
 
 interface AppointmentNote {
   id: string;
@@ -446,6 +447,7 @@ export function AppointmentDetailsContainer({
         onSendReminder={(id) =>
           sendReminderMutation.mutate({ appointmentIds: [id], reminderType: "email" })
         }
+        onExportIcs={viewingAppointment ? () => downloadAppointmentIcs(viewingAppointment) : undefined}
         isSendingReminder={sendReminderMutation.isPending}
         newNoteContent={newNoteContent}
         onNewNoteContentChange={setNewNoteContent}

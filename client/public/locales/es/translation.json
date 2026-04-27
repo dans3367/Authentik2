@@ -950,6 +950,15 @@
       "emails": "correos",
       "active": "Activo"
     },
+    "relative": {
+      "today": "hoy",
+      "dayAgo": "hace 1 día",
+      "daysAgo": "hace {{count}} días",
+      "monthAgo": "hace 1 mes",
+      "monthsAgo": "hace {{count}} meses",
+      "yearAgo": "hace 1 año",
+      "yearsAgo": "hace {{count}} años"
+    },
     "statusBadges": {
       "active": "Activo",
       "unsubscribed": "Dado de Baja",
@@ -3909,7 +3918,7 @@
     "notFoundDesc": "El contacto que buscas no existe o no tienes permiso para verlo.",
     "actions": {
       "sendEmail": "Enviar Correo",
-      "scheduleSend": "Programar Envío",
+      "scheduleSend": "Programar Correo",
       "edit": "Editar",
       "manageTags": "Gestionar Etiquetas",
       "deleteContact": "Eliminar Contacto",

@@ -2506,6 +2506,12 @@ export const appointments = pgTable("appointments", {
   serviceType: text("service_type"), // e.g., "consultation", "meeting", "service"
   status: text("status").notNull().default('scheduled'), // scheduled, confirmed, cancelled, completed, no_show
   notes: text("notes"),
+  recurrenceFrequency: text("recurrence_frequency").notNull().default('none'), // none, daily, weekly, monthly
+  recurrenceInterval: integer("recurrence_interval").default(1),
+  recurrenceCount: integer("recurrence_count"),
+  recurrenceEndDate: timestamp("recurrence_end_date"),
+  recurrenceSeriesId: text("recurrence_series_id"),
+  recurrenceParentId: text("recurrence_parent_id"),
   reminderSent: boolean("reminder_sent").default(false),
   reminderSentAt: timestamp("reminder_sent_at"),
   confirmationReceived: boolean("confirmation_received").default(false),
@@ -2756,7 +2762,28 @@ export const createAppointmentSchema = z.object({
   location: z.string().optional(),
   serviceType: z.string().optional(),
   notes: z.string().optional(),
+  recurrenceFrequency: z.enum(['none', 'daily', 'weekly', 'monthly']).optional().default('none'),
+  recurrenceInterval: z.number().int().min(1).max(12).optional().default(1),
+  recurrenceCount: z.number().int().min(1).max(365).optional().nullable(),
+  recurrenceEndDate: z.coerce.date().optional().nullable(),
   reminderSettings: z.string().optional(), // JSON string
+}).superRefine((data, ctx) => {
+  if (data.recurrenceFrequency && data.recurrenceFrequency !== 'none') {
+    if (!data.recurrenceCount && !data.recurrenceEndDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recurrenceCount'],
+        message: 'Recurring appointments need an occurrence count or end date',
+      });
+    }
+    if (data.recurrenceEndDate && data.recurrenceEndDate < data.appointmentDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recurrenceEndDate'],
+        message: 'Recurrence end date must be after the appointment date',
+      });
+    }
+  }
 });
 
 export const updateAppointmentSchema = z.object({
@@ -2776,6 +2803,12 @@ export const updateAppointmentSchema = z.object({
   serviceType: z.string().optional(),
   status: z.enum(['scheduled', 'confirmed', 'cancelled', 'completed', 'no_show']).optional(),
   notes: z.string().optional(),
+  recurrenceFrequency: z.enum(['none', 'daily', 'weekly', 'monthly']).optional(),
+  recurrenceInterval: z.number().int().min(1).max(12).optional().nullable(),
+  recurrenceCount: z.number().int().min(1).max(365).optional().nullable(),
+  recurrenceEndDate: z.coerce.date().optional().nullable(),
+  recurrenceSeriesId: z.string().optional().nullable(),
+  recurrenceParentId: z.string().optional().nullable(),
   reminderSettings: z.string().optional(),
 });
 

@@ -87,6 +87,55 @@ async function cancelPendingRemindersForAppointment(appointmentId: string): Prom
   return { cancelled, errors };
 }
 
+type RecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly';
+
+const MAX_RECURRENCE_OCCURRENCES = 365;
+
+function addRecurrenceInterval(date: Date, frequency: RecurrenceFrequency, interval: number): Date {
+  const next = new Date(date);
+  if (frequency === 'daily') {
+    next.setDate(next.getDate() + interval);
+  } else if (frequency === 'weekly') {
+    next.setDate(next.getDate() + interval * 7);
+  } else if (frequency === 'monthly') {
+    const day = next.getDate();
+    next.setDate(1);
+    next.setMonth(next.getMonth() + interval);
+    const lastDayOfMonth = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+    next.setDate(Math.min(day, lastDayOfMonth));
+  }
+  return next;
+}
+
+function buildAppointmentOccurrences<T extends { appointmentDate: Date; recurrenceFrequency?: RecurrenceFrequency; recurrenceInterval?: number | null; recurrenceCount?: number | null; recurrenceEndDate?: Date | null }>(
+  data: T,
+): T[] {
+  const frequency = data.recurrenceFrequency ?? 'none';
+  if (frequency === 'none') {
+    return [{ ...data, recurrenceFrequency: 'none', recurrenceInterval: 1, recurrenceCount: null, recurrenceEndDate: null }];
+  }
+
+  const interval = data.recurrenceInterval || 1;
+  const targetCount = Math.min(data.recurrenceCount || MAX_RECURRENCE_OCCURRENCES, MAX_RECURRENCE_OCCURRENCES);
+  const occurrences: T[] = [];
+  let occurrenceDate = new Date(data.appointmentDate);
+
+  for (let index = 0; index < targetCount; index++) {
+    if (data.recurrenceEndDate && occurrenceDate > data.recurrenceEndDate) break;
+    occurrences.push({
+      ...data,
+      appointmentDate: new Date(occurrenceDate),
+      recurrenceFrequency: frequency,
+      recurrenceInterval: interval,
+      recurrenceCount: targetCount,
+      recurrenceEndDate: data.recurrenceEndDate ?? null,
+    });
+    occurrenceDate = addRecurrenceInterval(occurrenceDate, frequency, interval);
+  }
+
+  return occurrences.length > 0 ? occurrences : [data];
+}
+
 
 // Apply authentication to all routes
 router.use(authenticateToken);
@@ -148,6 +197,12 @@ router.get('/', async (req: Request, res: Response) => {
         serviceType: appointments.serviceType,
         status: appointments.status,
         notes: appointments.notes,
+        recurrenceFrequency: appointments.recurrenceFrequency,
+        recurrenceInterval: appointments.recurrenceInterval,
+        recurrenceCount: appointments.recurrenceCount,
+        recurrenceEndDate: appointments.recurrenceEndDate,
+        recurrenceSeriesId: appointments.recurrenceSeriesId,
+        recurrenceParentId: appointments.recurrenceParentId,
         reminderSent: appointments.reminderSent,
         reminderSentAt: appointments.reminderSentAt,
         confirmationReceived: appointments.confirmationReceived,
@@ -253,6 +308,12 @@ router.get('/:id', async (req: Request, res: Response) => {
         serviceType: appointments.serviceType,
         status: appointments.status,
         notes: appointments.notes,
+        recurrenceFrequency: appointments.recurrenceFrequency,
+        recurrenceInterval: appointments.recurrenceInterval,
+        recurrenceCount: appointments.recurrenceCount,
+        recurrenceEndDate: appointments.recurrenceEndDate,
+        recurrenceSeriesId: appointments.recurrenceSeriesId,
+        recurrenceParentId: appointments.recurrenceParentId,
         reminderSent: appointments.reminderSent,
         reminderSentAt: appointments.reminderSentAt,
         confirmationReceived: appointments.confirmationReceived,
@@ -336,27 +397,33 @@ router.post('/', async (req: Request, res: Response) => {
       }
     }
 
-    // Generate confirmation token
-    const confirmationToken = uuidv4();
-
     // Resolve shopId: use selected shop from header, or fall back to tenant default
     const shopId = await resolveShopId((req as any).shopId, tenantId);
 
-    // Create appointment
-    const newAppointment = await db
+    const occurrences = buildAppointmentOccurrences(validatedData as any);
+    const isRecurring = (validatedData.recurrenceFrequency ?? 'none') !== 'none';
+    const recurrenceSeriesId = isRecurring ? uuidv4() : null;
+    const recurrenceParentId = isRecurring ? uuidv4() : null;
+
+    // Create appointment(s)
+    const newAppointments = await db
       .insert(appointments)
-      .values({
+      .values(occurrences.map((occurrence, index) => ({
+        id: index === 0 && recurrenceParentId ? recurrenceParentId : undefined,
         tenantId,
         userId,
-        confirmationToken,
+        confirmationToken: uuidv4(),
         shopId,
-        ...validatedData,
-      })
+        ...occurrence,
+        recurrenceCount: isRecurring ? occurrences.length : null,
+        recurrenceSeriesId,
+        recurrenceParentId: index === 0 ? null : recurrenceParentId,
+      })))
       .returning();
 
     // Fetch customer data if customerId exists to match GET response structure
     let appointmentCustomer = null;
-    if (newAppointment[0].customerId) {
+    if (newAppointments[0].customerId) {
       const customerData = await db
         .select({
           id: emailContacts.id,
@@ -372,18 +439,18 @@ router.post('/', async (req: Request, res: Response) => {
           phoneNumber: emailContacts.phoneNumber,
         })
         .from(emailContacts)
-        .where(and(eq(emailContacts.id, newAppointment[0].customerId), eq(emailContacts.tenantId, tenantId)))
+        .where(and(eq(emailContacts.id, newAppointments[0].customerId), eq(emailContacts.tenantId, tenantId)))
         .limit(1);
       appointmentCustomer = customerData[0] || null;
     }
 
     // Fetch provider details if assigned
     let appointmentProvider = null;
-    if (newAppointment[0].providerId) {
+    if (newAppointments[0].providerId) {
       const providerData = await db
         .select({ id: betterAuthUser.id, name: betterAuthUser.name, email: betterAuthUser.email })
         .from(betterAuthUser)
-        .where(and(eq(betterAuthUser.id, newAppointment[0].providerId), eq(betterAuthUser.tenantId, tenantId)))
+        .where(and(eq(betterAuthUser.id, newAppointments[0].providerId), eq(betterAuthUser.tenantId, tenantId)))
         .limit(1);
       appointmentProvider = providerData[0] || null;
     }
@@ -398,16 +465,20 @@ router.post('/', async (req: Request, res: Response) => {
         tenantId,
         userId,
         entityType: 'appointment',
-        entityId: newAppointment[0].id,
-        entityName: newAppointment[0].title,
+        entityId: newAppointments[0].id,
+        entityName: newAppointments[0].title,
         activityType: 'created',
-        description: `Created appointment "${newAppointment[0].title}" for ${customerName}`,
+        description: isRecurring && newAppointments.length > 1
+          ? `Created ${newAppointments.length} recurring appointments "${newAppointments[0].title}" for ${customerName}`
+          : `Created appointment "${newAppointments[0].title}" for ${customerName}`,
         metadata: {
-          customerId: newAppointment[0].customerId,
+          customerId: newAppointments[0].customerId,
           customerName,
-          appointmentDate: newAppointment[0].appointmentDate,
-          serviceType: newAppointment[0].serviceType,
-          location: newAppointment[0].location,
+          appointmentDate: newAppointments[0].appointmentDate,
+          serviceType: newAppointments[0].serviceType,
+          location: newAppointments[0].location,
+          recurrenceFrequency: newAppointments[0].recurrenceFrequency,
+          recurrenceCount: newAppointments.length,
         },
         req,
       });
@@ -415,9 +486,19 @@ router.post('/', async (req: Request, res: Response) => {
       console.error('[Activity Log] Failed to log appointment creation:', error);
     }
 
+    const appointmentsWithRelations = newAppointments.map((appointment) => ({
+      ...appointment,
+      customer: appointmentCustomer,
+      provider: appointmentProvider,
+    }));
+
     res.status(201).json({
-      appointment: { ...newAppointment[0], customer: appointmentCustomer, provider: appointmentProvider },
-      message: 'Appointment created successfully'
+      appointment: appointmentsWithRelations[0],
+      appointments: appointmentsWithRelations,
+      recurrenceCreatedCount: appointmentsWithRelations.length,
+      message: isRecurring && appointmentsWithRelations.length > 1
+        ? `${appointmentsWithRelations.length} appointments created successfully`
+        : 'Appointment created successfully'
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -503,7 +584,8 @@ router.put('/:id', async (req: Request, res: Response) => {
     // Log activity for appointment update
     const changes = computeChanges(existing, updatedAppointment[0], [
       'title', 'description', 'appointmentDate', 'duration', 'location',
-      'serviceType', 'status', 'notes', 'customerId', 'providerId'
+      'serviceType', 'status', 'notes', 'customerId', 'providerId',
+      'recurrenceFrequency', 'recurrenceInterval', 'recurrenceCount', 'recurrenceEndDate'
     ]);
 
     try {
@@ -554,7 +636,9 @@ router.patch('/:id', async (req: Request, res: Response) => {
     // Whitelist of allowed fields for PATCH updates - prevents mass assignment attacks
     const allowedFields = [
       'title', 'description', 'appointmentDate', 'duration', 'location',
-      'serviceType', 'status', 'notes', 'customerId', 'reminderSettings', 'providerId'
+      'serviceType', 'status', 'notes', 'customerId', 'reminderSettings', 'providerId',
+      'recurrenceFrequency', 'recurrenceInterval', 'recurrenceCount', 'recurrenceEndDate',
+      'recurrenceSeriesId', 'recurrenceParentId'
     ];
 
     // Build sanitized update data with only allowed fields
@@ -597,6 +681,45 @@ router.patch('/:id', async (req: Request, res: Response) => {
       }
     }
 
+    if (updateData.recurrenceEndDate) {
+      updateData.recurrenceEndDate = new Date(updateData.recurrenceEndDate);
+      if (isNaN(updateData.recurrenceEndDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid recurrenceEndDate format' });
+      }
+    } else if (updateData.recurrenceEndDate === null) {
+      updateData.recurrenceEndDate = null;
+    }
+
+    if (updateData.recurrenceFrequency) {
+      const validFrequencies = ['none', 'daily', 'weekly', 'monthly'];
+      if (!validFrequencies.includes(updateData.recurrenceFrequency)) {
+        return res.status(400).json({ error: `Invalid recurrenceFrequency. Must be one of: ${validFrequencies.join(', ')}` });
+      }
+      if (updateData.recurrenceFrequency === 'none') {
+        updateData.recurrenceInterval = 1;
+        updateData.recurrenceCount = null;
+        updateData.recurrenceEndDate = null;
+        updateData.recurrenceSeriesId = null;
+        updateData.recurrenceParentId = null;
+      }
+    }
+
+    if (updateData.recurrenceInterval !== undefined && updateData.recurrenceInterval !== null) {
+      const interval = Number(updateData.recurrenceInterval);
+      if (!Number.isInteger(interval) || interval < 1 || interval > 12) {
+        return res.status(400).json({ error: 'recurrenceInterval must be an integer between 1 and 12' });
+      }
+      updateData.recurrenceInterval = interval;
+    }
+
+    if (updateData.recurrenceCount !== undefined && updateData.recurrenceCount !== null) {
+      const count = Number(updateData.recurrenceCount);
+      if (!Number.isInteger(count) || count < 1 || count > MAX_RECURRENCE_OCCURRENCES) {
+        return res.status(400).json({ error: `recurrenceCount must be an integer between 1 and ${MAX_RECURRENCE_OCCURRENCES}` });
+      }
+      updateData.recurrenceCount = count;
+    }
+
     // Normalise providerId: empty string → null (unassign)
     if ('providerId' in updateData) {
       if (updateData.providerId === '' || updateData.providerId === undefined) {
@@ -635,6 +758,17 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const existing = existingAppointment[0];
     const isDateChanging = updateData.appointmentDate &&
       new Date(updateData.appointmentDate).getTime() !== new Date(existing.appointmentDate).getTime();
+    const shouldCreateSeriesFromEdit =
+      updateData.recurrenceFrequency &&
+      updateData.recurrenceFrequency !== 'none' &&
+      !existing.recurrenceSeriesId &&
+      ((updateData.recurrenceCount ?? 1) > 1 || updateData.recurrenceEndDate);
+
+    const editSeriesId = shouldCreateSeriesFromEdit ? uuidv4() : null;
+    if (shouldCreateSeriesFromEdit) {
+      updateData.recurrenceSeriesId = editSeriesId;
+      updateData.recurrenceParentId = null;
+    }
 
     let remindersCancelled = 0;
     if (isDateChanging) {
@@ -661,10 +795,58 @@ router.patch('/:id', async (req: Request, res: Response) => {
       .where(eq(appointments.id, id))
       .returning();
 
+    let createdSeriesOccurrences = 0;
+    if (shouldCreateSeriesFromEdit && editSeriesId) {
+      const baseAppointment = updatedAppointment[0];
+      const occurrences = buildAppointmentOccurrences({
+        customerId: baseAppointment.customerId,
+        providerId: baseAppointment.providerId,
+        title: baseAppointment.title,
+        description: baseAppointment.description ?? undefined,
+        appointmentDate: baseAppointment.appointmentDate,
+        duration: baseAppointment.duration ?? 60,
+        location: baseAppointment.location ?? undefined,
+        serviceType: baseAppointment.serviceType ?? undefined,
+        status: baseAppointment.status,
+        notes: baseAppointment.notes ?? undefined,
+        recurrenceFrequency: baseAppointment.recurrenceFrequency as RecurrenceFrequency,
+        recurrenceInterval: baseAppointment.recurrenceInterval ?? 1,
+        recurrenceCount: baseAppointment.recurrenceCount,
+        recurrenceEndDate: baseAppointment.recurrenceEndDate,
+        reminderSettings: baseAppointment.reminderSettings ?? undefined,
+      });
+
+      createdSeriesOccurrences = Math.max(0, occurrences.length - 1);
+      if (baseAppointment.recurrenceCount !== occurrences.length) {
+        const [baseWithActualCount] = await db
+          .update(appointments)
+          .set({ recurrenceCount: occurrences.length, updatedAt: new Date() })
+          .where(eq(appointments.id, id))
+          .returning();
+        updatedAppointment[0] = baseWithActualCount;
+      }
+
+      if (createdSeriesOccurrences > 0) {
+        await db.insert(appointments).values(
+          occurrences.slice(1).map((occurrence) => ({
+            tenantId,
+            userId: baseAppointment.userId,
+            confirmationToken: uuidv4(),
+            shopId: baseAppointment.shopId,
+            ...occurrence,
+            recurrenceCount: occurrences.length,
+            recurrenceSeriesId: editSeriesId,
+            recurrenceParentId: baseAppointment.id,
+          }))
+        );
+      }
+    }
+
     // Log activity for appointment update
     const changes = computeChanges(existing, updatedAppointment[0], [
       'title', 'description', 'appointmentDate', 'duration', 'location',
-      'serviceType', 'status', 'notes', 'customerId', 'providerId'
+      'serviceType', 'status', 'notes', 'customerId', 'providerId',
+      'recurrenceFrequency', 'recurrenceInterval', 'recurrenceCount', 'recurrenceEndDate'
     ]);
 
     try {
@@ -680,6 +862,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
         metadata: {
           isDateChanged: isDateChanging,
           remindersCancelled,
+          createdSeriesOccurrences,
         },
         req,
       });
@@ -691,6 +874,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       appointment: updatedAppointment[0],
       message: 'Appointment updated successfully',
       remindersCancelled: remindersCancelled > 0 ? remindersCancelled : undefined,
+      recurrenceCreatedCount: createdSeriesOccurrences > 0 ? createdSeriesOccurrences + 1 : undefined,
     });
   } catch (error) {
     console.error('Failed to update appointment:', error);

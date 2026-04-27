@@ -160,7 +160,7 @@ export function UpcomingScheduledEmailsCard() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setLocation("/email-contacts")}
+              onClick={() => setLocation("/contacts")}
               className="text-[10px] font-semibold rounded-lg text-muted-foreground/60 hover:text-primary h-7 px-2"
             >
               {t("dashboard.scheduledEmails.viewAll")}
@@ -186,7 +186,7 @@ export function UpcomingScheduledEmailsCard() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setLocation("/email-contacts")}
+              onClick={() => setLocation("/contacts")}
               className="text-xs rounded-lg mt-2"
             >
               {t("dashboard.scheduledEmails.scheduleNew")}
@@ -214,7 +214,7 @@ export function UpcomingScheduledEmailsCard() {
                       disabled={!clickable}
                       onClick={() =>
                         clickable &&
-                        setLocation(`/email-contacts/view/${email.contactId}/scheduled`)
+                        setLocation(`/contacts/view/${email.contactId}/scheduled`)
                       }
                       className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
                         clickable ? "cursor-pointer" : "cursor-default"
@@ -277,7 +277,7 @@ export function UpcomingScheduledEmailsCard() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setLocation("/email-contacts")}
+              onClick={() => setLocation("/contacts")}
               className="w-full mt-1 rounded-xl text-xs font-semibold border-dashed border-border/60 hover:bg-muted/30"
             >
               {t("dashboard.scheduledEmails.scheduleNew")}

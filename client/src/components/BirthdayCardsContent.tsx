@@ -236,7 +236,7 @@ export function BirthdayCardsContent() {
 
   // Handler to navigate to add customer page
   const handleAddCustomer = () => {
-    setLocation('/email-contacts?action=add');
+    setLocation('/contacts?action=add');
   };
 
   // Handler to open customer modal
@@ -1784,7 +1784,7 @@ export function BirthdayCardsContent() {
                         return (
                           <div
                             key={contact.id}
-                            onClick={() => setLocation(`/email-contacts/view/${contact.id}`)}
+                            onClick={() => setLocation(`/contacts/view/${contact.id}`)}
                             className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                           >
                             <div>
@@ -2459,7 +2459,7 @@ export function BirthdayCardsContent() {
                       setSelectedCustomer(null);
                       // Navigate after a brief delay to ensure smooth transition
                       setTimeout(() => {
-                        setLocation(`/email-contacts/view/${customerId}?return=/birthdays?tab=customers`);
+                        setLocation(`/contacts/view/${customerId}?return=/birthdays?tab=customers`);
                       }, 100);
                     }}
                     className="flex items-center gap-2"

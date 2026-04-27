@@ -441,13 +441,13 @@ function Router() {
 
                   <Route path="/email-approvals" component={EmailApprovalsPage} />
                   <Route path="/email-compose" component={EmailComposePage} />
-                  <Route path="/email-contacts" component={EmailContactsPage} />
+                  <Route path="/contacts" component={EmailContactsPage} />
 
-                  <Route path="/email-contacts/view/:id" component={ViewEmailContactPage} />
-                  <Route path="/email-contacts/view/:id/schedule" component={ScheduleEmailContactPage} />
-                  <Route path="/email-contacts/view/:id/scheduled" component={ScheduledTimelineContactPage} />
-                  <Route path="/email-contacts/edit/:id" component={EditEmailContactPage} />
-                  <Route path="/email-contacts/customer/:id" component={CustomerViewPage} />
+                  <Route path="/contacts/view/:id" component={ViewEmailContactPage} />
+                  <Route path="/contacts/view/:id/schedule" component={ScheduleEmailContactPage} />
+                  <Route path="/contacts/view/:id/scheduled" component={ScheduledTimelineContactPage} />
+                  <Route path="/contacts/edit/:id" component={EditEmailContactPage} />
+                  <Route path="/contacts/customer/:id" component={CustomerViewPage} />
                   <Route path="/email-analytics" component={EmailAnalyticsPage} />
                   <Route path="/segmentation" component={SegmentationPage} />
                   <Route path="/analytics" component={AnalyticsPage} />

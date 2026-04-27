@@ -39,6 +39,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Download,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -81,6 +82,7 @@ import {
   getStatusColor,
   formatDateTime,
   TIMING_MAP,
+  downloadAppointmentIcs,
   type Appointment,
   type AppointmentWithCustomer,
   type Customer,
@@ -573,6 +575,12 @@ export default function RemindersPage() {
         status: appointment.status,
         notes: appointment.notes,
         providerId: appointment.providerId ?? null,
+        recurrenceFrequency: appointment.recurrenceFrequency ?? 'none',
+        recurrenceInterval: appointment.recurrenceInterval ?? 1,
+        recurrenceCount: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceCount ?? null,
+        recurrenceEndDate: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceEndDate ?? null,
+        recurrenceSeriesId: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceSeriesId ?? null,
+        recurrenceParentId: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceParentId ?? null,
       },
     });
 
@@ -616,6 +624,12 @@ export default function RemindersPage() {
         status: 'completed',
         notes: appointment.notes,
         providerId: appointment.providerId ?? null,
+        recurrenceFrequency: appointment.recurrenceFrequency ?? 'none',
+        recurrenceInterval: appointment.recurrenceInterval ?? 1,
+        recurrenceCount: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceCount ?? null,
+        recurrenceEndDate: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceEndDate ?? null,
+        recurrenceSeriesId: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceSeriesId ?? null,
+        recurrenceParentId: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceParentId ?? null,
       }},
       {
         onSuccess: () => {
@@ -891,6 +905,9 @@ export default function RemindersPage() {
                 <DropdownMenuItem onClick={() => openScheduleReminder(appointment.id)}>
                   <Clock className="h-4 w-4 mr-2" />{t('reminders.actions.scheduleReminder')}
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); downloadAppointmentIcs(appointment); }}>
+                  <Download className="h-4 w-4 mr-2" />Export to Calendar
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-red-600 dark:text-red-400" onClick={(e) => { e.stopPropagation(); handleCancelAppointment(appointment.id); }}>
                   <Trash2 className="h-4 w-4 mr-2" />Delete
@@ -917,6 +934,16 @@ export default function RemindersPage() {
               </h1>
               <p className="text-gray-600 dark:text-gray-400">{t('reminders.pageSubtitle')}</p>
             </div>
+            <Button
+              onClick={() => {
+                setNewAppointmentDefaults(undefined);
+                setNewAppointmentSeedCustomer(undefined);
+                setNewAppointmentModalOpen(true);
+              }}
+            >
+              <CalendarPlus className="h-4 w-4 mr-2" />
+              {t('reminders.appointments.newAppointment')}
+            </Button>
           </div>
         </div>
 

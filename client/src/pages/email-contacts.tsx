@@ -307,10 +307,12 @@ export default function EmailContacts() {
     const Icon = config.icon;
 
     return (
-      <Badge className={`${config.color} flex items-center gap-1 !px-1 !py-0 text-xs h-5 w-fit inline-flex`}>
+      <span
+        className={`${config.color} inline-flex items-center gap-1 h-5 px-2 rounded-full text-xs font-medium`}
+      >
         <Icon className="w-3 h-3" />
         {config.label}
-      </Badge>
+      </span>
     );
   };
 
@@ -344,6 +346,22 @@ export default function EmailContacts() {
       day: "numeric",
       year: "numeric"
     });
+  };
+
+  const formatRelativeFromNow = (date: Date | string | null) => {
+    if (!date) return '';
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    const ms = Date.now() - dateObj.getTime();
+    const days = Math.floor(ms / 86_400_000);
+    if (days < 1) return t('emailContacts.relative.today');
+    if (days === 1) return t('emailContacts.relative.dayAgo');
+    if (days < 30) return t('emailContacts.relative.daysAgo', { count: days });
+    const months = Math.floor(days / 30);
+    if (months === 1) return t('emailContacts.relative.monthAgo');
+    if (months < 12) return t('emailContacts.relative.monthsAgo', { count: months });
+    const years = Math.floor(days / 365);
+    if (years === 1) return t('emailContacts.relative.yearAgo');
+    return t('emailContacts.relative.yearsAgo', { count: years });
   };
 
   const getEngagementRate = (sent: number, opened: number) => {
@@ -795,11 +813,9 @@ export default function EmailContacts() {
                           <TableCell>
                             <div className="text-sm">
                               <p>{formatDate(contact.addedDate)}</p>
-                              {contact.lastActivity && (
-                                <p className="text-gray-500 dark:text-gray-400">
-                                  {t('emailContacts.table.active')} {formatDate(contact.lastActivity)}
-                                </p>
-                              )}
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {formatRelativeFromNow(contact.addedDate)}
+                              </p>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -814,7 +830,7 @@ export default function EmailContacts() {
                                   <UserCheck className="w-4 h-4 mr-2" />
                                   {t('emailContacts.actions.viewContact')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setLocation(`/email-contacts/edit/${contact.id}`)}>
+                                <DropdownMenuItem onClick={() => setLocation(`/contacts/edit/${contact.id}`)}>
                                   <Edit className="w-4 h-4 mr-2" />
                                   {t('emailContacts.actions.editContact')}
                                 </DropdownMenuItem>
@@ -962,7 +978,7 @@ export default function EmailContacts() {
                                   <UserCheck className="w-4 h-4 mr-2" />
                                   {t('emailContacts.actions.viewContact')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setLocation(`/email-contacts/edit/${contact.id}`)}>
+                                <DropdownMenuItem onClick={() => setLocation(`/contacts/edit/${contact.id}`)}>
                                   <Edit className="w-4 h-4 mr-2" />
                                   {t('emailContacts.actions.editContact')}
                                 </DropdownMenuItem>
@@ -1052,11 +1068,9 @@ export default function EmailContacts() {
                               <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">{t('emailContacts.table.added')}</span>
                               <div className="text-sm">
                                 <p data-testid={`text-added-date-card-${contact.id}`}>{formatDate(contact.addedDate)}</p>
-                                {contact.lastActivity && (
-                                  <p className="text-gray-500 dark:text-gray-400" data-testid={`text-last-activity-card-${contact.id}`}>
-                                    {t('emailContacts.table.active')} {formatDate(contact.lastActivity)}
-                                  </p>
-                                )}
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {formatRelativeFromNow(contact.addedDate)}
+                                </p>
                               </div>
                             </div>
                           </div>

@@ -246,7 +246,7 @@ export default function ScheduleContactEmailPage() {
         title: "Email Scheduled",
         description: `Your email has been scheduled for ${date} at ${time || "00:00"} (${timezone}).`,
       });
-      navigate(`/email-contacts/view/${id}`);
+      navigate(`/contacts/view/${id}`);
     },
     onError: (error: any) => {
       toast({
@@ -292,7 +292,7 @@ export default function ScheduleContactEmailPage() {
     return (
       <div className="p-6">
         <div className="max-w-2xl mx-auto">
-          <Button variant="ghost" onClick={() => navigate(`/email-contacts/view/${id}`)} className="mb-4">
+          <Button variant="ghost" onClick={() => navigate(`/contacts/view/${id}`)} className="mb-4">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Contact
           </Button>
           <Alert>
@@ -310,7 +310,7 @@ export default function ScheduleContactEmailPage() {
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Button variant="ghost" onClick={() => navigate(`/email-contacts/view/${id}`)} className="mb-2">
+            <Button variant="ghost" onClick={() => navigate(`/contacts/view/${id}`)} className="mb-2">
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Contact
             </Button>
             <h1 className="text-2xl font-bold">Schedule Email</h1>
@@ -499,7 +499,7 @@ export default function ScheduleContactEmailPage() {
         </Card>
 
         <div className="flex items-center justify-end gap-3">
-          <Button variant="outline" onClick={() => navigate(`/email-contacts/view/${id}`)}>
+          <Button variant="outline" onClick={() => navigate(`/contacts/view/${id}`)}>
             Cancel
           </Button>
           <Button onClick={() => scheduleMutation.mutate()} disabled={!canSubmit || scheduleMutation.isPending} className="bg-indigo-600 hover:bg-indigo-700">

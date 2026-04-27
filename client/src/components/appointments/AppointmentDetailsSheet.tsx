@@ -28,6 +28,7 @@ import {
   BellOff,
   Building2,
   UserCircle2,
+  Download,
 } from "lucide-react";
 import { getCustomerName, formatDateTime } from "@/utils/appointment-utils";
 import type { AppointmentWithCustomer, Customer, AppointmentReminder } from "@/utils/appointment-utils";
@@ -60,6 +61,7 @@ interface AppointmentDetailsSheetProps {
   onCreateNewAppointment: (appointment: AppointmentWithCustomer) => void;
   onSendReminder?: (appointmentId: string) => void;
   isSendingReminder?: boolean;
+  onExportIcs?: () => void;
   // Note mutations
   newNoteContent: string;
   onNewNoteContentChange: (content: string) => void;
@@ -88,6 +90,7 @@ export function AppointmentDetailsSheet({
   onCreateNewAppointment,
   onSendReminder,
   isSendingReminder,
+  onExportIcs,
   newNoteContent,
   onNewNoteContentChange,
   onCreateNote,
@@ -657,6 +660,16 @@ export function AppointmentDetailsSheet({
                   </Button>
                 )}
               </>
+            )}
+            {onExportIcs && (
+              <Button
+                variant="outline"
+                className="flex-1 hover:bg-muted/50 transition-colors active:scale-[0.98]"
+                onClick={onExportIcs}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export .ics
+              </Button>
             )}
             <Button
               variant="outline"

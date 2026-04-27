@@ -23,6 +23,7 @@ import type { Customer } from "@/hooks/useAppointments";
 import type { Appointment } from "@shared/schema";
 
 const PROVIDER_UNASSIGNED = "__unassigned__";
+type RecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly';
 
 export interface NewAppointmentData {
   customerId: string;
@@ -36,6 +37,10 @@ export interface NewAppointmentData {
   serviceType: string;
   status: Appointment['status'];
   notes: string;
+  recurrenceFrequency: RecurrenceFrequency;
+  recurrenceInterval: number;
+  recurrenceCount: number | null;
+  recurrenceEndDate: Date | null;
 }
 
 export interface ShopOption {
@@ -104,6 +109,10 @@ export function AppointmentFormDialog({
     serviceType: "",
     status: 'scheduled',
     notes: "",
+    recurrenceFrequency: 'none',
+    recurrenceInterval: 1,
+    recurrenceCount: null,
+    recurrenceEndDate: null,
   });
 
   const [errors, setErrors] = useState<{
@@ -149,6 +158,10 @@ export function AppointmentFormDialog({
         serviceType: "",
         status: 'scheduled',
         notes: "",
+        recurrenceFrequency: 'none',
+        recurrenceInterval: 1,
+        recurrenceCount: null,
+        recurrenceEndDate: null,
       });
       setErrors({});
       setReminderEnabled(false);
@@ -431,6 +444,83 @@ export function AppointmentFormDialog({
               className="focus-visible:ring-0"
             />
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <Label>{t('reminders.appointments.repeat', { defaultValue: 'Repeat' })}</Label>
+            <Select
+              value={appointmentData.recurrenceFrequency}
+              onValueChange={(value: RecurrenceFrequency) => {
+                setAppointmentData(prev => ({
+                  ...prev,
+                  recurrenceFrequency: value,
+                  recurrenceInterval: value === 'none' ? 1 : prev.recurrenceInterval || 1,
+                  recurrenceCount: value === 'none' ? null : prev.recurrenceCount || 2,
+                  recurrenceEndDate: value === 'none' ? null : prev.recurrenceEndDate,
+                }));
+              }}
+            >
+              <SelectTrigger className="focus-visible:ring-0 focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t('reminders.appointments.repeatNone', { defaultValue: 'Does not repeat' })}</SelectItem>
+                <SelectItem value="daily">{t('reminders.appointments.repeatDaily', { defaultValue: 'Daily' })}</SelectItem>
+                <SelectItem value="weekly">{t('reminders.appointments.repeatWeekly', { defaultValue: 'Weekly' })}</SelectItem>
+                <SelectItem value="monthly">{t('reminders.appointments.repeatMonthly', { defaultValue: 'Monthly' })}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {appointmentData.recurrenceFrequency !== 'none' && (
+            <div>
+              <Label>{t('reminders.appointments.repeatEvery', { defaultValue: 'Every' })}</Label>
+              <Input
+                type="number"
+                min="1"
+                max="12"
+                value={appointmentData.recurrenceInterval}
+                onChange={(e) => setAppointmentData(prev => ({
+                  ...prev,
+                  recurrenceInterval: Math.max(1, parseInt(e.target.value) || 1),
+                }))}
+                className="focus-visible:ring-0"
+              />
+            </div>
+          )}
+
+          {appointmentData.recurrenceFrequency !== 'none' && (
+            <>
+              <div>
+                <Label>{t('reminders.appointments.occurrences', { defaultValue: 'Occurrences' })}</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={appointmentData.recurrenceCount ?? ''}
+                  onChange={(e) => setAppointmentData(prev => ({
+                    ...prev,
+                    recurrenceCount: e.target.value ? Math.max(1, parseInt(e.target.value) || 1) : null,
+                  }))}
+                  className="focus-visible:ring-0"
+                />
+              </div>
+              <div>
+                <Label>{t('reminders.appointments.endsOn', { defaultValue: 'Ends on' })}</Label>
+                <Input
+                  type="date"
+                  min={toLocalDateString(appointmentData.appointmentDate)}
+                  value={appointmentData.recurrenceEndDate ? toLocalDateString(appointmentData.recurrenceEndDate) : ''}
+                  onChange={(e) => setAppointmentData(prev => ({
+                    ...prev,
+                    recurrenceEndDate: e.target.value ? new Date(`${e.target.value}T23:59:59`) : null,
+                  }))}
+                  className="focus-visible:ring-0"
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <div>

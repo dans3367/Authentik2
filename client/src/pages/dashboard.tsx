@@ -619,7 +619,7 @@ export default function Dashboard() {
     {
       label: t("dashboard.quickActions.addContact"),
       icon: UserPlus,
-      onClick: () => setLocation("/email-contacts?action=add"),
+      onClick: () => setLocation("/contacts?action=add"),
       accent: "hover:border-violet-500/40 hover:bg-violet-500/5 dark:hover:bg-violet-500/10",
       iconBg: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
     },

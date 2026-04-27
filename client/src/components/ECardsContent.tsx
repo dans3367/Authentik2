@@ -550,7 +550,7 @@ export function ECardsContent() {
 
   // Handler to navigate to add customer page
   const handleAddCustomer = () => {
-    setLocation('/email-contacts?action=add');
+    setLocation('/contacts?action=add');
   };
 
   // Handler to open customer modal
@@ -2291,7 +2291,7 @@ export function ECardsContent() {
                       setSelectedCustomer(null);
                       // Navigate after a brief delay to ensure smooth transition
                       setTimeout(() => {
-                        setLocation(`/email-contacts/view/${customerId}?return=/birthdays?tab=customers`);
+                        setLocation(`/contacts/view/${customerId}?return=/birthdays?tab=customers`);
                       }, 100);
                     }}
                     className="flex items-center gap-2"

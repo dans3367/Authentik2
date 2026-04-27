@@ -3903,7 +3903,7 @@
     "notFoundDesc": "The contact you're looking for doesn't exist or you don't have permission to view it.",
     "actions": {
       "sendEmail": "Send Email",
-      "scheduleSend": "Schedule Send",
+      "scheduleSend": "Schedule Email",
       "edit": "Edit",
       "manageTags": "Manage Tags",
       "deleteContact": "Delete Contact",
