@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db';
-import { sql, eq, and } from 'drizzle-orm';
+import { sql, eq, and, inArray } from 'drizzle-orm';
 import { emailContacts, emailLists, bouncedEmails, contactListMemberships, contactTagAssignments, betterAuthUser, emailActivity, tenants, emailSends, emailContent, companies, masterEmailDesign, triggerTasks, birthdaySettings, unsubscribeTokens, shops } from '@shared/schema';
 import { authenticateToken, requireTenant, requirePermission } from '../../middleware/auth-middleware';
 import { sanitizeString, sanitizeEmail, escapeLikePattern } from '../../utils/sanitization';
@@ -19,6 +19,36 @@ import multer from 'multer';
 import Papa from 'papaparse';
 
 export const contactRoutes = Router();
+
+const EMAIL_ADDRESS_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function parseStringList(value: unknown): string[] {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.flatMap(item => parseStringList(item));
+  }
+
+  if (typeof value !== 'string') return [];
+
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parseStringList(parsed);
+    } catch {
+      // Fall through to delimiter parsing.
+    }
+  }
+
+  return trimmed.split(/[,\s;]+/).map(item => item.trim()).filter(Boolean);
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
 
 // Get email contacts
 contactRoutes.get("/email-contacts", authenticateToken, requireTenant, requirePermission('contacts.view'), async (req: any, res) => {
@@ -2106,6 +2136,10 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
     const tenantId = req.user.tenantId;
 
     const { subject, content } = req.body;
+    const recipientContactIds = uniqueStrings([id, ...parseStringList(req.body?.recipientContactIds)]);
+    const ccEmails = uniqueStrings(parseStringList(req.body?.cc)
+      .map(email => sanitizeEmail(email))
+      .filter((email): email is string => Boolean(email)));
 
     // Process attachments if present
     const uploadedFiles = (req.files as Express.Multer.File[]) || [];
@@ -2128,59 +2162,113 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
       });
     }
 
-    // Check email sending limits
-    await storage.validateEmailSending(tenantId, 1);
+    if (recipientContactIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one recipient is required'
+      });
+    }
 
-    // Get contact
-    const contact = await db.query.emailContacts.findFirst({
+    const invalidCcEmail = ccEmails.find(email => !EMAIL_ADDRESS_PATTERN.test(email));
+    if (invalidCcEmail) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid CC email address: ${invalidCcEmail}`
+      });
+    }
+
+    // Check email sending limits
+    await storage.validateEmailSending(tenantId, recipientContactIds.length + ccEmails.length);
+
+    // Get contacts
+    const selectedContacts = await db.query.emailContacts.findMany({
       where: and(
-        eq(emailContacts.id, id),
+        inArray(emailContacts.id, recipientContactIds),
         eq(emailContacts.tenantId, tenantId)
       ),
     });
 
-    if (!contact) {
-      console.log(`📧 [SendEmail] Contact ${id} not found`);
+    const contactById = new Map(selectedContacts.map(contact => [contact.id, contact]));
+    const contacts = recipientContactIds
+      .map(contactId => contactById.get(contactId))
+      .filter(Boolean) as typeof selectedContacts;
+    const missingContactIds = recipientContactIds.filter(contactId => !contactById.has(contactId));
+
+    if (missingContactIds.length > 0 || contacts.length === 0) {
+      console.log(`📧 [SendEmail] Contact lookup failed, missing: ${missingContactIds.join(', ') || id}`);
       return res.status(404).json({
         success: false,
-        message: "Contact not found"
+        message: missingContactIds.length > 1 ? "One or more contacts were not found" : "Contact not found"
       });
     }
 
-    console.log(`📧 [SendEmail] Found contact: ${maskEmail(String(contact.email))}, status: ${contact.status}`);
+    const contact = contacts[0];
+    const recipientEmails = contacts.map(contact => String(contact.email));
+
+    console.log(`📧 [SendEmail] Found ${contacts.length} contact recipient(s): ${recipientEmails.map(email => maskEmail(email)).join(', ')}`);
 
     // Hard block: check global suppression list (bounced_emails table) — cannot be overridden
-    const suppressionRecord = await db.query.bouncedEmails.findFirst({
-      where: and(
-        sql`LOWER(${bouncedEmails.email}) = ${String(contact.email).toLowerCase().trim()}`,
-        eq(bouncedEmails.isActive, true),
-      ),
-    });
-
-    if (suppressionRecord) {
-      const suppressedSince = suppressionRecord.firstBouncedAt
-        ? new Date(suppressionRecord.firstBouncedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-        : 'an unknown date';
-      const reason = suppressionRecord.suppressionReason || suppressionRecord.bounceReason || suppressionRecord.bounceType || 'provider suppression';
-
-      console.log(`🚫 [SendEmail] Hard-blocked: email ${maskEmail(String(contact.email))} is on suppression list (type=${suppressionRecord.bounceType}, since=${suppressedSince})`);
-
-      return res.status(403).json({
-        success: false,
-        message: `This email address has been suppressed since ${suppressedSince} due to: ${reason}. No outgoing communication can be sent to this address. The email provider has flagged this address and further sending attempts may harm your sender reputation.`,
-        contactStatus: 'suppressed',
-        suppressionType: suppressionRecord.bounceType,
-        suppressedSince: suppressionRecord.firstBouncedAt,
-        suppressionReason: reason,
-        email: maskEmail(String(contact.email)),
+    for (const recipientContact of contacts) {
+      const suppressionRecord = await db.query.bouncedEmails.findFirst({
+        where: and(
+          sql`LOWER(${bouncedEmails.email}) = ${String(recipientContact.email).toLowerCase().trim()}`,
+          eq(bouncedEmails.isActive, true),
+        ),
       });
+
+      if (suppressionRecord) {
+        const suppressedSince = suppressionRecord.firstBouncedAt
+          ? new Date(suppressionRecord.firstBouncedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+          : 'an unknown date';
+        const reason = suppressionRecord.suppressionReason || suppressionRecord.bounceReason || suppressionRecord.bounceType || 'provider suppression';
+
+        console.log(`🚫 [SendEmail] Hard-blocked: email ${maskEmail(String(recipientContact.email))} is on suppression list (type=${suppressionRecord.bounceType}, since=${suppressedSince})`);
+
+        return res.status(403).json({
+          success: false,
+          message: `This email address has been suppressed since ${suppressedSince} due to: ${reason}. No outgoing communication can be sent to this address. The email provider has flagged this address and further sending attempts may harm your sender reputation.`,
+          contactStatus: 'suppressed',
+          suppressionType: suppressionRecord.bounceType,
+          suppressedSince: suppressionRecord.firstBouncedAt,
+          suppressionReason: reason,
+          email: maskEmail(String(recipientContact.email)),
+        });
+      }
+    }
+
+    for (const ccEmail of ccEmails) {
+      const suppressionRecord = await db.query.bouncedEmails.findFirst({
+        where: and(
+          sql`LOWER(${bouncedEmails.email}) = ${ccEmail.toLowerCase().trim()}`,
+          eq(bouncedEmails.isActive, true),
+        ),
+      });
+
+      if (suppressionRecord) {
+        const suppressedSince = suppressionRecord.firstBouncedAt
+          ? new Date(suppressionRecord.firstBouncedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+          : 'an unknown date';
+        const reason = suppressionRecord.suppressionReason || suppressionRecord.bounceReason || suppressionRecord.bounceType || 'provider suppression';
+
+        console.log(`🚫 [SendEmail] Hard-blocked: CC email ${maskEmail(ccEmail)} is on suppression list (type=${suppressionRecord.bounceType}, since=${suppressedSince})`);
+
+        return res.status(403).json({
+          success: false,
+          message: `The CC email address has been suppressed since ${suppressedSince} due to: ${reason}. No outgoing communication can be sent to this address.`,
+          contactStatus: 'suppressed',
+          suppressionType: suppressionRecord.bounceType,
+          suppressedSince: suppressionRecord.firstBouncedAt,
+          suppressionReason: reason,
+          email: maskEmail(ccEmail),
+        });
+      }
     }
 
     // Block sending for unsubscribed/bounced contacts unless override flags are provided
     const { allowUnsubscribed, isTransactional } = req.body || {};
-    const isUnsubscribedOrBounced = contact.status === 'unsubscribed' || contact.status === 'bounced';
+    const blockedContact = contacts.find(contact => contact.status === 'unsubscribed' || contact.status === 'bounced');
 
-    if (isUnsubscribedOrBounced) {
+    if (blockedContact) {
       // SECURITY: Only allow Administrators and Owners to override unsubscribe protection
       const isAdminOrOwner = ['Administrator', 'Owner'].includes(req.user.role || '');
       const userAttemptedOverride = allowUnsubscribed === true || isTransactional === true;
@@ -2188,11 +2276,11 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
 
       if (canOverride) {
         // Audit log the override usage
-        console.log(`🔓 [SendEmail] Override used for ${contact.status} contact ${maskEmail(String(contact.email))} - allowUnsubscribed: ${allowUnsubscribed}, isTransactional: ${isTransactional}, userId: ${req.user.id}, role: ${req.user.role}, tenantId: ${tenantId}, timestamp: ${new Date().toISOString()}`);
+        console.log(`🔓 [SendEmail] Override used for ${blockedContact.status} contact ${maskEmail(String(blockedContact.email))} - allowUnsubscribed: ${allowUnsubscribed}, isTransactional: ${isTransactional}, userId: ${req.user.id}, role: ${req.user.role}, tenantId: ${tenantId}, timestamp: ${new Date().toISOString()}`);
       } else {
-        console.log(`🚫 [SendEmail] Blocked sending to ${contact.status} contact ${maskEmail(String(contact.email))} - override denied or not provided`);
+        console.log(`🚫 [SendEmail] Blocked sending to ${blockedContact.status} contact ${maskEmail(String(blockedContact.email))} - override denied or not provided`);
 
-        let errorMessage = `Cannot send email to ${contact.status} contact.`;
+        let errorMessage = `Cannot send email to ${blockedContact.status} contact.`;
         if (userAttemptedOverride && !isAdminOrOwner) {
           errorMessage += " Insufficient permissions to override unsubscribe protection.";
         } else {
@@ -2202,8 +2290,8 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
         return res.status(403).json({
           success: false,
           message: errorMessage,
-          contactStatus: contact.status,
-          email: maskEmail(String(contact.email)),
+          contactStatus: blockedContact.status,
+          email: maskEmail(String(blockedContact.email)),
         });
       }
     }
@@ -2253,16 +2341,20 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
     try {
       const { sendEmailTask } = await import('../../../src/trigger/email');
       const handle = await sendEmailTask.trigger({
-        to: contact.email,
+        to: recipientEmails.length === 1 ? recipientEmails[0] : recipientEmails,
+        ...(ccEmails.length > 0 && { cc: ccEmails.length === 1 ? ccEmails[0] : ccEmails }),
         subject: resolvedSubject,
         html: htmlContent,
         text: resolvedContent,
         metadata: {
           type: 'individual_contact_email',
           contactId: contact.id,
+          contactIds: contacts.map(contact => contact.id),
+          recipientCount: recipientEmails.length,
           tenantId: tenantId,
           sentBy: req.user.id,
           emailTrackingId: emailTrackingId, // Pass tracking ID so task can update email_sends with actual Resend ID
+          ...(ccEmails.length > 0 && { cc: ccEmails }),
         },
         ...(base64Attachments.length > 0 && { attachments: base64Attachments }),
       });
@@ -2280,6 +2372,8 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
             sentBy: req.user.id,
             subject: resolvedSubject,
             recipient: contact.email,
+            recipients: recipientEmails,
+            cc: ccEmails,
             recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined,
             from: displayCompanyName || 'Manager',
           }),
@@ -2307,13 +2401,16 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
         userId: req.user.id,
         entityType: 'email',
         entityId: emailActivityId || undefined,
-        entityName: `Email to ${contact.email}`,
+        entityName: `Email to ${recipientEmails.length === 1 ? contact.email : `${recipientEmails.length} recipients`}`,
         activityType: 'sent',
-        description: `Sent direct email "${resolvedSubject}" to ${contact.firstName || ''} ${contact.lastName || ''} (${contact.email})`.trim(),
+        description: `Sent direct email "${resolvedSubject}" to ${recipientEmails.length === 1 ? `${contact.firstName || ''} ${contact.lastName || ''} (${contact.email})`.trim() : `${recipientEmails.length} recipients`}`,
         metadata: {
           emailActivityId: emailActivityId,
           contactId: contact.id,
+          contactIds: contacts.map(contact => contact.id),
           contactEmail: contact.email,
+          recipientEmails,
+          ccEmails,
           emailSubject: resolvedSubject,
           triggerRunId: result?.runId
         },
@@ -2330,8 +2427,10 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
       await db.insert(emailSends).values({
         id: emailTrackingId,
         tenantId: tenantId,
-        recipientEmail: contact.email,
-        recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email,
+        recipientEmail: recipientEmails.join(', '),
+        recipientName: recipientEmails.length === 1
+          ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email
+          : `${recipientEmails.length} recipients`,
         senderEmail: 'admin@zendwise.com', // Default sender or configured one
         senderName: displayCompanyName || 'Manager',
         subject: resolvedSubject,
@@ -2343,24 +2442,28 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
         promotionId: null,
         sentAt: null, // Not sent yet
       });
-      console.log(`📧 [SendEmail] Logged to email_sends table for ${contact.email}, trackingId: ${emailTrackingId}`);
+      console.log(`📧 [SendEmail] Logged to email_sends table for ${recipientEmails.length} recipient(s), trackingId: ${emailTrackingId}`);
     } catch (logError) {
       console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
     }
 
     // Update contact stats - update lastActivity (emailsSent increment is handled by internal callback)
-    await db.update(emailContacts)
-      .set({
-        lastActivity: new Date(),
-        updatedAt: new Date()
-      })
-      .where(eq(emailContacts.id, contact.id));
+    for (const recipientContact of contacts) {
+      await db.update(emailContacts)
+        .set({
+          lastActivity: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(emailContacts.id, recipientContact.id));
+    }
 
-    console.log(`✅ [SendEmail] Email queued successfully for ${contact.email}, subject: "${subject}", runId: ${result?.runId}`);
+    console.log(`✅ [SendEmail] Email queued successfully for ${recipientEmails.length} recipient(s), subject: "${subject}", runId: ${result?.runId}`);
 
     res.json({
       success: true,
       message: "Email sent successfully",
+      recipientCount: recipientEmails.length,
+      ccCount: ccEmails.length,
       result
     });
   } catch (error: any) {
@@ -2371,4 +2474,3 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
     });
   }
 });
-

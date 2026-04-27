@@ -53,7 +53,8 @@ function getInitials(name: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-type TabKey = "all" | "today" | "scheduled" | "confirmed" | "notConfirmed" | "reminders" | "remindersNotSent";
+type SidebarFilterKey = "upcoming" | "today" | "confirmed" | "notConfirmed" | "reminders" | "remindersNotSent";
+type ListTabKey = "all" | "selected";
 
 const STATUS_DOT: Record<string, string> = {
   scheduled: "bg-rose-500",
@@ -89,7 +90,8 @@ export function AppointmentsWeekBoard({
   onViewCalendar,
 }: AppointmentsWeekBoardProps) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<TabKey>("all");
+  const [selectedFilter, setSelectedFilter] = useState<SidebarFilterKey>("upcoming");
+  const [listTab, setListTab] = useState<ListTabKey>("selected");
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(8);
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
@@ -156,8 +158,8 @@ export function AppointmentsWeekBoard({
   );
 
   useEffect(() => {
-    if (!isCurrentMonth && tab !== "all") setTab("all");
-  }, [isCurrentMonth, tab]);
+    if (!isCurrentMonth && listTab !== "all") setListTab("all");
+  }, [isCurrentMonth, listTab]);
 
   const totalThisMonth = useMemo(() => {
     const s = startOfMonth(now);
@@ -207,10 +209,6 @@ export function AppointmentsWeekBoard({
     () => monthAppointments.filter(a => isToday(new Date(a.appointmentDate))).length,
     [monthAppointments]
   );
-  const scheduledCount = useMemo(
-    () => monthAppointments.filter(a => a.status === "scheduled").length,
-    [monthAppointments]
-  );
   const confirmedCount = useMemo(
     () => monthAppointments.filter(a => a.status === "confirmed").length,
     [monthAppointments]
@@ -242,8 +240,8 @@ export function AppointmentsWeekBoard({
     ? last7Days.reduce((sum, d) => sum + d.count, 0) / last7Days.length
     : 0;
 
-  const filterItems: { key: TabKey; label: string; count: number; dotClass: string }[] = [
-    { key: "all", label: t('reminders.board.stats.upcoming'), count: upcomingCount, dotClass: "bg-rose-500" },
+  const filterItems: { key: SidebarFilterKey; label: string; count: number; dotClass: string }[] = [
+    { key: "upcoming", label: t('reminders.board.stats.upcoming'), count: upcomingCount, dotClass: "bg-rose-500" },
     { key: "today", label: t('reminders.board.stats.today'), count: todayCount, dotClass: "bg-slate-400" },
     { key: "confirmed", label: t('reminders.board.stats.confirmed'), count: confirmedCount, dotClass: "bg-emerald-500" },
     { key: "notConfirmed", label: t('reminders.board.stats.notConfirmed'), count: notConfirmedCount, dotClass: "bg-amber-500" },
@@ -251,25 +249,29 @@ export function AppointmentsWeekBoard({
     { key: "remindersNotSent", label: t('reminders.board.stats.remindersNotSent'), count: remindersNotSentCount, dotClass: "bg-slate-400" },
   ];
 
-  const tabCounts: Record<TabKey, number> = {
-    all: monthAppointments.length,
+  const filterCounts: Record<SidebarFilterKey, number> = {
+    upcoming: upcomingCount,
     today: todayCount,
-    scheduled: scheduledCount,
     confirmed: confirmedCount,
     notConfirmed: notConfirmedCount,
     reminders: remindersCount,
     remindersNotSent: remindersNotSentCount,
   };
 
+  const selectedFilterItem = filterItems.find(item => item.key === selectedFilter) ?? filterItems[0];
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return monthAppointments.filter(a => {
-      if (tab === "today" && !isToday(new Date(a.appointmentDate))) return false;
-      if (tab === "scheduled" && a.status !== "scheduled") return false;
-      if (tab === "confirmed" && a.status !== "confirmed") return false;
-      if (tab === "notConfirmed" && a.status === "confirmed") return false;
-      if (tab === "reminders" && !a.reminderSent) return false;
-      if (tab === "remindersNotSent" && a.reminderSent) return false;
+      if (listTab === "selected") {
+        const appointmentDate = new Date(a.appointmentDate);
+        if (selectedFilter === "upcoming" && appointmentDate < startOfDay(now)) return false;
+        if (selectedFilter === "today" && !isToday(appointmentDate)) return false;
+        if (selectedFilter === "confirmed" && a.status !== "confirmed") return false;
+        if (selectedFilter === "notConfirmed" && a.status === "confirmed") return false;
+        if (selectedFilter === "reminders" && !a.reminderSent) return false;
+        if (selectedFilter === "remindersNotSent" && a.reminderSent) return false;
+      }
       if (!q) return true;
       return (
         getCustomerNameForSort(a.customer).toLowerCase().includes(q) ||
@@ -278,7 +280,7 @@ export function AppointmentsWeekBoard({
         (a.serviceType || "").toLowerCase().includes(q)
       );
     });
-  }, [monthAppointments, tab, search]);
+  }, [monthAppointments, listTab, selectedFilter, search, now]);
 
   const visible = filtered.slice(0, pageSize);
 
@@ -311,13 +313,16 @@ export function AppointmentsWeekBoard({
 
           <div className="flex flex-col gap-1 -mx-2">
             {filterItems.map(item => {
-              const active = item.key === tab;
+              const active = item.key === selectedFilter;
               const disabled = !isCurrentMonth;
               return (
                 <button
                   key={item.key}
                   type="button"
-                  onClick={() => setTab(item.key)}
+                  onClick={() => {
+                    setSelectedFilter(item.key);
+                    setListTab("selected");
+                  }}
                   disabled={disabled}
                   className={`group flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                     disabled
@@ -503,40 +508,16 @@ export function AppointmentsWeekBoard({
           </div>
 
           <div className="flex items-center gap-1 px-5 py-3 border-b border-slate-200 dark:border-slate-800 overflow-x-auto">
-            <TabPill active={tab === "all"} onClick={() => setTab("all")} count={tabCounts.all}>
+            <TabPill active={listTab === "all"} onClick={() => setListTab("all")} count={monthAppointments.length}>
               {t('reminders.board.tabs.all')}
             </TabPill>
             <TabPill
-              active={tab === "today"}
-              onClick={() => setTab("today")}
-              count={tabCounts.today}
+              active={listTab === "selected"}
+              onClick={() => setListTab("selected")}
+              count={filterCounts[selectedFilter]}
               disabled={!isCurrentMonth}
             >
-              {t('reminders.board.tabs.today')}
-            </TabPill>
-            <TabPill
-              active={tab === "scheduled"}
-              onClick={() => setTab("scheduled")}
-              count={tabCounts.scheduled}
-              disabled={!isCurrentMonth}
-            >
-              {t('reminders.board.tabs.scheduled')}
-            </TabPill>
-            <TabPill
-              active={tab === "confirmed"}
-              onClick={() => setTab("confirmed")}
-              count={tabCounts.confirmed}
-              disabled={!isCurrentMonth}
-            >
-              {t('reminders.board.tabs.confirmed')}
-            </TabPill>
-            <TabPill
-              active={tab === "reminders"}
-              onClick={() => setTab("reminders")}
-              count={tabCounts.reminders}
-              disabled={!isCurrentMonth}
-            >
-              {t('reminders.board.tabs.reminders')}
+              {selectedFilterItem.label}
             </TabPill>
           </div>
 

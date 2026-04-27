@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -13,16 +13,28 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import RichTextEditor from "@/components/LazyRichTextEditor";
 import { Label } from "@/components/ui/label";
-import { Loader2, Mail, Paperclip, X, FileText, Image, FileSpreadsheet, File } from "lucide-react";
+import { Loader2, Mail, Paperclip, X, FileText, Image, FileSpreadsheet, File, Check, ChevronsUpDown } from "lucide-react";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { sanitizeHtmlForPreview } from "@/utils/sanitize-html";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 // 40MB total limit (including base64 overhead ~33%)
 const MAX_TOTAL_RAW_SIZE = 30 * 1024 * 1024; // 30MB raw = ~40MB after base64
 const MAX_FILES = 10;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+interface SelectableContact {
+  id: string;
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  status?: string;
+}
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -39,6 +51,22 @@ function getFileIcon(type: string) {
 
 function hasEditorContent(html: string): boolean {
   return html.replace(/<[^>]*>/g, "").trim().length > 0;
+}
+
+function getContactDisplayName(contact: Pick<SelectableContact, "firstName" | "lastName" | "email">): string {
+  const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim();
+  return name || contact.email;
+}
+
+function parseEmailList(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[,\s;]+/)
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
 }
 
 interface SendEmailModalProps {
@@ -62,15 +90,36 @@ export default function SendEmailModal({
 }: SendEmailModalProps) {
   const [open, setOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [recipientPickerOpen, setRecipientPickerOpen] = useState(false);
+  const [showCcInput, setShowCcInput] = useState(false);
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([contactId]);
+  const [recipientSearch, setRecipientSearch] = useState("");
+  const [ccInput, setCcInput] = useState("");
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const ccInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const totalSize = attachments.reduce((sum, f) => sum + f.size, 0);
   const estimatedBase64Size = Math.ceil(totalSize / 3) * 4;
+
+  useEffect(() => {
+    if (open) {
+      setSelectedContactIds([contactId]);
+      setRecipientSearch("");
+      setRecipientPickerOpen(false);
+      setShowCcInput(false);
+    }
+  }, [open, contactId]);
+
+  useEffect(() => {
+    if (showCcInput) {
+      ccInputRef.current?.focus();
+    }
+  }, [showCcInput]);
 
   const { data: masterDesign } = useQuery({
     queryKey: ["/api/master-email-design"],
@@ -83,6 +132,68 @@ export default function SendEmailModal({
       return response.json();
     },
   });
+
+  const { data: contactsData, isLoading: contactsLoading } = useQuery<{ contacts: SelectableContact[] }>({
+    queryKey: ["/api/email-contacts", "send-email-recipients"],
+    enabled: open,
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/email-contacts?status=active&limit=200");
+      return response.json();
+    },
+  });
+
+  const currentContact = useMemo<SelectableContact>(() => ({
+    id: contactId,
+    email: contactEmail,
+    firstName: contactName?.split(" ")[0],
+    lastName: contactName?.split(" ").slice(1).join(" "),
+  }), [contactId, contactEmail, contactName]);
+
+  const allRecipientContacts = useMemo(() => {
+    const map = new Map<string, SelectableContact>();
+    map.set(currentContact.id, currentContact);
+    for (const contact of contactsData?.contacts || []) {
+      map.set(contact.id, contact);
+    }
+    return Array.from(map.values());
+  }, [contactsData, currentContact]);
+
+  const recipientOptions = useMemo(() => {
+    const search = recipientSearch.trim().toLowerCase();
+    return allRecipientContacts.filter((contact) => {
+      if (!search) return true;
+      return (
+        contact.email.toLowerCase().includes(search) ||
+        getContactDisplayName(contact).toLowerCase().includes(search)
+      );
+    });
+  }, [allRecipientContacts, recipientSearch]);
+
+  const selectedRecipientContacts = useMemo(() => {
+    const allContacts = new Map(allRecipientContacts.map((contact) => [contact.id, contact]));
+    return selectedContactIds.map((id) => allContacts.get(id)).filter(Boolean) as SelectableContact[];
+  }, [allRecipientContacts, selectedContactIds]);
+
+  const recipientTriggerLabel = useMemo(() => {
+    if (selectedRecipientContacts.length === 0) return "Select recipients";
+    if (selectedRecipientContacts.length === 1) {
+      const recipient = selectedRecipientContacts[0];
+      return `${getContactDisplayName(recipient)} (${recipient.email})`;
+    }
+
+    const firstRecipient = selectedRecipientContacts[0];
+    return `${getContactDisplayName(firstRecipient)} +${selectedRecipientContacts.length - 1} more`;
+  }, [selectedRecipientContacts]);
+
+  const ccEmails = useMemo(() => parseEmailList(ccInput), [ccInput]);
+  const invalidCcEmails = useMemo(() => ccEmails.filter((email) => !EMAIL_PATTERN.test(email)), [ccEmails]);
+
+  const toggleRecipient = (recipientId: string, checked: boolean) => {
+    setSelectedContactIds((prev) => {
+      if (checked) return prev.includes(recipientId) ? prev : [...prev, recipientId];
+      return prev.filter((id) => id !== recipientId);
+    });
+  };
 
   const parsedSocialLinks = (() => {
     const raw = (masterDesign as any)?.socialLinks;
@@ -178,6 +289,10 @@ export default function SendEmailModal({
         const formData = new FormData();
         formData.append("subject", subject);
         formData.append("content", content);
+        formData.append("recipientContactIds", JSON.stringify(selectedContactIds));
+        if (ccEmails.length > 0) {
+          formData.append("cc", JSON.stringify(ccEmails));
+        }
         attachments.forEach((file) => {
           formData.append("attachments", file);
         });
@@ -199,7 +314,7 @@ export default function SendEmailModal({
         const response = await apiRequest(
           "POST",
           `/api/email-contacts/${contactId}/send-email`,
-          { subject, content }
+          { subject, content, recipientContactIds: selectedContactIds, cc: ccEmails }
         );
         return response.json();
       }
@@ -207,11 +322,12 @@ export default function SendEmailModal({
     onSuccess: () => {
       toast({
         title: "Email Sent",
-        description: `Email successfully sent to ${contactEmail}`,
+        description: `Email successfully sent to ${selectedContactIds.length} recipient${selectedContactIds.length === 1 ? "" : "s"}`,
       });
       setOpen(false);
       setSubject("");
       setContent("");
+      setCcInput("");
       setAttachments([]);
       onEmailSent?.();
     },
@@ -236,6 +352,24 @@ export default function SendEmailModal({
       return;
     }
 
+    if (selectedContactIds.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select at least one recipient",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (invalidCcEmails.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: `Invalid CC email: ${invalidCcEmails[0]}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!hasEditorContent(content)) {
       toast({
         title: "Validation Error",
@@ -253,6 +387,9 @@ export default function SendEmailModal({
     if (!nextOpen) {
       setAttachments([]);
       setShowPreview(false);
+      setCcInput("");
+      setRecipientPickerOpen(false);
+      setShowCcInput(false);
     }
   };
 
@@ -288,12 +425,12 @@ export default function SendEmailModal({
           )}
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Send Email</DialogTitle>
             <DialogDescription>
-              Send an individual email to{" "}
+              Send an email to one or more contacts. The current contact is selected by default:{" "}
               {contactName ? (
                 <>
                   <strong>{contactName}</strong> ({contactEmail})
@@ -305,6 +442,131 @@ export default function SendEmailModal({
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="recipients-trigger">To</Label>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {selectedContactIds.length} selected
+                </span>
+              </div>
+              <Popover open={recipientPickerOpen} onOpenChange={setRecipientPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="recipients-trigger"
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={recipientPickerOpen}
+                    disabled={sendEmailMutation.isPending}
+                    className={cn(
+                      "w-full justify-between font-normal",
+                      selectedRecipientContacts.length === 0 && "text-muted-foreground"
+                    )}
+                  >
+                    <span className="truncate text-left">{recipientTriggerLabel}</span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[--radix-popover-trigger-width] p-0"
+                  align="start"
+                  usePortal={false}
+                >
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Search contacts by name or email..."
+                      value={recipientSearch}
+                      onValueChange={setRecipientSearch}
+                    />
+                    <CommandList className="max-h-72 overflow-y-auto">
+                      {contactsLoading ? (
+                        <div className="flex items-center gap-2 px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading contacts...
+                        </div>
+                      ) : (
+                        <>
+                          <CommandEmpty>No matching contacts</CommandEmpty>
+                          <CommandGroup>
+                            {recipientOptions.map((contact) => {
+                              const checked = selectedContactIds.includes(contact.id);
+                              return (
+                                <CommandItem
+                                  key={contact.id}
+                                  value={contact.id}
+                                  onSelect={() => toggleRecipient(contact.id, !checked)}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      checked ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex min-w-0 flex-col">
+                                    <span className="truncate text-sm font-medium">
+                                      {getContactDisplayName(contact)}
+                                    </span>
+                                    <span className="truncate text-xs text-muted-foreground">
+                                      {contact.email}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="grid gap-2">
+              {!showCcInput && ccInput.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCcInput(true)}
+                  disabled={sendEmailMutation.isPending}
+                  className="ml-auto w-fit text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  Add Cc
+                </button>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="cc">Cc</Label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCcInput("");
+                        setShowCcInput(false);
+                      }}
+                      disabled={sendEmailMutation.isPending}
+                      className="text-xs text-gray-500 transition-colors hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <Input
+                    ref={ccInputRef}
+                    id="cc"
+                    type="text"
+                    placeholder="cc@example.com, another@example.com"
+                    value={ccInput}
+                    onChange={(e) => setCcInput(e.target.value)}
+                    disabled={sendEmailMutation.isPending}
+                    aria-invalid={invalidCcEmails.length > 0}
+                  />
+                  <p className={`text-xs ${invalidCcEmails.length > 0 ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}>
+                    {invalidCcEmails.length > 0
+                      ? `Invalid email: ${invalidCcEmails[0]}`
+                      : "Optional. Separate multiple CC addresses with commas, spaces, or semicolons."}
+                  </p>
+                </>
+              )}
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="subject">Subject</Label>
               <Input
@@ -443,7 +705,7 @@ export default function SendEmailModal({
           <DialogHeader>
             <DialogTitle>Email Preview</DialogTitle>
             <DialogDescription>
-              Preview of how this message will look in an email client for {contactEmail}.
+              Preview of how this message will look in an email client.
             </DialogDescription>
           </DialogHeader>
 
@@ -453,8 +715,16 @@ export default function SendEmailModal({
                 <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
                   <div className="flex gap-2 mb-1">
                     <span className="font-semibold text-right w-14">To:</span>
-                    <span className="text-gray-900">{contactEmail}</span>
+                    <span className="text-gray-900">
+                      {selectedRecipientContacts.map((contact) => contact.email).join(", ")}
+                    </span>
                   </div>
+                  {ccEmails.length > 0 && (
+                    <div className="flex gap-2 mb-1">
+                      <span className="font-semibold text-right w-14">Cc:</span>
+                      <span className="text-gray-900">{ccEmails.join(", ")}</span>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <span className="font-semibold text-right w-14">Subject:</span>
                     <span className="text-gray-900 font-bold">{subject || "(no subject)"}</span>

@@ -22,6 +22,7 @@ const emailPayloadSchema = z.object({
   text: z.string().optional(),
   from: z.string().optional(),
   replyTo: z.string().optional(),
+  cc: z.union([z.string().email(), z.array(z.string().email())]).optional(),
   headers: z.record(z.string()).optional(),
   metadata: z.record(z.any()).optional(),
   scheduledFor: z.string().optional(),
@@ -68,9 +69,11 @@ export const sendEmailTask = task({
     }
 
     const recipients = Array.isArray(data.to) ? data.to : [data.to];
+    const ccRecipients = data.cc ? (Array.isArray(data.cc) ? data.cc : [data.cc]) : undefined;
 
     logger.info("Sending email", {
       to: recipients,
+      cc: ccRecipients,
       subject: data.subject,
     });
 
@@ -132,6 +135,7 @@ export const sendEmailTask = task({
       const { data: resendData, error: resendError } = await resend.emails.send({
         from: data.from || process.env.EMAIL_FROM || "admin@zendwise.com",
         to: recipients,
+        cc: ccRecipients,
         subject: data.subject,
         html: data.html,
         text: data.text,
