@@ -357,9 +357,14 @@ export function NextUpAppointments({ appointments, onViewDetails, onConfirm }: N
 
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">
+                                <button
+                                  type="button"
+                                  onClick={() => onViewDetails(apt)}
+                                  className="max-w-full truncate text-left text-sm font-semibold text-slate-900 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-100 dark:focus-visible:ring-offset-slate-900"
+                                  aria-label={`View appointment details for ${customerName}`}
+                                >
                                   {customerName}
-                                </h4>
+                                </button>
                                 {!isConfirmed && !isInProgress && (
                                   <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-200 text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-md border-0">
                                     Needs Confirm
@@ -372,7 +377,14 @@ export function NextUpAppointments({ appointments, onViewDetails, onConfirm }: N
                                 )}
                               </div>
                               <div className="mt-0.5 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 min-w-0">
-                                <span className="truncate">{apt.title}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => onViewDetails(apt)}
+                                  className="truncate text-left underline-offset-4 hover:text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:hover:text-slate-200 dark:focus-visible:ring-offset-slate-900"
+                                  aria-label={`View details for ${apt.title}`}
+                                >
+                                  {apt.title}
+                                </button>
                                 {apt.shop?.name && (
                                   <>
                                     <span className="text-slate-300 dark:text-slate-600">·</span>

@@ -27,6 +27,7 @@ import {
   XCircle,
   Eye,
   Clock,
+  AlertTriangle,
   Search,
   Send,
   MoreVertical,
@@ -81,8 +82,10 @@ import {
   getCustomerNameForSort,
   getStatusColor,
   formatDateTime,
+  isAppointmentOverlapError,
   TIMING_MAP,
   downloadAppointmentIcs,
+  type AppointmentOverlapConflict,
   type Appointment,
   type AppointmentWithCustomer,
   type Customer,
@@ -156,6 +159,14 @@ export default function RemindersPage() {
     appointment: AppointmentWithCustomer;
     reminderEnabled: boolean;
     reminderData: EditReminderData;
+  } | null>(null);
+  const [overbookConfirmOpen, setOverbookConfirmOpen] = useState(false);
+  const [pendingOverbookUpdate, setPendingOverbookUpdate] = useState<{
+    appointment: AppointmentWithCustomer;
+    reminderEnabled: boolean;
+    reminderData: EditReminderData;
+    sendThankYouEmail: boolean;
+    conflicts: AppointmentOverlapConflict[];
   } | null>(null);
 
   // Pending creation state for optimistic UI
@@ -410,7 +421,7 @@ export default function RemindersPage() {
   });
 
   const updateAppointmentMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Appointment> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Appointment> & { forceOverbook?: boolean } }) => {
       const response = await apiRequest('PATCH', `/api/appointments/${id}`, data);
       return response.json();
     },
@@ -431,6 +442,9 @@ export default function RemindersPage() {
       setEditingAppointment(null);
     },
     onError: (error: any) => {
+      if (isAppointmentOverlapError(error)) {
+        return;
+      }
       toast({ title: t('reminders.toasts.error'), description: error?.message || t('reminders.toasts.appointmentUpdateError'), variant: "destructive" });
     },
   });
@@ -522,6 +536,115 @@ export default function RemindersPage() {
     setEditAppointmentModalOpen(true);
   };
 
+  const buildAppointmentUpdatePayload = (
+    appointment: AppointmentWithCustomer,
+    forceOverbook = false,
+  ): Partial<Appointment> & { forceOverbook?: boolean } => ({
+    title: appointment.title,
+    description: appointment.description,
+    appointmentDate: appointment.appointmentDate,
+    duration: appointment.duration,
+    location: appointment.location,
+    serviceType: appointment.serviceType,
+    status: appointment.status,
+    notes: appointment.notes,
+    providerId: appointment.providerId ?? null,
+    recurrenceFrequency: appointment.recurrenceFrequency ?? 'none',
+    recurrenceInterval: appointment.recurrenceInterval ?? 1,
+    recurrenceCount: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceCount ?? null,
+    recurrenceEndDate: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceEndDate ?? null,
+    recurrenceSeriesId: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceSeriesId ?? null,
+    recurrenceParentId: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceParentId ?? null,
+    ...(forceOverbook ? { forceOverbook: true } : {}),
+  });
+
+  const syncReminderStateForAppointment = (
+    appointment: AppointmentWithCustomer,
+    reminderEnabled: boolean,
+    reminderData: EditReminderData,
+  ) => {
+    const existingReminder = reminders.find(
+      (reminder) => reminder.appointmentId === appointment.id && reminder.status === 'pending'
+    );
+
+    if (reminderEnabled) {
+      const appointmentDate = new Date(appointment.appointmentDate);
+      const scheduledFor =
+        reminderData.reminderTiming === 'custom' && reminderData.customMinutesBefore
+          ? new Date(appointmentDate.getTime() - reminderData.customMinutesBefore * 60 * 1000)
+          : new Date(appointmentDate.getTime() - (TIMING_MAP[reminderData.reminderTiming] || 60) * 60 * 1000);
+
+      if (existingReminder) {
+        deleteReminderMutation.mutate(existingReminder.id);
+      }
+      createScheduledReminderMutation.mutate({
+        appointmentId: appointment.id,
+        data: {
+          reminderType: reminderData.reminderType,
+          reminderTiming: reminderData.reminderTiming,
+          customMinutesBefore: reminderData.customMinutesBefore,
+          scheduledFor,
+          timezone: reminderData.timezone,
+          content: reminderData.content,
+        },
+      });
+      return;
+    }
+
+    if (existingReminder) {
+      deleteReminderMutation.mutate(existingReminder.id);
+    }
+  };
+
+  const submitAppointmentUpdate = ({
+    appointment,
+    reminderEnabled,
+    reminderData,
+    sendThankYouEmail = false,
+    forceOverbook = false,
+  }: {
+    appointment: AppointmentWithCustomer;
+    reminderEnabled: boolean;
+    reminderData: EditReminderData;
+    sendThankYouEmail?: boolean;
+    forceOverbook?: boolean;
+  }) => {
+    updateAppointmentMutation.mutate(
+      {
+        id: appointment.id,
+        data: buildAppointmentUpdatePayload(appointment, forceOverbook),
+      },
+      {
+        onSuccess: () => {
+          syncReminderStateForAppointment(appointment, reminderEnabled, reminderData);
+          if (sendThankYouEmail) {
+            sendThankYouEmailMutation.mutate(appointment.id);
+            setThankYouEmailDialogOpen(false);
+            setPendingEditCompleted(null);
+          }
+          setOverbookConfirmOpen(false);
+          setPendingOverbookUpdate(null);
+        },
+        onError: (error: any) => {
+          if (isAppointmentOverlapError(error)) {
+            setPendingOverbookUpdate({
+              appointment,
+              reminderEnabled,
+              reminderData,
+              sendThankYouEmail,
+              conflicts: error.data.conflicts,
+            });
+            setOverbookConfirmOpen(true);
+          }
+          if (sendThankYouEmail) {
+            setThankYouEmailDialogOpen(false);
+            setPendingEditCompleted(null);
+          }
+        },
+      }
+    );
+  };
+
   const handleUpdateAppointment = async (appointment: AppointmentWithCustomer, reminderEnabled: boolean, reminderData: EditReminderData) => {
     // Validate reminder timing
     if (reminderEnabled && reminderData.reminderTiming === 'custom' && !reminderData.customMinutesBefore) {
@@ -563,47 +686,7 @@ export default function RemindersPage() {
       return;
     }
 
-    updateAppointmentMutation.mutate({
-      id: appointment.id,
-      data: {
-        title: appointment.title,
-        description: appointment.description,
-        appointmentDate: appointment.appointmentDate,
-        duration: appointment.duration,
-        location: appointment.location,
-        serviceType: appointment.serviceType,
-        status: appointment.status,
-        notes: appointment.notes,
-        providerId: appointment.providerId ?? null,
-        recurrenceFrequency: appointment.recurrenceFrequency ?? 'none',
-        recurrenceInterval: appointment.recurrenceInterval ?? 1,
-        recurrenceCount: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceCount ?? null,
-        recurrenceEndDate: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceEndDate ?? null,
-        recurrenceSeriesId: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceSeriesId ?? null,
-        recurrenceParentId: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceParentId ?? null,
-      },
-    });
-
-    // Handle reminder
-    const existingReminder = reminders.find(r => r.appointmentId === appointment.id && r.status === 'pending');
-    if (reminderEnabled) {
-      const appointmentDate = new Date(appointment.appointmentDate);
-      let scheduledFor: Date;
-      if (reminderData.reminderTiming === 'custom' && reminderData.customMinutesBefore) {
-        scheduledFor = new Date(appointmentDate.getTime() - reminderData.customMinutesBefore * 60 * 1000);
-      } else {
-        const minutes = TIMING_MAP[reminderData.reminderTiming] || 60;
-        scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
-      }
-
-      if (existingReminder) deleteReminderMutation.mutate(existingReminder.id);
-      createScheduledReminderMutation.mutate({
-        appointmentId: appointment.id,
-        data: { reminderType: reminderData.reminderType, reminderTiming: reminderData.reminderTiming, customMinutesBefore: reminderData.customMinutesBefore, scheduledFor, timezone: reminderData.timezone, content: reminderData.content },
-      });
-    } else if (existingReminder) {
-      deleteReminderMutation.mutate(existingReminder.id);
-    }
+    submitAppointmentUpdate({ appointment, reminderEnabled, reminderData });
   };
 
   const handleScheduleReminder = (appointmentId: string, data: ScheduleReminderData) => {
@@ -613,54 +696,23 @@ export default function RemindersPage() {
   const handleThankYouEmailConfirm = (sendEmail: boolean) => {
     if (!pendingEditCompleted) return;
     const { appointment, reminderEnabled, reminderData: editReminderData } = pendingEditCompleted;
-    updateAppointmentMutation.mutate(
-      { id: appointment.id, data: {
-        title: appointment.title,
-        description: appointment.description,
-        appointmentDate: appointment.appointmentDate,
-        duration: appointment.duration,
-        location: appointment.location,
-        serviceType: appointment.serviceType,
-        status: 'completed',
-        notes: appointment.notes,
-        providerId: appointment.providerId ?? null,
-        recurrenceFrequency: appointment.recurrenceFrequency ?? 'none',
-        recurrenceInterval: appointment.recurrenceInterval ?? 1,
-        recurrenceCount: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceCount ?? null,
-        recurrenceEndDate: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceEndDate ?? null,
-        recurrenceSeriesId: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceSeriesId ?? null,
-        recurrenceParentId: appointment.recurrenceFrequency === 'none' ? null : appointment.recurrenceParentId ?? null,
-      }},
-      {
-        onSuccess: () => {
-          if (sendEmail) sendThankYouEmailMutation.mutate(appointment.id);
-          const existingReminder = reminders.find(r => r.appointmentId === appointment.id && r.status === 'pending');
-          if (reminderEnabled) {
-            const appointmentDate = new Date(appointment.appointmentDate);
-            let scheduledFor: Date;
-            if (editReminderData.reminderTiming === 'custom' && editReminderData.customMinutesBefore) {
-              scheduledFor = new Date(appointmentDate.getTime() - editReminderData.customMinutesBefore * 60 * 1000);
-            } else {
-              const minutes = TIMING_MAP[editReminderData.reminderTiming] || 60;
-              scheduledFor = new Date(appointmentDate.getTime() - minutes * 60 * 1000);
-            }
-            if (existingReminder) deleteReminderMutation.mutate(existingReminder.id);
-            createScheduledReminderMutation.mutate({
-              appointmentId: appointment.id,
-              data: { reminderType: editReminderData.reminderType, reminderTiming: editReminderData.reminderTiming, customMinutesBefore: editReminderData.customMinutesBefore, scheduledFor, timezone: editReminderData.timezone, content: editReminderData.content },
-            });
-          } else if (existingReminder) {
-            deleteReminderMutation.mutate(existingReminder.id);
-          }
-          setThankYouEmailDialogOpen(false);
-          setPendingEditCompleted(null);
-        },
-        onError: () => {
-          setThankYouEmailDialogOpen(false);
-          setPendingEditCompleted(null);
-        }
-      }
-    );
+    submitAppointmentUpdate({
+      appointment: { ...appointment, status: 'completed' },
+      reminderEnabled,
+      reminderData: editReminderData,
+      sendThankYouEmail: sendEmail,
+    });
+  };
+
+  const confirmOverbookUpdate = () => {
+    if (!pendingOverbookUpdate) return;
+    submitAppointmentUpdate({
+      appointment: pendingOverbookUpdate.appointment,
+      reminderEnabled: pendingOverbookUpdate.reminderEnabled,
+      reminderData: pendingOverbookUpdate.reminderData,
+      sendThankYouEmail: pendingOverbookUpdate.sendThankYouEmail,
+      forceOverbook: true,
+    });
   };
 
   const handleSendReminders = () => {
@@ -714,6 +766,13 @@ export default function RemindersPage() {
     setNewAppointmentSeedCustomer(appointment.customer);
     setNewAppointmentModalOpen(true);
   };
+
+  const primaryOverbookConflict = pendingOverbookUpdate?.conflicts[0];
+  const overbookProviderName =
+    primaryOverbookConflict?.providerName ||
+    providers.find((provider) => provider.id === primaryOverbookConflict?.providerId)?.name ||
+    providers.find((provider) => provider.id === primaryOverbookConflict?.providerId)?.email ||
+    'this provider';
 
   // ─── Render Helpers ───────────────────────────────────────────────────────
 
@@ -1043,6 +1102,64 @@ export default function RemindersPage() {
               </AlertDialogCancel>
               <AlertDialogAction onClick={() => handleThankYouEmailConfirm(true)} disabled={updateAppointmentMutation.isPending || sendThankYouEmailMutation.isPending} className="bg-emerald-500 hover:bg-emerald-600">
                 <Send className="h-4 w-4 mr-2" />Yes, Send Thank-You
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={overbookConfirmOpen}
+          onOpenChange={(open) => {
+            setOverbookConfirmOpen(open);
+            if (!open) {
+              setPendingOverbookUpdate(null);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                Overbook appointment?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>{overbookProviderName} already has an appointment during this time.</p>
+                {primaryOverbookConflict && (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Existing appointment: <span className="font-medium text-foreground">{primaryOverbookConflict.conflictingTitle}</span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {primaryOverbookConflict.conflictingCustomerName} · {formatDateTime(primaryOverbookConflict.conflictingStart)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      New appointment: <span className="font-medium text-foreground">{pendingOverbookUpdate?.appointment.title}</span> · {formatDateTime(primaryOverbookConflict.requestedStart)}
+                    </p>
+                  </>
+                )}
+                {pendingOverbookUpdate && pendingOverbookUpdate.conflicts.length > 1 && (
+                  <p className="text-sm text-muted-foreground">
+                    {pendingOverbookUpdate.conflicts.length - 1} more overlap
+                    {pendingOverbookUpdate.conflicts.length > 2 ? 's' : ''} detected.
+                  </p>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel disabled={updateAppointmentMutation.isPending}>
+                Keep Editing
+              </AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <Button
+                  onClick={(event) => {
+                    event.preventDefault();
+                    confirmOverbookUpdate();
+                  }}
+                  disabled={updateAppointmentMutation.isPending}
+                  className="bg-amber-500 hover:bg-amber-600"
+                >
+                  {updateAppointmentMutation.isPending ? 'Saving...' : 'Overbook Appointment'}
+                </Button>
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

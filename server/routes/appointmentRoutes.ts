@@ -136,6 +136,127 @@ function buildAppointmentOccurrences<T extends { appointmentDate: Date; recurren
   return occurrences.length > 0 ? occurrences : [data];
 }
 
+type AppointmentOverlapCandidate = {
+  appointmentDate: Date;
+  duration?: number | null;
+  providerId?: string | null;
+  status?: string | null;
+};
+
+type AppointmentOverlapConflict = {
+  requestedStart: Date;
+  requestedEnd: Date;
+  conflictingAppointmentId: string;
+  conflictingTitle: string;
+  conflictingStart: Date;
+  conflictingEnd: Date;
+  conflictingDuration: number;
+  conflictingStatus: string;
+  conflictingCustomerName: string;
+  conflictingCustomerEmail?: string | null;
+  providerId?: string | null;
+  providerName?: string | null;
+};
+
+function isProviderConflictStatus(status?: string | null): boolean {
+  return status === 'scheduled' || status === 'confirmed';
+}
+
+function toPostgresTimestampString(date: Date): string {
+  return date.toISOString().replace('T', ' ').replace('Z', '');
+}
+
+async function collectProviderOverlapConflicts({
+  tenantId,
+  candidates,
+  excludeAppointmentId,
+}: {
+  tenantId: string;
+  candidates: AppointmentOverlapCandidate[];
+  excludeAppointmentId?: string;
+}): Promise<AppointmentOverlapConflict[]> {
+  const conflicts: AppointmentOverlapConflict[] = [];
+  const seenConflictKeys = new Set<string>();
+
+  for (const candidate of candidates) {
+    if (!candidate.providerId || !isProviderConflictStatus(candidate.status ?? 'scheduled')) {
+      continue;
+    }
+
+    const candidateDuration = candidate.duration ?? 60;
+    const requestedStart = new Date(candidate.appointmentDate);
+    const requestedEnd = new Date(requestedStart.getTime() + candidateDuration * 60 * 1000);
+    const requestedStartTimestamp = toPostgresTimestampString(requestedStart);
+    const requestedEndTimestamp = toPostgresTimestampString(requestedEnd);
+    const conditions = [
+      eq(appointments.tenantId, tenantId),
+      eq(appointments.providerId, candidate.providerId),
+      or(
+        eq(appointments.status, 'scheduled'),
+        eq(appointments.status, 'confirmed'),
+      )!,
+      sql`${appointments.appointmentDate} < ${requestedEndTimestamp}::timestamp`,
+      sql`${appointments.appointmentDate} + (coalesce(${appointments.duration}, 60) * interval '1 minute') > ${requestedStartTimestamp}::timestamp`,
+    ];
+
+    if (excludeAppointmentId) {
+      conditions.push(sql`${appointments.id} <> ${excludeAppointmentId}`);
+    }
+
+    const overlappingAppointments = await db
+      .select({
+        id: appointments.id,
+        title: appointments.title,
+        appointmentDate: appointments.appointmentDate,
+        duration: appointments.duration,
+        status: appointments.status,
+        customerEmail: emailContacts.email,
+        customerFirstName: emailContacts.firstName,
+        customerLastName: emailContacts.lastName,
+        providerId: betterAuthUser.id,
+        providerName: betterAuthUser.name,
+      })
+      .from(appointments)
+      .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
+      .leftJoin(betterAuthUser, eq(appointments.providerId, betterAuthUser.id))
+      .where(and(...conditions))
+      .orderBy(asc(appointments.appointmentDate));
+
+    for (const overlap of overlappingAppointments) {
+      const conflictKey = `${requestedStart.toISOString()}:${overlap.id}`;
+      if (seenConflictKeys.has(conflictKey)) {
+        continue;
+      }
+      seenConflictKeys.add(conflictKey);
+
+      const conflictingStart = new Date(overlap.appointmentDate);
+      const conflictingDuration = overlap.duration ?? 60;
+      const conflictingEnd = new Date(conflictingStart.getTime() + conflictingDuration * 60 * 1000);
+      const customerName =
+        `${overlap.customerFirstName || ''} ${overlap.customerLastName || ''}`.trim() ||
+        overlap.customerEmail ||
+        'Unknown Customer';
+
+      conflicts.push({
+        requestedStart,
+        requestedEnd,
+        conflictingAppointmentId: overlap.id,
+        conflictingTitle: overlap.title,
+        conflictingStart,
+        conflictingEnd,
+        conflictingDuration,
+        conflictingStatus: overlap.status,
+        conflictingCustomerName: customerName,
+        conflictingCustomerEmail: overlap.customerEmail,
+        providerId: overlap.providerId,
+        providerName: overlap.providerName,
+      });
+    }
+  }
+
+  return conflicts;
+}
+
 
 // Apply authentication to all routes
 router.use(authenticateToken);
@@ -364,6 +485,7 @@ router.post('/', async (req: Request, res: Response) => {
     const user = (req as any).user;
     const tenantId = user.tenantId;
     const userId = user.id;
+    const forceOverbook = req.body?.forceOverbook === true;
 
     // Validate request body
     const validatedData = createAppointmentSchema.parse(req.body);
@@ -404,6 +526,27 @@ router.post('/', async (req: Request, res: Response) => {
     const isRecurring = (validatedData.recurrenceFrequency ?? 'none') !== 'none';
     const recurrenceSeriesId = isRecurring ? uuidv4() : null;
     const recurrenceParentId = isRecurring ? uuidv4() : null;
+
+    if (!forceOverbook) {
+      const overlapConflicts = await collectProviderOverlapConflicts({
+        tenantId,
+        candidates: occurrences.map((occurrence) => ({
+          appointmentDate: new Date(occurrence.appointmentDate),
+          duration: occurrence.duration,
+          providerId: occurrence.providerId ?? null,
+          status: 'scheduled',
+        })),
+      });
+
+      if (overlapConflicts.length > 0) {
+        return res.status(409).json({
+          error: 'This provider already has an appointment at the selected time.',
+          message: 'This provider already has an appointment at the selected time.',
+          code: 'APPOINTMENT_OVERLAP',
+          conflicts: overlapConflicts,
+        });
+      }
+    }
 
     // Create appointment(s)
     const newAppointments = await db
@@ -518,6 +661,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const user = (req as any).user;
     const tenantId = user.tenantId;
+    const forceOverbook = req.body?.forceOverbook === true;
 
     // Validate request body
     const validatedData = updateAppointmentSchema.parse(req.body);
@@ -555,6 +699,42 @@ router.put('/:id', async (req: Request, res: Response) => {
     const existing = existingAppointment[0];
     const isDateChanging = validatedData.appointmentDate &&
       new Date(validatedData.appointmentDate).getTime() !== new Date(existing.appointmentDate).getTime();
+    const effectiveProviderId =
+      validatedData.providerId !== undefined ? validatedData.providerId : existing.providerId;
+    const effectiveAppointmentDate = validatedData.appointmentDate ?? existing.appointmentDate;
+    const effectiveDuration = validatedData.duration ?? existing.duration ?? 60;
+    const effectiveStatus = validatedData.status ?? existing.status;
+    const shouldCheckOverlap =
+      !forceOverbook &&
+      isProviderConflictStatus(effectiveStatus) &&
+      (
+        effectiveProviderId !== existing.providerId ||
+        new Date(effectiveAppointmentDate).getTime() !== new Date(existing.appointmentDate).getTime() ||
+        effectiveDuration !== (existing.duration ?? 60) ||
+        !isProviderConflictStatus(existing.status)
+      );
+
+    if (shouldCheckOverlap) {
+      const overlapConflicts = await collectProviderOverlapConflicts({
+        tenantId,
+        excludeAppointmentId: id,
+        candidates: [{
+          appointmentDate: new Date(effectiveAppointmentDate),
+          duration: effectiveDuration,
+          providerId: effectiveProviderId ?? null,
+          status: effectiveStatus,
+        }],
+      });
+
+      if (overlapConflicts.length > 0) {
+        return res.status(409).json({
+          error: 'This provider already has an appointment at the selected time.',
+          message: 'This provider already has an appointment at the selected time.',
+          code: 'APPOINTMENT_OVERLAP',
+          conflicts: overlapConflicts,
+        });
+      }
+    }
 
     let remindersCancelled = 0;
     if (isDateChanging) {
@@ -632,6 +812,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const user = (req as any).user;
     const tenantId = user.tenantId;
+    const forceOverbook = req.body?.forceOverbook === true;
 
     // Whitelist of allowed fields for PATCH updates - prevents mass assignment attacks
     const allowedFields = [
@@ -763,6 +944,61 @@ router.patch('/:id', async (req: Request, res: Response) => {
       updateData.recurrenceFrequency !== 'none' &&
       !existing.recurrenceSeriesId &&
       ((updateData.recurrenceCount ?? 1) > 1 || updateData.recurrenceEndDate);
+
+    const effectiveProviderId =
+      Object.prototype.hasOwnProperty.call(updateData, 'providerId')
+        ? updateData.providerId
+        : existing.providerId;
+    const effectiveAppointmentDate = updateData.appointmentDate ?? existing.appointmentDate;
+    const effectiveDuration = updateData.duration ?? existing.duration ?? 60;
+    const effectiveStatus = updateData.status ?? existing.status;
+    const schedulingFieldsChanged =
+      effectiveProviderId !== existing.providerId ||
+      new Date(effectiveAppointmentDate).getTime() !== new Date(existing.appointmentDate).getTime() ||
+      effectiveDuration !== (existing.duration ?? 60);
+    const shouldCheckOverlap =
+      !forceOverbook &&
+      isProviderConflictStatus(effectiveStatus) &&
+      (
+        schedulingFieldsChanged ||
+        shouldCreateSeriesFromEdit ||
+        !isProviderConflictStatus(existing.status)
+      );
+
+    if (shouldCheckOverlap) {
+      const overlapCandidates = shouldCreateSeriesFromEdit
+        ? buildAppointmentOccurrences({
+            appointmentDate: new Date(effectiveAppointmentDate),
+            duration: effectiveDuration,
+            providerId: effectiveProviderId ?? null,
+            status: effectiveStatus,
+            recurrenceFrequency: (updateData.recurrenceFrequency ?? existing.recurrenceFrequency ?? 'none') as RecurrenceFrequency,
+            recurrenceInterval: updateData.recurrenceInterval ?? existing.recurrenceInterval ?? 1,
+            recurrenceCount: updateData.recurrenceCount ?? existing.recurrenceCount ?? null,
+            recurrenceEndDate: updateData.recurrenceEndDate ?? existing.recurrenceEndDate ?? null,
+          })
+        : [{
+            appointmentDate: new Date(effectiveAppointmentDate),
+            duration: effectiveDuration,
+            providerId: effectiveProviderId ?? null,
+            status: effectiveStatus,
+          }];
+
+      const overlapConflicts = await collectProviderOverlapConflicts({
+        tenantId,
+        excludeAppointmentId: id,
+        candidates: overlapCandidates,
+      });
+
+      if (overlapConflicts.length > 0) {
+        return res.status(409).json({
+          error: 'This provider already has an appointment at the selected time.',
+          message: 'This provider already has an appointment at the selected time.',
+          code: 'APPOINTMENT_OVERLAP',
+          conflicts: overlapConflicts,
+        });
+      }
+    }
 
     const editSeriesId = shouldCreateSeriesFromEdit ? uuidv4() : null;
     if (shouldCreateSeriesFromEdit) {

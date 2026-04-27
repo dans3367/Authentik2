@@ -86,6 +86,42 @@ export interface AppointmentWithCustomer extends Appointment {
   shop?: { id: string; name: string } | null;
 }
 
+export interface AppointmentOverlapConflict {
+  requestedStart: Date | string;
+  requestedEnd: Date | string;
+  conflictingAppointmentId: string;
+  conflictingTitle: string;
+  conflictingStart: Date | string;
+  conflictingEnd: Date | string;
+  conflictingDuration: number;
+  conflictingStatus: string;
+  conflictingCustomerName: string;
+  conflictingCustomerEmail?: string | null;
+  providerId?: string | null;
+  providerName?: string | null;
+}
+
+export interface AppointmentOverlapErrorData {
+  code: "APPOINTMENT_OVERLAP";
+  message: string;
+  conflicts: AppointmentOverlapConflict[];
+}
+
+export function isAppointmentOverlapError(
+  error: unknown
+): error is Error & { status: number; data: AppointmentOverlapErrorData } {
+  if (!error || typeof error !== "object") return false;
+  const maybeError = error as {
+    status?: unknown;
+    data?: { code?: unknown; conflicts?: unknown };
+  };
+  return (
+    maybeError.status === 409 &&
+    maybeError.data?.code === "APPOINTMENT_OVERLAP" &&
+    Array.isArray(maybeError.data?.conflicts)
+  );
+}
+
 // Filter appointments that are upcoming (after current date)
 export function filterUpcomingAppointments(
   appointments: AppointmentWithCustomer[],

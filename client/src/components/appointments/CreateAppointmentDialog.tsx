@@ -23,6 +23,9 @@ import {
 import {
   TIMING_MAP,
   formatDateTime,
+  getCustomerName,
+  isAppointmentOverlapError,
+  type AppointmentOverlapConflict,
   type Appointment,
   type AppointmentWithCustomer,
   type Customer,
@@ -60,6 +63,14 @@ export function CreateAppointmentDialog({
     data: NewAppointmentData;
     reminderEnabled: boolean;
     reminderData: ReminderData;
+  } | null>(null);
+  const [overbookConfirmOpen, setOverbookConfirmOpen] = useState(false);
+  const pendingOverbookRef = useRef<{
+    appointmentData: Record<string, unknown>;
+    createReminder: boolean;
+    reminderSettings: ReminderData;
+    overrideShopId?: string | null;
+    conflicts: AppointmentOverlapConflict[];
   } | null>(null);
 
   const { data: customersData } = useQuery<{ contacts: Customer[] }>({
@@ -137,12 +148,13 @@ export function CreateAppointmentDialog({
       reminderSettings: any;
       overrideShopId?: string | null;
     }) => {
-      const { overrideShopId, ...rest } = params;
       const response = await apiRequest(
         "POST",
         "/api/appointments",
         params.appointmentData,
-        overrideShopId ? { headers: { "x-shop-id": overrideShopId } } : undefined,
+        params.overrideShopId
+          ? { headers: { "x-shop-id": params.overrideShopId } }
+          : undefined,
       );
       return response.json();
     },
@@ -204,6 +216,9 @@ export function CreateAppointmentDialog({
       return { previousAppointments, tempId, effectiveShopId };
     },
     onSuccess: (data, variables, context) => {
+      pendingOverbookRef.current = null;
+      setOverbookConfirmOpen(false);
+      onOpenChange(false);
       toast({
         title: t("reminders.toasts.success"),
         description: t("reminders.toasts.appointmentCreated"),
@@ -287,6 +302,17 @@ export function CreateAppointmentDialog({
         );
       }
       if (context?.tempId) onOptimisticResolve?.(context.tempId);
+      if (isAppointmentOverlapError(error)) {
+        pendingOverbookRef.current = {
+          appointmentData: _variables.appointmentData,
+          createReminder: _variables.createReminder,
+          reminderSettings: _variables.reminderSettings,
+          overrideShopId: _variables.overrideShopId ?? null,
+          conflicts: error.data.conflicts,
+        };
+        setOverbookConfirmOpen(true);
+        return;
+      }
       toast({
         title: t("reminders.toasts.error"),
         description: error?.message || t("reminders.toasts.appointmentCreateError"),
@@ -385,7 +411,6 @@ export function CreateAppointmentDialog({
       reminderSettings: reminderData,
       overrideShopId: pickedShopId ?? null,
     });
-    onOpenChange(false);
   };
 
   const confirmPastDateAppointment = () => {
@@ -400,8 +425,34 @@ export function CreateAppointmentDialog({
       reminderSettings: reminderData,
       overrideShopId: pickedShopId ?? null,
     });
-    onOpenChange(false);
   };
+
+  const confirmOverbookAppointment = () => {
+    if (!pendingOverbookRef.current) return;
+    const pending = pendingOverbookRef.current;
+    createAppointmentMutation.mutate({
+      appointmentData: {
+        ...pending.appointmentData,
+        forceOverbook: true,
+      },
+      createReminder: pending.createReminder,
+      reminderSettings: pending.reminderSettings,
+      overrideShopId: pending.overrideShopId ?? null,
+    });
+  };
+
+  const primaryConflict = pendingOverbookRef.current?.conflicts[0];
+  const providerName =
+    primaryConflict?.providerName ||
+    providers.find((provider) => provider.id === primaryConflict?.providerId)?.name ||
+    providers.find((provider) => provider.id === primaryConflict?.providerId)?.email ||
+    "this provider";
+  const conflictCustomer = primaryConflict
+    ? primaryConflict.conflictingCustomerName || primaryConflict.conflictingCustomerEmail || "another customer"
+    : null;
+  const requestedCustomer = pendingOverbookRef.current?.appointmentData.customerId
+    ? customers.find((customer) => customer.id === pendingOverbookRef.current?.appointmentData.customerId)
+    : null;
 
   return (
     <>
@@ -463,6 +514,78 @@ export function CreateAppointmentDialog({
                 {createAppointmentMutation.isPending
                   ? "Creating..."
                   : "Create Anyway"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={overbookConfirmOpen}
+        onOpenChange={(nextOpen) => {
+          setOverbookConfirmOpen(nextOpen);
+          if (!nextOpen) {
+            pendingOverbookRef.current = null;
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-5 w-5" />
+              Overbook appointment?
+            </DialogTitle>
+            <DialogDescription>
+              {providerName} already has an appointment during this time. You can still save it as an overbooked appointment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {primaryConflict && (
+              <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+                <div>
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                    New appointment
+                  </p>
+                  <p className="font-medium">
+                    {String(pendingOverbookRef.current?.appointmentData.title || "Untitled Appointment")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {requestedCustomer ? getCustomerName(requestedCustomer) : "Selected customer"} ·{" "}
+                    {formatDateTime(primaryConflict.requestedStart)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                    Existing appointment
+                  </p>
+                  <p className="font-medium">{primaryConflict.conflictingTitle}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {conflictCustomer} · {formatDateTime(primaryConflict.conflictingStart)}
+                  </p>
+                </div>
+                {pendingOverbookRef.current && pendingOverbookRef.current.conflicts.length > 1 && (
+                  <p className="text-sm text-muted-foreground">
+                    {pendingOverbookRef.current.conflicts.length - 1} more conflict
+                    {pendingOverbookRef.current.conflicts.length > 2 ? "s" : ""} found.
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setOverbookConfirmOpen(false);
+                  pendingOverbookRef.current = null;
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmOverbookAppointment}
+                disabled={createAppointmentMutation.isPending}
+              >
+                {createAppointmentMutation.isPending ? "Saving..." : "Overbook Appointment"}
               </Button>
             </div>
           </div>

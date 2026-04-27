@@ -7,11 +7,16 @@ async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
     let errorMessage = text;
+    let parsed: unknown;
 
     try {
-      const parsed = JSON.parse(text);
-      if (parsed && typeof parsed === "object" && typeof parsed.message === "string") {
-        errorMessage = parsed.message;
+      parsed = JSON.parse(text);
+      if (parsed && typeof parsed === "object") {
+        if (typeof (parsed as { message?: unknown }).message === "string") {
+          errorMessage = (parsed as { message: string }).message;
+        } else if (typeof (parsed as { error?: unknown }).error === "string") {
+          errorMessage = (parsed as { error: string }).error;
+        }
       }
     } catch {
       // Non-JSON response body; keep raw text/status text as fallback
@@ -31,7 +36,13 @@ async function throwIfResNotOk(res: Response) {
     }
     
     // Prefix message with status code so components can detect specific errors (e.g. '403:' for permission denied)
-    throw new Error(`${res.status}: ${errorMessage}`);
+    const error = new Error(`${res.status}: ${errorMessage}`) as Error & {
+      status?: number;
+      data?: unknown;
+    };
+    error.status = res.status;
+    error.data = parsed;
+    throw error;
   }
 }
 
