@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "node scripts/start-dev.js",
-    "dev:server": "NODE_ENV=development tsx server/index.ts",
+    "dev:server": "NODE_ENV=development tsx watch server/index.ts",
     "dev:trigger": "npx trigger.dev@latest dev",
     "build": "npm run build:email-css && vite build && cp -R server/public/* dist/public/ && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",

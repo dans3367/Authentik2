@@ -2332,15 +2332,14 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
     // Use shared wrapper so sent output matches preview and active email design
     const htmlContent = await wrapNewsletterContent(tenantId, wrappedBodyContent);
 
-    // Send email via Trigger.dev queue
-    // Generate a unique ID to track this email send - will be stored in email_sends and passed to Trigger task
-    const emailTrackingId = crypto.randomUUID();
+    const emailSendId = crypto.randomUUID();
     let emailActivityId: string | null = null;
+    let providerMessageId: string | null = null;
+    let providerName: 'resend' | 'ahasend' = 'resend';
 
-    let result: { success: boolean; runId?: string; error?: string };
     try {
-      const { sendEmailTask } = await import('../../../src/trigger/email');
-      const handle = await sendEmailTask.trigger({
+      const { sendEmailNow } = await import('../../../src/trigger/email');
+      const sendResult = await sendEmailNow({
         to: recipientEmails.length === 1 ? recipientEmails[0] : recipientEmails,
         ...(ccEmails.length > 0 && { cc: ccEmails.length === 1 ? ccEmails[0] : ccEmails }),
         subject: resolvedSubject,
@@ -2353,15 +2352,23 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
           recipientCount: recipientEmails.length,
           tenantId: tenantId,
           sentBy: req.user.id,
-          emailTrackingId: emailTrackingId, // Pass tracking ID so task can update email_sends with actual Resend ID
           ...(ccEmails.length > 0 && { cc: ccEmails }),
         },
         ...(base64Attachments.length > 0 && { attachments: base64Attachments }),
-      });
-      console.log(`📧 [SendEmail] Triggered send-email task, runId: ${handle.id}, trackingId: ${emailTrackingId}`);
-      result = { success: true, runId: handle.id };
+      }, { updateTrackingStatus: false });
 
-      // Log email activity as 'sent' now that the task system accepted it
+      if (!sendResult.success) {
+        console.error('[SendEmail] Direct send failed:', sendResult.error);
+        return res.status(503).json({
+          success: false,
+          message: sendResult.error || 'Email server is not available. Please try again later.'
+        });
+      }
+
+      providerMessageId = sendResult.emailId || null;
+      providerName = sendResult.provider || 'resend';
+      console.log(`📧 [SendEmail] Email sent directly, provider: ${providerName}, messageId: ${providerMessageId || 'none'}`);
+
       try {
         const [insertedActivity] = await db.insert(emailActivity).values({
           contactId: contact.id,
@@ -2374,6 +2381,8 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
             recipient: contact.email,
             recipients: recipientEmails,
             cc: ccEmails,
+            provider: providerName,
+            providerMessageId,
             recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined,
             from: displayCompanyName || 'Manager',
           }),
@@ -2384,13 +2393,12 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
       } catch (activityLogError) {
         console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
       }
-
-    } catch (triggerError: any) {
-      console.error('[SendEmail] Failed to trigger email task:', triggerError);
+    } catch (sendError: any) {
+      console.error('[SendEmail] Failed to send email directly:', sendError);
 
       return res.status(503).json({
         success: false,
-        message: 'Email server is not available. Please try again later.'
+        message: sendError?.message || 'Email server is not available. Please try again later.'
       });
     }
 
@@ -2412,7 +2420,8 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
           recipientEmails,
           ccEmails,
           emailSubject: resolvedSubject,
-          triggerRunId: result?.runId
+          provider: providerName,
+          providerMessageId,
         },
         req
       });
@@ -2421,11 +2430,10 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
       console.error(`⚠️ [SendEmail] Failed to log to activity_logs:`, activityLogError);
     }
 
-    // Log to email_sends table for limit tracking - use emailTrackingId as the record ID
-    // so the Trigger task can update it with the actual Resend email ID after sending
+    // Log to email_sends after the provider accepts the message so the record reflects actual delivery state.
     try {
       await db.insert(emailSends).values({
-        id: emailTrackingId,
+        id: emailSendId,
         tenantId: tenantId,
         recipientEmail: recipientEmails.join(', '),
         recipientName: recipientEmails.length === 1
@@ -2435,14 +2443,14 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
         senderName: displayCompanyName || 'Manager',
         subject: resolvedSubject,
         emailType: 'individual',
-        provider: 'resend',
-        providerMessageId: null, // Will be updated by Trigger task with actual Resend email ID
-        status: 'pending',
+        provider: providerName,
+        providerMessageId,
+        status: 'sent',
         contactId: contact.id,
         promotionId: null,
-        sentAt: null, // Not sent yet
+        sentAt: new Date(),
       });
-      console.log(`📧 [SendEmail] Logged to email_sends table for ${recipientEmails.length} recipient(s), trackingId: ${emailTrackingId}`);
+      console.log(`📧 [SendEmail] Logged to email_sends table for ${recipientEmails.length} recipient(s), id: ${emailSendId}`);
     } catch (logError) {
       console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
     }
@@ -2457,14 +2465,15 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
         .where(eq(emailContacts.id, recipientContact.id));
     }
 
-    console.log(`✅ [SendEmail] Email queued successfully for ${recipientEmails.length} recipient(s), subject: "${subject}", runId: ${result?.runId}`);
+    console.log(`✅ [SendEmail] Email sent successfully for ${recipientEmails.length} recipient(s), subject: "${subject}", provider: ${providerName}`);
 
     res.json({
       success: true,
       message: "Email sent successfully",
       recipientCount: recipientEmails.length,
       ccCount: ccEmails.length,
-      result
+      provider: providerName,
+      providerMessageId,
     });
   } catch (error: any) {
     console.error(`❌ [SendEmail] Send individual email error:`, error);

@@ -48,6 +48,221 @@ const batchEmailPayloadSchema = z.object({
 
 export type BatchEmailPayload = z.infer<typeof batchEmailPayloadSchema>;
 
+// Resend tags accept only [A-Za-z0-9_-], max 256 chars per name/value.
+// Drop array/object values, sanitize strings, skip empty results.
+function buildResendTags(metadata: Record<string, any> | undefined) {
+  if (!metadata) return undefined;
+  const sanitize = (input: string) =>
+    input.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 256);
+  const tags: { name: string; value: string }[] = [];
+  for (const [rawName, rawValue] of Object.entries(metadata)) {
+    if (rawValue === null || rawValue === undefined) continue;
+    if (typeof rawValue === 'object') continue;
+    const name = sanitize(String(rawName));
+    const value = sanitize(String(rawValue));
+    if (!name || !value) continue;
+    tags.push({ name, value });
+    if (tags.length >= 10) break;
+  }
+  return tags.length > 0 ? tags : undefined;
+}
+
+export async function sendEmailNow(
+  payload: EmailPayload,
+  options: { updateTrackingStatus?: boolean } = {}
+) {
+  const data = emailPayloadSchema.parse(payload);
+  const recipients = Array.isArray(data.to) ? data.to : [data.to];
+  const ccRecipients = data.cc ? (Array.isArray(data.cc) ? data.cc : [data.cc]) : undefined;
+  const apiUrl = process.env.API_URL || 'http://localhost:5002';
+  const secret = process.env.INTERNAL_SERVICE_SECRET;
+  const shouldUpdateTrackingStatus = options.updateTrackingStatus !== false;
+
+  logger.info("Sending email", {
+    to: recipients,
+    cc: ccRecipients,
+    subject: data.subject,
+  });
+
+  async function updateEmailSendStatus(update: { emailTrackingId: string; providerMessageId?: string; status: 'sent' | 'failed' }) {
+    if (!secret) {
+      return;
+    }
+
+    const { createHmac } = await import('crypto');
+    const timestamp = Date.now();
+    const body: {
+      emailTrackingId: string;
+      providerMessageId?: string;
+      status: 'sent' | 'failed';
+    } = {
+      emailTrackingId: update.emailTrackingId,
+      status: update.status,
+    };
+
+    if (update.providerMessageId) {
+      body.providerMessageId = update.providerMessageId;
+    }
+    const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
+    const signature = createHmac('sha256', secret).update(signaturePayload).digest('hex');
+
+    const response = await fetch(`${apiUrl}/api/internal/update-email-send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-service': 'trigger.dev',
+        'x-internal-timestamp': timestamp.toString(),
+        'x-internal-signature': signature,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      logger.warn("Failed to update email send status", {
+        status: response.status,
+        emailTrackingId: update.emailTrackingId,
+      });
+    }
+  }
+
+  try {
+    const resendAttachments = data.attachments?.map(att => ({
+      filename: att.filename,
+      content: Buffer.from(att.content, 'base64'),
+      content_type: att.contentType,
+    }));
+
+    let emailData: any = null;
+    let sendError: any = null;
+    let provider: 'resend' | 'ahasend' = 'resend';
+
+    const { data: resendData, error: resendError } = await resend.emails.send({
+      from: data.from || process.env.EMAIL_FROM || "admin@zendwise.com",
+      to: recipients,
+      cc: ccRecipients,
+      subject: data.subject,
+      html: data.html,
+      text: data.text,
+      replyTo: data.replyTo,
+      headers: data.headers,
+      tags: buildResendTags(data.metadata),
+      ...(resendAttachments && resendAttachments.length > 0 && { attachments: resendAttachments }),
+    });
+
+    emailData = resendData;
+    sendError = resendError;
+
+    if (sendError) {
+      logger.warn("Resend failed, falling back to AhaSend", { error: sendError.message, to: recipients });
+      try {
+        const ahaResult = await sendAhaEmail({
+          from: { email: data.from || process.env.EMAIL_FROM || "admin@zendwise.com" },
+          recipients: recipients.map(r => ({ email: r })),
+          subject: data.subject,
+          html_content: data.html,
+          text_content: data.text,
+          reply_to: data.replyTo,
+          attachments: data.attachments?.map(att => ({
+            filename: att.filename,
+            content: att.content,
+            content_type: att.contentType,
+          })),
+        });
+        const ahaMessages: any[] = ahaResult?.data || [];
+        const firstMsg = ahaMessages[0];
+        emailData = { id: firstMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
+        sendError = null;
+        provider = 'ahasend';
+      } catch (ahaError) {
+        logger.error("AhaSend fallback also failed", { error: ahaError instanceof Error ? ahaError.message : String(ahaError) });
+        sendError = ahaError;
+      }
+    }
+
+    if (sendError) {
+      logger.error("Failed to send email via both providers", { error: sendError });
+
+      if (shouldUpdateTrackingStatus && data.metadata?.emailTrackingId) {
+        try {
+          await updateEmailSendStatus({
+            emailTrackingId: String(data.metadata.emailTrackingId),
+            status: 'failed',
+          });
+        } catch (updateError) {
+          logger.warn("Error updating failed email status", {
+            error: updateError instanceof Error ? updateError.message : 'Unknown error',
+          });
+        }
+      }
+
+      return {
+        success: false,
+        provider,
+        to: recipients,
+        subject: data.subject,
+        error: sendError.message || String(sendError),
+      };
+    }
+
+    logger.info("Email sent successfully", {
+      emailId: emailData?.id,
+      provider,
+      to: recipients,
+    });
+
+    if (shouldUpdateTrackingStatus && data.metadata?.emailTrackingId && emailData?.id) {
+      try {
+        await updateEmailSendStatus({
+          emailTrackingId: String(data.metadata.emailTrackingId),
+          providerMessageId: String(emailData.id),
+          status: 'sent',
+        });
+        logger.info("Updated email_sends record with Resend email ID", {
+          emailTrackingId: data.metadata.emailTrackingId,
+          resendEmailId: emailData.id,
+        });
+      } catch (updateError) {
+        logger.warn("Error updating email_sends record", {
+          error: updateError instanceof Error ? updateError.message : 'Unknown error',
+        });
+      }
+    }
+
+    return {
+      success: true,
+      emailId: emailData?.id,
+      provider,
+      to: recipients,
+      subject: data.subject,
+      sentAt: new Date().toISOString(),
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    logger.error("Exception sending email", { error: errorMessage });
+
+    if (shouldUpdateTrackingStatus && data.metadata?.emailTrackingId) {
+      try {
+        await updateEmailSendStatus({
+          emailTrackingId: String(data.metadata.emailTrackingId),
+          providerMessageId: String(data.metadata.emailTrackingId),
+          status: 'failed',
+        });
+      } catch (updateError) {
+        logger.warn("Error updating failed email status", {
+          error: updateError instanceof Error ? updateError.message : 'Unknown error',
+        });
+      }
+    }
+
+    return {
+      success: false,
+      to: recipients,
+      subject: data.subject,
+      error: errorMessage,
+    };
+  }
+}
+
 /**
  * Send a single email immediately or at a scheduled time
  */
@@ -67,201 +282,7 @@ export const sendEmailTask = task({
         await wait.until({ date: scheduledDate });
       }
     }
-
-    const recipients = Array.isArray(data.to) ? data.to : [data.to];
-    const ccRecipients = data.cc ? (Array.isArray(data.cc) ? data.cc : [data.cc]) : undefined;
-
-    logger.info("Sending email", {
-      to: recipients,
-      cc: ccRecipients,
-      subject: data.subject,
-    });
-
-    const apiUrl = process.env.API_URL || 'http://localhost:5002';
-    const secret = process.env.INTERNAL_SERVICE_SECRET;
-
-    async function updateEmailSendStatus(update: { emailTrackingId: string; providerMessageId?: string; status: 'sent' | 'failed' }) {
-      if (!secret) {
-        return;
-      }
-
-      const { createHmac } = await import('crypto');
-      const timestamp = Date.now();
-      const body: {
-        emailTrackingId: string;
-        providerMessageId?: string;
-        status: 'sent' | 'failed';
-      } = {
-        emailTrackingId: update.emailTrackingId,
-        status: update.status,
-      };
-
-      if (update.providerMessageId) {
-        body.providerMessageId = update.providerMessageId;
-      }
-      const signaturePayload = `${timestamp}.${JSON.stringify(body)}`;
-      const signature = createHmac('sha256', secret).update(signaturePayload).digest('hex');
-
-      const response = await fetch(`${apiUrl}/api/internal/update-email-send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-service': 'trigger.dev',
-          'x-internal-timestamp': timestamp.toString(),
-          'x-internal-signature': signature,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        logger.warn("Failed to update email send status", {
-          status: response.status,
-          emailTrackingId: update.emailTrackingId,
-        });
-      }
-    }
-
-    try {
-      // Build Resend attachments from base64 data
-      const resendAttachments = data.attachments?.map(att => ({
-        filename: att.filename,
-        content: Buffer.from(att.content, 'base64'),
-        content_type: att.contentType,
-      }));
-
-      let emailData: any = null;
-      let sendError: any = null;
-
-      const { data: resendData, error: resendError } = await resend.emails.send({
-        from: data.from || process.env.EMAIL_FROM || "admin@zendwise.com",
-        to: recipients,
-        cc: ccRecipients,
-        subject: data.subject,
-        html: data.html,
-        text: data.text,
-        replyTo: data.replyTo,
-        headers: data.headers,
-        tags: data.metadata ? Object.entries(data.metadata).slice(0, 5).map(([name, value]) => ({
-          name,
-          value: String(value),
-        })) : undefined,
-        ...(resendAttachments && resendAttachments.length > 0 && { attachments: resendAttachments }),
-      });
-
-      emailData = resendData;
-      sendError = resendError;
-
-      if (sendError) {
-        logger.warn("Resend failed, falling back to AhaSend", { error: sendError.message, to: recipients });
-        try {
-          const ahaResult = await sendAhaEmail({
-            from: { email: data.from || process.env.EMAIL_FROM || "admin@zendwise.com" },
-            recipients: recipients.map(r => ({ email: r })),
-            subject: data.subject,
-            html_content: data.html,
-            text_content: data.text,
-            reply_to: data.replyTo,
-            attachments: data.attachments?.map(att => ({
-              filename: att.filename,
-              content: att.content,
-              content_type: att.contentType,
-            })),
-          });
-          // Extract per-recipient message ID from AhaSend v2 response
-          const ahaMessages: any[] = ahaResult?.data || [];
-          const firstMsg = ahaMessages[0];
-          emailData = { id: firstMsg?.id || ahaResult.id || ahaResult.message_id || 'ahasend-fallback-success' };
-          sendError = null; // Mark as success since fallback worked
-        } catch (ahaError) {
-          logger.error("AhaSend fallback also failed", { error: ahaError instanceof Error ? ahaError.message : String(ahaError) });
-          sendError = ahaError;
-        }
-      }
-
-      if (sendError) {
-        logger.error("Failed to send email via both providers", { error: sendError });
-
-        // If available, mark email_sends as failed
-        if (data.metadata?.emailTrackingId) {
-          try {
-            await updateEmailSendStatus({
-              emailTrackingId: String(data.metadata.emailTrackingId),
-              status: 'failed',
-            });
-          } catch (updateError) {
-            logger.warn("Error updating failed email status", {
-              error: updateError instanceof Error ? updateError.message : 'Unknown error',
-            });
-          }
-        }
-
-        return {
-          success: false,
-          to: recipients,
-          subject: data.subject,
-          error: sendError.message || String(sendError),
-        };
-      }
-
-      logger.info("Email sent successfully", {
-        emailId: emailData?.id,
-        to: recipients,
-      });
-
-      // If metadata contains emailTrackingId, update the email_sends record with actual Resend email ID
-      if (data.metadata?.emailTrackingId && emailData?.id) {
-        try {
-          if (secret) {
-            await updateEmailSendStatus({
-              emailTrackingId: String(data.metadata.emailTrackingId),
-              providerMessageId: String(emailData.id),
-              status: 'sent',
-            });
-            logger.info("Updated email_sends record with Resend email ID", {
-              emailTrackingId: data.metadata.emailTrackingId,
-              resendEmailId: emailData.id,
-            });
-          }
-        } catch (updateError) {
-          logger.warn("Error updating email_sends record", {
-            error: updateError instanceof Error ? updateError.message : 'Unknown error',
-          });
-        }
-      }
-
-      return {
-        success: true,
-        emailId: emailData?.id,
-        to: recipients,
-        subject: data.subject,
-        sentAt: new Date().toISOString(),
-      };
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      logger.error("Exception sending email", { error: errorMessage });
-
-      // If available, mark email_sends as failed
-      if (data.metadata?.emailTrackingId) {
-        try {
-          await updateEmailSendStatus({
-            emailTrackingId: String(data.metadata.emailTrackingId),
-            providerMessageId: String(data.metadata.emailTrackingId),
-            status: 'failed',
-          });
-        } catch (updateError) {
-          logger.warn("Error updating failed email status", {
-            error: updateError instanceof Error ? updateError.message : 'Unknown error',
-          });
-        }
-      }
-
-      return {
-        success: false,
-        to: recipients,
-        subject: data.subject,
-        error: errorMessage,
-      };
-    }
+    return await sendEmailNow(data);
   },
 });
 
@@ -404,7 +425,8 @@ export const scheduleEmailTask = task({
       return result.output;
     }
 
-    throw new Error(`Email send failed: ${result.error}`);
+    const error = "error" in result ? result.error : "Unknown email send failure";
+    throw new Error(`Email send failed: ${error}`);
   },
 });
 

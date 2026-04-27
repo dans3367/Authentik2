@@ -40,6 +40,9 @@ export async function logActivityToClickHouse(params: LogActivityParams): Promis
         });
     } catch (error) {
         // Never break main flows — just log the error
-        console.error('[ClickHouseActivityLogger] Failed to send event to ClickHouse:', error);
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(
+            `[ClickHouseActivityLogger] Failed to send event to ClickHouse (${process.env.CLICKHOUSE_URL || 'unset'}) for ${params.entityType}/${params.activityType}: ${message}`
+        );
     }
 }
