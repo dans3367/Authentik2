@@ -21,6 +21,7 @@ import Papa from 'papaparse';
 export const contactRoutes = Router();
 
 const EMAIL_ADDRESS_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SCHEDULE_CONTACT_EMAIL_MAX_DELAY_MS = 30 * 24 * 60 * 60 * 1000;
 
 function parseStringList(value: unknown): string[] {
   if (!value) return [];
@@ -1883,6 +1884,11 @@ contactRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTen
     if (scheduleDate.getTime() < Date.now() + 30 * 1000) {
       return res.status(400).json({ message: 'Schedule time must be at least 30 seconds in the future' });
     }
+    if (scheduleDate.getTime() > Date.now() + SCHEDULE_CONTACT_EMAIL_MAX_DELAY_MS) {
+      return res.status(400).json({ message: 'Schedule time must be within the next 30 days' });
+    }
+
+    await storage.validateEmailSending(tenantId, 1);
 
     // Get company info for footer label (no fallback if missing)
     const company = await db.query.companies.findFirst({
@@ -2177,6 +2183,13 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
       });
     }
 
+    if (recipientContactIds.length > 1 && ccEmails.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'CC recipients are only supported when sending to a single contact'
+      });
+    }
+
     // Check email sending limits
     await storage.validateEmailSending(tenantId, recipientContactIds.length + ccEmails.length);
 
@@ -2313,92 +2326,101 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
     });
     const displayCompanyName = (emailDesign?.companyName || companyName || '').trim();
 
-    // Replace template placeholders (e.g. {{first_name}}, {{company_name}}) with actual contact data
-    const resolvedContent = replaceEmailPlaceholders(content, contact, companyName);
-    const resolvedSubject = replaceEmailPlaceholders(subject, contact, companyName);
-
-    // Sanitize user-provided HTML content to prevent XSS before wrapping
-    const sanitizedContent = sanitizeEmailHtml(resolvedContent.replace(/\n/g, '<br>'));
-
-    // Match the send modal preview body block exactly
-    const wrappedBodyContent = `
-      <div style="padding:64px 48px;min-height:200px;">
-        <div style="font-size:16px;line-height:1.625;color:#334155;">
-          ${sanitizedContent}
-        </div>
-      </div>
-    `;
-
-    // Use shared wrapper so sent output matches preview and active email design
-    const htmlContent = await wrapNewsletterContent(tenantId, wrappedBodyContent);
-
-    const emailSendId = crypto.randomUUID();
-    let emailActivityId: string | null = null;
-    let providerMessageId: string | null = null;
-    let providerName: 'resend' | 'ahasend' = 'resend';
+    const successfulSends: Array<{
+      contact: typeof contacts[number];
+      emailActivityId: string | null;
+      providerMessageId: string | null;
+      providerName: 'resend' | 'ahasend';
+      resolvedSubject: string;
+    }> = [];
 
     try {
       const { sendEmailNow } = await import('../../../src/trigger/email');
-      const sendResult = await sendEmailNow({
-        to: recipientEmails.length === 1 ? recipientEmails[0] : recipientEmails,
-        ...(ccEmails.length > 0 && { cc: ccEmails.length === 1 ? ccEmails[0] : ccEmails }),
-        subject: resolvedSubject,
-        html: htmlContent,
-        text: resolvedContent,
-        metadata: {
-          type: 'individual_contact_email',
-          contactId: contact.id,
-          contactIds: contacts.map(contact => contact.id),
-          recipientCount: recipientEmails.length,
-          tenantId: tenantId,
-          sentBy: req.user.id,
-          ...(ccEmails.length > 0 && { cc: ccEmails }),
-        },
-        ...(base64Attachments.length > 0 && { attachments: base64Attachments }),
-      }, { updateTrackingStatus: false });
 
-      if (!sendResult.success) {
-        console.error('[SendEmail] Direct send failed:', sendResult.error);
-        return res.status(503).json({
-          success: false,
-          message: sendResult.error || 'Email server is not available. Please try again later.'
-        });
-      }
+      for (const recipientContact of contacts) {
+        const recipientEmail = String(recipientContact.email);
+        const resolvedContent = replaceEmailPlaceholders(content, recipientContact, companyName);
+        const resolvedSubject = replaceEmailPlaceholders(subject, recipientContact, companyName);
+        const sanitizedContent = sanitizeEmailHtml(resolvedContent.replace(/\n/g, '<br>'));
+        const wrappedBodyContent = `
+          <div style="padding:64px 48px;min-height:200px;">
+            <div style="font-size:16px;line-height:1.625;color:#334155;">
+              ${sanitizedContent}
+            </div>
+          </div>
+        `;
+        const htmlContent = await wrapNewsletterContent(tenantId, wrappedBodyContent);
 
-      providerMessageId = sendResult.emailId || null;
-      providerName = sendResult.provider || 'resend';
-      console.log(`📧 [SendEmail] Email sent directly, provider: ${providerName}, messageId: ${providerMessageId || 'none'}`);
-
-      try {
-        const [insertedActivity] = await db.insert(emailActivity).values({
-          contactId: contact.id,
-          tenantId: tenantId,
-          activityType: 'sent',
-          activityData: JSON.stringify({
-            source: 'individual_send',
+        const sendResult = await sendEmailNow({
+          to: recipientEmail,
+          ...(ccEmails.length > 0 && { cc: ccEmails.length === 1 ? ccEmails[0] : ccEmails }),
+          subject: resolvedSubject,
+          html: htmlContent,
+          text: resolvedContent,
+          metadata: {
+            type: 'individual_contact_email',
+            contactId: recipientContact.id,
+            tenantId: tenantId,
             sentBy: req.user.id,
-            subject: resolvedSubject,
-            recipient: contact.email,
-            recipients: recipientEmails,
-            cc: ccEmails,
-            provider: providerName,
-            providerMessageId,
-            recipientName: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || undefined,
-            from: displayCompanyName || 'Manager',
-          }),
-          occurredAt: new Date(),
-        }).returning();
-        emailActivityId = insertedActivity.id;
-        console.log(`📝 [SendEmail] Logged email activity as sent for ${contact.email}, id: ${emailActivityId}`);
-      } catch (activityLogError) {
-        console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
+            ...(ccEmails.length > 0 && { cc: ccEmails }),
+          },
+          ...(base64Attachments.length > 0 && { attachments: base64Attachments }),
+        }, { updateTrackingStatus: false });
+
+        if (!sendResult.success) {
+          console.error('[SendEmail] Direct send failed:', sendResult.error);
+          return res.status(503).json({
+            success: false,
+            message: sendResult.error || 'Email server is not available. Please try again later.',
+            sentCount: successfulSends.length,
+            failedRecipient: maskEmail(recipientEmail),
+          });
+        }
+
+        const providerMessageId = sendResult.emailId || null;
+        const providerName = sendResult.provider || 'resend';
+        let emailActivityId: string | null = null;
+        console.log(`📧 [SendEmail] Email sent directly to ${maskEmail(recipientEmail)}, provider: ${providerName}, messageId: ${providerMessageId || 'none'}`);
+
+        try {
+          const [insertedActivity] = await db.insert(emailActivity).values({
+            contactId: recipientContact.id,
+            tenantId: tenantId,
+            activityType: 'sent',
+            activityData: JSON.stringify({
+              source: 'individual_send',
+              sentBy: req.user.id,
+              subject: resolvedSubject,
+              recipient: recipientEmail,
+              cc: ccEmails,
+              provider: providerName,
+              providerMessageId,
+              recipientName: `${recipientContact.firstName || ''} ${recipientContact.lastName || ''}`.trim() || undefined,
+              from: displayCompanyName || 'Manager',
+            }),
+            occurredAt: new Date(),
+          }).returning();
+          emailActivityId = insertedActivity.id;
+          console.log(`📝 [SendEmail] Logged email activity as sent for ${maskEmail(recipientEmail)}, id: ${emailActivityId}`);
+        } catch (activityLogError) {
+          console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
+        }
+
+        successfulSends.push({
+          contact: recipientContact,
+          emailActivityId,
+          providerMessageId,
+          providerName,
+          resolvedSubject,
+        });
       }
     } catch (sendError: any) {
       console.error('[SendEmail] Failed to send email directly:', sendError);
 
       return res.status(503).json({
         success: false,
-        message: sendError?.message || 'Email server is not available. Please try again later.'
+        message: sendError?.message || 'Email server is not available. Please try again later.',
+        sentCount: successfulSends.length,
       });
     }
 
@@ -2408,20 +2430,18 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
         tenantId: tenantId,
         userId: req.user.id,
         entityType: 'email',
-        entityId: emailActivityId || undefined,
-        entityName: `Email to ${recipientEmails.length === 1 ? contact.email : `${recipientEmails.length} recipients`}`,
+        entityId: successfulSends[0]?.emailActivityId || undefined,
+        entityName: `Email to ${successfulSends.length === 1 ? String(successfulSends[0].contact.email) : `${successfulSends.length} recipients`}`,
         activityType: 'sent',
-        description: `Sent direct email "${resolvedSubject}" to ${recipientEmails.length === 1 ? `${contact.firstName || ''} ${contact.lastName || ''} (${contact.email})`.trim() : `${recipientEmails.length} recipients`}`,
+        description: `Sent direct email to ${successfulSends.length === 1 ? `${successfulSends[0].contact.firstName || ''} ${successfulSends[0].contact.lastName || ''} (${successfulSends[0].contact.email})`.trim() : `${successfulSends.length} recipients`}`,
         metadata: {
-          emailActivityId: emailActivityId,
-          contactId: contact.id,
-          contactIds: contacts.map(contact => contact.id),
-          contactEmail: contact.email,
-          recipientEmails,
+          emailActivityIds: successfulSends.map(send => send.emailActivityId).filter(Boolean),
+          contactIds: successfulSends.map(send => send.contact.id),
+          recipientEmails: successfulSends.map(send => String(send.contact.email)),
           ccEmails,
-          emailSubject: resolvedSubject,
-          provider: providerName,
-          providerMessageId,
+          emailSubjects: successfulSends.map(send => send.resolvedSubject),
+          providers: successfulSends.map(send => send.providerName),
+          providerMessageIds: successfulSends.map(send => send.providerMessageId).filter(Boolean),
         },
         req
       });
@@ -2430,27 +2450,46 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
       console.error(`⚠️ [SendEmail] Failed to log to activity_logs:`, activityLogError);
     }
 
-    // Log to email_sends after the provider accepts the message so the record reflects actual delivery state.
+    // Log one email_sends row per recipient so monthly usage matches the validated send count.
     try {
-      await db.insert(emailSends).values({
-        id: emailSendId,
+      const sentAt = new Date();
+      const contactSendRows = successfulSends.map((send) => ({
+        id: crypto.randomUUID(),
         tenantId: tenantId,
-        recipientEmail: recipientEmails.join(', '),
-        recipientName: recipientEmails.length === 1
-          ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contact.email
-          : `${recipientEmails.length} recipients`,
+        recipientEmail: String(send.contact.email),
+        recipientName: `${send.contact.firstName || ''} ${send.contact.lastName || ''}`.trim() || String(send.contact.email),
         senderEmail: 'admin@zendwise.com', // Default sender or configured one
         senderName: displayCompanyName || 'Manager',
-        subject: resolvedSubject,
+        subject: send.resolvedSubject,
         emailType: 'individual',
-        provider: providerName,
-        providerMessageId,
+        provider: send.providerName,
+        providerMessageId: send.providerMessageId,
         status: 'sent',
-        contactId: contact.id,
+        contactId: send.contact.id,
         promotionId: null,
-        sentAt: new Date(),
-      });
-      console.log(`📧 [SendEmail] Logged to email_sends table for ${recipientEmails.length} recipient(s), id: ${emailSendId}`);
+        sentAt,
+      }));
+      const ccSendRows = ccEmails.map((ccEmail) => ({
+        id: crypto.randomUUID(),
+        tenantId: tenantId,
+        recipientEmail: ccEmail,
+        recipientName: ccEmail,
+        senderEmail: 'admin@zendwise.com',
+        senderName: displayCompanyName || 'Manager',
+        subject: successfulSends[0]?.resolvedSubject || sanitizeString(subject) || 'No Subject',
+        emailType: 'individual',
+        provider: successfulSends[0]?.providerName || 'resend',
+        providerMessageId: successfulSends[0]?.providerMessageId || null,
+        status: 'sent',
+        contactId: null,
+        promotionId: null,
+        sentAt,
+      }));
+      const sendRows = [...contactSendRows, ...ccSendRows];
+      if (sendRows.length > 0) {
+        await db.insert(emailSends).values(sendRows);
+      }
+      console.log(`📧 [SendEmail] Logged to email_sends table for ${sendRows.length} recipient(s)`);
     } catch (logError) {
       console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
     }
@@ -2465,15 +2504,15 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
         .where(eq(emailContacts.id, recipientContact.id));
     }
 
-    console.log(`✅ [SendEmail] Email sent successfully for ${recipientEmails.length} recipient(s), subject: "${subject}", provider: ${providerName}`);
+    console.log(`✅ [SendEmail] Email sent successfully for ${successfulSends.length} recipient(s), subject: "${subject}"`);
 
     res.json({
       success: true,
       message: "Email sent successfully",
-      recipientCount: recipientEmails.length,
+      recipientCount: successfulSends.length,
       ccCount: ccEmails.length,
-      provider: providerName,
-      providerMessageId,
+      providers: Array.from(new Set(successfulSends.map(send => send.providerName))),
+      providerMessageIds: successfulSends.map(send => send.providerMessageId).filter(Boolean),
     });
   } catch (error: any) {
     console.error(`❌ [SendEmail] Send individual email error:`, error);

@@ -27,9 +27,9 @@ import {
   LayoutDashboard,
   AlertTriangle,
   BarChart3,
-  Calendar,
-  Globe,
   Store,
+  ShoppingBag,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
   Dialog,
@@ -103,17 +103,38 @@ function getTypeBadgeClasses(type: string) {
   }
 }
 
-function getTypeBorderAccent(type: string, isUniversal?: boolean) {
-  if (isUniversal) return "border-l-amber-500";
-  switch (type) {
-    case "all":
-      return "border-l-blue-500";
-    case "selected":
-      return "border-l-emerald-500";
-    case "tags":
-      return "border-l-purple-500";
+type CardBadgeKind = "shop" | "tag" | "custom" | "all";
+
+function getCardBadgeKind(list: SegmentList): CardBadgeKind {
+  if (list.isUniversal) return "shop";
+  if (list.type === "tags") return "tag";
+  if (list.type === "selected") return "custom";
+  return "all";
+}
+
+function getCardBadgeIcon(kind: CardBadgeKind) {
+  switch (kind) {
+    case "shop":
+      return <ShoppingBag className="h-3 w-3" />;
+    case "tag":
+      return <Tag className="h-3 w-3" />;
+    case "custom":
+      return <SlidersHorizontal className="h-3 w-3" />;
     default:
-      return "border-l-gray-400 dark:border-l-gray-600";
+      return <Users className="h-3 w-3" />;
+  }
+}
+
+function getCardBadgeClasses(kind: CardBadgeKind) {
+  switch (kind) {
+    case "shop":
+      return "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
+    case "tag":
+      return "bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300";
+    case "custom":
+      return "bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+    default:
+      return "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
   }
 }
 
@@ -366,12 +387,14 @@ export default function SegmentationPage() {
     });
   };
 
-  /** Get shop names for display on universal segment cards */
-  const getShopNames = (shopIds: string[]) => {
-    if (!shopIds || shopIds.length === 0) return "";
-    const names = shopIds.map((id) => allShops.find((s) => s.id === id)?.name).filter(Boolean);
-    if (names.length <= 2) return names.join(", ");
-    return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
+  /** Split shop names into visible names + overflow count for chip display */
+  const getShopChips = (shopIds: string[]) => {
+    const names = (shopIds || [])
+      .map((id) => allShops.find((s) => s.id === id)?.name)
+      .filter((n): n is string => Boolean(n));
+    const visible = names.slice(0, 2);
+    const overflow = Math.max(0, names.length - visible.length);
+    return { visible, overflow };
   };
 
   const getTypeLabel = (type: string) => {
@@ -384,6 +407,19 @@ export default function SegmentationPage() {
         return t("segmentation.list.tags", "Tags");
       default:
         return type;
+    }
+  };
+
+  const getCardBadgeLabel = (kind: CardBadgeKind) => {
+    switch (kind) {
+      case "shop":
+        return t("segmentation.cardBadge.shop", "SHOP-BASED");
+      case "tag":
+        return t("segmentation.cardBadge.tag", "TAG-BASED");
+      case "custom":
+        return t("segmentation.cardBadge.custom", "CUSTOM");
+      default:
+        return t("segmentation.cardBadge.all", "ALL CUSTOMERS");
     }
   };
 
@@ -582,111 +618,131 @@ export default function SegmentationPage() {
           ) : (
             /* Segment cards */
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredLists.map((list) => (
-                <div
-                  key={list.id}
-                  className={`group relative rounded-lg border border-l-4 ${getTypeBorderAccent(
-                    list.type, list.isUniversal
-                  )} bg-white dark:bg-neutral-900 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200`}
-                >
-                  <div className="p-5 space-y-3">
-                    {/* Header with name and type */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-base text-foreground truncate mb-1.5">
-                          {list.name}
-                        </h3>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {list.isUniversal && (
-                            <Badge
-                              variant="secondary"
-                              className="gap-1 text-[11px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                            >
-                              <Globe className="h-3 w-3" />
-                              {t("segmentation.list.crossStoreBadge", "Cross-Store")}
-                            </Badge>
-                          )}
-                          <Badge
-                            variant="secondary"
-                            className={`gap-1 text-[11px] font-medium ${getTypeBadgeClasses(
-                              list.type
-                            )}`}
+              {filteredLists.map((list) => {
+                const badgeKind = getCardBadgeKind(list);
+                const shopChips = getShopChips(list.selectedShopIds || []);
+                const updatedAt = list.updatedAt || list.createdAt;
+                return (
+                  <div
+                    key={list.id}
+                    className="group relative flex flex-col rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:shadow-md hover:border-gray-300 dark:hover:border-neutral-700 transition-all duration-200"
+                  >
+                    <div className="p-5 flex flex-col flex-1">
+                      {/* Pill badge */}
+                      <div>
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider uppercase ${getCardBadgeClasses(
+                            badgeKind
+                          )}`}
+                        >
+                          {getCardBadgeIcon(badgeKind)}
+                          {getCardBadgeLabel(badgeKind)}
+                        </span>
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="mt-3 text-lg font-semibold text-foreground tracking-tight line-clamp-1">
+                        {list.name}
+                      </h3>
+
+                      {/* Description */}
+                      <p
+                        className={`mt-2 text-sm leading-relaxed line-clamp-2 min-h-[2.5rem] ${
+                          list.description
+                            ? "text-muted-foreground"
+                            : "text-muted-foreground/60 italic"
+                        }`}
+                      >
+                        {list.description || t("segmentation.list.noDescription")}
+                      </p>
+
+                      {/* Sub-info row: shop names / tag count / rule count */}
+                      <div className="mt-3 flex items-center gap-1.5 text-sm text-foreground/80 min-h-[1.75rem]">
+                        {badgeKind === "shop" && shopChips.visible.length > 0 ? (
+                          <>
+                            <span className="truncate">{shopChips.visible.join(", ")}</span>
+                            {shopChips.overflow > 0 && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 dark:bg-neutral-800 text-xs text-foreground/70">
+                                +{shopChips.overflow}
+                              </span>
+                            )}
+                          </>
+                        ) : badgeKind === "tag" && list.selectedTagIds?.length > 0 ? (
+                          <span className="text-muted-foreground">
+                            {list.selectedTagIds.length}{" "}
+                            {t("segmentation.list.tags", "tags")}
+                          </span>
+                        ) : badgeKind === "custom" && list.selectedContactIds?.length > 0 ? (
+                          <span className="text-muted-foreground">
+                            {list.selectedContactIds.length}{" "}
+                            {t("segmentation.list.rules", "rules")}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {t("segmentation.filters.allCustomers")}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Divider */}
+                      <div className="my-4 border-t border-gray-200 dark:border-neutral-800" />
+
+                      {/* Stats row */}
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <div className="text-2xl font-bold text-foreground tabular-nums leading-none">
+                            {list.contactCount.toLocaleString()}
+                          </div>
+                          <div className="mt-1.5 text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+                            {t("segmentation.list.contacts")}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="mt-5 flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          {t("segmentation.list.updated", "Updated")}{" "}
+                          {new Date(updatedAt).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </span>
+                        <div className="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(list)}
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            aria-label={t("segmentation.actions.edit")}
                           >
-                            {getTypeIcon(list.type)}
-                            {getTypeLabel(list.type)}
-                          </Badge>
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDuplicate(list)}
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            aria-label={t("segmentation.actions.duplicate")}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(list)}
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-red-50 dark:hover:bg-red-950/50"
+                            aria-label={t("segmentation.actions.delete", "Delete")}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
                     </div>
-
-                    {/* Shop names for cross-store segments */}
-                    {list.isUniversal && list.selectedShopIds?.length > 0 && (
-                      <div className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300">
-                        <Store className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span className="truncate">{getShopNames(list.selectedShopIds)}</span>
-                      </div>
-                    )}
-
-                    {/* Description */}
-                    <div className="text-sm text-muted-foreground min-h-[2.5rem]">
-                      {list.description ? (
-                        <p className="line-clamp-2">{list.description}</p>
-                      ) : (
-                        <p className="italic opacity-60">
-                          {t("segmentation.list.noDescription")}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Stats row */}
-                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-                      <div className="flex items-center gap-1.5">
-                        <Users className="h-3.5 w-3.5" />
-                        <span className="font-medium">
-                          {list.contactCount}{" "}
-                          {t("segmentation.list.contacts")}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5" />
-                        <span>{new Date(list.createdAt).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(list)}
-                        className="flex-1 h-8 text-xs hover:bg-muted"
-                      >
-                        <Edit className="h-3.5 w-3.5 mr-1" />
-                        {t("segmentation.actions.edit")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDuplicate(list)}
-                        className="flex-1 h-8 text-xs hover:bg-muted"
-                      >
-                        <Copy className="h-3.5 w-3.5 mr-1" />
-                        {t("segmentation.actions.duplicate")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(list)}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-red-50 dark:hover:bg-red-950/50"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

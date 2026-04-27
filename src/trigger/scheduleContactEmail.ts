@@ -4,6 +4,7 @@ import { z } from "zod";
 import { DB_RETRY_CONFIG, dbConnectionCatchError } from "./retryStrategy";
 
 const resend = new Resend(process.env.RESEND_API_KEY || "re_placeholder");
+const MAX_SCHEDULE_DELAY_MS = 30 * 24 * 60 * 60 * 1000;
 
 const emailAttachmentSchema = z.object({
   filename: z.string(),
@@ -54,6 +55,9 @@ export const scheduleContactEmailTask = task({
 
     const now = new Date();
     const delayMs = scheduledDate.getTime() - now.getTime();
+    if (delayMs > MAX_SCHEDULE_DELAY_MS) {
+      throw new Error("Scheduled contact emails must be sent within 30 days");
+    }
 
     logger.info("Schedule contact email task started", {
       to: data.to,

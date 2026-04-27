@@ -16,7 +16,7 @@ import {
   Appointment,
   AppointmentReminder
 } from '@shared/schema';
-import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
+import { authenticateToken, getEffectivePermissions, requireTenant } from '../middleware/auth-middleware';
 import { requireRole } from '../middleware/auth-middleware';
 import { logActivity, computeChanges } from '../utils/activityLogger';
 import { v4 as uuidv4 } from 'uuid';
@@ -167,11 +167,15 @@ function toPostgresTimestampString(date: Date): string {
 }
 
 async function collectProviderOverlapConflicts({
+  database = db,
   tenantId,
+  shopId,
   candidates,
   excludeAppointmentId,
 }: {
+  database?: any;
   tenantId: string;
+  shopId?: string | null;
   candidates: AppointmentOverlapCandidate[];
   excludeAppointmentId?: string;
 }): Promise<AppointmentOverlapConflict[]> {
@@ -199,11 +203,15 @@ async function collectProviderOverlapConflicts({
       sql`${appointments.appointmentDate} + (coalesce(${appointments.duration}, 60) * interval '1 minute') > ${requestedStartTimestamp}::timestamp`,
     ];
 
+    if (shopId) {
+      conditions.push(eq(appointments.shopId, shopId));
+    }
+
     if (excludeAppointmentId) {
       conditions.push(sql`${appointments.id} <> ${excludeAppointmentId}`);
     }
 
-    const overlappingAppointments = await db
+    const overlappingAppointments = await database
       .select({
         id: appointments.id,
         title: appointments.title,
@@ -255,6 +263,43 @@ async function collectProviderOverlapConflicts({
   }
 
   return conflicts;
+}
+
+function getProviderScheduleLockKeys(tenantId: string, shopId: string | null | undefined, candidates: AppointmentOverlapCandidate[]): string[] {
+  const keys = new Set<string>();
+  for (const candidate of candidates) {
+    if (!candidate.providerId || !isProviderConflictStatus(candidate.status ?? 'scheduled')) {
+      continue;
+    }
+    keys.add(`${tenantId}:${shopId ?? 'all'}:${candidate.providerId}`);
+  }
+  return Array.from(keys).sort();
+}
+
+async function acquireProviderScheduleLocks(
+  database: any,
+  tenantId: string,
+  shopId: string | null | undefined,
+  candidates: AppointmentOverlapCandidate[],
+): Promise<void> {
+  const lockKeys = getProviderScheduleLockKeys(tenantId, shopId, candidates);
+  for (const lockKey of lockKeys) {
+    await database.execute(sql`SELECT pg_advisory_xact_lock(hashtext('appointment_provider_schedule'), hashtext(${lockKey}))`);
+  }
+}
+
+async function getAuthorizedForceOverbook(req: Request, res: Response, user: any, tenantId: string): Promise<boolean | null> {
+  if (req.body?.forceOverbook !== true) {
+    return false;
+  }
+
+  const permissions = await getEffectivePermissions(user.role, tenantId);
+  if (permissions['appointments.edit'] !== true) {
+    res.status(403).json({ error: 'Insufficient permissions to overbook appointments' });
+    return null;
+  }
+
+  return true;
 }
 
 
@@ -485,7 +530,8 @@ router.post('/', async (req: Request, res: Response) => {
     const user = (req as any).user;
     const tenantId = user.tenantId;
     const userId = user.id;
-    const forceOverbook = req.body?.forceOverbook === true;
+    const forceOverbook = await getAuthorizedForceOverbook(req, res, user, tenantId);
+    if (forceOverbook === null) return;
 
     // Validate request body
     const validatedData = createAppointmentSchema.parse(req.body);
@@ -527,46 +573,62 @@ router.post('/', async (req: Request, res: Response) => {
     const recurrenceSeriesId = isRecurring ? uuidv4() : null;
     const recurrenceParentId = isRecurring ? uuidv4() : null;
 
-    if (!forceOverbook) {
-      const overlapConflicts = await collectProviderOverlapConflicts({
-        tenantId,
-        candidates: occurrences.map((occurrence) => ({
-          appointmentDate: new Date(occurrence.appointmentDate),
-          duration: occurrence.duration,
-          providerId: occurrence.providerId ?? null,
-          status: 'scheduled',
-        })),
-      });
+    const overlapCandidates = occurrences.map((occurrence) => ({
+      appointmentDate: new Date(occurrence.appointmentDate),
+      duration: occurrence.duration,
+      providerId: occurrence.providerId ?? null,
+      status: 'scheduled',
+    }));
 
-      if (overlapConflicts.length > 0) {
-        return res.status(409).json({
-          error: 'This provider already has an appointment at the selected time.',
-          message: 'This provider already has an appointment at the selected time.',
-          code: 'APPOINTMENT_OVERLAP',
-          conflicts: overlapConflicts,
+    // Create appointment(s). The advisory transaction lock serializes check+insert for each provider.
+    const newAppointments = await db.transaction(async (tx: any) => {
+      await acquireProviderScheduleLocks(tx, tenantId, shopId, overlapCandidates);
+
+      if (!forceOverbook) {
+        const overlapConflicts = await collectProviderOverlapConflicts({
+          database: tx,
+          tenantId,
+          shopId,
+          candidates: overlapCandidates,
         });
+
+        if (overlapConflicts.length > 0) {
+          return { overlapConflicts };
+        }
       }
+
+      const createdAppointments = await tx
+        .insert(appointments)
+        .values(occurrences.map((occurrence, index) => ({
+          id: index === 0 && recurrenceParentId ? recurrenceParentId : undefined,
+          tenantId,
+          userId,
+          confirmationToken: uuidv4(),
+          shopId,
+          ...occurrence,
+          recurrenceCount: isRecurring ? occurrences.length : null,
+          recurrenceSeriesId,
+          recurrenceParentId: index === 0 ? null : recurrenceParentId,
+        })))
+        .returning();
+
+      return { createdAppointments };
+    });
+
+    if ('overlapConflicts' in newAppointments) {
+      return res.status(409).json({
+        error: 'This provider already has an appointment at the selected time.',
+        message: 'This provider already has an appointment at the selected time.',
+        code: 'APPOINTMENT_OVERLAP',
+        conflicts: newAppointments.overlapConflicts,
+      });
     }
 
-    // Create appointment(s)
-    const newAppointments = await db
-      .insert(appointments)
-      .values(occurrences.map((occurrence, index) => ({
-        id: index === 0 && recurrenceParentId ? recurrenceParentId : undefined,
-        tenantId,
-        userId,
-        confirmationToken: uuidv4(),
-        shopId,
-        ...occurrence,
-        recurrenceCount: isRecurring ? occurrences.length : null,
-        recurrenceSeriesId,
-        recurrenceParentId: index === 0 ? null : recurrenceParentId,
-      })))
-      .returning();
+    const createdAppointments = newAppointments.createdAppointments;
 
     // Fetch customer data if customerId exists to match GET response structure
     let appointmentCustomer = null;
-    if (newAppointments[0].customerId) {
+    if (createdAppointments[0].customerId) {
       const customerData = await db
         .select({
           id: emailContacts.id,
@@ -582,18 +644,18 @@ router.post('/', async (req: Request, res: Response) => {
           phoneNumber: emailContacts.phoneNumber,
         })
         .from(emailContacts)
-        .where(and(eq(emailContacts.id, newAppointments[0].customerId), eq(emailContacts.tenantId, tenantId)))
+        .where(and(eq(emailContacts.id, createdAppointments[0].customerId), eq(emailContacts.tenantId, tenantId)))
         .limit(1);
       appointmentCustomer = customerData[0] || null;
     }
 
     // Fetch provider details if assigned
     let appointmentProvider = null;
-    if (newAppointments[0].providerId) {
+    if (createdAppointments[0].providerId) {
       const providerData = await db
         .select({ id: betterAuthUser.id, name: betterAuthUser.name, email: betterAuthUser.email })
         .from(betterAuthUser)
-        .where(and(eq(betterAuthUser.id, newAppointments[0].providerId), eq(betterAuthUser.tenantId, tenantId)))
+        .where(and(eq(betterAuthUser.id, createdAppointments[0].providerId), eq(betterAuthUser.tenantId, tenantId)))
         .limit(1);
       appointmentProvider = providerData[0] || null;
     }
@@ -608,20 +670,21 @@ router.post('/', async (req: Request, res: Response) => {
         tenantId,
         userId,
         entityType: 'appointment',
-        entityId: newAppointments[0].id,
-        entityName: newAppointments[0].title,
+        entityId: createdAppointments[0].id,
+        entityName: createdAppointments[0].title,
         activityType: 'created',
-        description: isRecurring && newAppointments.length > 1
-          ? `Created ${newAppointments.length} recurring appointments "${newAppointments[0].title}" for ${customerName}`
-          : `Created appointment "${newAppointments[0].title}" for ${customerName}`,
+        description: isRecurring && createdAppointments.length > 1
+          ? `Created ${createdAppointments.length} recurring appointments "${createdAppointments[0].title}" for ${customerName}`
+          : `Created appointment "${createdAppointments[0].title}" for ${customerName}`,
         metadata: {
-          customerId: newAppointments[0].customerId,
+          customerId: createdAppointments[0].customerId,
           customerName,
-          appointmentDate: newAppointments[0].appointmentDate,
-          serviceType: newAppointments[0].serviceType,
-          location: newAppointments[0].location,
-          recurrenceFrequency: newAppointments[0].recurrenceFrequency,
-          recurrenceCount: newAppointments.length,
+          appointmentDate: createdAppointments[0].appointmentDate,
+          serviceType: createdAppointments[0].serviceType,
+          location: createdAppointments[0].location,
+          recurrenceFrequency: createdAppointments[0].recurrenceFrequency,
+          recurrenceCount: createdAppointments.length,
+          overbookOverride: forceOverbook,
         },
         req,
       });
@@ -629,7 +692,7 @@ router.post('/', async (req: Request, res: Response) => {
       console.error('[Activity Log] Failed to log appointment creation:', error);
     }
 
-    const appointmentsWithRelations = newAppointments.map((appointment) => ({
+    const appointmentsWithRelations = createdAppointments.map((appointment: Appointment) => ({
       ...appointment,
       customer: appointmentCustomer,
       provider: appointmentProvider,
@@ -661,7 +724,8 @@ router.put('/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const user = (req as any).user;
     const tenantId = user.tenantId;
-    const forceOverbook = req.body?.forceOverbook === true;
+    const forceOverbook = await getAuthorizedForceOverbook(req, res, user, tenantId);
+    if (forceOverbook === null) return;
 
     // Validate request body
     const validatedData = updateAppointmentSchema.parse(req.body);
@@ -714,27 +778,12 @@ router.put('/:id', async (req: Request, res: Response) => {
         !isProviderConflictStatus(existing.status)
       );
 
-    if (shouldCheckOverlap) {
-      const overlapConflicts = await collectProviderOverlapConflicts({
-        tenantId,
-        excludeAppointmentId: id,
-        candidates: [{
-          appointmentDate: new Date(effectiveAppointmentDate),
-          duration: effectiveDuration,
-          providerId: effectiveProviderId ?? null,
-          status: effectiveStatus,
-        }],
-      });
-
-      if (overlapConflicts.length > 0) {
-        return res.status(409).json({
-          error: 'This provider already has an appointment at the selected time.',
-          message: 'This provider already has an appointment at the selected time.',
-          code: 'APPOINTMENT_OVERLAP',
-          conflicts: overlapConflicts,
-        });
-      }
-    }
+    const overlapCandidates = [{
+      appointmentDate: new Date(effectiveAppointmentDate),
+      duration: effectiveDuration,
+      providerId: effectiveProviderId ?? null,
+      status: effectiveStatus,
+    }];
 
     let remindersCancelled = 0;
     if (isDateChanging) {
@@ -746,20 +795,50 @@ router.put('/:id', async (req: Request, res: Response) => {
       }
     }
 
-    // Update appointment
-    const updatedAppointment = await db
-      .update(appointments)
-      .set({
-        ...validatedData,
-        // Reset reminder flags if date/time changed so new reminders can be scheduled
-        ...(isDateChanging ? {
-          reminderSent: false,
-          reminderSentAt: null,
-        } : {}),
-        updatedAt: new Date(),
-      })
-      .where(eq(appointments.id, id))
-      .returning();
+    // The advisory transaction lock serializes overlap check+update for this provider.
+    const updateResult = await db.transaction(async (tx: any) => {
+      if (shouldCheckOverlap) {
+        await acquireProviderScheduleLocks(tx, tenantId, existing.shopId, overlapCandidates);
+        const overlapConflicts = await collectProviderOverlapConflicts({
+          database: tx,
+          tenantId,
+          shopId: existing.shopId,
+          excludeAppointmentId: id,
+          candidates: overlapCandidates,
+        });
+
+        if (overlapConflicts.length > 0) {
+          return { overlapConflicts };
+        }
+      }
+
+      const updatedAppointment = await tx
+        .update(appointments)
+        .set({
+          ...validatedData,
+          // Reset reminder flags if date/time changed so new reminders can be scheduled
+          ...(isDateChanging ? {
+            reminderSent: false,
+            reminderSentAt: null,
+          } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(appointments.id, id))
+        .returning();
+
+      return { updatedAppointment };
+    });
+
+    if ('overlapConflicts' in updateResult) {
+      return res.status(409).json({
+        error: 'This provider already has an appointment at the selected time.',
+        message: 'This provider already has an appointment at the selected time.',
+        code: 'APPOINTMENT_OVERLAP',
+        conflicts: updateResult.overlapConflicts,
+      });
+    }
+
+    const updatedAppointment = updateResult.updatedAppointment;
 
     // Log activity for appointment update
     const changes = computeChanges(existing, updatedAppointment[0], [
@@ -781,6 +860,7 @@ router.put('/:id', async (req: Request, res: Response) => {
         metadata: {
           isDateChanged: isDateChanging,
           remindersCancelled,
+          overbookOverride: forceOverbook,
         },
         req,
       });
@@ -812,7 +892,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const user = (req as any).user;
     const tenantId = user.tenantId;
-    const forceOverbook = req.body?.forceOverbook === true;
+    const forceOverbook = await getAuthorizedForceOverbook(req, res, user, tenantId);
+    if (forceOverbook === null) return;
 
     // Whitelist of allowed fields for PATCH updates - prevents mass assignment attacks
     const allowedFields = [
@@ -965,40 +1046,23 @@ router.patch('/:id', async (req: Request, res: Response) => {
         !isProviderConflictStatus(existing.status)
       );
 
-    if (shouldCheckOverlap) {
-      const overlapCandidates = shouldCreateSeriesFromEdit
-        ? buildAppointmentOccurrences({
-            appointmentDate: new Date(effectiveAppointmentDate),
-            duration: effectiveDuration,
-            providerId: effectiveProviderId ?? null,
-            status: effectiveStatus,
-            recurrenceFrequency: (updateData.recurrenceFrequency ?? existing.recurrenceFrequency ?? 'none') as RecurrenceFrequency,
-            recurrenceInterval: updateData.recurrenceInterval ?? existing.recurrenceInterval ?? 1,
-            recurrenceCount: updateData.recurrenceCount ?? existing.recurrenceCount ?? null,
-            recurrenceEndDate: updateData.recurrenceEndDate ?? existing.recurrenceEndDate ?? null,
-          })
-        : [{
-            appointmentDate: new Date(effectiveAppointmentDate),
-            duration: effectiveDuration,
-            providerId: effectiveProviderId ?? null,
-            status: effectiveStatus,
-          }];
-
-      const overlapConflicts = await collectProviderOverlapConflicts({
-        tenantId,
-        excludeAppointmentId: id,
-        candidates: overlapCandidates,
-      });
-
-      if (overlapConflicts.length > 0) {
-        return res.status(409).json({
-          error: 'This provider already has an appointment at the selected time.',
-          message: 'This provider already has an appointment at the selected time.',
-          code: 'APPOINTMENT_OVERLAP',
-          conflicts: overlapConflicts,
-        });
-      }
-    }
+    const overlapCandidates = shouldCreateSeriesFromEdit
+      ? buildAppointmentOccurrences({
+          appointmentDate: new Date(effectiveAppointmentDate),
+          duration: effectiveDuration,
+          providerId: effectiveProviderId ?? null,
+          status: effectiveStatus,
+          recurrenceFrequency: (updateData.recurrenceFrequency ?? existing.recurrenceFrequency ?? 'none') as RecurrenceFrequency,
+          recurrenceInterval: updateData.recurrenceInterval ?? existing.recurrenceInterval ?? 1,
+          recurrenceCount: updateData.recurrenceCount ?? existing.recurrenceCount ?? null,
+          recurrenceEndDate: updateData.recurrenceEndDate ?? existing.recurrenceEndDate ?? null,
+        })
+      : [{
+          appointmentDate: new Date(effectiveAppointmentDate),
+          duration: effectiveDuration,
+          providerId: effectiveProviderId ?? null,
+          status: effectiveStatus,
+        }];
 
     const editSeriesId = shouldCreateSeriesFromEdit ? uuidv4() : null;
     if (shouldCreateSeriesFromEdit) {
@@ -1016,67 +1080,97 @@ router.patch('/:id', async (req: Request, res: Response) => {
       }
     }
 
-    // Update appointment with partial data
-    const updatedAppointment = await db
-      .update(appointments)
-      .set({
-        ...updateData,
-        // Reset reminder flags if date/time changed so new reminders can be scheduled
-        ...(isDateChanging ? {
-          reminderSent: false,
-          reminderSentAt: null,
-        } : {}),
-        updatedAt: new Date(),
-      })
-      .where(eq(appointments.id, id))
-      .returning();
+    // The advisory transaction lock serializes overlap check+update/series creation for this provider.
+    const updateResult = await db.transaction(async (tx: any) => {
+      if (shouldCheckOverlap) {
+        await acquireProviderScheduleLocks(tx, tenantId, existing.shopId, overlapCandidates);
+        const overlapConflicts = await collectProviderOverlapConflicts({
+          database: tx,
+          tenantId,
+          shopId: existing.shopId,
+          excludeAppointmentId: id,
+          candidates: overlapCandidates,
+        });
 
-    let createdSeriesOccurrences = 0;
-    if (shouldCreateSeriesFromEdit && editSeriesId) {
-      const baseAppointment = updatedAppointment[0];
-      const occurrences = buildAppointmentOccurrences({
-        customerId: baseAppointment.customerId,
-        providerId: baseAppointment.providerId,
-        title: baseAppointment.title,
-        description: baseAppointment.description ?? undefined,
-        appointmentDate: baseAppointment.appointmentDate,
-        duration: baseAppointment.duration ?? 60,
-        location: baseAppointment.location ?? undefined,
-        serviceType: baseAppointment.serviceType ?? undefined,
-        status: baseAppointment.status,
-        notes: baseAppointment.notes ?? undefined,
-        recurrenceFrequency: baseAppointment.recurrenceFrequency as RecurrenceFrequency,
-        recurrenceInterval: baseAppointment.recurrenceInterval ?? 1,
-        recurrenceCount: baseAppointment.recurrenceCount,
-        recurrenceEndDate: baseAppointment.recurrenceEndDate,
-        reminderSettings: baseAppointment.reminderSettings ?? undefined,
+        if (overlapConflicts.length > 0) {
+          return { overlapConflicts };
+        }
+      }
+
+      const updatedAppointment = await tx
+        .update(appointments)
+        .set({
+          ...updateData,
+          // Reset reminder flags if date/time changed so new reminders can be scheduled
+          ...(isDateChanging ? {
+            reminderSent: false,
+            reminderSentAt: null,
+          } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(appointments.id, id))
+        .returning();
+
+      let createdSeriesOccurrences = 0;
+      if (shouldCreateSeriesFromEdit && editSeriesId) {
+        const baseAppointment = updatedAppointment[0];
+        const occurrences = buildAppointmentOccurrences({
+          customerId: baseAppointment.customerId,
+          providerId: baseAppointment.providerId,
+          title: baseAppointment.title,
+          description: baseAppointment.description ?? undefined,
+          appointmentDate: baseAppointment.appointmentDate,
+          duration: baseAppointment.duration ?? 60,
+          location: baseAppointment.location ?? undefined,
+          serviceType: baseAppointment.serviceType ?? undefined,
+          status: baseAppointment.status,
+          notes: baseAppointment.notes ?? undefined,
+          recurrenceFrequency: baseAppointment.recurrenceFrequency as RecurrenceFrequency,
+          recurrenceInterval: baseAppointment.recurrenceInterval ?? 1,
+          recurrenceCount: baseAppointment.recurrenceCount,
+          recurrenceEndDate: baseAppointment.recurrenceEndDate,
+          reminderSettings: baseAppointment.reminderSettings ?? undefined,
+        });
+
+        createdSeriesOccurrences = Math.max(0, occurrences.length - 1);
+        if (baseAppointment.recurrenceCount !== occurrences.length) {
+          const [baseWithActualCount] = await tx
+            .update(appointments)
+            .set({ recurrenceCount: occurrences.length, updatedAt: new Date() })
+            .where(eq(appointments.id, id))
+            .returning();
+          updatedAppointment[0] = baseWithActualCount;
+        }
+
+        if (createdSeriesOccurrences > 0) {
+          await tx.insert(appointments).values(
+            occurrences.slice(1).map((occurrence) => ({
+              tenantId,
+              userId: baseAppointment.userId,
+              confirmationToken: uuidv4(),
+              shopId: baseAppointment.shopId,
+              ...occurrence,
+              recurrenceCount: occurrences.length,
+              recurrenceSeriesId: editSeriesId,
+              recurrenceParentId: baseAppointment.id,
+            }))
+          );
+        }
+      }
+
+      return { updatedAppointment, createdSeriesOccurrences };
+    });
+
+    if ('overlapConflicts' in updateResult) {
+      return res.status(409).json({
+        error: 'This provider already has an appointment at the selected time.',
+        message: 'This provider already has an appointment at the selected time.',
+        code: 'APPOINTMENT_OVERLAP',
+        conflicts: updateResult.overlapConflicts,
       });
-
-      createdSeriesOccurrences = Math.max(0, occurrences.length - 1);
-      if (baseAppointment.recurrenceCount !== occurrences.length) {
-        const [baseWithActualCount] = await db
-          .update(appointments)
-          .set({ recurrenceCount: occurrences.length, updatedAt: new Date() })
-          .where(eq(appointments.id, id))
-          .returning();
-        updatedAppointment[0] = baseWithActualCount;
-      }
-
-      if (createdSeriesOccurrences > 0) {
-        await db.insert(appointments).values(
-          occurrences.slice(1).map((occurrence) => ({
-            tenantId,
-            userId: baseAppointment.userId,
-            confirmationToken: uuidv4(),
-            shopId: baseAppointment.shopId,
-            ...occurrence,
-            recurrenceCount: occurrences.length,
-            recurrenceSeriesId: editSeriesId,
-            recurrenceParentId: baseAppointment.id,
-          }))
-        );
-      }
     }
+
+    const { updatedAppointment, createdSeriesOccurrences } = updateResult;
 
     // Log activity for appointment update
     const changes = computeChanges(existing, updatedAppointment[0], [
@@ -1099,6 +1193,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
           isDateChanged: isDateChanging,
           remindersCancelled,
           createdSeriesOccurrences,
+          overbookOverride: forceOverbook,
         },
         req,
       });
