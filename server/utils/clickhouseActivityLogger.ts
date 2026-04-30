@@ -9,6 +9,18 @@
 import { getClickHouseClient, CLICKHOUSE_TABLE } from './clickhouseClient';
 import type { LogActivityParams } from './activityLogger';
 
+function getClickHouseLogTarget(): string {
+    const rawUrl = process.env.CLICKHOUSE_URL;
+    if (!rawUrl) return 'unset';
+
+    try {
+        const parsedUrl = new URL(rawUrl);
+        return parsedUrl.host || 'configured';
+    } catch {
+        return 'configured';
+    }
+}
+
 /**
  * Sends an activity log event to ClickHouse.
  * Non-blocking — failures are logged but never throw.
@@ -42,7 +54,7 @@ export async function logActivityToClickHouse(params: LogActivityParams): Promis
         // Never break main flows — just log the error
         const message = error instanceof Error ? error.message : String(error);
         console.error(
-            `[ClickHouseActivityLogger] Failed to send event to ClickHouse (${process.env.CLICKHOUSE_URL || 'unset'}) for ${params.entityType}/${params.activityType}: ${message}`
+            `[ClickHouseActivityLogger] Failed to send event to ClickHouse (${getClickHouseLogTarget()}) for ${params.entityType}/${params.activityType}: ${message}`
         );
     }
 }

@@ -87,6 +87,29 @@ export const scheduleContactEmailTask = task({
       subject: data.subject,
     });
 
+    const validation = await validateScheduledContactEmail(data);
+    if (!validation.allowed) {
+      const reason = validation.reason || "suppressed";
+      logger.warn("Scheduled contact email blocked by pre-send validation", {
+        to: data.to,
+        subject: data.subject,
+        contactId: data.contactId,
+        tenantId: data.tenantId,
+        reason,
+      });
+      await notifyBackend(data, 'suppressed', reason, undefined, reason !== 'contact_not_found');
+      return {
+        success: false,
+        blocked: true,
+        reason,
+        to: data.to,
+        subject: data.subject,
+        contactId: data.contactId,
+        tenantId: data.tenantId,
+        blockedAt: new Date().toISOString(),
+      };
+    }
+
     // Notify the backend that we're about to send (update status to 'running')
     await notifyBackend(data, 'sending');
 
@@ -158,6 +181,47 @@ async function signInternal(body: Record<string, any>, secret: string) {
   return { timestamp, signature };
 }
 
+async function validateScheduledContactEmail(data: ScheduleContactEmailPayload): Promise<{
+  allowed: boolean;
+  reason?: string;
+}> {
+  const apiUrl = process.env.API_URL || 'http://localhost:5002';
+  const secret = process.env.INTERNAL_SERVICE_SECRET;
+
+  if (!secret) {
+    throw new Error("INTERNAL_SERVICE_SECRET not configured; refusing to send scheduled contact email without pre-send validation");
+  }
+
+  const body: Record<string, any> = {
+    tenantId: data.tenantId,
+    contactId: data.contactId,
+    recipientEmail: data.to,
+    emailTrackingId: data.emailTrackingId || null,
+  };
+
+  const { timestamp, signature } = await signInternal(body, secret);
+  const response = await fetch(`${apiUrl}/api/internal/validate-scheduled-contact-email`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-internal-service': 'trigger.dev',
+      'x-internal-timestamp': timestamp.toString(),
+      'x-internal-signature': signature,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Internal API error validating scheduled contact email: ${response.status}`);
+  }
+
+  const result = await response.json() as { allowed?: boolean; reason?: string };
+  return {
+    allowed: result.allowed === true,
+    reason: result.reason,
+  };
+}
+
 /**
  * Notify the backend server about the status of a scheduled email send.
  * - Updates email_sends record via internal API (when emailTrackingId exists)
@@ -166,9 +230,10 @@ async function signInternal(body: Record<string, any>, secret: string) {
  */
 async function notifyBackend(
   data: ScheduleContactEmailPayload,
-  status: 'sending' | 'sent' | 'failed',
+  status: 'sending' | 'sent' | 'failed' | 'suppressed',
   errorMessage?: string,
   providerMessageId?: string,
+  logActivity = true,
 ) {
   const apiUrl = process.env.API_URL || 'http://localhost:5002';
   const secret = process.env.INTERNAL_SERVICE_SECRET;
@@ -186,6 +251,9 @@ async function notifyBackend(
     };
     if (providerMessageId) {
       body.providerMessageId = providerMessageId;
+    }
+    if (errorMessage) {
+      body.errorMessage = errorMessage;
     }
 
     const { timestamp, signature } = await signInternal(body, secret);
@@ -213,7 +281,7 @@ async function notifyBackend(
   }
 
   // 2. Log email_activity for sent/failed (so it shows in the contact timeline)
-  if (status === 'sent' || status === 'failed') {
+  if (logActivity && (status === 'sent' || status === 'failed' || status === 'suppressed')) {
     const activityBody: Record<string, any> = {
       tenantId: data.tenantId,
       contactId: data.contactId,

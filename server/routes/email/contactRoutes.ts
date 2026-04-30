@@ -3,12 +3,13 @@ import { db } from '../../db';
 import { sql, eq, and, inArray } from 'drizzle-orm';
 import { emailContacts, emailLists, bouncedEmails, contactListMemberships, contactTagAssignments, betterAuthUser, emailActivity, tenants, emailSends, emailContent, companies, masterEmailDesign, triggerTasks, birthdaySettings, unsubscribeTokens, shops } from '@shared/schema';
 import { authenticateToken, requireTenant, requirePermission } from '../../middleware/auth-middleware';
+import { requireTrustedOrigin } from '../../middleware/trusted-origin';
 import { sanitizeString, sanitizeEmail, escapeLikePattern } from '../../utils/sanitization';
 import { LANGUAGE_NAMES } from '../../utils/translationService';
 import { storage } from '../../storage';
 import crypto from 'crypto';
 import { logActivity, computeChanges } from '../../utils/activityLogger';
-import { emailAttachmentUpload, validateAttachmentSize, filesToBase64Attachments, handleEmailAttachmentError } from '../../middleware/emailAttachmentUpload';
+import { emailAttachmentUpload, validateAttachmentSize, validateAttachmentContent, filesToBase64Attachments, handleEmailAttachmentError } from '../../middleware/emailAttachmentUpload';
 import { fromZonedTime } from 'date-fns-tz';
 import { wrapNewsletterContent } from '../../utils/newsletterEmailWrapper';
 import { replaceEmailPlaceholders } from '../../utils/emailPlaceholders';
@@ -312,7 +313,7 @@ contactRoutes.get("/email-contacts/:id/scheduled", authenticateToken, requireTen
 });
 
 // Update a scheduled email for a specific contact (cancel old + create new)
-contactRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
+contactRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), requireTrustedOrigin, async (req: any, res) => {
   try {
     const { queueId, id: contactId } = req.params;
     const tenantId = req.user.tenantId;
@@ -469,7 +470,7 @@ contactRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticateToken, r
 });
 
 // Delete (cancel) a scheduled email for a specific contact
-contactRoutes.delete("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), async (req: any, res) => {
+contactRoutes.delete("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), requireTrustedOrigin, async (req: any, res) => {
   try {
     const { queueId, id: relatedId } = req.params;
     const tenantId = req.user.tenantId;
@@ -1733,7 +1734,7 @@ contactRoutes.get("/email-contacts/:contactId/activity", authenticateToken, requ
 });
 
 // Schedule a single B2C email for a contact (Send Later) - supports both JSON and multipart/form-data with attachments
-contactRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTenant, requirePermission('contacts.edit'), (req: any, res: any, next: any) => {
+contactRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTenant, requirePermission('contacts.edit'), requireTrustedOrigin, (req: any, res: any, next: any) => {
   // Only run multer for multipart/form-data requests (when attachments are present)
   const contentType = req.headers['content-type'] || '';
   if (contentType.includes('multipart/form-data')) {
@@ -1757,6 +1758,10 @@ contactRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTen
     const sizeCheck = validateAttachmentSize(uploadedFiles);
     if (!sizeCheck.valid) {
       return res.status(400).json({ message: sizeCheck.error });
+    }
+    const contentCheck = validateAttachmentContent(uploadedFiles);
+    if (!contentCheck.valid) {
+      return res.status(400).json({ message: contentCheck.error });
     }
     const base64Attachments = filesToBase64Attachments(uploadedFiles);
     if (base64Attachments.length > 0) {
@@ -1815,6 +1820,15 @@ contactRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTen
         suppressionType: suppressionRecord.bounceType,
         suppressedSince: suppressionRecord.firstBouncedAt,
         suppressionReason: reason,
+        email: maskEmail(String(contact.email)),
+      });
+    }
+
+    if (contact.status === 'suppressed') {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot schedule email to suppressed contact.',
+        contactStatus: contact.status,
         email: maskEmail(String(contact.email)),
       });
     }
@@ -2123,7 +2137,7 @@ contactRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTen
 });
 
 // Send individual email to a contact (supports both JSON and multipart/form-data with attachments)
-contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireTenant, requirePermission('contacts.edit'), (req: any, res: any, next: any) => {
+contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireTenant, requirePermission('contacts.edit'), requirePermission('emails.send'), (req: any, res: any, next: any) => {
   // Only run multer for multipart/form-data requests (when attachments are present)
   const contentType = req.headers['content-type'] || '';
   if (contentType.includes('multipart/form-data')) {
@@ -2152,6 +2166,10 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
     const sizeCheck = validateAttachmentSize(uploadedFiles);
     if (!sizeCheck.valid) {
       return res.status(400).json({ message: sizeCheck.error });
+    }
+    const contentCheck = validateAttachmentContent(uploadedFiles);
+    if (!contentCheck.valid) {
+      return res.status(400).json({ message: contentCheck.error });
     }
     const base64Attachments = filesToBase64Attachments(uploadedFiles);
     if (base64Attachments.length > 0) {
@@ -2193,13 +2211,20 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
     // Check email sending limits
     await storage.validateEmailSending(tenantId, recipientContactIds.length + ccEmails.length);
 
-    // Get contacts
-    const selectedContacts = await db.query.emailContacts.findMany({
-      where: and(
-        inArray(emailContacts.id, recipientContactIds),
-        eq(emailContacts.tenantId, tenantId)
-      ),
-    });
+	    // Get contacts. When a shop is selected, direct sends are limited to that shop's contacts.
+	    const selectedContactsWhere = req.shopId
+	      ? and(
+	        inArray(emailContacts.id, recipientContactIds),
+	        eq(emailContacts.tenantId, tenantId),
+	        eq(emailContacts.shopId, req.shopId)
+	      )
+	      : and(
+	        inArray(emailContacts.id, recipientContactIds),
+	        eq(emailContacts.tenantId, tenantId)
+	      );
+	    const selectedContacts = await db.query.emailContacts.findMany({
+	      where: selectedContactsWhere,
+	    });
 
     const contactById = new Map(selectedContacts.map(contact => [contact.id, contact]));
     const contacts = recipientContactIds
@@ -2207,24 +2232,57 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
       .filter(Boolean) as typeof selectedContacts;
     const missingContactIds = recipientContactIds.filter(contactId => !contactById.has(contactId));
 
-    if (missingContactIds.length > 0 || contacts.length === 0) {
-      console.log(`📧 [SendEmail] Contact lookup failed, missing: ${missingContactIds.join(', ') || id}`);
-      return res.status(404).json({
-        success: false,
-        message: missingContactIds.length > 1 ? "One or more contacts were not found" : "Contact not found"
-      });
-    }
+	    if (missingContactIds.length > 0 || contacts.length === 0) {
+	      console.log(`📧 [SendEmail] Contact lookup failed, missing: ${missingContactIds.join(', ') || id}`);
+	      return res.status(404).json({
+	        success: false,
+	        message: missingContactIds.length > 1 ? "One or more contacts were not found" : "Contact not found"
+	      });
+	    }
 
-    const contact = contacts[0];
-    const recipientEmails = contacts.map(contact => String(contact.email));
+	    let ccContacts: typeof selectedContacts = [];
+	    let ccContactByEmail = new Map<string, (typeof selectedContacts)[number]>();
+	    if (ccEmails.length > 0) {
+	      const ccContactsWhere = req.shopId
+	        ? and(
+	          eq(emailContacts.tenantId, tenantId),
+	          eq(emailContacts.shopId, req.shopId),
+	          sql`LOWER(${emailContacts.email}) = ANY(${ccEmails})`
+	        )
+	        : and(
+	          eq(emailContacts.tenantId, tenantId),
+	          sql`LOWER(${emailContacts.email}) = ANY(${ccEmails})`
+	        );
 
-    console.log(`📧 [SendEmail] Found ${contacts.length} contact recipient(s): ${recipientEmails.map(email => maskEmail(email)).join(', ')}`);
+	      ccContacts = await db.query.emailContacts.findMany({
+	        where: ccContactsWhere,
+	      });
+	      ccContactByEmail = new Map(ccContacts.map(contact => [String(contact.email).toLowerCase().trim(), contact]));
+	      const missingCcEmails = ccEmails.filter(email => !ccContactByEmail.has(email.toLowerCase().trim()));
 
-    // Hard block: check global suppression list (bounced_emails table) — cannot be overridden
-    for (const recipientContact of contacts) {
-      const suppressionRecord = await db.query.bouncedEmails.findFirst({
-        where: and(
-          sql`LOWER(${bouncedEmails.email}) = ${String(recipientContact.email).toLowerCase().trim()}`,
+	      if (missingCcEmails.length > 0) {
+	        console.log(`📧 [SendEmail] CC contact lookup failed, missing: ${missingCcEmails.map(maskEmail).join(', ')}`);
+	        return res.status(400).json({
+	          success: false,
+	          message: 'CC recipients must be existing contacts in the current store context',
+	          missingCcEmails: missingCcEmails.map(maskEmail),
+	        });
+	      }
+	    }
+
+	    const contact = contacts[0];
+	    const recipientEmails = contacts.map(contact => String(contact.email));
+	    const allContactRecipients = Array.from(
+	      new Map([...contacts, ...ccContacts].map(contact => [contact.id, contact])).values()
+	    );
+
+	    console.log(`📧 [SendEmail] Found ${contacts.length} contact recipient(s): ${recipientEmails.map(email => maskEmail(email)).join(', ')}`);
+
+	    // Hard block: check global suppression list (bounced_emails table) — cannot be overridden
+	    for (const recipientContact of allContactRecipients) {
+	      const suppressionRecord = await db.query.bouncedEmails.findFirst({
+	        where: and(
+	          sql`LOWER(${bouncedEmails.email}) = ${String(recipientContact.email).toLowerCase().trim()}`,
           eq(bouncedEmails.isActive, true),
         ),
       });
@@ -2245,41 +2303,13 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
           suppressedSince: suppressionRecord.firstBouncedAt,
           suppressionReason: reason,
           email: maskEmail(String(recipientContact.email)),
-        });
-      }
-    }
+	        });
+	      }
+	    }
 
-    for (const ccEmail of ccEmails) {
-      const suppressionRecord = await db.query.bouncedEmails.findFirst({
-        where: and(
-          sql`LOWER(${bouncedEmails.email}) = ${ccEmail.toLowerCase().trim()}`,
-          eq(bouncedEmails.isActive, true),
-        ),
-      });
-
-      if (suppressionRecord) {
-        const suppressedSince = suppressionRecord.firstBouncedAt
-          ? new Date(suppressionRecord.firstBouncedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-          : 'an unknown date';
-        const reason = suppressionRecord.suppressionReason || suppressionRecord.bounceReason || suppressionRecord.bounceType || 'provider suppression';
-
-        console.log(`🚫 [SendEmail] Hard-blocked: CC email ${maskEmail(ccEmail)} is on suppression list (type=${suppressionRecord.bounceType}, since=${suppressedSince})`);
-
-        return res.status(403).json({
-          success: false,
-          message: `The CC email address has been suppressed since ${suppressedSince} due to: ${reason}. No outgoing communication can be sent to this address.`,
-          contactStatus: 'suppressed',
-          suppressionType: suppressionRecord.bounceType,
-          suppressedSince: suppressionRecord.firstBouncedAt,
-          suppressionReason: reason,
-          email: maskEmail(ccEmail),
-        });
-      }
-    }
-
-    // Block sending for unsubscribed/bounced contacts unless override flags are provided
-    const { allowUnsubscribed, isTransactional } = req.body || {};
-    const blockedContact = contacts.find(contact => contact.status === 'unsubscribed' || contact.status === 'bounced');
+	    // Block sending for unsubscribed/bounced contacts unless override flags are provided
+	    const { allowUnsubscribed, isTransactional } = req.body || {};
+	    const blockedContact = allContactRecipients.find(contact => contact.status === 'unsubscribed' || contact.status === 'bounced' || contact.status === 'suppressed');
 
     if (blockedContact) {
       // SECURITY: Only allow Administrators and Owners to override unsubscribe protection
@@ -2350,6 +2380,61 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
           </div>
         `;
         const htmlContent = await wrapNewsletterContent(tenantId, wrappedBodyContent);
+        const emailSendRows: Array<typeof emailSends.$inferInsert> = [{
+          id: crypto.randomUUID(),
+          tenantId: tenantId,
+          recipientEmail: recipientEmail,
+          recipientName: `${recipientContact.firstName || ''} ${recipientContact.lastName || ''}`.trim() || recipientEmail,
+          senderEmail: 'admin@zendwise.com', // Default sender or configured one
+	          senderName: displayCompanyName || 'Manager',
+	          subject: resolvedSubject,
+	          emailType: 'individual',
+	          provider: 'resend',
+	          providerMessageId: null,
+	          status: 'pending',
+	          contactId: recipientContact.id,
+	          shopId: recipientContact.shopId || null,
+	          promotionId: null,
+	          sentAt: null,
+	        }];
+
+	        if (ccEmails.length > 0) {
+	          emailSendRows.push(...ccEmails.map((ccEmail) => {
+	            const ccContact = ccContactByEmail.get(ccEmail.toLowerCase().trim());
+	            return {
+	              id: crypto.randomUUID(),
+	              tenantId: tenantId,
+	              recipientEmail: ccEmail,
+	              recipientName: ccContact
+	                ? `${ccContact.firstName || ''} ${ccContact.lastName || ''}`.trim() || ccEmail
+	                : ccEmail,
+	              senderEmail: 'admin@zendwise.com',
+	              senderName: displayCompanyName || 'Manager',
+	              subject: resolvedSubject,
+	              emailType: 'individual',
+	              provider: 'resend',
+	              providerMessageId: null,
+	              status: 'pending',
+	              contactId: ccContact?.id || null,
+	              shopId: ccContact?.shopId || null,
+	              promotionId: null,
+	              sentAt: null,
+	            };
+	          }));
+	        }
+        const emailSendIds = emailSendRows.map((row) => row.id as string);
+
+        try {
+          await db.insert(emailSends).values(emailSendRows);
+          console.log(`📧 [SendEmail] Created pending email_sends rows for ${emailSendRows.length} recipient(s)`);
+        } catch (logError) {
+          console.error(`❌ [SendEmail] Refusing to send because usage logging failed:`, logError);
+          return res.status(500).json({
+            success: false,
+            message: 'Email could not be sent because usage logging failed. Please try again later.',
+            sentCount: successfulSends.length,
+          });
+        }
 
         const sendResult = await sendEmailNow({
           to: recipientEmail,
@@ -2369,6 +2454,16 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
 
         if (!sendResult.success) {
           console.error('[SendEmail] Direct send failed:', sendResult.error);
+          try {
+            await db.update(emailSends)
+              .set({
+                status: 'failed',
+                updatedAt: new Date(),
+              })
+              .where(inArray(emailSends.id, emailSendIds));
+          } catch (statusError) {
+            console.error(`⚠️ [SendEmail] Failed to mark email_sends rows as failed:`, statusError);
+          }
           return res.status(503).json({
             success: false,
             message: sendResult.error || 'Email server is not available. Please try again later.',
@@ -2383,27 +2478,70 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
         console.log(`📧 [SendEmail] Email sent directly to ${maskEmail(recipientEmail)}, provider: ${providerName}, messageId: ${providerMessageId || 'none'}`);
 
         try {
-          const [insertedActivity] = await db.insert(emailActivity).values({
-            contactId: recipientContact.id,
-            tenantId: tenantId,
-            activityType: 'sent',
-            activityData: JSON.stringify({
-              source: 'individual_send',
-              sentBy: req.user.id,
-              subject: resolvedSubject,
-              recipient: recipientEmail,
-              cc: ccEmails,
+          const sentAt = new Date();
+          await db.update(emailSends)
+            .set({
               provider: providerName,
               providerMessageId,
-              recipientName: `${recipientContact.firstName || ''} ${recipientContact.lastName || ''}`.trim() || undefined,
-              from: displayCompanyName || 'Manager',
-            }),
-            occurredAt: new Date(),
-          }).returning();
-          emailActivityId = insertedActivity.id;
-          console.log(`📝 [SendEmail] Logged email activity as sent for ${maskEmail(recipientEmail)}, id: ${emailActivityId}`);
-        } catch (activityLogError) {
-          console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
+              status: 'sent',
+              sentAt,
+              updatedAt: new Date(),
+            })
+            .where(inArray(emailSends.id, emailSendIds));
+          console.log(`📧 [SendEmail] Marked ${emailSendIds.length} email_sends row(s) as sent`);
+        } catch (statusError) {
+          console.error(`❌ [SendEmail] Email accepted by provider but failed to finalize usage status:`, statusError);
+          return res.status(500).json({
+            success: false,
+            message: 'Email was accepted by the provider, but usage status finalization failed. Please contact support.',
+            sentCount: successfulSends.length + 1,
+          });
+        }
+
+        try {
+	          const activityRows: Array<typeof emailActivity.$inferInsert> = [
+	            {
+	              contactId: recipientContact.id,
+	              tenantId: tenantId,
+	              activityType: 'sent',
+	              activityData: JSON.stringify({
+	                source: 'individual_send',
+	                recipientType: 'to',
+	                sentBy: req.user.id,
+	                subject: resolvedSubject,
+	                recipient: recipientEmail,
+	                cc: ccEmails,
+	                provider: providerName,
+	                providerMessageId,
+	                recipientName: `${recipientContact.firstName || ''} ${recipientContact.lastName || ''}`.trim() || undefined,
+	                from: displayCompanyName || 'Manager',
+	              }),
+	              occurredAt: new Date(),
+	            },
+	            ...ccContacts.map((ccContact) => ({
+	              contactId: ccContact.id,
+	              tenantId: tenantId,
+	              activityType: 'sent',
+	              activityData: JSON.stringify({
+	                source: 'individual_send',
+	                recipientType: 'cc',
+	                sentBy: req.user.id,
+	                subject: resolvedSubject,
+	                recipient: String(ccContact.email),
+	                to: recipientEmail,
+	                provider: providerName,
+	                providerMessageId,
+	                recipientName: `${ccContact.firstName || ''} ${ccContact.lastName || ''}`.trim() || undefined,
+	                from: displayCompanyName || 'Manager',
+	              }),
+	              occurredAt: new Date(),
+	            })),
+	          ];
+	          const [insertedActivity] = await db.insert(emailActivity).values(activityRows).returning();
+	          emailActivityId = insertedActivity?.id || null;
+	          console.log(`📝 [SendEmail] Logged email activity as sent for ${maskEmail(recipientEmail)}, id: ${emailActivityId}`);
+	        } catch (activityLogError) {
+	          console.error(`⚠️ [SendEmail] Failed to log email activity:`, activityLogError);
         }
 
         successfulSends.push({
@@ -2435,12 +2573,13 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
         activityType: 'sent',
         description: `Sent direct email to ${successfulSends.length === 1 ? `${successfulSends[0].contact.firstName || ''} ${successfulSends[0].contact.lastName || ''} (${successfulSends[0].contact.email})`.trim() : `${successfulSends.length} recipients`}`,
         metadata: {
-          emailActivityIds: successfulSends.map(send => send.emailActivityId).filter(Boolean),
-          contactIds: successfulSends.map(send => send.contact.id),
-          recipientEmails: successfulSends.map(send => String(send.contact.email)),
-          ccEmails,
-          emailSubjects: successfulSends.map(send => send.resolvedSubject),
-          providers: successfulSends.map(send => send.providerName),
+	          emailActivityIds: successfulSends.map(send => send.emailActivityId).filter(Boolean),
+	          contactIds: successfulSends.map(send => send.contact.id),
+	          recipientEmails: successfulSends.map(send => String(send.contact.email)),
+	          ccContactIds: ccContacts.map(contact => contact.id),
+	          ccEmails,
+	          emailSubjects: successfulSends.map(send => send.resolvedSubject),
+	          providers: successfulSends.map(send => send.providerName),
           providerMessageIds: successfulSends.map(send => send.providerMessageId).filter(Boolean),
         },
         req
@@ -2450,55 +2589,11 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
       console.error(`⚠️ [SendEmail] Failed to log to activity_logs:`, activityLogError);
     }
 
-    // Log one email_sends row per recipient so monthly usage matches the validated send count.
-    try {
-      const sentAt = new Date();
-      const contactSendRows = successfulSends.map((send) => ({
-        id: crypto.randomUUID(),
-        tenantId: tenantId,
-        recipientEmail: String(send.contact.email),
-        recipientName: `${send.contact.firstName || ''} ${send.contact.lastName || ''}`.trim() || String(send.contact.email),
-        senderEmail: 'admin@zendwise.com', // Default sender or configured one
-        senderName: displayCompanyName || 'Manager',
-        subject: send.resolvedSubject,
-        emailType: 'individual',
-        provider: send.providerName,
-        providerMessageId: send.providerMessageId,
-        status: 'sent',
-        contactId: send.contact.id,
-        promotionId: null,
-        sentAt,
-      }));
-      const ccSendRows = ccEmails.map((ccEmail) => ({
-        id: crypto.randomUUID(),
-        tenantId: tenantId,
-        recipientEmail: ccEmail,
-        recipientName: ccEmail,
-        senderEmail: 'admin@zendwise.com',
-        senderName: displayCompanyName || 'Manager',
-        subject: successfulSends[0]?.resolvedSubject || sanitizeString(subject) || 'No Subject',
-        emailType: 'individual',
-        provider: successfulSends[0]?.providerName || 'resend',
-        providerMessageId: successfulSends[0]?.providerMessageId || null,
-        status: 'sent',
-        contactId: null,
-        promotionId: null,
-        sentAt,
-      }));
-      const sendRows = [...contactSendRows, ...ccSendRows];
-      if (sendRows.length > 0) {
-        await db.insert(emailSends).values(sendRows);
-      }
-      console.log(`📧 [SendEmail] Logged to email_sends table for ${sendRows.length} recipient(s)`);
-    } catch (logError) {
-      console.error(`⚠️ [SendEmail] Failed to log to email_sends table:`, logError);
-    }
-
     // Update contact stats - update lastActivity (emailsSent increment is handled by internal callback)
-    for (const recipientContact of contacts) {
-      await db.update(emailContacts)
-        .set({
-          lastActivity: new Date(),
+	    for (const recipientContact of allContactRecipients) {
+	      await db.update(emailContacts)
+	        .set({
+	          lastActivity: new Date(),
           updatedAt: new Date()
         })
         .where(eq(emailContacts.id, recipientContact.id));

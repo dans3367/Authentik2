@@ -302,6 +302,28 @@ async function getAuthorizedForceOverbook(req: Request, res: Response, user: any
   return true;
 }
 
+async function resolveAuthorizedShopId(req: Request, res: Response, tenantId: string): Promise<string | null | undefined> {
+  const requestedShopId = (req as any).shopId as string | null | undefined;
+
+  if (requestedShopId) {
+    const shop = await db
+      .select({ id: shops.id })
+      .from(shops)
+      .where(and(
+        eq(shops.id, requestedShopId),
+        eq(shops.tenantId, tenantId),
+      ))
+      .limit(1);
+
+    if (shop.length === 0) {
+      res.status(400).json({ error: 'Shop not found or does not belong to your organization' });
+      return undefined;
+    }
+  }
+
+  return resolveShopId(requestedShopId, tenantId);
+}
+
 
 // Apply authentication to all routes
 router.use(authenticateToken);
@@ -566,7 +588,8 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Resolve shopId: use selected shop from header, or fall back to tenant default
-    const shopId = await resolveShopId((req as any).shopId, tenantId);
+    const shopId = await resolveAuthorizedShopId(req, res, tenantId);
+    if (shopId === undefined) return;
 
     const occurrences = buildAppointmentOccurrences(validatedData as any);
     const isRecurring = (validatedData.recurrenceFrequency ?? 'none') !== 'none';

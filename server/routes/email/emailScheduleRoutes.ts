@@ -3,12 +3,13 @@ import { db } from '../../db';
 import { sql, eq, and } from 'drizzle-orm';
 import { emailContacts, bouncedEmails, emailActivity, tenants, emailSends, emailContent, companies, masterEmailDesign, triggerTasks } from '@shared/schema';
 import { authenticateToken, requireTenant, requirePermission } from '../../middleware/auth-middleware';
+import { requireTrustedOrigin } from '../../middleware/trusted-origin';
 import { sanitizeString } from '../../utils/sanitization';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { storage } from '../../storage';
 import crypto from 'crypto';
 import { logActivity } from '../../utils/activityLogger';
-import { emailAttachmentUpload, validateAttachmentSize, filesToBase64Attachments, handleEmailAttachmentError } from '../../middleware/emailAttachmentUpload';
+import { emailAttachmentUpload, validateAttachmentSize, validateAttachmentContent, filesToBase64Attachments, handleEmailAttachmentError } from '../../middleware/emailAttachmentUpload';
 import { fromZonedTime } from 'date-fns-tz';
 import { wrapNewsletterContent } from '../../utils/newsletterEmailWrapper';
 import { replaceEmailPlaceholders } from '../../utils/emailPlaceholders';
@@ -118,7 +119,7 @@ emailScheduleRoutes.get("/email-contacts/:id/scheduled", authenticateToken, requ
 }));
 
 // Update a scheduled email for a specific contact (cancel old + create new)
-emailScheduleRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), asyncHandler(async (req: any, res) => {
+emailScheduleRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), requireTrustedOrigin, asyncHandler(async (req: any, res) => {
   const { queueId, id: contactId } = req.params;
   const tenantId = req.user.tenantId;
   const { subject, html, scheduleAt } = req.body;
@@ -270,7 +271,7 @@ emailScheduleRoutes.put("/email-contacts/:id/scheduled/:queueId", authenticateTo
 }));
 
 // Delete (cancel) a scheduled email for a specific contact
-emailScheduleRoutes.delete("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), asyncHandler(async (req: any, res) => {
+emailScheduleRoutes.delete("/email-contacts/:id/scheduled/:queueId", authenticateToken, requireTenant, requirePermission('contacts.edit'), requireTrustedOrigin, asyncHandler(async (req: any, res) => {
   const { queueId, id: relatedId } = req.params;
   const tenantId = req.user.tenantId;
 
@@ -349,7 +350,7 @@ emailScheduleRoutes.delete("/email-contacts/:id/scheduled/:queueId", authenticat
 }));
 
 // Schedule a single B2C email for a contact (Send Later) - supports both JSON and multipart/form-data with attachments
-emailScheduleRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTenant, requirePermission('contacts.edit'), (req: any, res: any, next: any) => {
+emailScheduleRoutes.post("/email-contacts/:id/schedule", authenticateToken, requireTenant, requirePermission('contacts.edit'), requireTrustedOrigin, (req: any, res: any, next: any) => {
   // Only run multer for multipart/form-data requests (when attachments are present)
   const contentType = req.headers['content-type'] || '';
   if (contentType.includes('multipart/form-data')) {
@@ -372,6 +373,10 @@ emailScheduleRoutes.post("/email-contacts/:id/schedule", authenticateToken, requ
   const sizeCheck = validateAttachmentSize(uploadedFiles);
   if (!sizeCheck.valid) {
     return res.status(400).json({ message: sizeCheck.error });
+  }
+  const contentCheck = validateAttachmentContent(uploadedFiles);
+  if (!contentCheck.valid) {
+    return res.status(400).json({ message: contentCheck.error });
   }
   const base64Attachments = filesToBase64Attachments(uploadedFiles);
   if (base64Attachments.length > 0) {
@@ -430,6 +435,15 @@ emailScheduleRoutes.post("/email-contacts/:id/schedule", authenticateToken, requ
       suppressionType: suppressionRecord.bounceType,
       suppressedSince: suppressionRecord.firstBouncedAt,
       suppressionReason: reason,
+      email: maskEmail(String(contact.email)),
+    });
+  }
+
+  if (contact.status === 'suppressed') {
+    return res.status(403).json({
+      success: false,
+      message: 'Cannot schedule email to suppressed contact.',
+      contactStatus: contact.status,
       email: maskEmail(String(contact.email)),
     });
   }

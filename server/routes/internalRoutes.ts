@@ -264,7 +264,7 @@ router.post(
   authenticateInternalService,
   async (req: InternalServiceRequest, res) => {
     try {
-      let { emailTrackingId, providerMessageId, status } = req.body;
+      let { emailTrackingId, providerMessageId, status, errorMessage } = req.body;
 
       // Normalize 'queued' to 'pending' to support external callers (e.g. Trigger.dev)
       if (status === 'queued') {
@@ -276,6 +276,7 @@ router.post(
         'sent',
         'delivered',
         'bounced',
+        'suppressed',
         'failed',
       ];
 
@@ -298,7 +299,7 @@ router.post(
 
       // Only require providerMessageId for terminal success statuses (sent, delivered)
       // 'pending' is a pre-send status update where providerMessageId doesn't exist yet
-      if (validatedStatus !== 'failed' && validatedStatus !== 'pending' && !providerMessageId) {
+      if (!['failed', 'pending', 'suppressed'].includes(validatedStatus) && !providerMessageId) {
         return res.status(400).json({
           success: false,
           error: 'Missing required field: providerMessageId is required for sent/delivered statuses',
@@ -318,6 +319,9 @@ router.post(
       // Only include providerMessageId in updatePayload when a real value is provided
       if (providerMessageId) {
         updatePayload.providerMessageId = providerMessageId;
+      }
+      if (errorMessage) {
+        updatePayload.errorMessage = String(errorMessage).slice(0, 1000);
       }
 
       if (validatedStatus === 'sent') {
@@ -367,6 +371,99 @@ router.post(
       return res.status(500).json({
         success: false,
         error: errorMessage,
+      });
+    }
+  }
+);
+
+/**
+ * Internal pre-send validation for delayed scheduled contact emails.
+ * Called by Trigger.dev immediately before handing an email to the provider.
+ */
+router.post(
+  '/validate-scheduled-contact-email',
+  authenticateInternalService,
+  async (req: InternalServiceRequest, res) => {
+    try {
+      const { tenantId, contactId, recipientEmail } = req.body || {};
+
+      if (!tenantId || !contactId || !recipientEmail) {
+        return res.status(400).json({
+          success: false,
+          allowed: false,
+          reason: 'missing_required_fields',
+        });
+      }
+
+      const normalizedRecipient = String(recipientEmail).toLowerCase().trim();
+      const contact = await db.query.emailContacts.findFirst({
+        where: and(
+          eq(emailContacts.id, String(contactId)),
+          eq(emailContacts.tenantId, String(tenantId))
+        ),
+        columns: { id: true, email: true, status: true },
+      });
+
+      if (!contact) {
+        return res.json({
+          success: true,
+          allowed: false,
+          reason: 'contact_not_found',
+        });
+      }
+
+      if (String(contact.email).toLowerCase().trim() !== normalizedRecipient) {
+        return res.json({
+          success: true,
+          allowed: false,
+          reason: 'recipient_mismatch',
+          contactStatus: contact.status,
+        });
+      }
+
+      if (['unsubscribed', 'bounced', 'suppressed'].includes(contact.status || '')) {
+        return res.json({
+          success: true,
+          allowed: false,
+          reason: `contact_${contact.status}`,
+          contactStatus: contact.status,
+        });
+      }
+
+      const suppressionRecord = await db.query.bouncedEmails.findFirst({
+        where: and(
+          sql`LOWER(${bouncedEmails.email}) = ${normalizedRecipient}`,
+          eq(bouncedEmails.isActive, true),
+        ),
+        columns: {
+          bounceType: true,
+          suppressionReason: true,
+          bounceReason: true,
+        },
+      });
+
+      if (suppressionRecord) {
+        return res.json({
+          success: true,
+          allowed: false,
+          reason: suppressionRecord.suppressionReason || suppressionRecord.bounceReason || suppressionRecord.bounceType || 'suppressed',
+          contactStatus: contact.status,
+          suppressionType: suppressionRecord.bounceType,
+        });
+      }
+
+      return res.json({
+        success: true,
+        allowed: true,
+        contactStatus: contact.status,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ [Internal API] Error validating scheduled contact email:', errorMessage);
+      return res.status(500).json({
+        success: false,
+        allowed: false,
+        reason: 'validation_error',
       });
     }
   }
@@ -444,7 +541,7 @@ router.post(
         });
       }
 
-      const allowedTypes = ['sent', 'failed', 'delivered', 'bounced', 'opened', 'clicked'];
+      const allowedTypes = ['sent', 'failed', 'suppressed', 'delivered', 'bounced', 'opened', 'clicked'];
       if (!allowedTypes.includes(activityType)) {
         return res.status(400).json({
           success: false,
