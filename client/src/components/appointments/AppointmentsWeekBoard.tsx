@@ -157,6 +157,18 @@ export function AppointmentsWeekBoard({
     [selectedMonthDate, now]
   );
 
+  const effectiveListTab = isCurrentMonth ? listTab : "all";
+
+  const handleMonthChange = (value: string) => {
+    setSelectedMonth(value);
+
+    const [year, month] = value.split("-").map(Number);
+    const nextMonthDate = new Date(year, month - 1, 1);
+    if (!isSameMonth(nextMonthDate, now)) {
+      setListTab("all");
+    }
+  };
+
   useEffect(() => {
     if (!isCurrentMonth && listTab !== "all") setListTab("all");
   }, [isCurrentMonth, listTab]);
@@ -263,7 +275,7 @@ export function AppointmentsWeekBoard({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return monthAppointments.filter(a => {
-      if (listTab === "selected") {
+      if (effectiveListTab === "selected") {
         const appointmentDate = new Date(a.appointmentDate);
         if (selectedFilter === "upcoming" && appointmentDate < startOfDay(now)) return false;
         if (selectedFilter === "today" && !isToday(appointmentDate)) return false;
@@ -280,7 +292,7 @@ export function AppointmentsWeekBoard({
         (a.serviceType || "").toLowerCase().includes(q)
       );
     });
-  }, [monthAppointments, listTab, selectedFilter, search, now]);
+  }, [monthAppointments, effectiveListTab, selectedFilter, search, now]);
 
   const visible = filtered.slice(0, pageSize);
 
@@ -358,7 +370,7 @@ export function AppointmentsWeekBoard({
             <p className="text-[11px] font-semibold tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400 mb-2">
               {t('reminders.board.allAppointments')}
             </p>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <Select value={selectedMonth} onValueChange={handleMonthChange}>
               <SelectTrigger className="w-full h-9 rounded-lg">
                 <SelectValue placeholder={t('reminders.board.selectMonth')} />
               </SelectTrigger>
@@ -508,11 +520,11 @@ export function AppointmentsWeekBoard({
           </div>
 
           <div className="flex items-center gap-1 px-5 py-3 border-b border-slate-200 dark:border-slate-800 overflow-x-auto">
-            <TabPill active={listTab === "all"} onClick={() => setListTab("all")} count={monthAppointments.length}>
+            <TabPill active={effectiveListTab === "all"} onClick={() => setListTab("all")} count={monthAppointments.length}>
               {t('reminders.board.tabs.all')}
             </TabPill>
             <TabPill
-              active={listTab === "selected"}
+              active={effectiveListTab === "selected"}
               onClick={() => setListTab("selected")}
               count={filterCounts[selectedFilter]}
               disabled={!isCurrentMonth}

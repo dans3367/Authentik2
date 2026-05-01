@@ -21,7 +21,7 @@ import { requireRole } from '../middleware/auth-middleware';
 import { logActivity, computeChanges } from '../utils/activityLogger';
 import { v4 as uuidv4 } from 'uuid';
 import { cancelReminderRun, triggerRescheduleEmail, triggerThankYouEmail } from '../lib/trigger';
-import { resolveShopId } from '../utils/defaultShop';
+import { getDefaultShopId, resolveShopId } from '../utils/defaultShop';
 
 const router = Router();
 
@@ -344,9 +344,17 @@ router.get('/', async (req: Request, res: Response) => {
     // Build where conditions
     const conditions = [eq(appointments.tenantId, tenantId)];
 
-    // Shop-level filtering when a specific shop is selected
-    if ((req as any).shopId) {
-      conditions.push(eq(appointments.shopId, (req as any).shopId));
+    // Shop-level filtering when a specific shop is selected.
+    // Older appointment rows can have a null shop_id; treat those as default-shop
+    // records so historical months still appear when that shop is selected.
+    const requestedShopId = (req as any).shopId as string | null | undefined;
+    if (requestedShopId) {
+      const defaultShopId = await getDefaultShopId(tenantId);
+      conditions.push(
+        defaultShopId === requestedShopId
+          ? or(eq(appointments.shopId, requestedShopId), isNull(appointments.shopId))!
+          : eq(appointments.shopId, requestedShopId)
+      );
     }
 
     if (status && status !== 'all') {
