@@ -1,8 +1,8 @@
+import { useEffect } from 'react';
 import { FormWizard } from '@/components/form-builder/form-wizard';
 import { useLocation, useRoute } from 'wouter';
 import { Loader2 } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
-import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -24,7 +24,7 @@ export default function EditForm() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute('/forms/:id/edit');
   const formId = params?.id;
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isLoading: permsLoading } = usePermissions();
 
   // Fetch form data for editing
   const { data: formData, isLoading: formLoading, error } = useQuery({
@@ -37,20 +37,19 @@ export default function EditForm() {
     enabled: isAuthenticated && isInitialized && !!formId,
   });
 
-  // Redirect unauthenticated users immediately
-  if (isInitialized && !isAuthenticated) {
-    setLocation('/auth');
-    return null;
-  }
+  const needsAuthRedirect = isInitialized && !authLoading && !isAuthenticated;
+  const needsPermRedirect =
+    isInitialized && isAuthenticated && !permsLoading && !hasPermission('forms.edit');
 
-  // Redirect if user doesn't have edit permission
-  if (!hasPermission('forms.edit')) {
-    setLocation('/forms');
-    return null;
-  }
+  useEffect(() => {
+    if (needsAuthRedirect) {
+      setLocation('/auth');
+    } else if (needsPermRedirect) {
+      setLocation('/forms');
+    }
+  }, [needsAuthRedirect, needsPermRedirect, setLocation]);
 
-  // Show loading while authentication is being determined
-  if (!isInitialized || authLoading) {
+  if (!isInitialized || authLoading || permsLoading || needsAuthRedirect || needsPermRedirect) {
     return (
       <div className="min-h-screen p-6 flex items-center justify-center">
         <div className="flex items-center justify-center">

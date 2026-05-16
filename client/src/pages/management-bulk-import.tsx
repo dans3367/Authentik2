@@ -261,10 +261,10 @@ export default function ManagementBulkImport() {
           {preview.length > 0 && !result && (
             <div>
               <p className="text-sm font-medium mb-2">Preview (first {preview.length} rows):</p>
-              <div className="overflow-x-auto border rounded-lg">
+              <div className="overflow-x-auto rounded-lg border border-border/60 bg-card">
                 <table className="min-w-full text-xs">
                   <thead>
-                    <tr className="bg-muted">
+                    <tr className="bg-muted/50 text-muted-foreground">
                       {headers.filter(h => knownColumns[h]).map((h) => (
                         <th key={h} className="px-3 py-2 text-left font-medium">
                           {knownColumns[h]}
@@ -274,7 +274,7 @@ export default function ManagementBulkImport() {
                   </thead>
                   <tbody>
                     {preview.map((row, i) => (
-                      <tr key={i} className="border-t">
+                      <tr key={i} className="border-t border-border hover:bg-muted/30">
                         {headers.filter(h => knownColumns[h]).map((h) => (
                           <td key={h} className="px-3 py-2 max-w-[200px] truncate">
                             {row[h] || <span className="text-muted-foreground">—</span>}
@@ -344,10 +344,10 @@ export default function ManagementBulkImport() {
                     <AlertTriangle className="h-4 w-4 text-amber-500" />
                     Skipped Rows ({result.errors.length}{result.hasMoreErrors ? '+' : ''})
                   </p>
-                  <div className="max-h-48 overflow-y-auto border rounded-lg">
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-border/60 bg-card">
                     <table className="min-w-full text-xs">
                       <thead>
-                        <tr className="bg-muted sticky top-0">
+                        <tr className="bg-muted/50 text-muted-foreground sticky top-0">
                           <th className="px-3 py-2 text-left font-medium">Row</th>
                           <th className="px-3 py-2 text-left font-medium">Email</th>
                           <th className="px-3 py-2 text-left font-medium">Reason</th>
@@ -355,7 +355,7 @@ export default function ManagementBulkImport() {
                       </thead>
                       <tbody>
                         {result.errors.map((err, i) => (
-                          <tr key={i} className="border-t">
+                          <tr key={i} className="border-t border-border hover:bg-muted/30">
                             <td className="px-3 py-1.5">{err.row || '—'}</td>
                             <td className="px-3 py-1.5">{err.email || '—'}</td>
                             <td className="px-3 py-1.5 text-muted-foreground">{err.reason}</td>

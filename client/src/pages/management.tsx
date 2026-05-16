@@ -36,19 +36,24 @@ export default function ManagementPage() {
   ]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
+    <div className="container mx-auto p-4 lg:p-6 space-y-5 lg:space-y-6 overflow-y-auto">
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 pt-1">
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-[0.15em]">
+            {t('navigation.management')}
+          </p>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('management.title')}</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
+            <h1 className="text-2xl sm:text-3xl lg:text-[2rem] font-extrabold tracking-tight leading-none text-foreground">{t('management.title')}</h1>
+            <p className="text-sm text-muted-foreground/80 mt-1.5">
               {t('management.subtitle')}
             </p>
           </div>
         </div>
+      </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="overflow-x-auto pb-1">
+          <TabsList className="w-max justify-start bg-card border border-border/60 p-1 text-muted-foreground">
             <TabsTrigger value="account-usage">{t('management.tabs.accountUsage', 'Account Usage')}</TabsTrigger>
             <TabsTrigger value="users">{t('management.tabs.users')}</TabsTrigger>
             <TabsTrigger value="shops">{t('management.tabs.shops')}</TabsTrigger>
@@ -60,43 +65,41 @@ export default function ManagementPage() {
             <TabsTrigger value="bulk-import">{t('management.tabs.bulkImport', 'Bulk Import')}</TabsTrigger>
             <TabsTrigger value="activity-logs">{t('management.tabs.activityLogs', 'Activity Logs')}</TabsTrigger>
           </TabsList>
-          <div className="mt-6">
-            <TabsContent value="account-usage">
-              <div className="grid gap-6 lg:grid-cols-2">
-                <AccountUsageCard />
-                <ResourceUsageCard />
-              </div>
-            </TabsContent>
-            <TabsContent value="users">
-              <UsersPage />
-            </TabsContent>
-            <TabsContent value="shops">
-              <ShopsPage />
-            </TabsContent>
-            <TabsContent value="tags">
-              <ManagementTags />
-            </TabsContent>
-            <TabsContent value="email-design">
-              <ManagementEmailDesign />
-            </TabsContent>
-            <TabsContent value="blog-design">
-              <ManagementBlogDesign />
-            </TabsContent>
-            <TabsContent value="review-and-send">
-              <ManagementReviewAndSend />
-            </TabsContent>
-            <TabsContent value="custom-fields">
-              <ManagementCustomFields />
-            </TabsContent>
-            <TabsContent value="bulk-import">
-              <ManagementBulkImport />
-            </TabsContent>
-            <TabsContent value="activity-logs">
-              <ManagementActivityLogs />
-            </TabsContent>
+        </div>
+        <TabsContent value="account-usage" className="mt-5">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <AccountUsageCard />
+            <ResourceUsageCard />
           </div>
-        </Tabs>
-      </div>
+        </TabsContent>
+        <TabsContent value="users" className="mt-5">
+          <UsersPage />
+        </TabsContent>
+        <TabsContent value="shops" className="mt-5">
+          <ShopsPage />
+        </TabsContent>
+        <TabsContent value="tags" className="mt-5">
+          <ManagementTags />
+        </TabsContent>
+        <TabsContent value="email-design" className="mt-5">
+          <ManagementEmailDesign />
+        </TabsContent>
+        <TabsContent value="blog-design" className="mt-5">
+          <ManagementBlogDesign />
+        </TabsContent>
+        <TabsContent value="review-and-send" className="mt-5">
+          <ManagementReviewAndSend />
+        </TabsContent>
+        <TabsContent value="custom-fields" className="mt-5">
+          <ManagementCustomFields />
+        </TabsContent>
+        <TabsContent value="bulk-import" className="mt-5">
+          <ManagementBulkImport />
+        </TabsContent>
+        <TabsContent value="activity-logs" className="mt-5">
+          <ManagementActivityLogs />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

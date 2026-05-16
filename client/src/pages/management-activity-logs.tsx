@@ -82,7 +82,7 @@ const activityColors: Record<string, string> = {
   deleted: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   sent: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
   scheduled: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  archived: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
+  archived: "bg-muted text-muted-foreground",
   cancelled: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
@@ -148,7 +148,7 @@ function ChangesButton({ changeCount, isOpen, onToggle }: { changeCount: number;
   return (
     <button
       onClick={onToggle}
-      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
     >
       {isOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       {changeCount}
@@ -159,16 +159,16 @@ function ChangesButton({ changeCount, isOpen, onToggle }: { changeCount: number;
 function ChangesPanel({ changes }: { changes: Record<string, { old: any; new: any }> }) {
   const keys = Object.keys(changes);
   return (
-    <td colSpan={5} className="px-4 py-1.5 bg-gray-50/80 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800">
+    <td colSpan={5} className="px-4 py-1.5 bg-muted/30 border-b border-border">
       <div className="flex flex-wrap gap-x-6 gap-y-0.5 text-xs">
         {keys.map((field) => {
           const v = changes[field];
           return (
             <span key={field} className="inline-flex items-center gap-1">
-              <span className="font-medium text-gray-600 dark:text-gray-300">{field}:</span>
-              <span className="line-through text-gray-400 dark:text-gray-500">{formatValue(v.old)}</span>
-              <span className="text-gray-400">&rarr;</span>
-              <span className="text-gray-900 dark:text-gray-100">{formatValue(v.new)}</span>
+              <span className="font-medium text-muted-foreground">{field}:</span>
+              <span className="line-through text-muted-foreground/70">{formatValue(v.old)}</span>
+              <span className="text-muted-foreground/60">&rarr;</span>
+              <span className="text-foreground">{formatValue(v.new)}</span>
             </span>
           );
         })}
@@ -183,8 +183,8 @@ function ActivityLogRow({ log, isExpanded, onToggle }: { log: any; isExpanded: b
 
   return (
     <>
-      <tr className="group border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
-        <td className="px-4 py-2 font-mono text-[11px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
+      <tr className="group border-b border-border hover:bg-muted/30">
+        <td className="px-4 py-2 font-mono text-[11px] text-muted-foreground whitespace-nowrap">
           {format(new Date(log.createdAt), "MMM d, HH:mm")}
         </td>
         <td className="px-4 py-2">
@@ -192,7 +192,7 @@ function ActivityLogRow({ log, isExpanded, onToggle }: { log: any; isExpanded: b
             variant="secondary"
             className={cn(
               "text-[11px] gap-1 py-0 h-5",
-              activityColors[log.activityType] || "bg-gray-100 text-gray-700"
+              activityColors[log.activityType] || "bg-muted text-muted-foreground"
             )}
           >
             {activityIcons[log.activityType] || <Activity className="h-3 w-3" />}
@@ -212,22 +212,22 @@ function ActivityLogRow({ log, isExpanded, onToggle }: { log: any; isExpanded: b
         </td>
         <td className="px-4 py-2 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm text-gray-900 dark:text-gray-100 truncate">
+            <span className="text-sm text-foreground truncate">
               {log.entityName || log.description || "—"}
             </span>
             <ChangesButton changeCount={changeCount} isOpen={isExpanded} onToggle={onToggle} />
           </div>
           {log.entityName && log.description && (
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
+            <p className="text-[11px] text-muted-foreground truncate mt-0.5">
               {log.description}
             </p>
           )}
         </td>
-        <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 truncate">
+        <td className="px-4 py-2 text-sm text-muted-foreground truncate">
           {log.user?.firstName && log.user?.lastName
             ? `${log.user.firstName} ${log.user.lastName}`
             : log.user?.email || (
-              <span className="text-gray-400 italic text-xs">System</span>
+              <span className="text-muted-foreground/70 italic text-xs">System</span>
             )}
         </td>
       </tr>
@@ -246,7 +246,7 @@ function ActivityLogsTable({ logs, t }: { logs: any[]; t: any }) {
   return (
     <table className="w-full table-fixed">
       <thead>
-        <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <tr className="border-b border-border bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <th className="px-4 py-2 w-[11%]">{t("management.activityLogs.table.timestamp", "Timestamp")}</th>
           <th className="px-4 py-2 w-[11%]">{t("management.activityLogs.table.action", "Action")}</th>
           <th className="px-4 py-2 w-[10%]">{t("management.activityLogs.table.entity", "Entity")}</th>
@@ -364,10 +364,10 @@ export default function ManagementActivityLogs() {
       <Card className="border-destructive/50">
         <CardContent className="flex flex-col items-center justify-center py-12">
           <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          <h3 className="text-lg font-semibold text-foreground mb-2">
             {t("management.activityLogs.accessDenied", "Access Denied")}
           </h3>
-          <p className="text-gray-500 dark:text-gray-400 text-center max-w-md">
+          <p className="text-muted-foreground text-center max-w-md">
             {t("management.activityLogs.accessDeniedDesc", "You don't have permission to view activity logs.")}
           </p>
         </CardContent>
@@ -404,22 +404,22 @@ export default function ManagementActivityLogs() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               {t("management.activityLogs.stats.totalEvents", "Total Events")}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="text-2xl font-bold text-foreground">
               {totalLogs.toLocaleString()}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {TIME_RANGES.find((r) => r.value === timeRange)?.label || "Last 30 days"}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               {t("management.activityLogs.stats.topEntities", "Top Entity Types")}
             </CardTitle>
           </CardHeader>
@@ -435,14 +435,14 @@ export default function ManagementActivityLogs() {
                 </Badge>
               ))}
               {topEntityTypes.length === 0 && (
-                <span className="text-sm text-gray-400">No data</span>
+                <span className="text-sm text-muted-foreground">No data</span>
               )}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 dark:text-gray-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               {t("management.activityLogs.stats.topActions", "Top Actions")}
             </CardTitle>
           </CardHeader>
@@ -458,7 +458,7 @@ export default function ManagementActivityLogs() {
                 </Badge>
               ))}
               {topActivityTypes.length === 0 && (
-                <span className="text-sm text-gray-400">No data</span>
+                <span className="text-sm text-muted-foreground">No data</span>
               )}
             </div>
           </CardContent>
@@ -472,7 +472,7 @@ export default function ManagementActivityLogs() {
             {/* Search bar */}
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder={t("management.activityLogs.searchPlaceholder", "Search activity logs...")}
                   value={searchQuery}
@@ -493,8 +493,8 @@ export default function ManagementActivityLogs() {
             {/* Filter row */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-gray-400" />
-                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">
                   {t("management.activityLogs.filters", "Filters")}:
                 </span>
               </div>
@@ -541,7 +541,7 @@ export default function ManagementActivityLogs() {
               </Select>
 
               {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 text-gray-500">
+                <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 text-muted-foreground hover:text-foreground">
                   <X className="h-3.5 w-3.5 mr-1" />
                   {t("management.activityLogs.clearFilters", "Clear")}
                 </Button>
@@ -568,20 +568,20 @@ export default function ManagementActivityLogs() {
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <Activity className="h-8 w-8 text-gray-400 mb-2" />
-              <p className="text-gray-500 dark:text-gray-400">
+              <Activity className="h-8 w-8 text-muted-foreground mb-2" />
+              <p className="text-muted-foreground">
                 {t("management.activityLogs.errorLoading", "Failed to load activity logs.")}
               </p>
             </div>
           ) : logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-              <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-                <Activity className="h-8 w-8 text-gray-400" />
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                <Activity className="h-8 w-8 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+              <h3 className="text-lg font-medium text-foreground mb-2">
                 {t("management.activityLogs.noResults", "No activity logs found")}
               </h3>
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
+              <p className="text-muted-foreground text-sm">
                 {hasActiveFilters
                   ? t("management.activityLogs.noResultsFiltered", "Try adjusting your filters or search query.")
                   : t("management.activityLogs.noResultsEmpty", "Activity will appear here as actions are performed.")}
@@ -593,8 +593,8 @@ export default function ManagementActivityLogs() {
 
               {/* Pagination */}
               {pagination && (
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+                  <div className="text-sm text-muted-foreground">
                     {t("management.activityLogs.pagination.showing", "Showing")} {page * limit + 1}–
                     {Math.min((page + 1) * limit, pagination.total)}{" "}
                     {t("management.activityLogs.pagination.of", "of")} {pagination.total.toLocaleString()}
@@ -608,7 +608,7 @@ export default function ManagementActivityLogs() {
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <span className="text-sm text-gray-600 dark:text-gray-300 min-w-[80px] text-center">
+                    <span className="text-sm text-muted-foreground min-w-[80px] text-center">
                       {t("management.activityLogs.pagination.page", "Page")} {page + 1}{" "}
                       {t("management.activityLogs.pagination.of", "of")} {totalPages || 1}
                     </span>

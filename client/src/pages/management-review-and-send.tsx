@@ -224,7 +224,7 @@ export default function ManagementReviewAndSend() {
 
     if (isLoading) {
         return (
-            <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+            <div className="p-6 bg-background min-h-screen">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex flex-col items-center justify-center min-h-[400px]">
                         <FileCheck2 className="w-10 h-10 animate-bounce text-primary mb-4" />
@@ -237,7 +237,7 @@ export default function ManagementReviewAndSend() {
 
     if (!isAdmin) {
         return (
-            <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+            <div className="p-6 bg-background min-h-screen">
                 <div className="max-w-7xl mx-auto">
                     <Card>
                         <CardContent className="py-8">
@@ -256,7 +256,7 @@ export default function ManagementReviewAndSend() {
     }
 
     return (
-        <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+        <div className="p-6 bg-background min-h-screen">
             <div className="max-w-7xl mx-auto">
                 <div className="space-y-6">
                     {/* Header */}

@@ -274,7 +274,7 @@ export default function ManagementBlogDesign() {
 
   if (isLoading) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col items-center justify-center min-h-[400px]">
           <BookOpen className="w-10 h-10 animate-bounce text-primary mb-4" />
@@ -288,7 +288,7 @@ export default function ManagementBlogDesign() {
   const is403 = error instanceof Error && (error.message?.startsWith('403:') || (error as any).status === 403);
   if (is403) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
       <div className="max-w-7xl mx-auto">
         <Card>
           <CardContent className="py-8">
@@ -314,7 +314,7 @@ export default function ManagementBlogDesign() {
   const logoHeight = logoSizeMap[draft.logoSize || 'medium'] || "56px";
 
   return (
-    <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+    <div className="p-6 bg-background min-h-screen">
     <div className="max-w-7xl mx-auto">
     <div className="space-y-6">
       {/* Header Actions */}
@@ -815,7 +815,7 @@ export default function ManagementBlogDesign() {
             </div>
 
             {/* Blog Canvas */}
-            <div className={`transition-all duration-500 ease-in-out mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl overflow-y-auto max-h-[calc(100vh-12rem)] ${previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
+            <div className={`transition-all duration-500 ease-in-out mx-auto p-4 sm:p-6 bg-muted/50 rounded-xl overflow-y-auto max-h-[calc(100vh-12rem)] ${previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
               }`}>
               <div className="bg-gray-50 mx-auto rounded-lg overflow-hidden shadow-2xl" style={{ fontFamily: draft.fontFamily }}>
 

@@ -468,7 +468,7 @@ export default function UsersPage() {
   // Check authentication first
   if (authLoading) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
         <div className="max-w-7xl mx-auto">
           <div className="space-y-6">
             <div>
@@ -481,7 +481,7 @@ export default function UsersPage() {
             </div>
             <div className="grid gap-4">
               {[1, 2, 3].map((i) => (
-                <Card key={i} className="animate-pulse bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+                <Card key={i} className="animate-pulse border border-border/60 bg-card">
                   <CardContent className="p-6">
                     <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
                     <div className="h-3 bg-muted rounded w-1/2"></div>
@@ -498,14 +498,14 @@ export default function UsersPage() {
   // Check if current user has permission to access this page
   if (!currentUser || !canViewUsers) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
         <div className="max-w-4xl mx-auto">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+          <Card className="border border-border/60 bg-card">
             <CardContent className="p-8">
               <div className="text-center">
                 <Shield className="mx-auto h-12 w-12 text-red-500 dark:text-red-400 mb-4" />
-                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{t('users.accessDenied')}</h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                <h2 className="mt-4 text-lg font-semibold text-foreground">{t('users.accessDenied')}</h2>
+                <p className="mt-2 text-muted-foreground">
                   {t('users.accessDeniedMessage')}
                 </p>
               </div>
@@ -519,16 +519,16 @@ export default function UsersPage() {
   // Check if plan allows user management
   if (!canManageUsers) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
         <div className="max-w-4xl mx-auto">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+          <Card className="border border-border/60 bg-card">
             <CardContent className="p-8">
               <div className="text-center">
                 <UsersIcon className="mx-auto h-12 w-12 text-amber-500 dark:text-amber-400 mb-4" />
-                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                <h2 className="mt-4 text-lg font-semibold text-foreground">
                   {t('users.upgradeRequired', 'Upgrade Required')}
                 </h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                <p className="mt-2 text-muted-foreground">
                   {t('users.upgradeDescription', {
                     planName,
                     defaultValue: 'Your current plan ({{planName}}) does not include user management. Upgrade to Plus or Pro to add team members and manage roles.'
@@ -648,27 +648,27 @@ export default function UsersPage() {
             <div className="relative">
               <Avatar className="h-10 w-10">
                 <AvatarImage src="" />
-                <AvatarFallback className="bg-gray-100 text-gray-600 text-sm">
+                <AvatarFallback className="bg-muted text-muted-foreground text-sm">
                   {getUserInitials(user.firstName || undefined, user.lastName || undefined)}
                 </AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></div>
+              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-card"></div>
             </div>
             {isOwnerSelf ? (
               <Link href="/profile" className="group">
                 <div>
-                  <div className="font-medium text-blue-700 group-hover:underline">
+                  <div className="font-medium text-primary group-hover:underline">
                     {name}
                   </div>
-                  <div className="text-sm text-blue-600/80">{user.email}</div>
+                  <div className="text-sm text-primary/80">{user.email}</div>
                 </div>
               </Link>
             ) : (
               <div>
-                <div className="font-medium text-gray-900">
+                <div className="font-medium text-foreground">
                   {name}
                 </div>
-                <div className="text-sm text-gray-500">{user.email}</div>
+                <div className="text-sm text-muted-foreground">{user.email}</div>
               </div>
             )}
           </div>
@@ -681,13 +681,13 @@ export default function UsersPage() {
       cell: ({ row }) => {
         const role = row.getValue("role") as string;
         const roleStyles = {
-          'Owner': 'bg-purple-100 text-purple-700',
-          'Administrator': 'bg-red-100 text-red-700',
-          'Manager': 'bg-blue-100 text-blue-700',
-          'Employee': 'bg-gray-100 text-gray-700'
+          'Owner': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+          'Administrator': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+          'Manager': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+          'Employee': 'bg-muted text-muted-foreground'
         };
         return (
-          <Badge variant="secondary" className={`${roleStyles[role as keyof typeof roleStyles] || 'bg-gray-100 text-gray-700'} hover:bg-opacity-80 font-normal border-0`}>
+          <Badge variant="secondary" className={`${roleStyles[role as keyof typeof roleStyles] || 'bg-muted text-muted-foreground'} hover:bg-opacity-80 font-normal border-0`}>
             {t(getRoleTranslationKey(role))}
           </Badge>
         );
@@ -735,7 +735,7 @@ export default function UsersPage() {
       header: t('users.table.location'),
       cell: ({ row }) => {
         // For now, we'll show a dash as location is not in our schema
-        return <span className="text-gray-400">—</span>;
+        return <span className="text-muted-foreground/70">—</span>;
       },
     },
     {
@@ -744,13 +744,13 @@ export default function UsersPage() {
       cell: ({ row }) => {
         const lastLogin = row.getValue("lastLoginAt");
         if (!lastLogin) return (
-          <div className="flex items-center space-x-1.5 text-gray-500">
+          <div className="flex items-center space-x-1.5 text-muted-foreground">
             <Calendar className="h-4 w-4" />
             <span>{t('users.table.never')}</span>
           </div>
         );
         return (
-          <div className="flex items-center space-x-1.5 text-gray-500">
+          <div className="flex items-center space-x-1.5 text-muted-foreground">
             <Calendar className="h-4 w-4" />
             <span>{format(new Date(lastLogin as string), "MMM d, yyyy")}</span>
           </div>
@@ -764,7 +764,7 @@ export default function UsersPage() {
         const createdAt = row.getValue("createdAt");
         if (!createdAt) return null;
         return (
-          <div className="flex items-center space-x-1.5 text-gray-500">
+          <div className="flex items-center space-x-1.5 text-muted-foreground">
             <Calendar className="h-4 w-4" />
             <span>{format(new Date(createdAt as string), "MMM d, yyyy, h:mm a")}</span>
           </div>
@@ -787,7 +787,7 @@ export default function UsersPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-300 dark:hover:bg-purple-900/20"
                   title="Go to Profile"
                 >
                   <UserIcon className="h-4 w-4" />
@@ -818,7 +818,7 @@ export default function UsersPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 onClick={() => handleViewUser(user)}
                 title="View User"
               >
@@ -836,7 +836,7 @@ export default function UsersPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-900/20"
                 onClick={() => handleEditUser(user)}
               >
                 <Edit className="h-4 w-4" />
@@ -893,17 +893,17 @@ export default function UsersPage() {
 
   if (usersLoading) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
         <div className="max-w-7xl mx-auto">
           <div className="space-y-6">
             <div className="mb-8">
               <div className="flex items-center space-x-4">
                 <UsersIcon className="text-blue-600 dark:text-blue-500 w-8 h-8" />
                 <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
+                  <h1 className="text-3xl font-bold text-foreground">
                     {t('users.title')}
                   </h1>
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">
+                  <p className="text-muted-foreground mt-1">
                     {t('users.subtitle')}
                   </p>
                 </div>
@@ -911,7 +911,7 @@ export default function UsersPage() {
             </div>
             <div className="grid gap-4">
               {[1, 2, 3].map((i) => (
-                <Card key={i} className="animate-pulse bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+                <Card key={i} className="animate-pulse border border-border/60 bg-card">
                   <CardContent className="p-6">
                     <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
                     <div className="h-3 bg-muted rounded w-1/2"></div>
@@ -926,7 +926,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+    <div className="p-6 bg-background min-h-screen">
       <div className="max-w-7xl mx-auto">
         <Tabs defaultValue="users" className="w-full">
           <div className="flex items-center justify-between mb-6">
@@ -1124,12 +1124,12 @@ export default function UsersPage() {
 
           {/* Statistics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
+            <Card className="border border-border/60 bg-card transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.totalUsers')}</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalUsers}</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t('users.stats.totalUsers')}</p>
+                    <p className="text-2xl font-bold text-foreground">{stats.totalUsers}</p>
                   </div>
                   <UsersIcon className="text-blue-500 w-8 h-8" />
                 </div>
@@ -1137,12 +1137,12 @@ export default function UsersPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
+            <Card className="border border-border/60 bg-card transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.activeUsers')}</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.activeUsers}</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t('users.stats.activeUsers')}</p>
+                    <p className="text-2xl font-bold text-foreground">{stats.activeUsers}</p>
                   </div>
                   <UserCheck className="text-green-500 w-8 h-8" />
                 </div>
@@ -1152,12 +1152,12 @@ export default function UsersPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
+            <Card className="border border-border/60 bg-card transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.roles')}</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{Object.keys(stats.usersByRole).length}</p>
+                    <p className="text-sm font-medium text-muted-foreground">{t('users.stats.roles')}</p>
+                    <p className="text-2xl font-bold text-foreground">{Object.keys(stats.usersByRole).length}</p>
                   </div>
                   <Shield className="text-purple-500 w-8 h-8" />
                 </div>
@@ -1165,12 +1165,12 @@ export default function UsersPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300">
+            <Card className="border border-border/60 bg-card transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('users.stats.planLimits')}</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                    <p className="text-sm font-medium text-muted-foreground">{t('users.stats.planLimits')}</p>
+                    <p className="text-2xl font-bold text-foreground">
                       {limits.currentUsers}{limits.maxUsers ? `/${limits.maxUsers}` : ''}
                     </p>
                   </div>
@@ -1186,7 +1186,7 @@ export default function UsersPage() {
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder={t('users.filters.searchPlaceholder')}
                 value={searchTerm}
@@ -1197,7 +1197,7 @@ export default function UsersPage() {
                 <button
                   type="button"
                   onClick={() => setSearchTerm("")}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 h-4 w-4"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground h-4 w-4"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -1239,7 +1239,7 @@ export default function UsersPage() {
           </div>
 
           {/* Responsive Users Layout */}
-          <div className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg">
+          <div className="rounded-lg">
             {/* Table View for Large Screens */}
             <div className="hidden lg:block">
               <DataTable
@@ -1254,7 +1254,7 @@ export default function UsersPage() {
             {/* Card View for Tablets and Smaller */}
             <div className="lg:hidden">
               {filteredUsers.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400 py-12">
+                <div className="flex flex-col items-center gap-2 text-muted-foreground py-12">
                   <UsersIcon className="h-8 w-8" />
                   <p>No users found</p>
                   {(searchTerm || roleFilter || statusFilter) && (
@@ -1266,7 +1266,7 @@ export default function UsersPage() {
                   {filteredUsers.map((user: User) => (
                     <Card
                       key={user.id}
-                      className="transition-all duration-300 hover:border-blue-200 dark:hover:border-blue-700"
+                      className="border-border/60 bg-card transition-all duration-300 hover:border-primary/40"
                       data-testid={`card-user-${user.id}`}
                     >
                       <CardContent className="p-4">
@@ -1276,27 +1276,27 @@ export default function UsersPage() {
                             <div className="relative">
                               <Avatar className="h-12 w-12">
                                 <AvatarImage src="" />
-                                <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-sm font-medium">
+                                <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
                                   {getUserInitials(user.firstName || undefined, user.lastName || undefined)}
                                 </AvatarFallback>
                               </Avatar>
                               {user.isActive && (
-                                <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-white dark:border-gray-800"></div>
+                                <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-card"></div>
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h3 className="font-medium text-gray-900 dark:text-white truncate" data-testid={`text-user-name-card-${user.id}`}>
+                              <h3 className="font-medium text-foreground truncate" data-testid={`text-user-name-card-${user.id}`}>
                                 {user.role === 'Owner' && user.id === currentUser.id ? (
-                                  <Link href="/profile" className="text-blue-700 hover:underline">
+                                  <Link href="/profile" className="text-primary hover:underline">
                                     {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'}
                                   </Link>
                                 ) : (
                                   user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'
                                 )}
                               </h3>
-                              <p className="text-sm text-gray-500 dark:text-gray-400 truncate" data-testid={`text-user-email-card-${user.id}`}>
+                              <p className="text-sm text-muted-foreground truncate" data-testid={`text-user-email-card-${user.id}`}>
                                 {user.role === 'Owner' && user.id === currentUser.id ? (
-                                  <Link href="/profile" className="text-blue-600 hover:underline">{user.email}</Link>
+                                  <Link href="/profile" className="text-primary/80 hover:text-primary hover:underline">{user.email}</Link>
                                 ) : (
                                   user.email
                                 )}
@@ -1313,7 +1313,7 @@ export default function UsersPage() {
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                                      className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-300 dark:hover:bg-purple-900/20"
                                       data-testid={`button-profile-owner-card-${user.id}`}
                                       title="Go to Profile"
                                     >
@@ -1336,7 +1336,7 @@ export default function UsersPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-950/20"
+                                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                                   onClick={() => handleViewUser(user)}
                                   data-testid={`button-view-user-card-${user.id}`}
                                 >
@@ -1348,7 +1348,7 @@ export default function UsersPage() {
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                                      className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-900/20"
                                       onClick={() => handleEditUser(user)}
                                       data-testid={`button-edit-user-card-${user.id}`}
                                     >
@@ -1408,13 +1408,13 @@ export default function UsersPage() {
                           {/* Role and Status Row */}
                           <div className="flex items-center justify-between">
                             <div>
-                              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">{t('users.cardView.role')}</span>
+                              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-1">{t('users.cardView.role')}</span>
                               <Badge
                                 variant="secondary"
                                 className={`${user.role === 'Owner' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400' :
                                     user.role === 'Administrator' ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400' :
                                       user.role === 'Manager' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' :
-                                        'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                                        'bg-muted text-muted-foreground'
                                   } hover:bg-opacity-80 font-normal border-0`}
                                 data-testid={`badge-role-card-${user.id}`}
                               >
@@ -1422,7 +1422,7 @@ export default function UsersPage() {
                               </Badge>
                             </div>
                             <div>
-                              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Status</span>
+                              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-1">Status</span>
                               {user.isActive ? (
                                 <div className="flex items-center space-x-1.5" data-testid={`status-active-card-${user.id}`}>
                                   <UserCheck className="h-4 w-4 text-green-600" />
@@ -1444,14 +1444,14 @@ export default function UsersPage() {
 
                           {/* Last Login */}
                           <div>
-                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Last Login</span>
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-1">Last Login</span>
                             {user.lastLoginAt ? (
-                              <div className="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300" data-testid={`text-last-login-card-${user.id}`}>
+                              <div className="flex items-center space-x-1.5 text-muted-foreground" data-testid={`text-last-login-card-${user.id}`}>
                                 <Calendar className="h-4 w-4" />
                                 <span className="text-sm">{format(new Date(user.lastLoginAt), "MMM d, yyyy")}</span>
                               </div>
                             ) : (
-                              <div className="flex items-center space-x-1.5 text-gray-500" data-testid={`text-never-logged-in-card-${user.id}`}>
+                              <div className="flex items-center space-x-1.5 text-muted-foreground" data-testid={`text-never-logged-in-card-${user.id}`}>
                                 <Calendar className="h-4 w-4" />
                                 <span className="text-sm">Never</span>
                               </div>
@@ -1460,22 +1460,22 @@ export default function UsersPage() {
 
                           {/* Joined Date */}
                           <div>
-                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Joined</span>
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-1">Joined</span>
                             {user.createdAt ? (
-                              <div className="flex items-center space-x-1.5 text-gray-600 dark:text-gray-300" data-testid={`text-joined-date-card-${user.id}`}>
+                              <div className="flex items-center space-x-1.5 text-muted-foreground" data-testid={`text-joined-date-card-${user.id}`}>
                                 <Calendar className="h-4 w-4" />
                                 <span className="text-sm">{format(new Date(user.createdAt), "MMM d, yyyy")}</span>
                               </div>
                             ) : (
-                              <span className="text-sm text-gray-500">—</span>
+                              <span className="text-sm text-muted-foreground">—</span>
                             )}
                           </div>
 
                           {/* Status Toggle */}
                           {canToggleStatus && user.id !== currentUser.id && canActOnUser(currentUser.role || '', user.role || '') && (
-                            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <div className="pt-2 border-t border-border">
                               <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Account Status</span>
+                                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Account Status</span>
                                 <Switch
                                   checked={user.isActive ?? true}
                                   onCheckedChange={(checked) => handleToggleStatus(user.id, checked)}

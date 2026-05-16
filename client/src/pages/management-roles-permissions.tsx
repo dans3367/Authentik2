@@ -85,9 +85,9 @@ function getRoleIcon(role: string, size: "sm" | "md" = "md") {
     case "Manager":
       return <ShieldCheck className={`${cls} text-blue-600`} />;
     case "Employee":
-      return <Shield className={`${cls} text-gray-600`} />;
+      return <Shield className={`${cls} text-muted-foreground`} />;
     default:
-      return <Shield className={`${cls} text-gray-400`} />;
+      return <Shield className={`${cls} text-muted-foreground/70`} />;
   }
 }
 
@@ -100,9 +100,9 @@ function getRoleColor(role: string) {
     case "Manager":
       return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
     case "Employee":
-      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+      return "bg-muted text-muted-foreground";
     default:
-      return "bg-gray-100 text-gray-700";
+      return "bg-muted text-muted-foreground";
   }
 }
 
@@ -115,9 +115,9 @@ function getRoleBorderColor(role: string) {
     case "Manager":
       return "border-blue-200 dark:border-blue-800/50";
     case "Employee":
-      return "border-gray-200 dark:border-gray-700/50";
+      return "border-border/70";
     default:
-      return "border-gray-200";
+      return "border-border/70";
   }
 }
 
@@ -342,7 +342,7 @@ export default function ManagementRolesPermissions() {
   // Check if plan data is loading
   if (planLoading) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
       <div className="max-w-7xl mx-auto">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -369,16 +369,16 @@ export default function ManagementRolesPermissions() {
   // Check if plan allows roles management - after all hooks
   if (!canManageRoles) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
         <div className="max-w-4xl mx-auto">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+          <Card className="border border-border/60 bg-card">
             <CardContent className="p-8">
               <div className="text-center">
                 <Shield className="mx-auto h-12 w-12 text-amber-500 dark:text-amber-400 mb-4" />
-                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                <h2 className="mt-4 text-lg font-semibold text-foreground">
                   {t('management.rolesPermissions.upgradeRequired', 'Upgrade Required')}
                 </h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                <p className="mt-2 text-muted-foreground">
                   {t('management.rolesPermissions.upgradeDescription', { 
                     planName, 
                     defaultValue: 'Your current plan ({{planName}}) does not include roles & permissions management. Upgrade to Plus or Pro to customize role permissions.' 
@@ -527,7 +527,7 @@ export default function ManagementRolesPermissions() {
   }
 
   return (
-    <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+    <div className="p-6 bg-background min-h-screen">
     <div className="max-w-7xl mx-auto">
     <div className="space-y-6">
       {/* Header */}
@@ -563,7 +563,7 @@ export default function ManagementRolesPermissions() {
         {roles.map((role) => (
           <Card
             key={role.name}
-            className={`border-2 ${getRoleBorderColor(role.name)} bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm transition-all duration-300`}
+            className={`border-2 ${getRoleBorderColor(role.name)} bg-card transition-all duration-300`}
           >
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -597,7 +597,7 @@ export default function ManagementRolesPermissions() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full bg-green-500 dark:bg-green-400 rounded-full transition-all"
                     style={{
@@ -718,7 +718,7 @@ export default function ManagementRolesPermissions() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-lg overflow-hidden">
+              <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -812,7 +812,7 @@ export default function ManagementRolesPermissions() {
                                         ) : (
                                           <Badge
                                             variant="secondary"
-                                            className="bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500 text-[10px]"
+                                            className="bg-muted text-muted-foreground text-[10px]"
                                           >
                                             {t("management.rolesPermissions.none", "None")}
                                           </Badge>
@@ -829,7 +829,7 @@ export default function ManagementRolesPermissions() {
                               {isExpanded &&
                                 category.permissions.map((perm) => (
                                   <TableRow key={perm.key} className="hover:bg-muted/20">
-                                    <TableCell className="pl-10 sticky left-0 bg-background z-10">
+                                    <TableCell className="pl-10 sticky left-0 bg-card z-10">
                                       <TooltipProvider>
                                         <Tooltip>
                                           <TooltipTrigger asChild>
@@ -853,7 +853,7 @@ export default function ManagementRolesPermissions() {
                                       return (
                                         <TableCell
                                           key={role.name}
-                                          className={`text-center ${hasChanged ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
+                                          className={`text-center ${hasChanged ? "bg-primary/10" : ""}`}
                                         >
                                           {isEditingThis ? (
                                             <div className="flex justify-center">
@@ -866,7 +866,7 @@ export default function ManagementRolesPermissions() {
                                           ) : currentValue ? (
                                             <Check className="h-4 w-4 text-green-600 dark:text-green-400 mx-auto" />
                                           ) : (
-                                            <X className="h-4 w-4 text-gray-300 dark:text-gray-600 mx-auto" />
+                                            <X className="h-4 w-4 text-muted-foreground/40 mx-auto" />
                                           )}
                                         </TableCell>
                                       );
@@ -917,7 +917,7 @@ export default function ManagementRolesPermissions() {
                           {t("management.rolesPermissions.noUsersInRole", "No users with this role")}
                         </p>
                       ) : (
-                        <div className="border rounded-lg overflow-hidden ml-7">
+                        <div className="rounded-lg border border-border/60 bg-card overflow-hidden ml-7">
                           <Table>
                             <TableHeader>
                               <TableRow className="bg-muted/30">
@@ -949,7 +949,7 @@ export default function ManagementRolesPermissions() {
                                     <TableCell>
                                       <div className="flex items-center gap-2">
                                         <Avatar className="h-8 w-8">
-                                          <AvatarFallback className="text-xs bg-gray-100 dark:bg-gray-800">
+                                          <AvatarFallback className="text-xs bg-muted text-muted-foreground">
                                             {getUserInitials(
                                               roleUser.firstName,
                                               roleUser.lastName

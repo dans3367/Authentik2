@@ -286,9 +286,9 @@ export default function ManagementTags() {
 
   if (is403) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
       <div className="max-w-7xl mx-auto">
-      <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+      <Card className="border border-border/60 bg-card">
         <CardContent className="p-8">
           <div className="flex flex-col items-center gap-3 py-4 text-center">
             <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-full">
@@ -314,7 +314,7 @@ export default function ManagementTags() {
   // — Loading skeleton —
   if (isLoading) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
       <div className="max-w-7xl mx-auto">
       <div className="space-y-6">
         {/* Header skeleton */}
@@ -356,7 +356,7 @@ export default function ManagementTags() {
   }
 
   return (
-    <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+    <div className="p-6 bg-background min-h-screen">
     <div className="max-w-7xl mx-auto">
     <div className="space-y-6">
       {/* ── Header ── */}
@@ -387,7 +387,7 @@ export default function ManagementTags() {
 
       {/* ── Stat Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300 hover:shadow-md">
+        <Card className="border border-border/60 bg-card transition-all duration-300 hover:shadow-md">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
@@ -403,7 +403,7 @@ export default function ManagementTags() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300 hover:shadow-md">
+        <Card className="border border-border/60 bg-card transition-all duration-300 hover:shadow-md">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
@@ -419,7 +419,7 @@ export default function ManagementTags() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 transition-all duration-300 hover:shadow-md">
+        <Card className="border border-border/60 bg-card transition-all duration-300 hover:shadow-md">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
@@ -432,7 +432,7 @@ export default function ManagementTags() {
                     .map((c, i) => (
                       <span
                         key={i}
-                        className="h-5 w-5 rounded-full border border-white dark:border-gray-700 shadow-sm"
+                        className="h-5 w-5 rounded-full border border-card shadow-sm"
                         style={{ backgroundColor: c }}
                       />
                     ))}
@@ -518,11 +518,11 @@ export default function ManagementTags() {
               {filteredTags.map((tag) => (
                 <div
                   key={tag.id}
-                  className="group relative flex items-start gap-3 p-4 rounded-lg border border-gray-200/80 dark:border-gray-700/50 bg-white/50 dark:bg-gray-800/30 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200"
+                  className="group relative flex items-start gap-3 p-4 rounded-lg border border-border/60 bg-card hover:shadow-md hover:border-primary/40 transition-all duration-200"
                 >
                   {/* Color dot */}
                   <span
-                    className="mt-0.5 h-5 w-5 rounded-full shrink-0 shadow-sm ring-2 ring-white dark:ring-gray-800"
+                    className="mt-0.5 h-5 w-5 rounded-full shrink-0 shadow-sm ring-2 ring-card"
                     style={{ backgroundColor: tag.color }}
                   />
 

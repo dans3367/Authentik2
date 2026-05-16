@@ -166,7 +166,7 @@ function ShopCard({ shop, onToggleStatus, onDelete, t, canEdit, canDelete, canTo
   const location = [shop.city, shop.state, shop.country].filter(Boolean).join(', ');
 
   return (
-    <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300 overflow-hidden">
+    <Card className="border border-border/60 bg-card hover:shadow-lg transition-all duration-300 overflow-hidden">
       <CardContent className="p-0">
         {/* Header with status indicator */}
         <div className="relative">
@@ -183,7 +183,7 @@ function ShopCard({ shop, onToggleStatus, onDelete, t, canEdit, canDelete, canTo
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center space-x-3">
               <div className="relative">
-                <Avatar className="h-12 w-12 ring-2 ring-gray-100 dark:ring-gray-700">
+                <Avatar className="h-12 w-12 ring-2 ring-border/70">
                   <AvatarImage src={shop.logoUrl ?? undefined} />
                   <AvatarFallback className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-600 dark:text-blue-300">
                     {getShopCategoryIcon(shop.category || undefined)}
@@ -191,7 +191,7 @@ function ShopCard({ shop, onToggleStatus, onDelete, t, canEdit, canDelete, canTo
                 </Avatar>
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">{shop.name}</h3>
+                <h3 className="font-semibold text-foreground truncate">{shop.name}</h3>
                 <Badge variant="secondary" className="mt-1 text-xs">
                   {shop.category || 'Uncategorized'}
                 </Badge>
@@ -257,13 +257,13 @@ function ShopCard({ shop, onToggleStatus, onDelete, t, canEdit, canDelete, canTo
           <div className="space-y-3">
             {/* Manager */}
             <div className="flex items-center space-x-2 text-sm">
-              <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
-              <span className="text-gray-600 dark:text-gray-300 truncate">
+              <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-muted-foreground truncate">
                 {shop.manager
                   ? (shop.manager.firstName || shop.manager.lastName
                     ? `${shop.manager.firstName || ''} ${shop.manager.lastName || ''}`.trim()
                     : shop.manager.email)
-                  : <span className="text-gray-400 italic">{t('shops.table.noManager')}</span>
+                  : <span className="text-muted-foreground/70 italic">{t('shops.table.noManager')}</span>
                 }
               </span>
             </div>
@@ -271,29 +271,29 @@ function ShopCard({ shop, onToggleStatus, onDelete, t, canEdit, canDelete, canTo
             {/* Location */}
             {location && (
               <div className="flex items-center space-x-2 text-sm">
-                <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <span className="text-gray-600 dark:text-gray-300 truncate">{location}</span>
+                <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-muted-foreground truncate">{location}</span>
               </div>
             )}
 
             {/* Contact Info */}
             {shop.phone && (
               <div className="flex items-center space-x-2 text-sm">
-                <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <span className="text-gray-600 dark:text-gray-300">{shop.phone}</span>
+                <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-muted-foreground">{shop.phone}</span>
               </div>
             )}
 
             {shop.email && (
               <div className="flex items-center space-x-2 text-sm">
-                <Mail className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <span className="text-gray-600 dark:text-gray-300 truncate">{shop.email}</span>
+                <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-muted-foreground truncate">{shop.email}</span>
               </div>
             )}
 
             {/* Created Date */}
             {shop.createdAt && (
-              <div className="flex items-center space-x-2 text-sm text-gray-400">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4 flex-shrink-0" />
                 <span>{format(new Date(shop.createdAt), "MMM d, yyyy")}</span>
               </div>
@@ -302,7 +302,7 @@ function ShopCard({ shop, onToggleStatus, onDelete, t, canEdit, canDelete, canTo
         </div>
 
         {/* Footer Actions */}
-        <div className="px-4 py-3 bg-gray-50/50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-700/30 flex gap-2">
+        <div className="px-4 py-3 bg-muted/30 border-t border-border flex gap-2">
           <Link href={`/shops/${shop.id}`} className="flex-1">
             <Button variant="outline" size="sm" className="w-full">
               <Eye className="mr-2 h-4 w-4" />
@@ -554,14 +554,14 @@ export default function ShopsPage() {
             <div className="relative">
               <Avatar className="h-10 w-10">
                 <AvatarImage src={shop.logoUrl ?? undefined} />
-                <AvatarFallback className="bg-gray-100 text-gray-600 text-sm">
+                <AvatarFallback className="bg-muted text-muted-foreground text-sm">
                   {getShopCategoryIcon(shop.category || undefined)}
                 </AvatarFallback>
               </Avatar>
             </div>
             <div>
-              <div className="font-medium text-gray-900">{shop.name}</div>
-              <div className="text-sm text-gray-500">{shop.category || 'Uncategorized'}</div>
+              <div className="font-medium text-foreground">{shop.name}</div>
+              <div className="text-sm text-muted-foreground">{shop.category || 'Uncategorized'}</div>
             </div>
           </div>
         );
@@ -581,12 +581,12 @@ export default function ShopsPage() {
       cell: ({ row }) => {
         const shop = row.original;
         if (!shop.manager) {
-          return <span className="text-gray-400">{t('shops.table.noManager')}</span>;
+          return <span className="text-muted-foreground">{t('shops.table.noManager')}</span>;
         }
         return (
           <div className="flex items-center space-x-2">
-            <User className="h-4 w-4 text-gray-400" />
-            <span className="text-gray-900">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span className="text-foreground">
               {shop.manager.firstName || shop.manager.lastName
                 ? `${shop.manager.firstName || ''} ${shop.manager.lastName || ''}`.trim()
                 : shop.manager.email}
@@ -603,8 +603,8 @@ export default function ShopsPage() {
         const location = [shop.city, shop.state, shop.country].filter(Boolean).join(', ');
         return (
           <div className="flex items-center space-x-2">
-            <MapPin className="h-4 w-4 text-gray-400" />
-            <span className="text-gray-900">{location || 'No location'}</span>
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+            <span className="text-foreground">{location || 'No location'}</span>
           </div>
         );
       },
@@ -618,14 +618,14 @@ export default function ShopsPage() {
           <div className="space-y-1">
             {shop.phone && (
               <div className="flex items-center space-x-2 text-sm">
-                <Phone className="h-3 w-3 text-gray-400" />
-                <span className="text-gray-600">{shop.phone}</span>
+                <Phone className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">{shop.phone}</span>
               </div>
             )}
             {shop.email && (
               <div className="flex items-center space-x-2 text-sm">
-                <Mail className="h-3 w-3 text-gray-400" />
-                <span className="text-gray-600">{shop.email}</span>
+                <Mail className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">{shop.email}</span>
               </div>
             )}
           </div>
@@ -642,7 +642,7 @@ export default function ShopsPage() {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center justify-center text-gray-500">
+                <div className="flex items-center justify-center text-muted-foreground">
                   <Calendar className="h-4 w-4" />
                 </div>
               </TooltipTrigger>
@@ -742,14 +742,14 @@ export default function ShopsPage() {
   // Show permission denied if user doesn't have shops.view
   if (!canViewShops) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
         <div className="max-w-4xl mx-auto">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+          <Card className="border border-border/60 bg-card">
             <CardContent className="p-8">
               <div className="text-center">
                 <AlertCircle className="mx-auto h-12 w-12 text-orange-500 dark:text-orange-400 mb-4" />
-                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{t('common.permissionDenied', 'Permission Denied')}</h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                <h2 className="mt-4 text-lg font-semibold text-foreground">{t('common.permissionDenied', 'Permission Denied')}</h2>
+                <p className="mt-2 text-muted-foreground">
                   {t('common.permissionDeniedDescription', 'You do not have permission to view shops. Contact your administrator to request access.')}
                 </p>
               </div>
@@ -764,14 +764,14 @@ export default function ShopsPage() {
   // maxShops is null while loading — only show upgrade when confirmed to be 0
   if (maxShops !== null && maxShops === 0) {
     return (
-      <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+      <div className="p-6 bg-background min-h-screen">
         <div className="max-w-4xl mx-auto">
-          <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+          <Card className="border border-border/60 bg-card">
             <CardContent className="p-8">
               <div className="text-center">
                 <Store className="mx-auto h-12 w-12 text-amber-500 dark:text-amber-400 mb-4" />
-                <h2 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">{t('shops.upgradeRequired', 'Upgrade Required')}</h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-300">
+                <h2 className="mt-4 text-lg font-semibold text-foreground">{t('shops.upgradeRequired', 'Upgrade Required')}</h2>
+                <p className="mt-2 text-muted-foreground">
                   {t('shops.upgradeDescription', { planName, defaultValue: 'Your current plan ({{planName}}) does not include shops. Upgrade to Plus or Pro to create and manage shops.' })}
                 </p>
                 <Button
@@ -789,7 +789,7 @@ export default function ShopsPage() {
   }
 
   return (
-    <div className="p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 min-h-screen">
+    <div className="p-6 bg-background min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="space-y-6">
           {/* Header */}
@@ -837,7 +837,7 @@ export default function ShopsPage() {
           {/* Stats Cards */}
           {!isLoading && data?.stats && (
             <div className="grid gap-4 md:grid-cols-4">
-              <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+              <Card className="border border-border/60 bg-card hover:shadow-lg transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -849,7 +849,7 @@ export default function ShopsPage() {
                   <p className="text-xs text-muted-foreground mt-2">Across all locations</p>
                 </CardContent>
               </Card>
-              <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+              <Card className="border border-border/60 bg-card hover:shadow-lg transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -865,7 +865,7 @@ export default function ShopsPage() {
                   </p>
                 </CardContent>
               </Card>
-              <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+              <Card className="border border-border/60 bg-card hover:shadow-lg transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -879,7 +879,7 @@ export default function ShopsPage() {
                   <p className="text-xs text-muted-foreground mt-2">Different shop types</p>
                 </CardContent>
               </Card>
-              <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30 hover:shadow-lg transition-all duration-300">
+              <Card className="border border-border/60 bg-card hover:shadow-lg transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -904,7 +904,7 @@ export default function ShopsPage() {
                                 "w-2 h-2 rounded-sm",
                                 index < data.limits.currentShops
                                   ? "bg-orange-600 dark:bg-orange-500"
-                                  : "bg-gray-200 dark:bg-gray-700"
+                                  : "bg-muted"
                               )}
                               title={index < data.limits.currentShops ? "Used" : "Available"}
                             />
@@ -974,7 +974,7 @@ export default function ShopsPage() {
               {/* Stats Cards Skeleton */}
               <div className="grid gap-4 md:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Card key={i} className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+                  <Card key={i} className="border border-border/60 bg-card">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div className="space-y-2">
@@ -1003,9 +1003,9 @@ export default function ShopsPage() {
               {/* Mobile/Tablet Card Skeleton - shown below lg breakpoint */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:hidden">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Card key={i} className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+                  <Card key={i} className="border border-border/60 bg-card">
                     <CardContent className="p-0">
-                      <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-t" />
+                      <div className="h-1 bg-muted rounded-t" />
                       <div className="p-4 pt-5 space-y-4">
                         <div className="flex items-center space-x-3">
                           <Skeleton className="h-12 w-12 rounded-full" />
@@ -1022,7 +1022,7 @@ export default function ShopsPage() {
                           <Skeleton className="h-4 w-1/2" />
                         </div>
                       </div>
-                      <div className="px-4 py-3 bg-gray-50/50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-700/30 flex gap-2">
+                      <div className="px-4 py-3 bg-muted/30 border-t border-border flex gap-2">
                         <Skeleton className="h-8 flex-1" />
                         <Skeleton className="h-8 flex-1" />
                       </div>
@@ -1032,7 +1032,7 @@ export default function ShopsPage() {
               </div>
 
               {/* Desktop Table Skeleton - shown only at lg breakpoint and above */}
-              <Card className="hidden lg:block bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+              <Card className="hidden lg:block border border-border/60 bg-card">
                 <CardContent className="p-0">
                   <div className="space-y-4 p-6">
                     {Array.from({ length: 5 }).map((_, i) => (
@@ -1053,18 +1053,18 @@ export default function ShopsPage() {
               </Card>
             </div>
           ) : error ? (
-            <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+            <Card className="border border-border/60 bg-card">
               <CardContent className="py-8">
                 {(error as any)?.status === 403 || error.message?.includes('403') || error.message?.toLowerCase().includes('permission') ? (
                   <div className="text-center space-y-3">
                     <AlertCircle className="mx-auto h-10 w-10 text-orange-500" />
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('common.permissionDenied', 'Permission Denied')}</h3>
-                    <p className="text-gray-600 dark:text-gray-300 text-sm max-w-md mx-auto">
+                    <h3 className="text-lg font-semibold text-foreground">{t('common.permissionDenied', 'Permission Denied')}</h3>
+                    <p className="text-muted-foreground text-sm max-w-md mx-auto">
                       {t('common.permissionDeniedDescription', 'You do not have permission to view shops. Contact your administrator to request access.')}
                     </p>
                   </div>
                 ) : (
-                  <p className="text-center text-gray-600 dark:text-gray-300">{t('shops.toasts.fetchError')}</p>
+                  <p className="text-center text-muted-foreground">{t('shops.toasts.fetchError')}</p>
                 )}
               </CardContent>
             </Card>
@@ -1076,12 +1076,12 @@ export default function ShopsPage() {
                 </div>
               )}
               {filteredShops.length === 0 ? (
-                <Card className="bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+                <Card className="border border-border/60 bg-card">
                   <CardContent className="py-8">
                     <div className="text-center">
                       <Store className="mx-auto h-12 w-12 text-blue-500 dark:text-blue-400 mb-4" />
-                      <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">{t('shops.empty.noShops')}</h3>
-                      <p className="text-gray-600 dark:text-gray-300 mb-4">
+                      <h3 className="text-lg font-semibold mb-2 text-foreground">{t('shops.empty.noShops')}</h3>
+                      <p className="text-muted-foreground mb-4">
                         {searchTerm || statusFilter !== 'all' || categoryFilter !== 'all'
                           ? t('shops.empty.tryAdjusting')
                           : t('shops.empty.noShopsDescription')}
@@ -1118,7 +1118,7 @@ export default function ShopsPage() {
                   </div>
 
                   {/* Desktop Table - shown only at lg breakpoint and above */}
-                  <Card className="hidden lg:block bg-white/70 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/30">
+                  <Card className="hidden lg:block border border-border/60 bg-card">
                     <CardContent className="p-0">
                       <DataTable columns={columns} data={filteredShops} showColumnVisibility={false} />
                     </CardContent>

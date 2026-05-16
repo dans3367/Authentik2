@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Calendar, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText, ClipboardList, FileQuestion, Mail, MessageSquare, CheckCircle2, TrendingUp } from 'lucide-react';
+import { Plus, Loader2, Calendar, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText, ClipboardList, FileQuestion, Mail, MessageSquare, CheckCircle2, TrendingUp, Clock } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/store';
@@ -33,33 +33,140 @@ interface Form {
   updatedAt: string;
 }
 
-// Helper function to get theme preview classes
-const getThemePreview = (themeId: string): string => {
-  const themePreviewMap: Record<string, string> = {
-    'minimal': 'bg-white border border-gray-200 shadow-sm',
-    'modern': 'bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500',
-    'professional': 'bg-gray-50 border-l-4 border-blue-600 shadow-sm',
-    'playful': 'bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400',
-    'elegant': 'bg-gradient-to-r from-gray-900 to-gray-700 border border-yellow-400/20',
-    'modern-bold': 'bg-gradient-to-br from-orange-500 via-red-500 to-purple-600',
-    'neon': 'bg-black border-2 border-cyan-400 shadow-cyan-400/50 shadow-lg',
-    'nature': 'bg-gradient-to-r from-green-500 to-emerald-600',
-    'luxury': 'bg-gradient-to-r from-purple-900 to-indigo-900 border border-yellow-400/30',
-    'retro': 'bg-gradient-to-r from-orange-400 to-pink-500 border-4 border-yellow-300',
-    'neo-modern': 'bg-gradient-to-br from-slate-800 via-gray-800 to-black border border-green-400/30',
-    'aurora': 'bg-[radial-gradient(120%_120%_at_0%_0%,_#7dd3fc_0%,_transparent_40%),_radial-gradient(120%_120%_at_100%_0%,_#c084fc_0%,_transparent_40%),_radial-gradient(120%_120%_at_100%_100%,_#fca5a5_0%,_transparent_40%),_radial-gradient(120%_120%_at_0%_100%,_#86efac_0%,_transparent_40%)]',
-    'cosmic': 'bg-gradient-to-br from-purple-900 via-indigo-900 to-black',
-    'brutalist': 'bg-gray-800 border-4 border-black',
-    'pastel-dream': 'bg-gradient-to-br from-pink-200 via-purple-200 to-indigo-200',
-    'promotional': 'bg-gradient-to-br from-red-500 to-orange-500',
-    'ocean-breeze': 'bg-gradient-to-br from-cyan-400 via-teal-500 to-blue-600',
-    'sunset-warmth': 'bg-gradient-to-br from-amber-400 via-orange-400 to-rose-500'
+// CSS gradient strings keyed to form theme, used as the preview background. Matches design tokens.
+const getThemeHeaderGradient = (themeId: string): string => {
+  const map: Record<string, string> = {
+    'minimal':           'linear-gradient(135deg, #64748b 0%, #334155 100%)',
+    'modern':            'linear-gradient(135deg, #2563eb 0%, #a855f7 60%, #ec4899 100%)',
+    'professional':      'linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%)',
+    'playful':           'linear-gradient(135deg, #ec4899 0%, #a855f7 100%)',
+    'elegant':           'linear-gradient(135deg, #fbbf24 0%, #b45309 100%)',
+    'modern-bold':       'linear-gradient(135deg, #f97316 0%, #ef4444 60%, #7c3aed 100%)',
+    'neon':              'linear-gradient(135deg, #22d3ee 0%, #34d399 100%)',
+    'nature':            'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+    'luxury':            'linear-gradient(135deg, #fbbf24 0%, #92400e 100%)',
+    'retro':             'linear-gradient(135deg, #f97316 0%, #ec4899 60%, #a855f7 100%)',
+    'neo-modern':        'linear-gradient(135deg, #34d399 0%, #0d9488 100%)',
+    'aurora':            'linear-gradient(135deg, #0ea5e9 0%, #d946ef 60%, #f43f5e 100%)',
+    'cosmic':            'linear-gradient(135deg, #a855f7 0%, #ec4899 60%, #22d3ee 100%)',
+    'brutalist':         'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
+    'pastel-dream':      'linear-gradient(135deg, #c4b5fd 0%, #fbcfe8 100%)',
+    'promotional':       'linear-gradient(135deg, #ef4444 0%, #f97316 50%, #fbbf24 100%)',
+    'brutalist-pop':     'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+    'brutalist-noir':    'linear-gradient(135deg, #1e40af 0%, #0f172a 100%)',
+    'ocean-breeze':      'linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%)',
+    'sunset-warmth':     'linear-gradient(135deg, #f59e0b 0%, #ef6f6f 50%, #ec4899 100%)',
+    'monospace-terminal':'linear-gradient(135deg, #16a34a 0%, #064e3b 100%)',
+    'silk':              'linear-gradient(135deg, #fda4af 0%, #fde68a 50%, #fb7185 100%)',
+    'art-deco':          'linear-gradient(135deg, #c9a84c 0%, #8a6f24 100%)',
+    'vapor':             'linear-gradient(135deg, #ff2d95 0%, #b967ff 50%, #01cdfe 100%)',
+    'custom':            'linear-gradient(135deg, #7c5cff 0%, #5b3df5 60%, #2dd4bf 100%)',
   };
-
-  return themePreviewMap[themeId] || themePreviewMap['minimal'];
+  return map[themeId] || map['minimal'];
 };
 
-// Helper function to get theme-specific preview content
+// Thin gradient stripe across the bottom of the preview — same palette as the header but extended.
+const getThemeStripeGradient = (themeId: string): string => {
+  const map: Record<string, string> = {
+    'minimal':           'linear-gradient(90deg, #64748b, #cbd5e1)',
+    'modern':            'linear-gradient(90deg, #2563eb, #a855f7, #ec4899)',
+    'professional':      'linear-gradient(90deg, #1d4ed8, #60a5fa)',
+    'playful':           'linear-gradient(90deg, #ec4899, #a855f7)',
+    'elegant':           'linear-gradient(90deg, #fbbf24, #f59e0b)',
+    'modern-bold':       'linear-gradient(90deg, #f97316, #ef4444, #7c3aed)',
+    'neon':              'linear-gradient(90deg, #22d3ee, #34d399)',
+    'nature':            'linear-gradient(90deg, #10b981, #34d399)',
+    'luxury':            'linear-gradient(90deg, #fbbf24, #f59e0b)',
+    'retro':             'linear-gradient(90deg, #f97316, #ec4899)',
+    'neo-modern':        'linear-gradient(90deg, #34d399, #0d9488)',
+    'aurora':            'linear-gradient(90deg, #0ea5e9, #d946ef, #f43f5e)',
+    'cosmic':            'linear-gradient(90deg, #a855f7, #ec4899, #22d3ee)',
+    'brutalist':         'linear-gradient(90deg, #ef6f6f, #f5b25b, #34d399)',
+    'pastel-dream':      'linear-gradient(90deg, #c4b5fd, #fbcfe8)',
+    'promotional':       'linear-gradient(90deg, #ef4444, #f97316, #fbbf24)',
+    'brutalist-pop':     'linear-gradient(90deg, #ef4444, #f87171)',
+    'brutalist-noir':    'linear-gradient(90deg, #1e40af, #60a5fa)',
+    'ocean-breeze':      'linear-gradient(90deg, #06b6d4, #0ea5e9)',
+    'sunset-warmth':     'linear-gradient(90deg, #f5b25b, #ef6f6f)',
+    'monospace-terminal':'linear-gradient(90deg, #16a34a, #4ade80)',
+    'silk':              'linear-gradient(90deg, #fda4af, #fde68a, #fb7185)',
+    'art-deco':          'linear-gradient(90deg, #c9a84c, #d4b85c)',
+    'vapor':             'linear-gradient(90deg, #ff2d95, #b967ff, #01cdfe)',
+    'custom':            'linear-gradient(90deg, #7c5cff, #2dd4bf)',
+  };
+  return map[themeId] || map['minimal'];
+};
+
+const formatRelativeTime = (iso: string): string => {
+  const d = new Date(iso).getTime();
+  if (Number.isNaN(d)) return '—';
+  const diff = Date.now() - d;
+  const min = Math.floor(diff / 60000);
+  const hr = Math.floor(diff / 3600000);
+  const day = Math.floor(diff / 86400000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  if (hr < 24) return `${hr}h ago`;
+  if (day < 30) return `${day}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+const computeCompleteness = (form: Form, elementCount: number): number => {
+  let score = 0;
+  if (elementCount > 0) score += 25;
+  if (form.description?.trim()) score += 25;
+  if (form.tags && form.tags.length > 0) score += 25;
+  if (form.isActive) score += 25;
+  return score;
+};
+
+// Deterministic synthetic time-series for sparklines — we don't have per-form weekly response counts,
+// so derive a stable pattern from the form id so each card has a consistent visual signature.
+const buildTrendSeries = (seed: string, length = 12): number[] => {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const out: number[] = [];
+  for (let i = 0; i < length; i++) {
+    h ^= h << 13; h ^= h >>> 17; h ^= h << 5;
+    out.push(((h >>> 0) % 100) / 100);
+  }
+  return out;
+};
+
+function Spark({ values, color, width = 64, height = 22 }: { values: number[]; color: string; width?: number; height?: number }) {
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const step = width / Math.max(values.length - 1, 1);
+  const pts = values
+    .map((v, i) => `${(i * step).toFixed(1)},${(height - ((v - min) / range) * (height - 2) - 1).toFixed(1)}`)
+    .join(' ');
+  const area = `0,${height} ${pts} ${width},${height}`;
+  const gradId = `spark-${seedId(values.join(','))}`;
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }} aria-hidden>
+      <defs>
+        <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={area} fill={`url(#${gradId})`} />
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function seedId(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+// Per-theme decorative tile rendered in the center of the preview header.
 const getThemePreviewContent = (themeId: string) => {
   switch (themeId) {
     case 'neon':
@@ -94,7 +201,7 @@ const getThemePreviewContent = (themeId: string) => {
       );
     case 'brutalist':
       return (
-        <div className="text-white font-black text-sm tracking-wider uppercase border-2 border-white px-2 py-1">
+        <div className="text-white font-black text-sm tracking-wider uppercase">
           BRUTALIST
         </div>
       );
@@ -336,17 +443,12 @@ export default function Forms2() {
 
   // Helper function to render a form card (used in both sections)
   const renderFormCard = (form: Form) => {
-    // Parse theme data to get theme info
-    let themeData: { id: string; name: string; preview?: string } = { id: 'minimal', name: 'Unknown' };
+    let themeData: { id: string; name: string } = { id: 'minimal', name: 'Unknown' };
     try {
       const parsed = JSON.parse(form.theme);
-      themeData = {
-        id: parsed.id || 'minimal',
-        name: parsed.name || parsed.id || 'Unknown',
-        preview: getThemePreview(parsed.id || 'minimal')
-      };
-    } catch (e) {
-      themeData = { id: 'minimal', name: form.theme || 'Unknown', preview: getThemePreview('minimal') };
+      themeData = { id: parsed.id || 'minimal', name: parsed.name || parsed.id || 'Unknown' };
+    } catch {
+      themeData = { id: 'minimal', name: form.theme || 'Unknown' };
     }
 
     // Parse form data to get element count
@@ -358,20 +460,63 @@ export default function Forms2() {
       elementCount = 0;
     }
 
+    const category = form.category || 'intake';
+    const categoryLabel = category === 'email-signup' ? 'email' : category;
+    const headerGradient = getThemeHeaderGradient(themeData.id);
+    const stripeGradient = getThemeStripeGradient(themeData.id);
+    const completeness = computeCompleteness(form, elementCount);
+    const trendSeries = buildTrendSeries(form.id);
+    const status: 'active' | 'draft' = form.isActive ? 'active' : 'draft';
+    const newResponses = 0; // no delta data wired yet — design supports +N pill when available
+
+    const statusStyles = status === 'active'
+      ? { color: '#34d399', borderColor: 'rgba(52,211,153,0.3)', background: 'rgba(52,211,153,0.08)', dot: '#34d399' }
+      : { color: '#f5b25b', borderColor: 'rgba(245,178,91,0.3)', background: 'rgba(245,178,91,0.08)', dot: '#f5b25b' };
+
     return (
-      <Card key={form.id} className="bg-card border border-border rounded-[10px] shadow-[0_1px_0_rgba(20,16,10,.02),0_1px_2px_rgba(20,16,10,.03)] hover:shadow-[0_4px_16px_rgba(20,16,10,.06)] transition-shadow duration-200 group overflow-hidden">
-        {/* Theme Preview Header */}
-        <div className={`h-20 relative flex items-center justify-center overflow-hidden ${themeData.preview}`}>
-          <div className="text-center px-4">
-            {getThemePreviewContent(themeData.id)}
+      <div
+        key={form.id}
+        className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0e0e17] shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)] transition-[border-color,background,transform] duration-200 hover:-translate-y-px hover:border-white/[0.18] hover:bg-[#14141f]"
+        tabIndex={0}
+      >
+        {/* Preview */}
+        <div
+          className="relative h-[110px] overflow-hidden border-b border-white/[0.06]"
+          style={{ background: `linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 100%), ${headerGradient}` }}
+        >
+          {/* faint grid overlay */}
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
+              backgroundSize: '18px 18px',
+              WebkitMaskImage: 'linear-gradient(180deg, black, transparent)',
+              maskImage: 'linear-gradient(180deg, black, transparent)',
+            }}
+          />
+          <div className="serif italic absolute left-3.5 top-3 z-10 text-[13px] tracking-[0.04em] text-white/60">
+            {categoryLabel}
           </div>
-          {/* Dropdown Menu positioned over theme preview */}
-          <div className="absolute top-2 right-2">
+
+          {/* Theme-specific decorative tile */}
+          <div className="absolute inset-0 flex items-center justify-center px-4 text-center">
+            <div className="inline-flex items-center rounded border border-white/40 bg-black/25 px-3 py-1.5 backdrop-blur-sm shadow-[0_1px_0_rgba(255,255,255,0.06)_inset]">
+              {getThemePreviewContent(themeData.id)}
+            </div>
+          </div>
+
+          {/* Dropdown menu (visible on hover) */}
+          <div className="absolute right-2.5 top-2.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0 bg-black/20 hover:bg-black/30 text-white/90 hover:text-white backdrop-blur-sm rounded-full opacity-70 group-hover:opacity-100 transition-opacity">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
+                <button
+                  type="button"
+                  className="grid h-7 w-7 place-items-center rounded-md border border-white/10 bg-black/35 text-white/70 backdrop-blur-md transition-colors hover:text-white"
+                  aria-label="Form actions"
+                >
+                  <MoreVertical className="h-3.5 w-3.5" />
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => handleViewForm(form.id)}>
@@ -433,73 +578,77 @@ export default function Forms2() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {/* bottom gradient stripe */}
+          <div className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: stripeGradient }} />
         </div>
 
-        <CardHeader className="pb-3 pt-4">
-          <CardTitle className="text-foreground text-[15px] font-semibold leading-snug tracking-[-0.005em] line-clamp-2">
+        {/* Body */}
+        <div className="flex flex-1 flex-col gap-2.5 px-3.5 pb-3 pt-3.5">
+          <h3 className="m-0 text-[15.5px] font-medium leading-[1.3] tracking-[-0.01em] text-[#f4f4f8] line-clamp-2">
             {form.title}
-          </CardTitle>
-          <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-            <span className="mono inline-flex items-center gap-1.5 text-[10.5px] font-medium px-1.5 py-0.5 rounded border border-border text-muted-foreground">
-              {themeData.name}
+          </h3>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span
+              className="inline-flex h-[22px] items-center gap-1.5 rounded-[5px] border px-2 text-[11.5px] leading-none"
+              style={{ color: statusStyles.color, borderColor: statusStyles.borderColor, background: statusStyles.background }}
+            >
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: statusStyles.dot }} />
+              {status}
             </span>
-            <span className={`mono inline-flex items-center gap-1.5 text-[10.5px] font-medium px-1.5 py-0.5 rounded border ${form.isActive
-              ? 'border-[color:var(--good)]/30 text-[color:var(--good)] bg-[color:var(--good)]/5'
-              : 'border-border text-muted-foreground/70'
-              }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${form.isActive ? 'bg-[color:var(--good)]' : 'bg-muted-foreground/40'}`} />
-              {form.isActive ? 'Active' : 'Inactive'}
+            <span className="inline-flex h-[22px] items-center rounded-[5px] border border-white/[0.10] bg-[#14141f] px-2 text-[11.5px] leading-none text-[#c8c8d4]">
+              {themeData.name.toLowerCase()}
             </span>
+            {form.tags?.slice(0, 1).map((tagId) => (
+              <span
+                key={tagId}
+                className="inline-flex h-[22px] items-center rounded-[5px] border border-white/[0.10] bg-[#14141f] px-2 text-[11.5px] leading-none text-[#c8c8d4]"
+              >
+                {tagId.slice(0, 10)}
+              </span>
+            ))}
             {form.shopId && shopsMap.get(form.shopId) && (
-              <span className="mono inline-flex items-center text-[10.5px] font-medium px-1.5 py-0.5 rounded border border-[color:var(--accent-warm)]/30 text-[color:var(--accent-warm)] bg-[color:var(--accent-warm)]/5">
+              <span
+                className="inline-flex h-[22px] items-center rounded-[5px] border px-2 text-[11.5px] leading-none"
+                style={{ color: '#9b82ff', borderColor: 'rgba(124,92,255,0.3)', background: 'rgba(124,92,255,0.08)' }}
+              >
                 {shopsMap.get(form.shopId)}
               </span>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-3 pt-0 pb-4">
-          {form.description && (
-            <p className="text-muted-foreground text-[12.5px] leading-relaxed line-clamp-2">
-              {form.description}
-            </p>
-          )}
 
-          {/* Tags */}
-          {form.tags && form.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {form.tags.slice(0, 3).map((tagId) => (
-                <span
-                  key={tagId}
-                  className="mono inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground"
-                >
-                  {tagId.slice(0, 8)}
-                </span>
-              ))}
-              {form.tags.length > 3 && (
-                <span className="mono inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground/70">
-                  +{form.tags.length - 3}
-                </span>
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between pt-1 border-t border-border/60">
-            <div className="mono flex items-center gap-3 text-[11px] text-muted-foreground pt-2">
-              <span className="inline-flex items-center gap-1">
-                <FileText className="h-3 w-3" strokeWidth={1.5} />
-                {elementCount} field{elementCount !== 1 ? 's' : ''}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Calendar className="h-3 w-3" strokeWidth={1.5} />
-                {new Date(form.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              </span>
-            </div>
-            <span className="mono text-[11px] text-foreground pt-2">
-              {form.responseCount} <span className="text-muted-foreground/60">resp.</span>
+          <div className="mt-0.5 flex items-center gap-3 text-[12px] text-[#8689a0]">
+            <span className="inline-flex items-center gap-1.5">
+              <FileText className="h-3 w-3 text-[#5b5e74]" strokeWidth={1.75} />
+              {elementCount} field{elementCount !== 1 ? 's' : ''}
             </span>
+            <span className="text-[#5b5e74]">·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-[#5b5e74]" strokeWidth={1.75} />
+              {formatRelativeTime(form.updatedAt || form.createdAt)}
+            </span>
+            <span className="text-[#5b5e74]">·</span>
+            <span>{completeness}% complete</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Footer */}
+        <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-dashed border-white/[0.06] bg-white/[0.015] px-3.5 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <span className="serif text-[20px] leading-none text-[#f4f4f8]">{form.responseCount.toLocaleString()}</span>
+            <span className="mono text-[11px] uppercase tracking-[0.1em] text-[#8689a0]">responses</span>
+            {newResponses > 0 && (
+              <span className="mono inline-flex h-[18px] items-center rounded px-1.5 text-[10.5px] font-semibold tracking-[0.04em] text-[#34d399]" style={{ background: 'rgba(52,211,153,0.12)' }}>
+                +{newResponses}
+              </span>
+            )}
+          </div>
+          <div style={{ color: status === 'active' ? '#7c5cff' : '#5b5e74' }}>
+            <Spark values={trendSeries} color="currentColor" width={64} height={22} />
+          </div>
+        </div>
+      </div>
     );
   };
 

@@ -382,11 +382,11 @@ export default function ManagementCustomFields() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Settings2 className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
             {t('management.customFields.title')}
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-muted-foreground mt-1">
             {t('management.customFields.subtitle')}
           </p>
         </div>
@@ -416,11 +416,11 @@ export default function ManagementCustomFields() {
         <Card>
           <CardContent className="py-12">
             <div className="flex flex-col items-center gap-3 text-center">
-              <Settings2 className="h-12 w-12 text-gray-300 dark:text-gray-600" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <Settings2 className="h-12 w-12 text-muted-foreground/50" />
+              <h3 className="text-lg font-semibold text-foreground">
                 {searchTerm ? t('management.customFields.noSearchResults') : t('management.customFields.noFieldsTitle')}
               </h3>
-              <p className="text-gray-600 dark:text-gray-400 text-sm max-w-md">
+              <p className="text-muted-foreground text-sm max-w-md">
                 {searchTerm
                   ? t('management.customFields.noSearchResultsHint')
                   : t('management.customFields.noFieldsDescription')}
@@ -440,7 +440,7 @@ export default function ManagementCustomFields() {
             const Icon = getFieldTypeIcon(field.fieldType);
             const maskLabel = field.mask ? t(`management.customFields.masks.${field.mask}`, { defaultValue: '' }) : null;
             return (
-              <Card key={field.id} className="group hover:shadow-md transition-shadow">
+              <Card key={field.id} className="group border border-border/60 bg-card hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -449,7 +449,7 @@ export default function ManagementCustomFields() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-semibold text-gray-900 dark:text-white truncate">
+                          <h4 className="font-semibold text-foreground truncate">
                             {field.label}
                           </h4>
                           <Badge variant="outline" className="text-xs font-mono">
