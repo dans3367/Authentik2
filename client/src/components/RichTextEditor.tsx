@@ -315,7 +315,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     },
     editorProps: {
       attributes: {
-        class: `prose prose-sm max-w-none focus:outline-none ${className}`,
+        class: `prose prose-sm dark:prose-invert max-w-none focus:outline-none ${className}`,
         style: 'min-height: 120px; padding: 8px;'
       },
     },
@@ -462,9 +462,9 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
   }, [contextMenu]);
 
   return (
-    <div ref={containerRef} className="relative min-h-[150px] border rounded-md bg-white">
+    <div ref={containerRef} className="relative min-h-[150px] border dark:border-neutral-700 rounded-md bg-white dark:bg-neutral-900">
       {/* Permanent top toolbar */}
-      <div className="bg-gray-800 text-white rounded-t-md shadow-lg px-2 py-1 flex flex-wrap items-center gap-1 border-b overflow-x-auto">
+      <div className="bg-neutral-900 text-white rounded-t-md shadow-lg px-2 py-1 flex flex-wrap items-center gap-1 border-b overflow-x-auto">
         <Button
           type="button"
           variant="ghost"
