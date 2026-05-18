@@ -679,7 +679,7 @@ export default function EmailContacts() {
           )}
 
           {/* Contacts Table */}
-          <div className="relative overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
+          <div className="relative overflow-hidden rounded-lg border border-border bg-background">
             {/* Search Loading Indicator */}
             {isFetching && (
               <div className="absolute right-4 top-4 z-10">
@@ -879,9 +879,9 @@ export default function EmailContacts() {
               </div>
 
               {/* Card View for Tablets and Smaller */}
-              <div className="lg:hidden bg-white dark:bg-gray-950">
+              <div className="lg:hidden">
                 {/* Select All Header for Card View */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+                <div className="flex items-center justify-between p-4 border-b border-border">
                   <div className="flex items-center gap-2">
                     <Checkbox
                       checked={selectedContacts.length === contacts.length && contacts.length > 0}

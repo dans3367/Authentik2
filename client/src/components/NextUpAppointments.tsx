@@ -223,7 +223,7 @@ export function NextUpAppointments({ appointments, onViewDetails, onConfirm }: N
   ).length;
 
   return (
-    <Card className="mb-6 bg-slate-50/60 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 shadow-sm">
+    <Card className="mb-6 shadow-sm">
       <CardHeader className="pb-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
           <div className="flex flex-col gap-2">

@@ -1147,7 +1147,7 @@ export function BirthdayCardsContent() {
     <div key={currentLanguage} className="min-h-screen overflow-x-hidden">
       <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-6 sm:space-y-8">
         {/* Greeting Header Card */}
-        <Card className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
+        <Card className="rounded-2xl border-border shadow-sm">
           <CardContent className="p-4 sm:p-6 lg:p-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
               <div className="space-y-4 sm:space-y-6 lg:space-y-8 pr-0 sm:pr-4 lg:pr-6 xl:pr-12 lg:col-span-8">

@@ -662,7 +662,7 @@ export default function Dashboard() {
 
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 pt-1">
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-[0.15em]">
               {getFormattedDate(i18n.language === 'es' ? 'es-ES' : 'en-US')}
             </p>
@@ -673,7 +673,7 @@ export default function Dashboard() {
               {greeting.text}, {firstName}
             </h1>
             <p
-              className="text-sm text-muted-foreground/80 whitespace-nowrap"
+              className="max-w-2xl text-sm leading-5 text-muted-foreground/80"
               data-testid="text-dashboard-welcome"
             >
               {t("dashboard.welcomeMessage")}

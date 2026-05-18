@@ -625,7 +625,7 @@ export default function SegmentationPage() {
                 return (
                   <div
                     key={list.id}
-                    className="group relative flex flex-col rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:shadow-md hover:border-gray-300 dark:hover:border-neutral-700 transition-all duration-200"
+                    className="group relative flex flex-col rounded-xl border border-gray-200 dark:border-neutral-800 bg-background hover:shadow-md hover:border-gray-300 dark:hover:border-neutral-700 transition-all duration-200"
                   >
                     <div className="p-5 flex flex-col flex-1">
                       {/* Pill badge */}

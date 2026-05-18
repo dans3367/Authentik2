@@ -1512,8 +1512,8 @@ export default function TemplatesPage() {
         </section>
 
         <section className="bg-card border border-border rounded-lg shadow-sm">
-          <div className="border-b border-border p-6 space-y-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="border-b border-border p-4 sm:p-6 space-y-3 sm:space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -1523,9 +1523,9 @@ export default function TemplatesPage() {
                   className="pl-9"
                 />
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3">
                 <Select value={categoryFilter} onValueChange={(value: TemplateCategory | "all") => setCategoryFilter(value)}>
-                  <SelectTrigger className="w-[200px]">
+                  <SelectTrigger className="w-full sm:w-[200px]">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1541,6 +1541,7 @@ export default function TemplatesPage() {
                   type="button"
                   variant={favoritesOnly ? "default" : "outline"}
                   onClick={() => setFavoritesOnly((previous) => !previous)}
+                  className="w-full sm:w-auto"
                 >
                   {favoritesOnly ? <Star className="mr-2 h-4 w-4" /> : <StarOff className="mr-2 h-4 w-4" />}
                   {t('templatesPage.filters.favorites')}

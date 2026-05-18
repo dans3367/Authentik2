@@ -1,0 +1,47 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Main Server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:server"],
+      "port": 5002
+    },
+    {
+      "name": "Form Server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "formserver", "run", "dev"],
+      "port": 3004
+    },
+    {
+      "name": "Webhook Server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "server-hook", "run", "dev"],
+      "port": 3505
+    },
+    {
+      "name": "Bounce Webhook Server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "webhook-bounces", "run", "dev"],
+      "port": 5003
+    },
+    {
+      "name": "Admin API",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "admin", "run", "dev:api"],
+      "port": 5100
+    },
+    {
+      "name": "Admin UI",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "admin", "run", "dev:ui"],
+      "port": 5174
+    },
+    {
+      "name": "All-in-one (Main + Webhooks)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5002
+    }
+  ]
+}

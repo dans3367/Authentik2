@@ -830,7 +830,7 @@ export default function AuthPage() {
             </div>
 
             <p className="mt-6 text-center text-xs text-muted-foreground">
-              Protected by enterprise-grade encryption
+              Copyright notice of Zendwise LLC
             </p>
           </div>
         </section>
