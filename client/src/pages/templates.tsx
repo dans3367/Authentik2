@@ -481,7 +481,7 @@ function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, o
       <CardContent className="space-y-4">
         <div>
           <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{t('templatesPage.card.subjectLine')}</p>
-          <p className="text-sm font-mono bg-gray-50 dark:bg-gray-800 rounded-md px-3 py-2 text-gray-800 dark:text-gray-100 break-words">
+          <p className="text-sm font-mono bg-muted rounded-md px-3 py-2 text-foreground break-words">
             {template.subjectLine}
           </p>
         </div>
@@ -1461,7 +1461,7 @@ export default function TemplatesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
+    <div className="min-h-screen">
       <div className="max-w-7xl mx-auto p-6 space-y-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -1511,8 +1511,8 @@ export default function TemplatesPage() {
           </Card>
         </section>
 
-        <section className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-lg shadow-sm">
-          <div className="border-b border-gray-200 dark:border-slate-800 p-6 space-y-4">
+        <section className="bg-card border border-border rounded-lg shadow-sm">
+          <div className="border-b border-border p-6 space-y-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
