@@ -408,6 +408,15 @@
   overflow-y: auto !important;
 }
 
+/* Hidden scrollbar utility */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
 /* Thin, elegant scrollbar for sidebar menu */
 [data-sidebar="content"]::-webkit-scrollbar {
   width: 4px;

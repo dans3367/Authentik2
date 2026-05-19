@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import phoneMockup from "@assets/phone_14.svg";
 
 interface BlogDesignData {
   id: string;
@@ -183,6 +184,40 @@ export default function ManagementBlogDesign() {
   const [hasChanges, setHasChanges] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   const [previewPage, setPreviewPage] = useState<"hub" | "article">("hub");
+
+  const screenRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef({ active: false, startY: 0, startScrollTop: 0, moved: false });
+
+  const handleDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!screenRef.current) return;
+    dragState.current = {
+      active: true,
+      startY: e.clientY,
+      startScrollTop: screenRef.current.scrollTop,
+      moved: false,
+    };
+    screenRef.current.style.cursor = 'grabbing';
+  };
+
+  const handleDragMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!dragState.current.active || !screenRef.current) return;
+    const dy = e.clientY - dragState.current.startY;
+    if (Math.abs(dy) > 3) dragState.current.moved = true;
+    screenRef.current.scrollTop = dragState.current.startScrollTop - dy;
+  };
+
+  const handleDragEnd = () => {
+    if (!screenRef.current) return;
+    dragState.current.active = false;
+    screenRef.current.style.cursor = 'grab';
+  };
+
+  const handleClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (dragState.current.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
 
   const { data: blogDesign, isLoading, error } = useQuery({
     queryKey: ["/api/blog-design"],
@@ -817,21 +852,26 @@ export default function ManagementBlogDesign() {
             {/* Blog Canvas */}
             <div className={`transition-all duration-500 ease-in-out mx-auto p-4 sm:p-6 bg-muted/50 rounded-xl overflow-y-auto max-h-[calc(100vh-12rem)] ${previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
               }`}>
-              <div className={`mx-auto shadow-2xl w-full relative ${
-                previewDevice === "mobile"
-                  ? "bg-black rounded-[2.75rem] p-3 max-w-[340px] ring-2 ring-neutral-800"
-                  : "bg-gray-50 rounded-lg overflow-hidden"
-              }`} style={{ fontFamily: draft.fontFamily }}>
+              <div
+                className={`mx-auto w-full relative ${
+                  previewDevice === "mobile"
+                    ? "max-w-[340px]"
+                    : "shadow-2xl bg-gray-50 rounded-lg overflow-hidden"
+                }`}
+                style={previewDevice === "mobile"
+                  ? { aspectRatio: '436 / 878', fontFamily: draft.fontFamily }
+                  : { fontFamily: draft.fontFamily }}
+              >
 
-                {/* Side buttons — mobile only */}
+                {/* Phone SVG mockup overlay — mobile only */}
                 {previewDevice === "mobile" && (
-                  <>
-                    {/* Volume buttons (left) */}
-                    <div className="absolute -left-[3px] top-24 w-[3px] h-8 bg-neutral-800 rounded-l-sm"></div>
-                    <div className="absolute -left-[3px] top-36 w-[3px] h-12 bg-neutral-800 rounded-l-sm"></div>
-                    {/* Power button (right) */}
-                    <div className="absolute -right-[3px] top-28 w-[3px] h-14 bg-neutral-800 rounded-r-sm"></div>
-                  </>
+                  <img
+                    src={phoneMockup}
+                    alt=""
+                    aria-hidden="true"
+                    draggable={false}
+                    className="absolute inset-0 w-full h-full pointer-events-none select-none z-20"
+                  />
                 )}
 
                 {/* Simulated browser chrome — desktop only */}
@@ -846,15 +886,28 @@ export default function ManagementBlogDesign() {
                   </div>
                 )}
 
-                <div className={`relative ${previewDevice === "mobile" ? "bg-black rounded-[2rem] overflow-hidden" : "bg-gray-50"}`}>
-                {/* Phone notch & home indicator — mobile only */}
-                {previewDevice === "mobile" && (
-                  <>
-                    <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-28 h-7 bg-black rounded-full z-30"></div>
-                    <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-white rounded-full z-30"></div>
-                    <div className="h-10"></div>
-                  </>
-                )}
+                <div
+                  ref={previewDevice === "mobile" ? screenRef : undefined}
+                  onMouseDown={previewDevice === "mobile" ? handleDragStart : undefined}
+                  onMouseMove={previewDevice === "mobile" ? handleDragMove : undefined}
+                  onMouseUp={previewDevice === "mobile" ? handleDragEnd : undefined}
+                  onMouseLeave={previewDevice === "mobile" ? handleDragEnd : undefined}
+                  onClickCapture={previewDevice === "mobile" ? handleClickCapture : undefined}
+                  className={previewDevice === "mobile"
+                    ? "absolute overflow-y-auto overflow-x-hidden bg-gray-50 z-10 select-none scrollbar-hide"
+                    : "relative bg-gray-50"}
+                  style={previewDevice === "mobile" ? {
+                    top: '4.04%',
+                    left: '6.84%',
+                    right: '6.46%',
+                    bottom: '2.71%',
+                    borderRadius: '12.7% / 5.86%',
+                    cursor: 'grab',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    WebkitOverflowScrolling: 'touch',
+                  } as React.CSSProperties : undefined}
+                >
 
                 {previewPage === "hub" ? (
                   /* ─── Newsletter Hub Preview ─── */
@@ -1068,9 +1121,6 @@ export default function ManagementBlogDesign() {
                       </p>
                     </footer>
                   </div>
-                )}
-                {previewDevice === "mobile" && (
-                  <div className="h-8 bg-black"></div>
                 )}
                 </div>
               </div>
