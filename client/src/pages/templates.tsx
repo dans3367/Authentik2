@@ -58,6 +58,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import RichTextEditor from "@/components/LazyRichTextEditor";
+import phoneMockup from "@assets/phone_14.svg";
 
 
 
@@ -408,6 +409,40 @@ function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, o
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
 
+  const screenRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef({ active: false, startY: 0, startScrollTop: 0, moved: false });
+
+  const handleDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!screenRef.current) return;
+    dragState.current = {
+      active: true,
+      startY: e.clientY,
+      startScrollTop: screenRef.current.scrollTop,
+      moved: false,
+    };
+    screenRef.current.style.cursor = 'grabbing';
+  };
+
+  const handleDragMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!dragState.current.active || !screenRef.current) return;
+    const dy = e.clientY - dragState.current.startY;
+    if (Math.abs(dy) > 3) dragState.current.moved = true;
+    screenRef.current.scrollTop = dragState.current.startScrollTop - dy;
+  };
+
+  const handleDragEnd = () => {
+    if (!screenRef.current) return;
+    dragState.current.active = false;
+    screenRef.current.style.cursor = 'grab';
+  };
+
+  const handleClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (dragState.current.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
   return (
     <Card className={`h-full flex flex-col relative overflow-hidden transition-opacity duration-300 ${isDeleting ? 'opacity-60 pointer-events-none' : ''}`}>
       {isDeleting && (
@@ -553,21 +588,26 @@ function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, o
               <div className="flex-1 overflow-y-auto">
                 <div className={`transition-all duration-300 mx-auto p-4 sm:p-6 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl ${previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
                   }`}>
-                  <div className={`shadow-2xl mx-auto w-full relative ${
-                    previewDevice === "mobile"
-                      ? "bg-black rounded-[2.75rem] p-3 max-w-[340px] ring-2 ring-neutral-800"
-                      : "rounded-lg overflow-hidden max-w-[600px] border border-gray-200 dark:border-gray-700"
-                  }`} style={{ fontFamily: masterDesign?.fontFamily || "Arial, sans-serif" }}>
+                  <div
+                    className={`mx-auto w-full relative ${
+                      previewDevice === "mobile"
+                        ? "max-w-[340px]"
+                        : "shadow-2xl rounded-lg overflow-hidden max-w-[600px] border border-gray-200 dark:border-gray-700"
+                    }`}
+                    style={previewDevice === "mobile"
+                      ? { aspectRatio: '436 / 878', fontFamily: masterDesign?.fontFamily || "Arial, sans-serif" }
+                      : { fontFamily: masterDesign?.fontFamily || "Arial, sans-serif" }}
+                  >
 
-                    {/* Side buttons — mobile only */}
+                    {/* Phone SVG mockup overlay — mobile only */}
                     {previewDevice === "mobile" && (
-                      <>
-                        {/* Volume buttons (left) */}
-                        <div className="absolute -left-[3px] top-24 w-[3px] h-8 bg-neutral-800 rounded-l-sm"></div>
-                        <div className="absolute -left-[3px] top-36 w-[3px] h-12 bg-neutral-800 rounded-l-sm"></div>
-                        {/* Power button (right) */}
-                        <div className="absolute -right-[3px] top-28 w-[3px] h-14 bg-neutral-800 rounded-r-sm"></div>
-                      </>
+                      <img
+                        src={phoneMockup}
+                        alt=""
+                        aria-hidden="true"
+                        draggable={false}
+                        className="absolute inset-0 w-full h-full pointer-events-none select-none z-20"
+                      />
                     )}
 
                     {/* Browser chrome — desktop only */}
@@ -582,15 +622,30 @@ function TemplateCard({ template, masterDesign, onToggleFavorite, onDuplicate, o
                       </div>
                     )}
 
-                    <div className={`bg-white text-slate-900 relative ${previewDevice === "mobile" ? "rounded-[2rem] overflow-hidden" : ""}`}>
-                    {/* Phone notch & home indicator — mobile only, overlay the screen */}
-                    {previewDevice === "mobile" && (
-                      <>
-                        <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-28 h-7 bg-black rounded-full z-30"></div>
-                        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-black rounded-full z-30"></div>
-                        <div className="h-10"></div>
-                      </>
-                    )}
+                    <div
+                      ref={previewDevice === "mobile" ? screenRef : undefined}
+                      onMouseDown={previewDevice === "mobile" ? handleDragStart : undefined}
+                      onMouseMove={previewDevice === "mobile" ? handleDragMove : undefined}
+                      onMouseUp={previewDevice === "mobile" ? handleDragEnd : undefined}
+                      onMouseLeave={previewDevice === "mobile" ? handleDragEnd : undefined}
+                      onClickCapture={previewDevice === "mobile" ? handleClickCapture : undefined}
+                      className={previewDevice === "mobile"
+                        ? "absolute overflow-y-auto overflow-x-hidden bg-white text-slate-900 z-10 select-none scrollbar-hide"
+                        : "bg-white text-slate-900 relative"}
+                      style={previewDevice === "mobile" ? {
+                        top: '4.04%',
+                        left: '6.84%',
+                        right: '6.46%',
+                        bottom: '2.71%',
+                        borderRadius: '12.7% / 5.86%',
+                        cursor: 'grab',
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none',
+                        WebkitOverflowScrolling: 'touch',
+                      } as React.CSSProperties : undefined}
+                    >
+                    {/* Spacer to clear the SVG notch — mobile only */}
+                    {previewDevice === "mobile" && <div className="h-10 shrink-0 bg-gray-50" />}
                     {/* Simulated email header */}
                     <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
                       <div className="flex gap-2 mb-1">

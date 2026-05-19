@@ -858,6 +858,8 @@ export default function ManagementEmailDesign() {
                     WebkitOverflowScrolling: 'touch',
                   } as React.CSSProperties : undefined}
                 >
+                {/* Spacer to clear the SVG notch — mobile only */}
+                {previewDevice === "mobile" && <div className="h-10 shrink-0 bg-gray-50" />}
                 {/* Simulated Email Header (Subject Line Context) */}
                 <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
                   <div className="flex gap-2 mb-1">
