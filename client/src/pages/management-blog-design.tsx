@@ -817,19 +817,44 @@ export default function ManagementBlogDesign() {
             {/* Blog Canvas */}
             <div className={`transition-all duration-500 ease-in-out mx-auto p-4 sm:p-6 bg-muted/50 rounded-xl overflow-y-auto max-h-[calc(100vh-12rem)] ${previewDevice === "mobile" ? "max-w-[400px]" : "w-full"
               }`}>
-              <div className="bg-gray-50 mx-auto rounded-lg overflow-hidden shadow-2xl" style={{ fontFamily: draft.fontFamily }}>
+              <div className={`mx-auto shadow-2xl w-full relative ${
+                previewDevice === "mobile"
+                  ? "bg-black rounded-[2.75rem] p-3 max-w-[340px] ring-2 ring-neutral-800"
+                  : "bg-gray-50 rounded-lg overflow-hidden"
+              }`} style={{ fontFamily: draft.fontFamily }}>
 
-                {/* Simulated browser chrome */}
-                <div className="bg-gray-200 px-4 py-2 flex items-center gap-2 border-b border-gray-300">
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-red-400" />
-                    <div className="w-3 h-3 rounded-full bg-yellow-400" />
-                    <div className="w-3 h-3 rounded-full bg-green-400" />
+                {/* Side buttons — mobile only */}
+                {previewDevice === "mobile" && (
+                  <>
+                    {/* Volume buttons (left) */}
+                    <div className="absolute -left-[3px] top-24 w-[3px] h-8 bg-neutral-800 rounded-l-sm"></div>
+                    <div className="absolute -left-[3px] top-36 w-[3px] h-12 bg-neutral-800 rounded-l-sm"></div>
+                    {/* Power button (right) */}
+                    <div className="absolute -right-[3px] top-28 w-[3px] h-14 bg-neutral-800 rounded-r-sm"></div>
+                  </>
+                )}
+
+                {/* Simulated browser chrome — desktop only */}
+                {previewDevice === "desktop" && (
+                  <div className="bg-gray-200 dark:bg-gray-700 px-3 py-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-300 dark:border-gray-600">
+                    <div className="flex gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-red-400" />
+                      <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                      <div className="w-3 h-3 rounded-full bg-green-400" />
+                    </div>
+                    <div className="flex-1 bg-white dark:bg-gray-600 rounded px-2 py-0.5">&nbsp;</div>
                   </div>
-                  <div className="flex-1 bg-white rounded-md px-3 py-1 text-xs text-gray-500 truncate ml-2">
-                    yoursite.com/newsletters
-                  </div>
-                </div>
+                )}
+
+                <div className={`bg-gray-50 relative ${previewDevice === "mobile" ? "rounded-[2rem] overflow-hidden" : ""}`}>
+                {/* Phone notch & home indicator — mobile only */}
+                {previewDevice === "mobile" && (
+                  <>
+                    <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-28 h-7 bg-black rounded-full z-30"></div>
+                    <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-black rounded-full z-30"></div>
+                    <div className="h-10"></div>
+                  </>
+                )}
 
                 {previewPage === "hub" ? (
                   /* ─── Newsletter Hub Preview ─── */
@@ -1044,6 +1069,7 @@ export default function ManagementBlogDesign() {
                     </footer>
                   </div>
                 )}
+                </div>
               </div>
             </div>
           </div>
