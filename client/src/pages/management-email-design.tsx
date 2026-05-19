@@ -36,6 +36,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import phoneMockup from "@assets/phone_14.svg";
 
 interface MasterEmailDesign {
   id: string;
@@ -200,6 +201,40 @@ export default function ManagementEmailDesign() {
   const [activeTab, setActiveTab] = useState("brand");
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
+
+  const screenRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef({ active: false, startY: 0, startScrollTop: 0, moved: false });
+
+  const handleDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!screenRef.current) return;
+    dragState.current = {
+      active: true,
+      startY: e.clientY,
+      startScrollTop: screenRef.current.scrollTop,
+      moved: false,
+    };
+    screenRef.current.style.cursor = 'grabbing';
+  };
+
+  const handleDragMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!dragState.current.active || !screenRef.current) return;
+    const dy = e.clientY - dragState.current.startY;
+    if (Math.abs(dy) > 3) dragState.current.moved = true;
+    screenRef.current.scrollTop = dragState.current.startScrollTop - dy;
+  };
+
+  const handleDragEnd = () => {
+    if (!screenRef.current) return;
+    dragState.current.active = false;
+    screenRef.current.style.cursor = 'grab';
+  };
+
+  const handleClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (dragState.current.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
 
   const { data: masterDesign, isLoading, error } = useQuery({
     queryKey: ["/api/master-email-design"],
@@ -772,20 +807,23 @@ export default function ManagementEmailDesign() {
               }`}>
 
               {/* Actual Email Container */}
-              <div className={`shadow-2xl mx-auto w-full relative ${
-                previewDevice === "mobile"
-                  ? "bg-black rounded-[2.75rem] p-3 max-w-[340px] ring-2 ring-neutral-800"
-                  : "rounded-lg overflow-hidden max-w-[600px] border border-gray-200 dark:border-gray-700"
-              }`}>
-                {/* Side buttons — mobile only */}
+              <div
+                className={`mx-auto w-full relative ${
+                  previewDevice === "mobile"
+                    ? "max-w-[340px]"
+                    : "shadow-2xl rounded-lg overflow-hidden max-w-[600px] border border-gray-200 dark:border-gray-700"
+                }`}
+                style={previewDevice === "mobile" ? { aspectRatio: '436 / 878' } : undefined}
+              >
+                {/* Phone SVG mockup overlay — mobile only */}
                 {previewDevice === "mobile" && (
-                  <>
-                    {/* Volume buttons (left) */}
-                    <div className="absolute -left-[3px] top-24 w-[3px] h-8 bg-neutral-800 rounded-l-sm"></div>
-                    <div className="absolute -left-[3px] top-36 w-[3px] h-12 bg-neutral-800 rounded-l-sm"></div>
-                    {/* Power button (right) */}
-                    <div className="absolute -right-[3px] top-28 w-[3px] h-14 bg-neutral-800 rounded-r-sm"></div>
-                  </>
+                  <img
+                    src={phoneMockup}
+                    alt=""
+                    aria-hidden="true"
+                    draggable={false}
+                    className="absolute inset-0 w-full h-full pointer-events-none select-none z-20"
+                  />
                 )}
                 {/* Browser chrome — desktop only */}
                 {previewDevice === "desktop" && (
@@ -798,15 +836,28 @@ export default function ManagementEmailDesign() {
                     <div className="flex-1 bg-white dark:bg-gray-600 rounded px-2 py-0.5">&nbsp;</div>
                   </div>
                 )}
-                <div className={`bg-white text-slate-900 relative ${previewDevice === "mobile" ? "rounded-[2rem] overflow-hidden" : ""}`}>
-                {/* Phone notch & home indicator — mobile only, overlay the screen */}
-                {previewDevice === "mobile" && (
-                  <>
-                    <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-28 h-7 bg-black rounded-full z-30"></div>
-                    <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-black rounded-full z-30"></div>
-                    <div className="h-10"></div>
-                  </>
-                )}
+                <div
+                  ref={previewDevice === "mobile" ? screenRef : undefined}
+                  onMouseDown={previewDevice === "mobile" ? handleDragStart : undefined}
+                  onMouseMove={previewDevice === "mobile" ? handleDragMove : undefined}
+                  onMouseUp={previewDevice === "mobile" ? handleDragEnd : undefined}
+                  onMouseLeave={previewDevice === "mobile" ? handleDragEnd : undefined}
+                  onClickCapture={previewDevice === "mobile" ? handleClickCapture : undefined}
+                  className={previewDevice === "mobile"
+                    ? "absolute overflow-y-auto overflow-x-hidden bg-white text-slate-900 z-10 select-none scrollbar-hide"
+                    : "bg-white text-slate-900 relative"}
+                  style={previewDevice === "mobile" ? {
+                    top: '4.04%',
+                    left: '6.84%',
+                    right: '6.46%',
+                    bottom: '2.71%',
+                    borderRadius: '12.7% / 5.86%',
+                    cursor: 'grab',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    WebkitOverflowScrolling: 'touch',
+                  } as React.CSSProperties : undefined}
+                >
                 {/* Simulated Email Header (Subject Line Context) */}
                 <div className="border-b bg-gray-50 p-4 text-xs sm:text-sm text-gray-500">
                   <div className="flex gap-2 mb-1">
