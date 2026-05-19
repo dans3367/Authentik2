@@ -846,12 +846,12 @@ export default function ManagementBlogDesign() {
                   </div>
                 )}
 
-                <div className={`bg-gray-50 relative ${previewDevice === "mobile" ? "rounded-[2rem] overflow-hidden" : ""}`}>
+                <div className={`relative ${previewDevice === "mobile" ? "bg-black rounded-[2rem] overflow-hidden" : "bg-gray-50"}`}>
                 {/* Phone notch & home indicator — mobile only */}
                 {previewDevice === "mobile" && (
                   <>
                     <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-28 h-7 bg-black rounded-full z-30"></div>
-                    <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-black rounded-full z-30"></div>
+                    <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-28 h-1 bg-white rounded-full z-30"></div>
                     <div className="h-10"></div>
                   </>
                 )}
@@ -952,7 +952,7 @@ export default function ManagementBlogDesign() {
                   </div>
                 ) : (
                   /* ─── Article View Preview ─── */
-                  <div className="min-h-[500px]">
+                  <div className="min-h-[500px] bg-gray-50">
                     {/* Header: banner spread or compact nav bar */}
                     {(draft.headerMode || 'logo') === 'banner' && draft.bannerUrl && isSafeUrl(draft.bannerUrl) ? (
                       <div>
@@ -1048,7 +1048,7 @@ export default function ManagementBlogDesign() {
                     </main>
 
                     {/* Footer */}
-                    <footer className="border-t border-gray-200 bg-white px-6 py-6 text-center mt-4">
+                    <footer className="px-6 py-6 text-center mt-4">
                       <div className="flex items-center justify-center gap-4 mb-3 text-xs">
                         {isSafeUrl(draft.socialLinks?.facebook) && (
                           <span className="text-gray-400 hover:text-gray-600 cursor-pointer">Facebook</span>
@@ -1068,6 +1068,9 @@ export default function ManagementBlogDesign() {
                       </p>
                     </footer>
                   </div>
+                )}
+                {previewDevice === "mobile" && (
+                  <div className="h-8 bg-black"></div>
                 )}
                 </div>
               </div>

@@ -1,0 +1,52 @@
+<svg width="430" height="860" viewBox="0 0 430 860" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">iPhone mockup with transparent screen</title>
+  <desc id="desc">A polished iPhone-style device frame with the display area cut out so content behind the SVG remains visible.</desc>
+  <defs>
+    <linearGradient id="frameEdge" x1="54" y1="36" x2="379" y2="825" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F6F8FB"/>
+      <stop offset="0.2" stop-color="#9EA7B3"/>
+      <stop offset="0.48" stop-color="#F9FBFD"/>
+      <stop offset="0.76" stop-color="#737D8B"/>
+      <stop offset="1" stop-color="#E7EBF0"/>
+    </linearGradient>
+    <linearGradient id="blackGlass" x1="95" y1="77" x2="336" y2="785" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#303742"/>
+      <stop offset="0.36" stop-color="#10141B"/>
+      <stop offset="1" stop-color="#06080C"/>
+    </linearGradient>
+    <linearGradient id="rimLight" x1="76" y1="55" x2="354" y2="808" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.88"/>
+      <stop offset="0.18" stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.26"/>
+    </linearGradient>
+    <linearGradient id="buttonMetal" x1="17" y1="198" x2="413" y2="653" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#AEB7C2"/>
+      <stop offset="0.5" stop-color="#F7F9FC"/>
+      <stop offset="1" stop-color="#788391"/>
+    </linearGradient>
+    <filter id="phoneShadow" x="19" y="8" width="392" height="844" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="16"/>
+      <feGaussianBlur stdDeviation="18"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.04 0 0 0 0 0.05 0 0 0 0 0.07 0 0 0 0.28 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="dropShadow"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="dropShadow" result="shape"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#phoneShadow)">
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M116 30H314C358.183 30 394 65.8172 394 110V750C394 794.183 358.183 830 314 830H116C71.8172 830 36 794.183 36 750V110C36 65.8172 71.8172 30 116 30ZM116 55C85.6243 55 61 79.6243 61 110V750C61 780.376 85.6243 805 116 805H314C344.376 805 369 780.376 369 750V110C369 79.6243 344.376 55 314 55H116Z" fill="url(#frameEdge)"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M116 52H314C346.033 52 372 77.9675 372 110V750C372 782.033 346.033 808 314 808H116C83.9675 808 58 782.033 58 750V110C58 77.9675 83.9675 52 116 52ZM119 79C100.222 79 85 94.2223 85 113V747C85 765.778 100.222 781 119 781H311C329.778 781 345 765.778 345 747V113C345 94.2223 329.778 79 311 79H119Z" fill="url(#blackGlass)"/>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M116 42H314C351.555 42 382 72.4446 382 110V750C382 787.555 351.555 818 314 818H116C78.4446 818 48 787.555 48 750V110C48 72.4446 78.4446 42 116 42ZM116 55C85.6243 55 61 79.6243 61 110V750C61 780.376 85.6243 805 116 805H314C344.376 805 369 780.376 369 750V110C369 79.6243 344.376 55 314 55H116Z" fill="url(#rimLight)" opacity="0.8"/>
+    <path d="M209 88H221C237.016 88 250 100.984 250 117C250 133.016 237.016 146 221 146H209C192.984 146 180 133.016 180 117C180 100.984 192.984 88 209 88Z" fill="#05070B"/>
+    <circle cx="234" cy="117" r="8" fill="#111827"/>
+    <circle cx="236" cy="115" r="3" fill="#2B3545"/>
+    <rect x="30" y="181" width="8" height="78" rx="4" fill="url(#buttonMetal)"/>
+    <rect x="30" y="287" width="8" height="104" rx="4" fill="url(#buttonMetal)"/>
+    <rect x="392" y="251" width="8" height="142" rx="4" fill="url(#buttonMetal)"/>
+    <path d="M95 96C87.268 103.631 83 114.049 83 125V166" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="2" stroke-linecap="round"/>
+    <path d="M335 695V735C335 746.046 326.046 755 315 755H282" stroke="#FFFFFF" stroke-opacity="0.1" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>
