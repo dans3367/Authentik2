@@ -250,6 +250,11 @@
     color-scheme: dark;
   }
 
+  /* Use the lighter input-shade as the page background in dark mode */
+  .dark body {
+    background-color: var(--input);
+  }
+
   /* Ensure inputs and form elements work well in dark mode */
   .dark input:not([type="submit"]):not([type="button"]):not([type="reset"]),
   .dark textarea,
@@ -257,6 +262,11 @@
   .dark button[role="combobox"] {
     background-color: var(--input);
     color: var(--foreground);
+    border-color: var(--border);
+  }
+
+  /* Match switch unchecked track border to input border in dark mode */
+  .dark button[role="switch"][data-state="unchecked"] {
     border-color: var(--border);
   }
 
