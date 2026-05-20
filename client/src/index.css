@@ -253,7 +253,8 @@
   /* Ensure inputs and form elements work well in dark mode */
   .dark input:not([type="submit"]):not([type="button"]):not([type="reset"]),
   .dark textarea,
-  .dark select {
+  .dark select,
+  .dark button[role="combobox"] {
     background-color: var(--input);
     color: var(--foreground);
     border-color: var(--border);
