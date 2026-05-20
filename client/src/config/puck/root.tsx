@@ -2,46 +2,58 @@ import { useSyncExternalStore } from "react";
 import { TFunction } from "i18next";
 import type { RootProps } from "./puck-shared";
 import { getRootFieldErrorState, rootFieldErrors, subscribeRootFieldErrors } from "./root-field-errors";
+import { useTheme } from "@/contexts/ThemeContext";
 
-const colorPickerRender = ({ value, onChange, field }: { value: string | undefined; onChange: (val: string | undefined) => void; field: { label?: string } }) => (
-  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-    {field.label && (
-      <label style={{ fontSize: "13px", fontWeight: 500, color: "#374151" }}>
-        {field.label}
-      </label>
-    )}
-    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-      <input
-        type="color"
-        value={value || "#ffffff"}
-        onChange={(e) => onChange(e.currentTarget.value)}
-        style={{
-          width: "36px",
-          height: "36px",
-          padding: "2px",
-          border: "1px solid #d1d5db",
-          borderRadius: "6px",
-          cursor: "pointer",
-          backgroundColor: "#fff",
-        }}
-      />
-      <input
-        type="text"
-        value={value || "#ffffff"}
-        onChange={(e) => onChange(e.currentTarget.value)}
-        style={{
-          flex: 1,
-          padding: "6px 8px",
-          fontSize: "13px",
-          fontFamily: "monospace",
-          border: "1px solid #d1d5db",
-          borderRadius: "6px",
-          outline: "none",
-        }}
-      />
+const colorPickerRender = ({ value, onChange, field }: { value: string | undefined; onChange: (val: string | undefined) => void; field: { label?: string } }) => {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const labelColor = isDark ? "#d1d5db" : "#374151";
+  const inputBg = isDark ? "hsl(215, 20%, 16%)" : "#ffffff";
+  const inputColor = isDark ? "#e5e7eb" : "#111827";
+  const borderColor = isDark ? "hsl(215, 20%, 25%)" : "#d1d5db";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      {field.label && (
+        <label style={{ fontSize: "13px", fontWeight: 500, color: labelColor }}>
+          {field.label}
+        </label>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <input
+          type="color"
+          value={value || "#ffffff"}
+          onChange={(e) => onChange(e.currentTarget.value)}
+          style={{
+            width: "36px",
+            height: "36px",
+            padding: "2px",
+            border: `1px solid ${borderColor}`,
+            borderRadius: "6px",
+            cursor: "pointer",
+            backgroundColor: inputBg,
+          }}
+        />
+        <input
+          type="text"
+          value={value || "#ffffff"}
+          onChange={(e) => onChange(e.currentTarget.value)}
+          style={{
+            flex: 1,
+            padding: "6px 8px",
+            fontSize: "13px",
+            fontFamily: "monospace",
+            border: `1px solid ${borderColor}`,
+            borderRadius: "6px",
+            outline: "none",
+            backgroundColor: inputBg,
+            color: inputColor,
+          }}
+        />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 function useRootFieldErrors() {
   return useSyncExternalStore(subscribeRootFieldErrors, getRootFieldErrorState);
@@ -49,11 +61,17 @@ function useRootFieldErrors() {
 
 const textWithPlaceholderRender = (placeholder: string, errorKey?: keyof typeof rootFieldErrors) => ({ value, onChange, field }: { value: string | undefined; onChange: (val: string) => void; field: { label?: string } }) => {
   const fieldErrors = useRootFieldErrors();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const hasError = errorKey ? fieldErrors[errorKey] : false;
+  const labelColor = hasError ? "#dc2626" : isDark ? "#d1d5db" : "#374151";
+  const inputBg = isDark ? "hsl(215, 20%, 16%)" : "#ffffff";
+  const inputColor = isDark ? "#e5e7eb" : "#111827";
+  const borderColor = hasError ? "#dc2626" : isDark ? "hsl(215, 20%, 25%)" : "#d1d5db";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
       {field.label && (
-        <label style={{ fontSize: "13px", fontWeight: 500, color: hasError ? "#dc2626" : "#374151", transition: "color 0.2s" }}>
+        <label style={{ fontSize: "13px", fontWeight: 500, color: labelColor, transition: "color 0.2s" }}>
           {field.label}{hasError ? <span style={{ color: "#dc2626" }}> * required</span> : ""}
         </label>
       )}
@@ -69,10 +87,12 @@ const textWithPlaceholderRender = (placeholder: string, errorKey?: keyof typeof 
           width: "100%",
           padding: "6px 8px",
           fontSize: "13px",
-          border: `1px solid ${hasError ? "#dc2626" : "#d1d5db"}`,
+          border: `1px solid ${borderColor}`,
           borderRadius: "6px",
           outline: "none",
           transition: "border-color 0.2s ease",
+          backgroundColor: inputBg,
+          color: inputColor,
         }}
       />
     </div>

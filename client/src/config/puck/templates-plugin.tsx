@@ -259,7 +259,7 @@ function TemplatesPanel() {
           display: "flex",
           gap: "4px",
           marginBottom: "12px",
-          borderBottom: "1px solid #e5e7eb",
+          borderBottom: dk ? "1px solid hsl(215, 20%, 22%)" : "1px solid #e5e7eb",
           paddingBottom: "8px",
         }}
       >
@@ -271,8 +271,8 @@ function TemplatesPanel() {
               padding: "4px 10px",
               fontSize: "12px",
               fontWeight: filter === f ? 600 : 400,
-              color: filter === f ? "#2563eb" : "#6b7280",
-              background: filter === f ? "#eff6ff" : "transparent",
+              color: filter === f ? (dk ? "#93c5fd" : "#2563eb") : (dk ? "#9ca3af" : "#6b7280"),
+              background: filter === f ? (dk ? "hsl(215, 30%, 18%)" : "#eff6ff") : "transparent",
               border: "none",
               borderRadius: "4px",
               cursor: "pointer",
@@ -289,10 +289,10 @@ function TemplatesPanel() {
           <div
             key={template.id}
             style={{
-              border: "1px solid #e5e7eb",
+              border: dk ? "1px solid hsl(215, 20%, 22%)" : "1px solid #e5e7eb",
               borderRadius: "8px",
               overflow: "hidden",
-              background: "#fff",
+              background: dk ? "hsl(215, 20%, 14%)" : "#fff",
             }}
           >
             {/* Thumbnail */}
@@ -301,7 +301,7 @@ function TemplatesPanel() {
                 width: "100%",
                 height: "100px",
                 background: `url(${template.thumbnail}) center/cover no-repeat`,
-                borderBottom: "1px solid #e5e7eb",
+                borderBottom: dk ? "1px solid hsl(215, 20%, 22%)" : "1px solid #e5e7eb",
               }}
             />
             {/* Info */}
@@ -314,7 +314,7 @@ function TemplatesPanel() {
                   marginBottom: "4px",
                 }}
               >
-                <span style={{ fontWeight: 600, fontSize: "13px", color: "#111827" }}>
+                <span style={{ fontWeight: 600, fontSize: "13px", color: dk ? "#e5e7eb" : "#111827" }}>
                   {t(`puckEditor.templates.items.${template.id}.name`, template.name)}
                 </span>
                 <span
@@ -324,9 +324,13 @@ function TemplatesPanel() {
                     padding: "2px 6px",
                     borderRadius: "4px",
                     background:
-                      template.category === "product" ? "#fef3c7" : "#dbeafe",
+                      template.category === "product"
+                        ? dk ? "hsl(40, 50%, 20%)" : "#fef3c7"
+                        : dk ? "hsl(215, 40%, 20%)" : "#dbeafe",
                     color:
-                      template.category === "product" ? "#92400e" : "#1e40af",
+                      template.category === "product"
+                        ? dk ? "#fbbf24" : "#92400e"
+                        : dk ? "#93c5fd" : "#1e40af",
                   }}
                 >
                   {t(`puckEditor.templates.categories.${template.category}`, template.category)}
@@ -337,7 +341,7 @@ function TemplatesPanel() {
                   margin: "0 0 8px 0",
                   fontSize: "12px",
                   lineHeight: "1.4",
-                  color: "#6b7280",
+                  color: dk ? "#9ca3af" : "#6b7280",
                 }}
               >
                 {t(`puckEditor.templates.items.${template.id}.description`, template.description)}

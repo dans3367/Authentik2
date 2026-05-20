@@ -185,6 +185,25 @@ export default function NewsletterCreatePage() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const queryClient = useQueryClient();
+  const editorSurface = {
+    appBg: isDark ? "hsl(215, 25%, 8%)" : "#f7fafc",
+    chromeBg: isDark ? "hsl(215, 25%, 10%)" : "#ffffff",
+    chromeHover: isDark ? "hsl(215, 20%, 18%)" : "#f3f4f6",
+    border: isDark ? "hsl(215, 20%, 22%)" : "#e5e7eb",
+    borderStrong: isDark ? "hsl(215, 20%, 28%)" : "#d1d5db",
+    text: isDark ? "#f3f4f6" : "#111827",
+    textSoft: isDark ? "#d1d5db" : "#374151",
+    textMuted: isDark ? "#9ca3af" : "#6b7280",
+    textSubtle: isDark ? "#64748b" : "#94a3b8",
+    cardBg: isDark ? "hsl(215, 22%, 13%)" : "#ffffff",
+    cardBgAlt: isDark ? "hsl(215, 22%, 11%)" : "#f8fafc",
+    cardShadow: isDark
+      ? "0 0 0 1px hsla(215, 20%, 28%, 0.95), 0 18px 42px rgba(0,0,0,0.35)"
+      : "0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)",
+    controlBg: isDark ? "hsl(215, 20%, 16%)" : "#ffffff",
+    controlBorder: isDark ? "hsl(215, 20%, 25%)" : "#e5e7eb",
+    previewFrameBg: isDark ? "hsl(215, 22%, 12%)" : "#ffffff",
+  };
 
   // Stable key for the Puck editor — locked at mount time so auto-save
   // (which sets newsletterId from null → real id) never remounts the editor.
@@ -615,7 +634,7 @@ export default function NewsletterCreatePage() {
 
   if (!isClient || (isEditMode && isLoadingNewsletter)) {
     return (
-      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: editorSurface.appBg }}>
         <Loader2 size={32} className="animate-spin text-blue-500" />
       </div>
     );
@@ -641,15 +660,15 @@ export default function NewsletterCreatePage() {
   if (isEdit) {
     return (
       <>
-        <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: editorSurface.appBg, color: editorSurface.text }}>
           {/* Top bar with close X */}
           <div style={{
             display: "flex",
             alignItems: "center",
             height: "40px",
             padding: "0 12px",
-            borderBottom: isDark ? "1px solid hsl(215, 20%, 22%)" : "1px solid #e5e7eb",
-            background: isDark ? "hsl(215, 25%, 10%)" : "#fff",
+            borderBottom: `1px solid ${editorSurface.border}`,
+            background: editorSurface.chromeBg,
             flexShrink: 0,
             justifyContent: "flex-end",
           }}>
@@ -673,12 +692,12 @@ export default function NewsletterCreatePage() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: isDark ? "#9ca3af" : "#6b7280",
+                color: editorSurface.textMuted,
               }}
               title="Close editor"
               data-testid="button-close"
-              onMouseEnter={(e) => { e.currentTarget.style.background = isDark ? 'hsl(215, 20%, 18%)' : '#f3f4f6'; e.currentTarget.style.color = isDark ? '#e5e7eb' : '#111827'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDark ? '#9ca3af' : '#6b7280'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = editorSurface.chromeHover; e.currentTarget.style.color = editorSurface.text; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = editorSurface.textMuted; }}
             >
               <X size={18} />
             </button>
@@ -686,8 +705,8 @@ export default function NewsletterCreatePage() {
 
           <div style={{ flex: 1, minHeight: 0 }}>
             <Suspense fallback={
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#6b7280' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', background: editorSurface.appBg }}>
+                <Loader2 className="h-8 w-8 animate-spin" style={{ color: editorSurface.textMuted }} />
               </div>
             }>
               {editorType === 'notion' ? (
@@ -699,8 +718,8 @@ export default function NewsletterCreatePage() {
                     alignItems: 'center',
                     gap: '8px',
                     padding: '8px 16px',
-                    borderBottom: '1px solid #e5e7eb',
-                    background: '#fff',
+                    borderBottom: `1px solid ${editorSurface.border}`,
+                    background: editorSurface.chromeBg,
                     flexShrink: 0,
                   }}>
                     <span
@@ -780,7 +799,7 @@ export default function NewsletterCreatePage() {
                       {t("newsletter.create.ready", "Ready")}
                     </button>
                   </div>
-                  <div style={{ flex: 1, minHeight: 0, overflow: 'auto', background: '#f7fafc' }}>
+                  <div style={{ flex: 1, minHeight: 0, overflow: 'auto', background: editorSurface.appBg }}>
                     {/* Email design chrome wrapper — mirrors the Puck preview override */}
                     {(() => {
                       const primaryColor = emailDesign?.primaryColor || '#3B82F6';
@@ -815,12 +834,13 @@ export default function NewsletterCreatePage() {
                             maxWidth: '620px',
                             marginBottom: '10px',
                             padding: '20px 24px 16px',
-                            background: '#fff',
+                            background: editorSurface.cardBg,
                             borderRadius: '2px',
-                            boxShadow: '0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)',
+                            boxShadow: editorSurface.cardShadow,
                             fontFamily,
                           }}>
                             <input
+                              className="newsletter-create-title-input"
                               type="text"
                               value={title}
                               onChange={(e) => { setTitle(e.target.value); setHasUnsavedChanges(true); if (titleError && e.target.value.trim()) setTitleError(false); }}
@@ -831,7 +851,7 @@ export default function NewsletterCreatePage() {
                                 outline: 'none',
                                 fontSize: '22px',
                                 fontWeight: 700,
-                                color: '#1e293b',
+                                color: editorSurface.text,
                                 background: 'transparent',
                                 padding: 0,
                                 margin: '0 0 4px 0',
@@ -840,6 +860,7 @@ export default function NewsletterCreatePage() {
                               }}
                             />
                             <input
+                              className="newsletter-create-subject-input"
                               type="text"
                               value={subject}
                               onChange={(e) => { setSubject(e.target.value); setHasUnsavedChanges(true); }}
@@ -850,7 +871,7 @@ export default function NewsletterCreatePage() {
                                 outline: 'none',
                                 fontSize: '14px',
                                 fontWeight: 400,
-                                color: '#94a3b8',
+                                color: editorSurface.textSubtle,
                                 background: 'transparent',
                                 padding: 0,
                                 margin: 0,
@@ -863,8 +884,8 @@ export default function NewsletterCreatePage() {
                           <div style={{
                             width: '100%',
                             maxWidth: '620px',
-                            boxShadow: '0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)',
-                            background: '#fff',
+                            boxShadow: editorSurface.cardShadow,
+                            background: editorSurface.cardBg,
                             margin: '0 auto',
                             fontFamily,
                             borderRadius: '2px',
@@ -968,7 +989,7 @@ export default function NewsletterCreatePage() {
                             )}
 
                             {/* Body content zone — editor lives here */}
-                            <div className="notion-editor-embedded" style={{ padding: '20px 24px 32px 24px', fontSize: '16px', lineHeight: '1.625', color: '#334155' }}>
+                            <div className="notion-editor-embedded" style={{ padding: '20px 24px 32px 24px', fontSize: '16px', lineHeight: '1.625', color: editorSurface.textSoft }}>
                               <LazyNotionEditor
                                 content={notionHtmlContent}
                                 onChange={(html) => {
@@ -982,11 +1003,11 @@ export default function NewsletterCreatePage() {
 
                             {/* Branded email footer */}
                             <div style={{
-                              backgroundColor: '#f8fafc',
+                              backgroundColor: editorSurface.cardBgAlt,
                               padding: '32px',
                               textAlign: 'center',
-                              borderTop: '1px solid #e2e8f0',
-                              color: '#64748b',
+                              borderTop: `1px solid ${editorSurface.border}`,
+                              color: editorSurface.textMuted,
                             }}>
                               {socialLinks && (socialLinks.facebook || socialLinks.twitter || socialLinks.instagram || socialLinks.linkedin) && (
                                 <div style={{ marginBottom: '24px' }}>
@@ -996,19 +1017,19 @@ export default function NewsletterCreatePage() {
                                     socialLinks.instagram && 'Instagram',
                                     socialLinks.linkedin && 'LinkedIn',
                                   ].filter(Boolean).map((name, i, arr) => (
-                                    <span key={name} style={{ color: '#64748b', fontSize: '13px', fontWeight: 500 }}>
+                                    <span key={name} style={{ color: editorSurface.textMuted, fontSize: '13px', fontWeight: 500 }}>
                                       {name}{i < arr.length - 1 ? ' | ' : ''}
                                     </span>
                                   ))}
                                 </div>
                               )}
                               {footerText && (
-                                <p style={{ margin: '0 0 16px 0', fontSize: '12px', lineHeight: '1.5', color: '#64748b' }}>
+                                <p style={{ margin: '0 0 16px 0', fontSize: '12px', lineHeight: '1.5', color: editorSurface.textMuted }}>
                                   {footerText}
                                 </p>
                               )}
                               {companyName && showName && (
-                                <div style={{ fontSize: '12px', lineHeight: '1.5', color: '#94a3b8' }}>
+                                <div style={{ fontSize: '12px', lineHeight: '1.5', color: editorSurface.textSubtle }}>
                                   <p style={{ margin: 0 }}>Sent via {companyName}</p>
                                 </div>
                               )}
@@ -1066,8 +1087,8 @@ export default function NewsletterCreatePage() {
                     }}
                   />
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                    <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#6b7280' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', background: editorSurface.appBg }}>
+                    <Loader2 className="h-8 w-8 animate-spin" style={{ color: editorSurface.textMuted }} />
                   </div>
                 )
               )}
@@ -1113,12 +1134,12 @@ export default function NewsletterCreatePage() {
 
   return (
     <>
-      <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: dataRef.current?.root?.props?.bodyBackgroundColor || "#f7fafc" }}>
+      <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: isDark ? editorSurface.appBg : (dataRef.current?.root?.props?.bodyBackgroundColor || "#f7fafc"), color: editorSurface.text }}>
         {/* Toolbar */}
         <div
           style={{
-            background: "white",
-            borderBottom: "1px solid #e5e7eb",
+            background: editorSurface.chromeBg,
+            borderBottom: `1px solid ${editorSurface.border}`,
             padding: "12px 16px",
             display: "flex",
             justifyContent: "space-between",
@@ -1126,7 +1147,7 @@ export default function NewsletterCreatePage() {
             flexShrink: 0,
           }}
         >
-          <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>
+          <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 600, color: editorSurface.text }}>
             Email Preview
           </h1>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -1140,9 +1161,9 @@ export default function NewsletterCreatePage() {
                   onClick={() => setPreviewViewport(vp)}
                   style={{
                     padding: "6px 10px",
-                    background: previewViewport === vp ? "#2563eb" : "#fff",
-                    color: previewViewport === vp ? "#fff" : "#000",
-                    border: "1px solid #e5e7eb",
+                    background: previewViewport === vp ? "#2563eb" : editorSurface.controlBg,
+                    color: previewViewport === vp ? "#fff" : editorSurface.textSoft,
+                    border: `1px solid ${previewViewport === vp ? "#2563eb" : editorSurface.controlBorder}`,
                     borderRadius: "4px",
                     cursor: "pointer",
                     display: "flex",
@@ -1186,13 +1207,13 @@ export default function NewsletterCreatePage() {
           }}
         >
           <div
-            style={{
-              width: previewViewportWidths[previewViewport],
-              maxWidth: "100%",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)",
+              style={{
+                width: previewViewportWidths[previewViewport],
+                maxWidth: "100%",
+              boxShadow: isDark ? "0 18px 48px rgba(0,0,0,0.38), 0 0 0 1px hsla(215, 20%, 28%, 0.9)" : "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06)",
               borderRadius: "8px",
               overflow: "hidden",
-              background: "#fff",
+              background: editorSurface.previewFrameBg,
             }}
           >
             <iframe

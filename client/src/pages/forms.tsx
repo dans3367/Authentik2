@@ -469,19 +469,22 @@ export default function Forms2() {
     const status: 'active' | 'draft' = form.isActive ? 'active' : 'draft';
     const newResponses = 0; // no delta data wired yet — design supports +N pill when available
 
-    const statusStyles = status === 'active'
-      ? { color: '#34d399', borderColor: 'rgba(52,211,153,0.3)', background: 'rgba(52,211,153,0.08)', dot: '#34d399' }
-      : { color: '#f5b25b', borderColor: 'rgba(245,178,91,0.3)', background: 'rgba(245,178,91,0.08)', dot: '#f5b25b' };
+    const statusClasses = status === 'active'
+      ? 'border-emerald-600/25 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/[0.08] dark:text-[#34d399]'
+      : 'border-amber-600/25 bg-amber-500/10 text-amber-700 dark:border-amber-300/30 dark:bg-amber-300/[0.08] dark:text-[#f5b25b]';
+    const statusDotClass = status === 'active'
+      ? 'bg-emerald-600 dark:bg-[#34d399]'
+      : 'bg-amber-600 dark:bg-[#f5b25b]';
 
     return (
       <div
         key={form.id}
-        className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0e0e17] shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)] transition-[border-color,background,transform] duration-200 hover:-translate-y-px hover:border-white/[0.18] hover:bg-[#14141f]"
+        className="group relative flex flex-col overflow-hidden rounded-[10px] border border-border bg-card shadow-[0_1px_0_rgba(20,16,10,.02),0_10px_24px_-18px_rgba(20,16,10,.3)] transition-[border-color,background,transform,box-shadow] duration-200 hover:-translate-y-px hover:border-border/80 hover:bg-muted/20 hover:shadow-[0_16px_30px_-22px_rgba(20,16,10,.42)] dark:rounded-2xl dark:border-white/[0.06] dark:bg-[#0e0e17] dark:shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)] dark:hover:border-white/[0.18] dark:hover:bg-[#14141f]"
         tabIndex={0}
       >
         {/* Preview */}
         <div
-          className="relative h-[110px] overflow-hidden border-b border-white/[0.06]"
+          className="relative h-[110px] overflow-hidden border-b border-border/70 dark:border-white/[0.06]"
           style={{ background: `linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 100%), ${headerGradient}` }}
         >
           {/* faint grid overlay */}
@@ -585,59 +588,57 @@ export default function Forms2() {
 
         {/* Body */}
         <div className="flex flex-1 flex-col gap-2.5 px-3.5 pb-3 pt-3.5">
-          <h3 className="m-0 text-[15.5px] font-medium leading-[1.3] tracking-[-0.01em] text-[#f4f4f8] line-clamp-2">
+          <h3 className="m-0 text-[15.5px] font-medium leading-[1.3] tracking-[-0.01em] text-foreground line-clamp-2 dark:text-[#f4f4f8]">
             {form.title}
           </h3>
 
           <div className="flex flex-wrap items-center gap-1.5">
             <span
-              className="inline-flex h-[22px] items-center gap-1.5 rounded-[5px] border px-2 text-[11.5px] leading-none"
-              style={{ color: statusStyles.color, borderColor: statusStyles.borderColor, background: statusStyles.background }}
+              className={`inline-flex h-[22px] items-center gap-1.5 rounded-[5px] border px-2 text-[11.5px] leading-none ${statusClasses}`}
             >
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: statusStyles.dot }} />
+              <span className={`h-1.5 w-1.5 rounded-full ${statusDotClass}`} />
               {status}
             </span>
-            <span className="inline-flex h-[22px] items-center rounded-[5px] border border-white/[0.10] bg-[#14141f] px-2 text-[11.5px] leading-none text-[#c8c8d4]">
+            <span className="inline-flex h-[22px] items-center rounded-[5px] border border-border bg-muted/40 px-2 text-[11.5px] leading-none text-muted-foreground dark:border-white/[0.10] dark:bg-[#14141f] dark:text-[#c8c8d4]">
               {themeData.name.toLowerCase()}
             </span>
             {form.tags?.slice(0, 1).map((tagId) => (
               <span
                 key={tagId}
-                className="inline-flex h-[22px] items-center rounded-[5px] border border-white/[0.10] bg-[#14141f] px-2 text-[11.5px] leading-none text-[#c8c8d4]"
+                className="inline-flex h-[22px] items-center rounded-[5px] border border-border bg-muted/40 px-2 text-[11.5px] leading-none text-muted-foreground dark:border-white/[0.10] dark:bg-[#14141f] dark:text-[#c8c8d4]"
               >
                 {tagId.slice(0, 10)}
               </span>
             ))}
             {form.shopId && shopsMap.get(form.shopId) && (
               <span
-                className="inline-flex h-[22px] items-center rounded-[5px] border px-2 text-[11.5px] leading-none"
-                style={{ color: '#9b82ff', borderColor: 'rgba(124,92,255,0.3)', background: 'rgba(124,92,255,0.08)' }}
+                className="inline-flex h-[22px] items-center rounded-[5px] border border-violet-600/25 bg-violet-500/10 px-2 text-[11.5px] leading-none text-violet-700 dark:border-violet-400/30 dark:bg-violet-400/[0.08] dark:text-[#9b82ff]"
               >
                 {shopsMap.get(form.shopId)}
               </span>
             )}
           </div>
 
-          <div className="mt-0.5 flex items-center gap-3 text-[12px] text-[#8689a0]">
+          <div className="mt-0.5 flex items-center gap-3 text-[12px] text-muted-foreground dark:text-[#8689a0]">
             <span className="inline-flex items-center gap-1.5">
-              <FileText className="h-3 w-3 text-[#5b5e74]" strokeWidth={1.75} />
+              <FileText className="h-3 w-3 text-muted-foreground/70 dark:text-[#5b5e74]" strokeWidth={1.75} />
               {elementCount} field{elementCount !== 1 ? 's' : ''}
             </span>
-            <span className="text-[#5b5e74]">·</span>
+            <span className="text-muted-foreground/60 dark:text-[#5b5e74]">·</span>
             <span className="inline-flex items-center gap-1.5">
-              <Clock className="h-3 w-3 text-[#5b5e74]" strokeWidth={1.75} />
+              <Clock className="h-3 w-3 text-muted-foreground/70 dark:text-[#5b5e74]" strokeWidth={1.75} />
               {formatRelativeTime(form.updatedAt || form.createdAt)}
             </span>
-            <span className="text-[#5b5e74]">·</span>
+            <span className="text-muted-foreground/60 dark:text-[#5b5e74]">·</span>
             <span>{completeness}% complete</span>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-dashed border-white/[0.06] bg-white/[0.015] px-3.5 py-2.5">
+        <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-dashed border-border/80 bg-muted/20 px-3.5 py-2.5 dark:border-white/[0.06] dark:bg-white/[0.015]">
           <div className="flex items-center gap-2.5">
-            <span className="serif text-[20px] leading-none text-[#f4f4f8]">{form.responseCount.toLocaleString()}</span>
-            <span className="mono text-[11px] uppercase tracking-[0.1em] text-[#8689a0]">responses</span>
+            <span className="serif text-[20px] leading-none text-foreground dark:text-[#f4f4f8]">{form.responseCount.toLocaleString()}</span>
+            <span className="mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground dark:text-[#8689a0]">responses</span>
             {newResponses > 0 && (
               <span className="mono inline-flex h-[18px] items-center rounded px-1.5 text-[10.5px] font-semibold tracking-[0.04em] text-[#34d399]" style={{ background: 'rgba(52,211,153,0.12)' }}>
                 +{newResponses}
