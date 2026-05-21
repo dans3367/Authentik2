@@ -3813,8 +3813,10 @@
       "dividerDesc": "Línea horizontal",
       "table": "Tabla",
       "tableDesc": "Insertar una tabla",
+      "productCardTemplate": "Plantilla de tarjeta de producto",
+      "productCardTemplateDesc": "Dos tarjetas de producto una al lado de la otra",
       "image": "Imagen",
-      "imageDesc": "Insertar imagen desde URL",
+      "imageDesc": "Buscar fotos o usar una URL de imagen",
       "imagePrompt": "Ingresa la URL de la imagen",
       "firstName": "Nombre",
       "firstNameDesc": "Insertar variable {{first_name}}",
@@ -3830,6 +3832,19 @@
       "officeHoursDesc": "Insertar variable {{office_hours}}",
       "contactCard": "Tarjeta de contacto",
       "contactCardDesc": "Insertar bloque de tarjeta de contacto"
+    },
+    "imageBrowser": {
+      "title": "Elegir imagen",
+      "subtitle": "Busca fotos o pega una URL de imagen.",
+      "close": "Cerrar",
+      "urlLabel": "URL de imagen",
+      "useUrl": "Usar URL",
+      "searchPlaceholder": "Buscar fotos...",
+      "search": "Buscar",
+      "emptyQuery": "Ingresa un término de búsqueda para encontrar fotos.",
+      "emptyResults": "Aún no hay resultados. Intenta una búsqueda.",
+      "searchError": "No se pudieron buscar imágenes. Inténtalo de nuevo.",
+      "invalidUrl": "Ingresa una URL de imagen válida."
     },
     "toolbar": {
       "turnInto": "Convertir en",

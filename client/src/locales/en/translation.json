@@ -3866,8 +3866,10 @@
       "dividerDesc": "Horizontal rule",
       "table": "Table",
       "tableDesc": "Insert a table",
+      "productCardTemplate": "Product Card Template",
+      "productCardTemplateDesc": "Two side-by-side product cards",
       "image": "Image",
-      "imageDesc": "Embed an image from URL",
+      "imageDesc": "Search photos or use an image URL",
       "imagePrompt": "Enter image URL",
       "firstName": "First Name",
       "firstNameDesc": "Insert {{first_name}} variable",
@@ -3883,6 +3885,19 @@
       "officeHoursDesc": "Insert {{office_hours}} variable",
       "contactCard": "Contact Card",
       "contactCardDesc": "Insert formatted contact card block"
+    },
+    "imageBrowser": {
+      "title": "Choose image",
+      "subtitle": "Search photos or paste an image URL.",
+      "close": "Close",
+      "urlLabel": "Image URL",
+      "useUrl": "Use URL",
+      "searchPlaceholder": "Search photos...",
+      "search": "Search",
+      "emptyQuery": "Enter a search term to find photos.",
+      "emptyResults": "No results yet. Try a search.",
+      "searchError": "Unable to search images. Please try again.",
+      "invalidUrl": "Enter a valid image URL."
     },
     "toolbar": {
       "turnInto": "Turn Into",

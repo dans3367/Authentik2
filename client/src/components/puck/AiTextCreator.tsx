@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createUsePuck } from "@puckeditor/core";
 import { generateNewsletterText } from "@/lib/aiApi";
 import { Sparkles, Loader2, ChevronDown, RotateCcw, Check } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const toneOptions = [
   { label: "Professional", value: "professional" },
@@ -25,6 +26,31 @@ export function AiTextCreator({ fieldName = "text" }: { fieldName?: string }) {
 
   const selectedItem = usePuck((s) => s.selectedItem);
   const dispatch = usePuck((s) => s.dispatch);
+
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
+  const c = {
+    panelBg: isDark ? "#1e293b" : "#f8fafc",
+    panelBorder: isDark ? "#334155" : "#e2e8f0",
+    label: isDark ? "#cbd5e1" : "#475569",
+    inputBg: isDark ? "#0f172a" : "#fff",
+    inputBorder: isDark ? "#475569" : "#d1d5db",
+    inputText: isDark ? "#f1f5f9" : "#1e293b",
+    inputFocus: isDark ? "#818cf8" : "#818cf8",
+    previewBg: isDark ? "#0f172a" : "#fff",
+    previewText: isDark ? "#e2e8f0" : "#1e293b",
+    previewHeadingStrong: isDark ? "#f8fafc" : "#0f172a",
+    previewHeadingSub: isDark ? "#e2e8f0" : "#1e293b",
+    previewHr: isDark ? "#334155" : "#e2e8f0",
+    errorBg: isDark ? "rgba(220, 38, 38, 0.15)" : "#fef2f2",
+    errorBorder: isDark ? "#7f1d1d" : "#fecaca",
+    errorText: isDark ? "#fca5a5" : "#dc2626",
+    regenBg: isDark ? "transparent" : "#fff",
+    regenText: isDark ? "#a5b4fc" : "#6366f1",
+    regenBorder: isDark ? "#4338ca" : "#c7d2fe",
+    disabledBg: isDark ? "#3730a3" : "#c7d2fe",
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -121,8 +147,8 @@ export function AiTextCreator({ fieldName = "text" }: { fieldName?: string }) {
           style={{
             marginTop: "8px",
             padding: "12px",
-            background: "#f8fafc",
-            border: "1px solid #e2e8f0",
+            background: c.panelBg,
+            border: `1px solid ${c.panelBorder}`,
             borderRadius: "8px",
           }}
         >
@@ -131,7 +157,7 @@ export function AiTextCreator({ fieldName = "text" }: { fieldName?: string }) {
               display: "block",
               fontSize: "12px",
               fontWeight: 600,
-              color: "#475569",
+              color: c.label,
               marginBottom: "6px",
             }}
           >
@@ -146,16 +172,18 @@ export function AiTextCreator({ fieldName = "text" }: { fieldName?: string }) {
               width: "100%",
               padding: "8px 10px",
               fontSize: "13px",
-              border: "1px solid #d1d5db",
+              border: `1px solid ${c.inputBorder}`,
               borderRadius: "6px",
               resize: "vertical",
               outline: "none",
               fontFamily: "inherit",
               lineHeight: "1.5",
               boxSizing: "border-box",
+              background: c.inputBg,
+              color: c.inputText,
             }}
-            onFocus={(e) => (e.target.style.borderColor = "#818cf8")}
-            onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
+            onFocus={(e) => (e.target.style.borderColor = c.inputFocus)}
+            onBlur={(e) => (e.target.style.borderColor = c.inputBorder)}
           />
 
           <div style={{ marginTop: "8px", display: "flex", gap: "8px", alignItems: "center" }}>
@@ -163,7 +191,7 @@ export function AiTextCreator({ fieldName = "text" }: { fieldName?: string }) {
               style={{
                 fontSize: "12px",
                 fontWeight: 600,
-                color: "#475569",
+                color: c.label,
                 whiteSpace: "nowrap",
               }}
             >
@@ -176,9 +204,10 @@ export function AiTextCreator({ fieldName = "text" }: { fieldName?: string }) {
                 flex: 1,
                 padding: "5px 8px",
                 fontSize: "12px",
-                border: "1px solid #d1d5db",
+                border: `1px solid ${c.inputBorder}`,
                 borderRadius: "6px",
-                background: "#fff",
+                background: c.inputBg,
+                color: c.inputText,
                 outline: "none",
                 cursor: "pointer",
               }}
@@ -205,7 +234,7 @@ export function AiTextCreator({ fieldName = "text" }: { fieldName?: string }) {
               padding: "8px 12px",
               background:
                 isGenerating || !prompt.trim()
-                  ? "#c7d2fe"
+                  ? c.disabledBg
                   : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
               color: "#fff",
               border: "none",
@@ -234,11 +263,11 @@ export function AiTextCreator({ fieldName = "text" }: { fieldName?: string }) {
               style={{
                 marginTop: "8px",
                 padding: "8px 10px",
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
+                background: c.errorBg,
+                border: `1px solid ${c.errorBorder}`,
                 borderRadius: "6px",
                 fontSize: "12px",
-                color: "#dc2626",
+                color: c.errorText,
               }}
             >
               {error}
@@ -252,22 +281,22 @@ export function AiTextCreator({ fieldName = "text" }: { fieldName?: string }) {
                   display: "block",
                   fontSize: "12px",
                   fontWeight: 600,
-                  color: "#475569",
+                  color: c.label,
                   marginBottom: "6px",
                 }}
               >
                 Generated Newsletter
               </label>
               <div
-                className="ai-newsletter-preview"
+                className={`ai-newsletter-preview ${isDark ? "ai-newsletter-preview--dark" : ""}`}
                 style={{
                   padding: "10px",
-                  background: "#fff",
-                  border: "1px solid #d1d5db",
+                  background: c.previewBg,
+                  border: `1px solid ${c.inputBorder}`,
                   borderRadius: "6px",
                   fontSize: "13px",
                   lineHeight: "1.6",
-                  color: "#1e293b",
+                  color: c.previewText,
                   maxHeight: "250px",
                   overflowY: "auto",
                 }}
@@ -317,9 +346,9 @@ export function AiTextCreator({ fieldName = "text" }: { fieldName?: string }) {
                     justifyContent: "center",
                     gap: "4px",
                     padding: "8px 12px",
-                    background: "#fff",
-                    color: "#6366f1",
-                    border: "1px solid #c7d2fe",
+                    background: c.regenBg,
+                    color: c.regenText,
+                    border: `1px solid ${c.regenBorder}`,
                     borderRadius: "6px",
                     cursor: isGenerating ? "not-allowed" : "pointer",
                     fontSize: "13px",

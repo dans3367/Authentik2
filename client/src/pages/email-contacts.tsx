@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useAppSelector, useAppDispatch } from "@/store";
 import { setSelectedShop } from "@/store/shopSlice";
 import { useSetBreadcrumbs } from "@/contexts/PageTitleContext";
@@ -124,6 +125,8 @@ export default function EmailContacts() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const { t } = useLanguage();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const canEditContacts = !permissionsLoading && hasPermission('contacts.edit');
   const queryClient = useQueryClient();
   const dispatch = useAppDispatch();
   const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
@@ -830,10 +833,12 @@ export default function EmailContacts() {
                                   <UserCheck className="w-4 h-4 mr-2" />
                                   {t('emailContacts.actions.viewContact')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setLocation(`/contacts/edit/${contact.id}`)}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  {t('emailContacts.actions.editContact')}
-                                </DropdownMenuItem>
+                                {canEditContacts && (
+                                  <DropdownMenuItem onClick={() => setLocation(`/contacts/edit/${contact.id}`)}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    {t('emailContacts.actions.editContact')}
+                                  </DropdownMenuItem>
+                                )}
                                 <SendEmailModal
                                   contactId={contact.id}
                                   contactEmail={contact.email}
@@ -978,10 +983,12 @@ export default function EmailContacts() {
                                   <UserCheck className="w-4 h-4 mr-2" />
                                   {t('emailContacts.actions.viewContact')}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setLocation(`/contacts/edit/${contact.id}`)}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  {t('emailContacts.actions.editContact')}
-                                </DropdownMenuItem>
+                                {canEditContacts && (
+                                  <DropdownMenuItem onClick={() => setLocation(`/contacts/edit/${contact.id}`)}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    {t('emailContacts.actions.editContact')}
+                                  </DropdownMenuItem>
+                                )}
                                 <SendEmailModal
                                   contactId={contact.id}
                                   contactEmail={contact.email}

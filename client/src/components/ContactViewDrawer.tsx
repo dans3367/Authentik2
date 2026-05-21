@@ -20,6 +20,7 @@ import ScheduleEmailModal from "@/components/ScheduleEmailModal";
 import ManageContactTagsModal from "@/components/ManageContactTagsModal";
 import CustomerAppointmentsTab from "@/components/CustomerAppointmentsTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   Mail,
   Calendar,
@@ -99,6 +100,8 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const canEditContacts = !permissionsLoading && hasPermission('contacts.edit');
 
   const { data: response, isLoading, error } = useQuery({
     queryKey: ['/api/email-contacts', contactId],
@@ -358,17 +361,19 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
                   }
                 />
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onOpenChange(false);
-                    setLocation(`/contacts/edit/${contact.id}`);
-                  }}
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  {t('contactDrawer.actions.edit')}
-                </Button>
+                {canEditContacts && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onOpenChange(false);
+                      setLocation(`/contacts/edit/${contact.id}`);
+                    }}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    {t('contactDrawer.actions.edit')}
+                  </Button>
+                )}
               </div>
 
               {/* Suppressed Email Warning */}

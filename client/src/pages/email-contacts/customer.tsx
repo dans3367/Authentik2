@@ -14,6 +14,7 @@ import ScheduleEmailModal from "@/components/ScheduleEmailModal";
 import ManageContactTagsModal from "@/components/ManageContactTagsModal";
 import CustomerAppointmentsTab from "@/components/CustomerAppointmentsTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   ArrowLeft,
   Mail,
@@ -79,6 +80,8 @@ export default function CustomerViewPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const canEditContacts = !permissionsLoading && hasPermission('contacts.edit');
 
   // Get return URL from query parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -357,14 +360,16 @@ export default function CustomerViewPage() {
             </Button>
           }
         />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setLocation(`/contacts/edit/${contact.id}`)}
-        >
-          <Edit className="w-4 h-4 mr-2" />
-          Edit
-        </Button>
+        {canEditContacts && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setLocation(`/contacts/edit/${contact.id}`)}
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Edit
+          </Button>
+        )}
       </div>
 
       {/* Suppressed Email Warning */}
