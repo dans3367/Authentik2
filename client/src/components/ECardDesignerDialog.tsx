@@ -994,7 +994,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                       {sendDate ? format(new Date(sendDate + 'T00:00:00'), "MMMM d") : <span>{t('ecards.designer.pickADate')}</span>}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-0 z-[20001]" align="start">
                     <Calendar
                       selected={sendDate ? new Date(sendDate + 'T00:00:00') : undefined}
                       onSelect={(date) => {
@@ -1006,6 +1006,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                           setCalendarOpen(false);
                         }
                       }}
+                      disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
                       fromYear={new Date().getFullYear()}
                       toYear={new Date().getFullYear() + 10}
                       hideYear={true}

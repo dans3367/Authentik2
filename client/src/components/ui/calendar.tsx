@@ -100,15 +100,15 @@ function Calendar({ selected, onSelect, disabled, fromYear = 1900, toYear = new 
   }
 
   return (
-    <div className={cn("p-4 bg-white rounded-2xl border shadow-sm", className)}>
+    <div className={cn("p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm", className)}>
       {/* Header with navigation and dropdowns */}
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={prevMonth}
-          className="p-1 hover:bg-gray-100 rounded"
+          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
           type="button"
         >
-          <ChevronLeft className="h-4 w-4 text-gray-600" />
+          <ChevronLeft className="h-4 w-4 text-gray-600 dark:text-gray-300" />
         </button>
 
         <div className="flex items-center gap-2">
@@ -117,15 +117,15 @@ function Calendar({ selected, onSelect, disabled, fromYear = 1900, toYear = new 
             <select
               value={currentMonth}
               onChange={(e) => setCurrentMonth(parseInt(e.target.value))}
-              className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="appearance-none bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               {months.map((month, index) => (
-                <option key={month} value={index}>
+                <option key={month} value={index} className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                   {month}
                 </option>
               ))}
             </select>
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
           </div>
 
           {/* Year Dropdown - hide if hideYear is true */}
@@ -134,25 +134,25 @@ function Calendar({ selected, onSelect, disabled, fromYear = 1900, toYear = new 
               <select
                 value={currentYear}
                 onChange={(e) => setCurrentYear(parseInt(e.target.value))}
-                className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="appearance-none bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 {Array.from({ length: toYear - fromYear + 1 }, (_, i) => fromYear + i).map(year => (
-                  <option key={year} value={year}>
+                  <option key={year} value={year} className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                     {year}
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
             </div>
           )}
         </div>
 
         <button
           onClick={nextMonth}
-          className="p-1 hover:bg-gray-100 rounded"
+          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
           type="button"
         >
-          <ChevronRight className="h-4 w-4 text-gray-600" />
+          <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-300" />
         </button>
       </div>
 
@@ -161,7 +161,7 @@ function Calendar({ selected, onSelect, disabled, fromYear = 1900, toYear = new 
         {weekDays.map((day) => (
           <div
             key={day}
-            className="p-2 text-center text-sm font-normal text-gray-500"
+            className="p-2 text-center text-sm font-normal text-gray-500 dark:text-gray-400"
           >
             {day}
           </div>
@@ -183,12 +183,12 @@ function Calendar({ selected, onSelect, disabled, fromYear = 1900, toYear = new 
               disabled={disabled || !isCurrentMonth}
               className={cn(
                 "h-9 w-full text-sm font-normal transition-colors",
-                "hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                "hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900",
                 {
-                  "text-gray-400": !isCurrentMonth,
-                  "text-gray-900": isCurrentMonth && !selected && !disabled,
-                  "text-gray-400 cursor-not-allowed": disabled,
-                  "bg-black text-white hover:bg-black rounded-lg": selected,
+                  "text-gray-400 dark:text-gray-600": !isCurrentMonth,
+                  "text-gray-900 dark:text-gray-100": isCurrentMonth && !selected && !disabled,
+                  "text-gray-400 dark:text-gray-600 cursor-not-allowed": disabled,
+                  "bg-black dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-white rounded-lg": selected,
                 }
               )}
             >
