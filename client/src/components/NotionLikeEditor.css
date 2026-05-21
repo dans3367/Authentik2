@@ -942,6 +942,367 @@
   color: #f3f4f6;
 }
 
+/* ─── Image Browser Modal ─────────────────────────────────────────────────── */
+
+.notion-image-browser-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.notion-image-browser {
+  width: min(760px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24), 0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+.notion-image-browser-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.notion-image-browser-header h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.notion-image-browser-header p {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.notion-image-browser-close {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.notion-image-browser-close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.notion-image-browser-custom,
+.notion-image-browser-search {
+  display: flex;
+  gap: 10px;
+}
+
+.notion-image-browser-custom {
+  flex-direction: column;
+}
+
+.notion-image-browser-custom label {
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.notion-image-browser-url-row,
+.notion-image-browser-search {
+  align-items: center;
+}
+
+.notion-image-browser-url-row {
+  display: flex;
+  gap: 10px;
+}
+
+.notion-image-browser-url-row input,
+.notion-image-browser-search-input input {
+  min-width: 0;
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+}
+
+.notion-image-browser-url-row input::placeholder,
+.notion-image-browser-search-input input::placeholder {
+  color: #9ca3af;
+}
+
+.notion-image-browser-url-row input,
+.notion-image-browser-search-input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  background: #f9fafb;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.notion-image-browser-url-row input:focus,
+.notion-image-browser-search-input:focus-within {
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.notion-image-browser-search-input {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+}
+
+.notion-image-browser-url-row button,
+.notion-image-browser-search > button {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 0 14px;
+  border: none;
+  border-radius: 9px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.notion-image-browser-url-row button:hover,
+.notion-image-browser-search > button:hover {
+  background: #1f2937;
+}
+
+.notion-image-browser-url-row button:disabled,
+.notion-image-browser-search > button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.notion-image-browser-error {
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 9px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.notion-image-browser-results {
+  min-height: 220px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.notion-image-browser-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.notion-image-browser-result {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f3f4f6;
+  cursor: pointer;
+  padding: 0;
+}
+
+.notion-image-browser-result:hover {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.notion-image-browser-result img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform 0.18s ease;
+}
+
+.notion-image-browser-result:hover img {
+  transform: scale(1.03);
+}
+
+.notion-image-browser-result span {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  left: 6px;
+  overflow: hidden;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(17, 24, 39, 0.74);
+  color: #ffffff;
+  font-size: 11px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notion-image-browser-skeleton {
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 45%, #f3f4f6 90%);
+  background-size: 200% 100%;
+  animation: notion-image-browser-pulse 1.25s ease-in-out infinite;
+}
+
+@keyframes notion-image-browser-pulse {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.notion-image-browser-empty {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #d1d5db;
+  border-radius: 10px;
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 13px;
+  text-align: center;
+}
+
+.dark .notion-image-browser {
+  background: #1f2937;
+  border-color: #374151;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.44);
+}
+
+.dark .notion-image-browser-header h3,
+.dark .notion-image-browser-url-row input,
+.dark .notion-image-browser-search-input input {
+  color: #f9fafb;
+}
+
+.dark .notion-image-browser-header p,
+.dark .notion-image-browser-custom label,
+.dark .notion-image-browser-search-input {
+  color: #9ca3af;
+}
+
+.dark .notion-image-browser-close {
+  color: #d1d5db;
+}
+
+.dark .notion-image-browser-close:hover {
+  background: #374151;
+  color: #ffffff;
+}
+
+.dark .notion-image-browser-url-row input,
+.dark .notion-image-browser-search-input {
+  background: #111827;
+  border-color: #374151;
+}
+
+.dark .notion-image-browser-url-row input:focus,
+.dark .notion-image-browser-search-input:focus-within {
+  border-color: #60a5fa;
+  background: #172033;
+}
+
+.dark .notion-image-browser-url-row button,
+.dark .notion-image-browser-search > button {
+  background: #2563eb;
+}
+
+.dark .notion-image-browser-url-row button:hover,
+.dark .notion-image-browser-search > button:hover {
+  background: #1d4ed8;
+}
+
+.dark .notion-image-browser-error {
+  background: rgba(127, 29, 29, 0.28);
+  border-color: rgba(248, 113, 113, 0.36);
+  color: #fecaca;
+}
+
+.dark .notion-image-browser-result {
+  background: #111827;
+  border-color: #374151;
+}
+
+.dark .notion-image-browser-skeleton {
+  background: linear-gradient(90deg, #111827 0%, #374151 45%, #111827 90%);
+  background-size: 200% 100%;
+}
+
+.dark .notion-image-browser-empty {
+  background: #111827;
+  border-color: #374151;
+  color: #9ca3af;
+}
+
+@media (max-width: 640px) {
+  .notion-image-browser-overlay {
+    align-items: stretch;
+    padding: 12px;
+  }
+
+  .notion-image-browser {
+    max-height: calc(100vh - 24px);
+    padding: 16px;
+  }
+
+  .notion-image-browser-url-row,
+  .notion-image-browser-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .notion-image-browser-url-row button,
+  .notion-image-browser-search > button {
+    width: 100%;
+  }
+
+  .notion-image-browser-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* ─── Slash Command Menu ──────────────────────────────────────────────────── */
 
 .notion-slash-menu {

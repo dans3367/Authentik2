@@ -29,6 +29,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Save, Loader2, X, Mail, CheckCircle2, UserCheck, Tag, Calendar, Shield, AlertTriangle, CalendarIcon, ShieldAlert, Settings2, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -95,17 +96,21 @@ export default function EditEmailContact() {
   const [match, params] = useRoute("/contacts/edit/:id");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const canEditContacts = !permissionsLoading && hasPermission("contacts.edit");
+  const isEditPermissionDenied = !permissionsLoading && !canEditContacts;
+  const contactId = match && params?.id ? params.id : "";
+  const hasRouteContactId = Boolean(contactId);
 
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedLists, setSelectedLists] = useState<string[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
 
-  if (!match || !params?.id) {
-    setLocation("/contacts");
-    return null;
-  }
-
-  const contactId = params.id;
+  useEffect(() => {
+    if (!hasRouteContactId) {
+      setLocation("/contacts");
+    }
+  }, [hasRouteContactId, setLocation]);
 
   // Fetch contact data
   const { data: contactData, isLoading: isContactLoading, error: contactError } = useQuery({
@@ -114,6 +119,7 @@ export default function EditEmailContact() {
       const res = await apiRequest("GET", `${queryKey[0]}/${queryKey[1]}`);
       return res.json();
     },
+    enabled: hasRouteContactId && canEditContacts,
   });
 
 
@@ -124,6 +130,7 @@ export default function EditEmailContact() {
       const res = await apiRequest("GET", queryKey[0]);
       return res.json();
     },
+    enabled: canEditContacts,
   });
 
   // Fetch available lists
@@ -133,6 +140,7 @@ export default function EditEmailContact() {
       const res = await apiRequest("GET", queryKey[0]);
       return res.json();
     },
+    enabled: canEditContacts,
   });
 
   // Fetch shops for shop assignment dropdown
@@ -143,6 +151,7 @@ export default function EditEmailContact() {
       return response.json();
     },
     staleTime: Infinity,
+    enabled: canEditContacts,
   });
   const shopsList: { id: string; name: string; status: string }[] = shopsData?.shops || [];
 
@@ -153,7 +162,7 @@ export default function EditEmailContact() {
       const res = await apiRequest("GET", `/api/email-contacts/${contactId}/custom-fields`);
       return res.json();
     },
-    enabled: !!contactId,
+    enabled: hasRouteContactId && canEditContacts,
   });
 
   const customFieldDefs: any[] = customFieldsData?.customFields || [];
@@ -320,12 +329,38 @@ export default function EditEmailContact() {
     );
   };
 
-  if (isContactLoading) {
+  if (!hasRouteContactId) {
+    return null;
+  }
+
+  if (permissionsLoading || isContactLoading) {
     return (
       <div className="max-w-6xl mx-auto p-4">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
+      </div>
+    );
+  }
+
+  if (isEditPermissionDenied) {
+    return (
+      <div className="max-w-6xl mx-auto p-4">
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <ShieldAlert className="h-12 w-12 text-orange-500" />
+              <h2 className="text-xl font-semibold">Permission Denied</h2>
+              <p className="text-muted-foreground text-sm max-w-md">
+                You do not have permission to edit contacts. Contact your administrator to request access.
+              </p>
+              <Button variant="outline" onClick={() => setLocation("/contacts")}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Contacts
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

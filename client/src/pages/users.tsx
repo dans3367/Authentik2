@@ -15,7 +15,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserCheck, UserX, Calendar, Mail, MapPin, Eye, EyeOff, X, User as UserIcon, KeyRound, AlertTriangle } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Users as UsersIcon, Plus, Search, Filter, Edit, Trash2, Shield, UserCheck, UserX, Calendar, Mail, MapPin, Eye, EyeOff, X, User as UserIcon, KeyRound, AlertTriangle, CheckCircle2, XCircle, Clock, Hash } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -144,6 +145,7 @@ export default function UsersPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isViewMode, setIsViewMode] = useState(false);
+  const [panelUser, setPanelUser] = useState<User | null>(null);
 
   // State for tracking unsaved changes in edit dialog
   const [hasUnsavedEditChanges, setHasUnsavedEditChanges] = useState(false);
@@ -655,7 +657,7 @@ export default function UsersPage() {
               <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-card"></div>
             </div>
             {isOwnerSelf ? (
-              <Link href="/profile" className="group">
+              <Link href="/profile" className="group" onClick={(e) => e.stopPropagation()}>
                 <div>
                   <div className="font-medium text-primary group-hover:underline">
                     {name}
@@ -782,7 +784,7 @@ export default function UsersPage() {
         // Current Owner: show profile link + set own password
         if (user.id === currentUser.id && user.role === 'Owner') {
           return (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
               <Link href="/profile">
                 <Button
                   variant="ghost"
@@ -814,7 +816,7 @@ export default function UsersPage() {
         // Users at or above your role level are view-only
         if (!canActOnUser(currentUser.role || '', user.role || '')) {
           return (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
               <Button
                 variant="ghost"
                 size="icon"
@@ -831,7 +833,7 @@ export default function UsersPage() {
         const canSetPassword = canEditUsers && canSetPasswordFor(user.role || '');
 
         return (
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
             {canEditUsers && (
               <Button
                 variant="ghost"
@@ -1248,6 +1250,7 @@ export default function UsersPage() {
                 showPagination={true}
                 pageSize={10}
                 showColumnVisibility={false}
+                onRowClick={(user) => setPanelUser(user)}
               />
             </div>
 
@@ -1272,7 +1275,10 @@ export default function UsersPage() {
                       <CardContent className="p-4">
                         {/* User Header */}
                         <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center gap-3 flex-1">
+                          <div
+                            className="flex items-center gap-3 flex-1 cursor-pointer"
+                            onClick={() => setPanelUser(user)}
+                          >
                             <div className="relative">
                               <Avatar className="h-12 w-12">
                                 <AvatarImage src="" />
@@ -1287,7 +1293,7 @@ export default function UsersPage() {
                             <div className="flex-1 min-w-0">
                               <h3 className="font-medium text-foreground truncate" data-testid={`text-user-name-card-${user.id}`}>
                                 {user.role === 'Owner' && user.id === currentUser.id ? (
-                                  <Link href="/profile" className="text-primary hover:underline">
+                                  <Link href="/profile" className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
                                     {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'No name'}
                                   </Link>
                                 ) : (
@@ -1296,7 +1302,7 @@ export default function UsersPage() {
                               </h3>
                               <p className="text-sm text-muted-foreground truncate" data-testid={`text-user-email-card-${user.id}`}>
                                 {user.role === 'Owner' && user.id === currentUser.id ? (
-                                  <Link href="/profile" className="text-primary/80 hover:text-primary hover:underline">{user.email}</Link>
+                                  <Link href="/profile" className="text-primary/80 hover:text-primary hover:underline" onClick={(e) => e.stopPropagation()}>{user.email}</Link>
                                 ) : (
                                   user.email
                                 )}
@@ -1493,6 +1499,243 @@ export default function UsersPage() {
               )}
             </div>
           </div>
+
+          {/* User Detail Side Panel */}
+          <Sheet open={!!panelUser} onOpenChange={(open) => !open && setPanelUser(null)}>
+            <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+              {panelUser && (
+                <>
+                  <SheetHeader className="text-left">
+                    <div className="flex items-center gap-4 mb-2">
+                      <div className="relative">
+                        <Avatar className="h-16 w-16">
+                          <AvatarImage src="" />
+                          <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
+                            {getUserInitials(panelUser.firstName || undefined, panelUser.lastName || undefined)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {panelUser.isActive && (
+                          <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-green-500 border-2 border-card"></div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <SheetTitle className="truncate">
+                          {panelUser.firstName || panelUser.lastName
+                            ? `${panelUser.firstName || ''} ${panelUser.lastName || ''}`.trim()
+                            : t('users.table.noName')}
+                        </SheetTitle>
+                        <SheetDescription className="truncate">{panelUser.email}</SheetDescription>
+                      </div>
+                    </div>
+                  </SheetHeader>
+
+                  <div className="mt-6 space-y-5">
+                    {/* Role & Status */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+                          {t('users.cardView.role')}
+                        </p>
+                        <Badge
+                          variant="secondary"
+                          className={`${
+                            panelUser.role === 'Owner'
+                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400'
+                              : panelUser.role === 'Administrator'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                              : panelUser.role === 'Manager'
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                              : 'bg-muted text-muted-foreground'
+                          } hover:bg-opacity-80 font-normal border-0`}
+                        >
+                          {t(getRoleTranslationKey(panelUser.role || ''))}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+                          {t('users.table.status')}
+                        </p>
+                        {panelUser.isActive ? (
+                          <div className="flex items-center gap-1.5">
+                            <UserCheck className="h-4 w-4 text-green-600" />
+                            <span className="text-green-600 font-medium text-sm">{t('users.status.active')}</span>
+                          </div>
+                        ) : (panelUser as any).suspendedByDowngrade ? (
+                          <div className="flex items-center gap-1.5">
+                            <UserX className="h-4 w-4 text-amber-600" />
+                            <span className="text-amber-600 font-medium text-sm">Suspended (plan limit)</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <UserX className="h-4 w-4 text-red-600" />
+                            <span className="text-red-600 font-medium text-sm">{t('users.status.inactive')}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-border" />
+
+                    {/* Contact / Identity */}
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <Mail className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Email</p>
+                          <p className="text-sm text-foreground break-all">{panelUser.email}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        {panelUser.emailVerified ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Email Verified</p>
+                          <p className="text-sm text-foreground">{panelUser.emailVerified ? 'Yes' : 'No'}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <UserIcon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">First Name</p>
+                          <p className="text-sm text-foreground">{panelUser.firstName || '—'}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <UserIcon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Last Name</p>
+                          <p className="text-sm text-foreground">{panelUser.lastName || '—'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-border" />
+
+                    {/* Activity */}
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Last Login</p>
+                          <p className="text-sm text-foreground">
+                            {panelUser.lastLoginAt
+                              ? `${format(new Date(panelUser.lastLoginAt), 'MMM d, yyyy, h:mm a')} (${formatDistanceToNow(new Date(panelUser.lastLoginAt), { addSuffix: true })})`
+                              : t('users.table.never')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <Calendar className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Joined</p>
+                          <p className="text-sm text-foreground">
+                            {panelUser.createdAt
+                              ? format(new Date(panelUser.createdAt), 'MMM d, yyyy, h:mm a')
+                              : '—'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <Calendar className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Last Updated</p>
+                          <p className="text-sm text-foreground">
+                            {panelUser.updatedAt
+                              ? format(new Date(panelUser.updatedAt), 'MMM d, yyyy, h:mm a')
+                              : '—'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-border" />
+
+                    {/* IDs */}
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <Hash className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">User ID</p>
+                          <p className="text-xs text-foreground font-mono break-all">{panelUser.id}</p>
+                        </div>
+                      </div>
+
+                      {(panelUser as any).tenantId && (
+                        <div className="flex items-start gap-3">
+                          <Hash className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Tenant ID</p>
+                            <p className="text-xs text-foreground font-mono break-all">{(panelUser as any).tenantId}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    {panelUser.id !== currentUser.id && canActOnUser(currentUser.role || '', panelUser.role || '') && (
+                      <>
+                        <div className="h-px bg-border" />
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {canEditUsers && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const u = panelUser;
+                                setPanelUser(null);
+                                handleEditUser(u);
+                              }}
+                            >
+                              <Edit className="h-4 w-4 mr-1.5" />
+                              Edit
+                            </Button>
+                          )}
+                          {canEditUsers && canSetPasswordFor(panelUser.role || '') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const u = panelUser;
+                                setPanelUser(null);
+                                handleOpenSetPassword(u);
+                              }}
+                            >
+                              <KeyRound className="h-4 w-4 mr-1.5" />
+                              Set Password
+                            </Button>
+                          )}
+                          {canDeleteUsers && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                              onClick={() => {
+                                if (confirm(`Are you sure you want to delete ${panelUser.firstName} ${panelUser.lastName}?`)) {
+                                  handleDeleteUser(panelUser.id);
+                                  setPanelUser(null);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1.5" />
+                              Delete
+                            </Button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </SheetContent>
+          </Sheet>
 
           {/* Edit User Dialog */}
           <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose}>

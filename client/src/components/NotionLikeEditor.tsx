@@ -10,10 +10,10 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Highlight } from "@tiptap/extension-highlight";
 import { HandlebarVariable, DEFAULT_HANDLEBAR_VARIABLES } from "@/extensions/HandlebarVariable";
-import { Table } from "@tiptap/extension-table";
+import { Table as TiptapTable } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
-import { TableCell } from "@tiptap/extension-table-cell";
-import { TableHeader } from "@tiptap/extension-table-header";
+import { TableCell as TiptapTableCell } from "@tiptap/extension-table-cell";
+import { TableHeader as TiptapTableHeader } from "@tiptap/extension-table-header";
 import {
     Bold,
     Italic,
@@ -45,12 +45,17 @@ import {
     Languages,
     ChevronRight,
     Loader2,
+    Search,
+    RefreshCw,
+    X,
+    Check,
     User,
     Mail,
     Phone,
     MapPin,
     Clock,
     CreditCard,
+    ShoppingBag,
     Table as TableIcon,
     Rows3,
     Columns3,
@@ -75,6 +80,7 @@ import {
     Paintbrush,
 } from "lucide-react";
 import { improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText, generateNewsletter } from "@/lib/aiApi";
+import { apiRequest } from "@/lib/queryClient";
 import "./NotionLikeEditor.css";
 
 // ── Template Variables ──────────────────────────────────────────────────────────
@@ -90,6 +96,116 @@ const TEMPLATE_VARIABLES = [
 
 const CONTACT_CARD_TEMPLATE = `<p><strong>{{company_name}}</strong></p><p>\u2709 {{email}}</p><p>\u260E {{phone}}</p><p>\u{1F4CD} {{address}}</p>`;
 
+const PRODUCT_CARD_TEMPLATE_TYPE = "product-card-template";
+const PRODUCT_IMAGE_PLACEHOLDER = "https://placehold.co/280x180/f8fafc/64748b?text=Product+Photo";
+
+const ProductAwareTable = TiptapTable.extend({
+    addAttributes() {
+        return {
+            templateType: {
+                default: null,
+                parseHTML: (element: HTMLElement) =>
+                    element.getAttribute("data-template-type") ||
+                    (element.classList.contains("notion-product-card-template") ? PRODUCT_CARD_TEMPLATE_TYPE : null),
+                renderHTML: (attributes: { templateType?: string | null }) =>
+                    attributes.templateType
+                        ? { "data-template-type": attributes.templateType, class: "notion-product-card-template" }
+                        : {},
+            },
+            lockedStructure: {
+                default: false,
+                parseHTML: (element: HTMLElement) => element.getAttribute("data-locked-structure") === "true",
+                renderHTML: (attributes: { lockedStructure?: boolean }) =>
+                    attributes.lockedStructure ? { "data-locked-structure": "true" } : {},
+            },
+        };
+    },
+});
+
+const StyledTableCell = TiptapTableCell.extend({
+    addAttributes() {
+        return {
+            ...this.parent?.(),
+            style: {
+                default: null,
+                parseHTML: (element: HTMLElement) => element.getAttribute("style"),
+                renderHTML: (attributes: { style?: string | null }) =>
+                    attributes.style ? { style: attributes.style } : {},
+            },
+        };
+    },
+});
+
+const StyledTableHeader = TiptapTableHeader.extend({
+    addAttributes() {
+        return {
+            ...this.parent?.(),
+            style: {
+                default: null,
+                parseHTML: (element: HTMLElement) => element.getAttribute("style"),
+                renderHTML: (attributes: { style?: string | null }) =>
+                    attributes.style ? { style: attributes.style } : {},
+            },
+        };
+    },
+});
+
+function createProductCardCell() {
+    return {
+        type: "tableCell",
+        content: [
+            {
+                type: "image",
+                attrs: {
+                    src: PRODUCT_IMAGE_PLACEHOLDER,
+                    alt: "Product photo",
+                    width: 240,
+                },
+            },
+            {
+                type: "heading",
+                attrs: { level: 3 },
+                content: [{ type: "text", text: "Product Title" }],
+            },
+            {
+                type: "paragraph",
+                content: [
+                    {
+                        type: "text",
+                        marks: [{ type: "bold" }],
+                        text: "$00.00",
+                    },
+                ],
+            },
+            {
+                type: "paragraph",
+                content: [
+                    {
+                        type: "text",
+                        text: "Add product details, features, sizing, or availability here.",
+                    },
+                ],
+            },
+        ],
+    };
+}
+
+function createProductCardTemplate() {
+    return {
+        type: "table",
+        attrs: {
+            templateType: PRODUCT_CARD_TEMPLATE_TYPE,
+            lockedStructure: true,
+        },
+        content: [
+            {
+                type: "tableRow",
+                content: [createProductCardCell(), createProductCardCell()],
+            },
+        ],
+    };
+}
+
 // ── Slash Command Menu ─────────────────────────────────────────────────────────
 
 interface SlashCommand {
@@ -98,7 +214,17 @@ interface SlashCommand {
     icon: React.ReactNode;
     command: (editor: any) => void;
     isAiGenerate?: boolean;
+    isImageBrowser?: boolean;
     category?: string;
+}
+
+interface ImageSearchResult {
+    provider: "unsplash" | "pexels";
+    id: string;
+    url: string;
+    thumbUrl: string;
+    alt: string;
+    attribution: { name: string; profileUrl?: string };
 }
 
 function getSlashCommands(t: (key: string) => string): SlashCommand[] {
@@ -171,15 +297,17 @@ function getSlashCommands(t: (key: string) => string): SlashCommand[] {
         command: (editor) => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
     },
     {
+        title: t('notionEditor.slash.productCardTemplate'),
+        description: t('notionEditor.slash.productCardTemplateDesc'),
+        icon: <ShoppingBag className="w-4 h-4" style={{ color: '#f59e0b' }} />,
+        command: (editor) => editor.chain().focus().insertContent(createProductCardTemplate()).run(),
+    },
+    {
         title: t('notionEditor.slash.image'),
         description: t('notionEditor.slash.imageDesc'),
         icon: <ImageIcon className="w-4 h-4" />,
-        command: (editor) => {
-            const url = window.prompt(t('notionEditor.slash.imagePrompt'));
-            if (url) {
-                editor.chain().focus().setImage({ src: url }).run();
-            }
-        },
+        command: () => {},
+        isImageBrowser: true,
     },
     {
         title: t('notionEditor.slash.firstName'),
@@ -394,6 +522,145 @@ function SlashCommandMenu({
                 </>
             )}
         </div>
+    );
+}
+
+function isSafeImageUrl(value: string) {
+    const trimmed = value.trim();
+    if (trimmed.startsWith("data:image/")) return true;
+
+    try {
+        const parsed = new URL(trimmed);
+        return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+function ImageBrowserModal({
+    open,
+    query,
+    customUrl,
+    results,
+    isSearching,
+    error,
+    onQueryChange,
+    onCustomUrlChange,
+    onSearch,
+    onPick,
+    onApplyUrl,
+    onClose,
+    t,
+}: {
+    open: boolean;
+    query: string;
+    customUrl: string;
+    results: ImageSearchResult[];
+    isSearching: boolean;
+    error: string;
+    onQueryChange: (query: string) => void;
+    onCustomUrlChange: (url: string) => void;
+    onSearch: (query: string) => void;
+    onPick: (result: ImageSearchResult) => void;
+    onApplyUrl: () => void;
+    onClose: () => void;
+    t: (key: string, fallback?: string) => string;
+}) {
+    if (!open || typeof document === "undefined") return null;
+
+    const canSearch = query.trim().length >= 2 && !isSearching;
+    const canApplyUrl = isSafeImageUrl(customUrl);
+
+    return createPortal(
+        <div className="notion-image-browser-overlay" onMouseDown={onClose}>
+            <div className="notion-image-browser" onMouseDown={(e) => e.stopPropagation()}>
+                <div className="notion-image-browser-header">
+                    <div>
+                        <h3>{t("notionEditor.imageBrowser.title", "Choose image")}</h3>
+                        <p>{t("notionEditor.imageBrowser.subtitle", "Search photos or paste an image URL.")}</p>
+                    </div>
+                    <button type="button" className="notion-image-browser-close" onClick={onClose} aria-label={t("notionEditor.imageBrowser.close", "Close")}>
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+
+                <div className="notion-image-browser-custom">
+                    <label>{t("notionEditor.imageBrowser.urlLabel", "Image URL")}</label>
+                    <div className="notion-image-browser-url-row">
+                        <input
+                            value={customUrl}
+                            onChange={(e) => onCustomUrlChange(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && canApplyUrl) {
+                                    e.preventDefault();
+                                    onApplyUrl();
+                                }
+                            }}
+                            placeholder="https://example.com/image.jpg"
+                        />
+                        <button type="button" onClick={onApplyUrl} disabled={!canApplyUrl}>
+                            <Check className="w-4 h-4" />
+                            <span>{t("notionEditor.imageBrowser.useUrl", "Use URL")}</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="notion-image-browser-search">
+                    <div className="notion-image-browser-search-input">
+                        <Search className="w-4 h-4" />
+                        <input
+                            value={query}
+                            onChange={(e) => onQueryChange(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && canSearch) {
+                                    e.preventDefault();
+                                    onSearch(query);
+                                }
+                            }}
+                            placeholder={t("notionEditor.imageBrowser.searchPlaceholder", "Search photos...")}
+                            autoFocus
+                        />
+                    </div>
+                    <button type="button" onClick={() => onSearch(query)} disabled={!canSearch}>
+                        {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                        <span>{t("notionEditor.imageBrowser.search", "Search")}</span>
+                    </button>
+                </div>
+
+                {error && <div className="notion-image-browser-error">{error}</div>}
+
+                <div className="notion-image-browser-results">
+                    {isSearching && results.length === 0 ? (
+                        <div className="notion-image-browser-grid">
+                            {Array.from({ length: 9 }).map((_, index) => (
+                                <div key={index} className="notion-image-browser-skeleton" />
+                            ))}
+                        </div>
+                    ) : results.length > 0 ? (
+                        <div className="notion-image-browser-grid">
+                            {results.map((result) => (
+                                <button
+                                    key={`${result.provider}-${result.id}`}
+                                    type="button"
+                                    className="notion-image-browser-result"
+                                    onClick={() => onPick(result)}
+                                >
+                                    <img src={result.thumbUrl} alt={result.alt} loading="lazy" />
+                                    <span>{result.attribution?.name ? `Photo by ${result.attribution.name}` : result.provider}</span>
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="notion-image-browser-empty">
+                            {query.trim().length < 2
+                                ? t("notionEditor.imageBrowser.emptyQuery", "Enter a search term to find photos.")
+                                : t("notionEditor.imageBrowser.emptyResults", "No results yet. Try a search.")}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>,
+        document.body
     );
 }
 
@@ -982,6 +1249,18 @@ function findTableAround(editor: any): { tableNode: any; tablePos: number } | nu
     return null;
 }
 
+function isLockedProductTableNode(tableNode: any): boolean {
+    return Boolean(
+        tableNode?.attrs?.lockedStructure ||
+        tableNode?.attrs?.templateType === PRODUCT_CARD_TEMPLATE_TYPE
+    );
+}
+
+function isSelectionInLockedProductTable(editor: any): boolean {
+    const found = findTableAround(editor);
+    return Boolean(found && isLockedProductTableNode(found.tableNode));
+}
+
 function moveColumn(editor: any, direction: -1 | 1) {
     const found = findTableAround(editor);
     if (!found) return;
@@ -1248,7 +1527,7 @@ function colorColumn(editor: any, color: string) {
         for (let c = 0; c < row.childCount; c++) {
             if (c === colIndex) {
                 const cell = row.child(c);
-                const style = color ? `background-color: ${color}` : '';
+                const style = getStyleWithBackgroundColor(cell.attrs.style, color);
                 cells.push(cell.type.create({ ...cell.attrs, style }, cell.content));
             } else {
                 cells.push(row.child(c));
@@ -1285,7 +1564,7 @@ function colorRow(editor: any, color: string) {
             const cells: any[] = [];
             for (let c = 0; c < row.childCount; c++) {
                 const cell = row.child(c);
-                const style = color ? `background-color: ${color}` : '';
+                const style = getStyleWithBackgroundColor(cell.attrs.style, color);
                 cells.push(cell.type.create({ ...cell.attrs, style }, cell.content));
             }
             newRows.push(row.type.create(row.attrs, cells));
@@ -1392,6 +1671,19 @@ const TABLE_CELL_COLORS = [
     { label: 'Light Pink', value: '#fce7f3' },
 ] as const;
 
+function getStyleWithBackgroundColor(currentStyle: string | null | undefined, color: string) {
+    const remainingStyles = (currentStyle || "")
+        .split(";")
+        .map((part) => part.trim())
+        .filter((part) => part && !/^background(?:-color)?\s*:/i.test(part));
+
+    if (color) {
+        remainingStyles.unshift(`background-color: ${color}`);
+    }
+
+    return remainingStyles.join("; ") || null;
+}
+
 // ── Table Floating Controls ─────────────────────────────────────────────────────
 
 interface ColInfo {
@@ -1406,9 +1698,27 @@ interface RowInfo {
     index: number;
 }
 
+function getScrollableAncestors(element: HTMLElement): Array<HTMLElement | Window> {
+    const ancestors: Array<HTMLElement | Window> = [];
+    let current = element.parentElement;
+
+    while (current && current !== document.body) {
+        const style = window.getComputedStyle(current);
+        const overflow = `${style.overflow} ${style.overflowX} ${style.overflowY}`;
+        if (/(auto|scroll|overlay)/.test(overflow)) {
+            ancestors.push(current);
+        }
+        current = current.parentElement;
+    }
+
+    ancestors.push(window);
+    return ancestors;
+}
+
 function TableFloatingControls({ editor }: { editor: any }) {
     const { t } = useTranslation();
     const [isInTable, setIsInTable] = useState(false);
+    const [isStructureLocked, setIsStructureLocked] = useState(false);
     const [columns, setColumns] = useState<ColInfo[]>([]);
     const [rows, setRows] = useState<RowInfo[]>([]);
     const [tablePos, setTablePos] = useState<{ top: number; left: number; width: number; height: number; bottom: number }>({
@@ -1570,6 +1880,40 @@ function TableFloatingControls({ editor }: { editor: any }) {
         try { viewDom = editor.view?.dom; } catch { /* not mounted yet */ }
         if (!viewDom) return;
 
+        let trackedTable: HTMLTableElement | null = null;
+        let trackedImages: HTMLImageElement[] = [];
+        let rafId: number | null = null;
+        const scheduleUpdate = () => {
+            if (rafId !== null) return;
+            rafId = requestAnimationFrame(() => {
+                rafId = null;
+                update();
+            });
+        };
+        const onImageLoad = () => { if (editor.isActive('table')) scheduleUpdate(); };
+        const resizeObserver = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(() => scheduleUpdate())
+            : null;
+
+        const trackTable = (table: HTMLTableElement | null) => {
+            if (trackedTable === table) return;
+            if (trackedTable) {
+                resizeObserver?.unobserve(trackedTable);
+                trackedImages.forEach((img) => img.removeEventListener('load', onImageLoad));
+                trackedImages = [];
+            }
+            trackedTable = table;
+            if (table) {
+                resizeObserver?.observe(table);
+                // Async-loaded images (product card placeholders) resize the table after load —
+                // listen so controls reposition once the image lays out.
+                trackedImages = Array.from(table.querySelectorAll('img')) as HTMLImageElement[];
+                trackedImages.forEach((img) => {
+                    if (!img.complete) img.addEventListener('load', onImageLoad, { once: true });
+                });
+            }
+        };
+
         const update = () => {
             let dom: HTMLElement | undefined;
             try { dom = editor.view?.dom; } catch { return; }
@@ -1577,25 +1921,51 @@ function TableFloatingControls({ editor }: { editor: any }) {
             const active = editor.isActive('table');
             if (!active) {
                 setIsInTable(false);
+                setIsStructureLocked(false);
                 setOpenColMenu(null);
                 setOpenRowMenu(null);
+                trackTable(null);
                 return;
             }
+            const activeTable = findTableAround(editor);
+            if (!activeTable) {
+                setIsInTable(false);
+                setIsStructureLocked(false);
+                setOpenColMenu(null);
+                setOpenRowMenu(null);
+                trackTable(null);
+                return;
+            }
+            setIsStructureLocked(isLockedProductTableNode(activeTable.tableNode));
 
             const { state } = editor;
             const { $from } = state.selection;
             let domNode: HTMLElement | null = null;
+            let tableRoot: HTMLElement | null = null;
             try {
+                const nodeDom = editor.view.nodeDOM(activeTable.tablePos);
+                tableRoot = nodeDom instanceof HTMLElement ? nodeDom : null;
                 domNode = editor.view.domAtPos($from.start($from.depth)).node as HTMLElement;
             } catch {
                 setIsInTable(false);
+                setIsStructureLocked(false);
+                trackTable(null);
                 return;
             }
-            const table = (domNode?.closest?.('table') || dom.querySelector('table')) as HTMLTableElement | null;
+            const table = (
+                tableRoot?.matches?.('table')
+                    ? tableRoot
+                    : tableRoot?.querySelector?.('table') ||
+                    domNode?.closest?.('table')
+            ) as HTMLTableElement | null;
             if (!table) {
                 setIsInTable(false);
+                setIsStructureLocked(false);
+                trackTable(null);
                 return;
             }
+
+            trackTable(table);
 
             // Use viewport-relative coords (position: fixed) to avoid overflow clipping
             const tableRect = table.getBoundingClientRect();
@@ -1627,19 +1997,27 @@ function TableFloatingControls({ editor }: { editor: any }) {
             setIsInTable(true);
         };
 
-        // Also re-measure on scroll so fixed-position handles track the table
-        const scrollEl = viewDom.closest('.notion-editor-area') as HTMLElement | null;
-        const onScroll = () => { if (editor.isActive('table')) update(); };
+        // Re-measure on every scrollable parent so fixed-position handles track embedded editors.
+        const scrollAncestors = getScrollableAncestors(viewDom);
+        const onViewportChange = () => { if (editor.isActive('table')) scheduleUpdate(); };
 
         editor.on('selectionUpdate', update);
         editor.on('transaction', update);
-        scrollEl?.addEventListener('scroll', onScroll, { passive: true });
-        window.addEventListener('scroll', onScroll, { passive: true });
+        scrollAncestors.forEach((ancestor) => {
+            ancestor.addEventListener('scroll', onViewportChange, { passive: true });
+        });
+        window.addEventListener('resize', onViewportChange);
+        scheduleUpdate();
         return () => {
             editor.off('selectionUpdate', update);
             editor.off('transaction', update);
-            scrollEl?.removeEventListener('scroll', onScroll);
-            window.removeEventListener('scroll', onScroll);
+            scrollAncestors.forEach((ancestor) => {
+                ancestor.removeEventListener('scroll', onViewportChange);
+            });
+            window.removeEventListener('resize', onViewportChange);
+            trackTable(null);
+            resizeObserver?.disconnect();
+            if (rafId !== null) cancelAnimationFrame(rafId);
         };
     }, [editor]);
 
@@ -1695,6 +2073,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
     const handleColAction = (action: string, colIndex: number) => {
         setOpenColMenu(null);
         setColSubmenu(null);
+        if (isStructureLocked && ['insertLeft', 'insertRight', 'duplicate'].includes(action)) return;
         focusCellInColumn(colIndex);
         setTimeout(() => {
             switch (action) {
@@ -1749,6 +2128,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
     const handleRowAction = (action: string, rowIndex: number) => {
         setOpenRowMenu(null);
         setRowSubmenu(null);
+        if (isStructureLocked && ['insertAbove', 'insertBelow', 'moveUp', 'moveDown', 'duplicate'].includes(action)) return;
         focusCellInRow(rowIndex);
         setTimeout(() => {
             switch (action) {
@@ -1796,8 +2176,8 @@ function TableFloatingControls({ editor }: { editor: any }) {
 
     if (!isInTable || columns.length === 0) return null;
 
-    const canMerge = editor.can().mergeCells();
-    const canSplit = editor.can().splitCell();
+    const canMerge = !isStructureLocked && editor.can().mergeCells();
+    const canSplit = !isStructureLocked && editor.can().splitCell();
     const totalCols = columns.length;
     const totalRows = rows.length;
 
@@ -1832,24 +2212,28 @@ function TableFloatingControls({ editor }: { editor: any }) {
                         {/* Column dropdown menu */}
                         {openColMenu === col.index && (
                             <div className="table-col-dropdown">
-                                <div className="table-dropdown-section-label">{t('notionEditor.table.insert')}</div>
-                                <button
-                                    className="table-dropdown-item"
-                                    onClick={() => handleColAction('insertLeft', col.index)}
-                                    onMouseDown={(e) => e.preventDefault()}
-                                >
-                                    <PanelLeftOpen className="w-4 h-4" />
-                                    <span>{t('notionEditor.table.insertColLeft')}</span>
-                                </button>
-                                <button
-                                    className="table-dropdown-item"
-                                    onClick={() => handleColAction('insertRight', col.index)}
-                                    onMouseDown={(e) => e.preventDefault()}
-                                >
-                                    <PanelRightOpen className="w-4 h-4" />
-                                    <span>{t('notionEditor.table.insertColRight')}</span>
-                                </button>
-                                <div className="table-dropdown-divider" />
+                                {!isStructureLocked && (
+                                    <>
+                                        <div className="table-dropdown-section-label">{t('notionEditor.table.insert')}</div>
+                                        <button
+                                            className="table-dropdown-item"
+                                            onClick={() => handleColAction('insertLeft', col.index)}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                        >
+                                            <PanelLeftOpen className="w-4 h-4" />
+                                            <span>{t('notionEditor.table.insertColLeft')}</span>
+                                        </button>
+                                        <button
+                                            className="table-dropdown-item"
+                                            onClick={() => handleColAction('insertRight', col.index)}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                        >
+                                            <PanelRightOpen className="w-4 h-4" />
+                                            <span>{t('notionEditor.table.insertColRight')}</span>
+                                        </button>
+                                        <div className="table-dropdown-divider" />
+                                    </>
+                                )}
                                 <div className="table-dropdown-section-label">{t('notionEditor.table.move')}</div>
                                 <button
                                     className="table-dropdown-item"
@@ -1870,14 +2254,16 @@ function TableFloatingControls({ editor }: { editor: any }) {
                                     <span>{t('notionEditor.table.moveColRight')}</span>
                                 </button>
                                 <div className="table-dropdown-divider" />
-                                <button
-                                    className="table-dropdown-item"
-                                    onClick={() => handleColAction('duplicate', col.index)}
-                                    onMouseDown={(e) => e.preventDefault()}
-                                >
-                                    <Copy className="w-4 h-4" />
-                                    <span>{t('notionEditor.table.duplicateCol')}</span>
-                                </button>
+                                {!isStructureLocked && (
+                                    <button
+                                        className="table-dropdown-item"
+                                        onClick={() => handleColAction('duplicate', col.index)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        <Copy className="w-4 h-4" />
+                                        <span>{t('notionEditor.table.duplicateCol')}</span>
+                                    </button>
+                                )}
                                 <button
                                     className="table-dropdown-item"
                                     onClick={() => handleColAction('sortAsc', col.index)}
@@ -2007,7 +2393,13 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 <div key={row.index} style={{ position: 'fixed', top: row.top, left: tablePos.left - 32, zIndex: openRowMenu === row.index ? 10002 : 9999 }}>
                     <button
                         onClick={() => handleRowClick(row.index)}
-                        onMouseDown={(e) => handleRowDragStart(row.index, e)}
+                        onMouseDown={(e) => {
+                            if (isStructureLocked) {
+                                e.preventDefault();
+                                return;
+                            }
+                            handleRowDragStart(row.index, e);
+                        }}
                         onMouseEnter={() => setHoveredRow(row.index)}
                         onMouseLeave={() => { if (dragRowFrom === null) setHoveredRow(null); }}
                         className={`table-row-drag-bar ${
@@ -2022,52 +2414,62 @@ function TableFloatingControls({ editor }: { editor: any }) {
                     {/* Row dropdown menu */}
                     {openRowMenu === row.index && (
                         <div className="table-row-dropdown" style={{ position: 'absolute', top: 0, right: '100%', marginRight: 4 }}>
-                            <div className="table-dropdown-section-label">{t('notionEditor.table.insert')}</div>
-                            <button
-                                className="table-dropdown-item"
-                                onClick={() => handleRowAction('insertAbove', row.index)}
-                                onMouseDown={(e) => e.preventDefault()}
-                            >
-                                <ArrowUp className="w-4 h-4" />
-                                <span>{t('notionEditor.table.insertRowAbove')}</span>
-                            </button>
-                            <button
-                                className="table-dropdown-item"
-                                onClick={() => handleRowAction('insertBelow', row.index)}
-                                onMouseDown={(e) => e.preventDefault()}
-                            >
-                                <ArrowDown className="w-4 h-4" />
-                                <span>{t('notionEditor.table.insertRowBelow')}</span>
-                            </button>
-                            <div className="table-dropdown-divider" />
-                            <div className="table-dropdown-section-label">{t('notionEditor.table.move')}</div>
-                            <button
-                                className="table-dropdown-item"
-                                onClick={() => handleRowAction('moveUp', row.index)}
-                                onMouseDown={(e) => e.preventDefault()}
-                                disabled={row.index === 0}
-                            >
-                                <ArrowUp className="w-4 h-4" />
-                                <span>{t('notionEditor.table.moveRowUp')}</span>
-                            </button>
-                            <button
-                                className="table-dropdown-item"
-                                onClick={() => handleRowAction('moveDown', row.index)}
-                                onMouseDown={(e) => e.preventDefault()}
-                                disabled={row.index >= totalRows - 1}
-                            >
-                                <ArrowDown className="w-4 h-4" />
-                                <span>{t('notionEditor.table.moveRowDown')}</span>
-                            </button>
-                            <div className="table-dropdown-divider" />
-                            <button
-                                className="table-dropdown-item"
-                                onClick={() => handleRowAction('duplicate', row.index)}
-                                onMouseDown={(e) => e.preventDefault()}
-                            >
-                                <Copy className="w-4 h-4" />
-                                <span>{t('notionEditor.table.duplicateRow')}</span>
-                            </button>
+                            {!isStructureLocked && (
+                                <>
+                                    <div className="table-dropdown-section-label">{t('notionEditor.table.insert')}</div>
+                                    <button
+                                        className="table-dropdown-item"
+                                        onClick={() => handleRowAction('insertAbove', row.index)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        <ArrowUp className="w-4 h-4" />
+                                        <span>{t('notionEditor.table.insertRowAbove')}</span>
+                                    </button>
+                                    <button
+                                        className="table-dropdown-item"
+                                        onClick={() => handleRowAction('insertBelow', row.index)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                        <ArrowDown className="w-4 h-4" />
+                                        <span>{t('notionEditor.table.insertRowBelow')}</span>
+                                    </button>
+                                    <div className="table-dropdown-divider" />
+                                </>
+                            )}
+                            {!isStructureLocked && (
+                                <>
+                                    <div className="table-dropdown-section-label">{t('notionEditor.table.move')}</div>
+                                    <button
+                                        className="table-dropdown-item"
+                                        onClick={() => handleRowAction('moveUp', row.index)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        disabled={row.index === 0}
+                                    >
+                                        <ArrowUp className="w-4 h-4" />
+                                        <span>{t('notionEditor.table.moveRowUp')}</span>
+                                    </button>
+                                    <button
+                                        className="table-dropdown-item"
+                                        onClick={() => handleRowAction('moveDown', row.index)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        disabled={row.index >= totalRows - 1}
+                                    >
+                                        <ArrowDown className="w-4 h-4" />
+                                        <span>{t('notionEditor.table.moveRowDown')}</span>
+                                    </button>
+                                    <div className="table-dropdown-divider" />
+                                </>
+                            )}
+                            {!isStructureLocked && (
+                                <button
+                                    className="table-dropdown-item"
+                                    onClick={() => handleRowAction('duplicate', row.index)}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                >
+                                    <Copy className="w-4 h-4" />
+                                    <span>{t('notionEditor.table.duplicateRow')}</span>
+                                </button>
+                            )}
                             <div className="table-dropdown-divider" />
                             <div className="table-dropdown-section-label">{t('notionEditor.table.format')}</div>
                             {/* Row color submenu */}
@@ -2218,37 +2620,41 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 />
             )}
 
-            {/* ── "+" button ─ add column (right edge) ────────────────────── */}
-            <button
-                className="table-extend-btn"
-                style={{
-                    position: 'fixed',
-                    top: tablePos.top + tablePos.height / 2 - 14,
-                    left: tablePos.left + tablePos.width + 6,
-                    zIndex: 9999,
-                }}
-                onClick={() => editor.chain().focus().addColumnAfter().run()}
-                onMouseDown={(e) => e.preventDefault()}
-                title={t('notionEditor.table.addColumn')}
-            >
-                <Plus className="w-3.5 h-3.5" />
-            </button>
+            {!isStructureLocked && (
+                <>
+                    {/* ── "+" button ─ add column (right edge) ────────────────────── */}
+                    <button
+                        className="table-extend-btn"
+                        style={{
+                            position: 'fixed',
+                            top: tablePos.top + tablePos.height / 2 - 14,
+                            left: tablePos.left + tablePos.width + 6,
+                            zIndex: 9999,
+                        }}
+                        onClick={() => editor.chain().focus().addColumnAfter().run()}
+                        onMouseDown={(e) => e.preventDefault()}
+                        title={t('notionEditor.table.addColumn')}
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                    </button>
 
-            {/* ── "+" button ─ add row (bottom edge) ──────────────────────── */}
-            <button
-                className="table-extend-btn"
-                style={{
-                    position: 'fixed',
-                    top: tablePos.bottom + 6,
-                    left: tablePos.left + tablePos.width / 2 - 14,
-                    zIndex: 9999,
-                }}
-                onClick={() => editor.chain().focus().addRowAfter().run()}
-                onMouseDown={(e) => e.preventDefault()}
-                title={t('notionEditor.table.addRow')}
-            >
-                <Plus className="w-3.5 h-3.5" />
-            </button>
+                    {/* ── "+" button ─ add row (bottom edge) ──────────────────────── */}
+                    <button
+                        className="table-extend-btn"
+                        style={{
+                            position: 'fixed',
+                            top: tablePos.bottom + 6,
+                            left: tablePos.left + tablePos.width / 2 - 14,
+                            zIndex: 9999,
+                        }}
+                        onClick={() => editor.chain().focus().addRowAfter().run()}
+                        onMouseDown={(e) => e.preventDefault()}
+                        title={t('notionEditor.table.addRow')}
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                    </button>
+                </>
+            )}
 
             {/* ── Delete table button ─ below the add-row button ──────────── */}
             <div
@@ -2317,6 +2723,46 @@ export default function NotionLikeEditor({
     const [aiGenerateModalOpen, setAiGenerateModalOpen] = useState(false);
     const [aiGeneratePrompt, setAiGeneratePrompt] = useState("");
     const [aiGenerating, setAiGenerating] = useState(false);
+    const [imageBrowserOpen, setImageBrowserOpen] = useState(false);
+    const [imageTarget, setImageTarget] = useState<{ pos: number | null; attrs: Record<string, any> } | null>(null);
+    const [imageSearchQuery, setImageSearchQuery] = useState("");
+    const [imageCustomUrl, setImageCustomUrl] = useState("");
+    const [imageResults, setImageResults] = useState<ImageSearchResult[]>([]);
+    const [imageSearching, setImageSearching] = useState(false);
+    const [imageSearchError, setImageSearchError] = useState("");
+
+    const runImageSearch = useCallback(async (value: string) => {
+        const term = value.trim();
+        if (term.length < 2) return;
+
+        setImageSearching(true);
+        setImageSearchError("");
+        try {
+            const res = await apiRequest("GET", `/api/newsletters/ai/unsplash-search?q=${encodeURIComponent(term)}&per_page=12`);
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || t("notionEditor.imageBrowser.searchError"));
+            setImageResults(data.results as ImageSearchResult[]);
+        } catch (error: any) {
+            setImageResults([]);
+            setImageSearchError(error?.message || t("notionEditor.imageBrowser.searchError"));
+        } finally {
+            setImageSearching(false);
+        }
+    }, [t]);
+
+    const openImageBrowser = useCallback((target: { pos: number | null; attrs: Record<string, any> } | null = null) => {
+        const attrs = target?.attrs || {};
+        const seed = (attrs.alt || attrs.title || "").trim();
+        const nextQuery = seed || "product photo";
+
+        setImageTarget(target);
+        setImageSearchQuery(nextQuery);
+        setImageCustomUrl(attrs.src || "");
+        setImageResults([]);
+        setImageSearchError("");
+        setImageBrowserOpen(true);
+        void runImageSearch(nextQuery);
+    }, [runImageSearch]);
 
     const slashCommands = getSlashCommands(t);
     const filteredCommands = slashCommands.filter(
@@ -2351,12 +2797,12 @@ export default function NotionLikeEditor({
             Color.configure({ types: ["textStyle"] }),
             Highlight.configure({ multicolor: true }),
             HandlebarVariable,
-            Table.configure({
+            ProductAwareTable.configure({
                 resizable: true,
             }),
             TableRow,
-            TableCell,
-            TableHeader,
+            StyledTableCell,
+            StyledTableHeader,
         ],
         content,
         onUpdate: ({ editor }) => {
@@ -2428,10 +2874,73 @@ export default function NotionLikeEditor({
                     }
                 }
 
+                if (event.key === "Tab" && isSelectionInLockedProductTable(editor)) {
+                    event.preventDefault();
+                    if (event.shiftKey) {
+                        editor.commands.goToPreviousCell();
+                    } else {
+                        editor.commands.goToNextCell();
+                    }
+                    return true;
+                }
+
+                return false;
+            },
+            handleClickOn: (_view, _pos, node, nodePos, event, direct) => {
+                if (direct && node.type.name === "image") {
+                    event.preventDefault();
+                    openImageBrowser({ pos: nodePos, attrs: node.attrs });
+                    return true;
+                }
+
                 return false;
             },
         },
     });
+
+    const closeImageBrowser = useCallback(() => {
+        setImageBrowserOpen(false);
+        setImageSearchError("");
+    }, []);
+
+    const applyImage = useCallback((src: string, alt?: string) => {
+        if (!editor) return;
+
+        const nextSrc = src.trim();
+        if (!isSafeImageUrl(nextSrc)) {
+            setImageSearchError(t("notionEditor.imageBrowser.invalidUrl"));
+            return;
+        }
+
+        if (imageTarget?.pos !== null && imageTarget?.pos !== undefined) {
+            const node = editor.state.doc.nodeAt(imageTarget.pos);
+            if (node?.type.name === "image") {
+                const nextAttrs = {
+                    ...node.attrs,
+                    src: nextSrc,
+                    alt: alt || node.attrs.alt || "",
+                };
+                const tr = editor.state.tr.setNodeMarkup(imageTarget.pos, undefined, nextAttrs);
+                editor.view.dispatch(tr);
+                editor.commands.focus();
+                onChange(editor.getHTML());
+                closeImageBrowser();
+                return;
+            }
+        }
+
+        editor.chain().focus().setImage({ src: nextSrc, alt: alt || "" }).run();
+        closeImageBrowser();
+    }, [closeImageBrowser, editor, imageTarget, onChange, t]);
+
+    const applyCustomImageUrl = useCallback(() => {
+        applyImage(imageCustomUrl, imageTarget?.attrs?.alt || "");
+    }, [applyImage, imageCustomUrl, imageTarget]);
+
+    const pickSearchImage = useCallback((result: ImageSearchResult) => {
+        const attribution = result.attribution?.name ? `Photo by ${result.attribution.name}` : result.alt;
+        applyImage(result.url, result.alt || attribution || "");
+    }, [applyImage]);
 
     // Track slash command trigger AND handlebar {{ trigger
     useEffect(() => {
@@ -2542,6 +3051,8 @@ export default function NotionLikeEditor({
             if (cmd.isAiGenerate) {
                 setAiGenerateModalOpen(true);
                 setAiGeneratePrompt("");
+            } else if (cmd.isImageBrowser) {
+                openImageBrowser(null);
             } else {
                 cmd.command(editor);
             }
@@ -2549,7 +3060,7 @@ export default function NotionLikeEditor({
             setSlashMenuOpen(false);
             slashStartPos.current = null;
         },
-        [editor]
+        [editor, openImageBrowser]
     );
 
     const handleAiGenerate = useCallback(async () => {
@@ -2679,6 +3190,22 @@ export default function NotionLikeEditor({
                     </div>
                 </div>
             )}
+
+            <ImageBrowserModal
+                open={imageBrowserOpen}
+                query={imageSearchQuery}
+                customUrl={imageCustomUrl}
+                results={imageResults}
+                isSearching={imageSearching}
+                error={imageSearchError}
+                onQueryChange={setImageSearchQuery}
+                onCustomUrlChange={setImageCustomUrl}
+                onSearch={runImageSearch}
+                onPick={pickSearchImage}
+                onApplyUrl={applyCustomImageUrl}
+                onClose={closeImageBrowser}
+                t={t}
+            />
 
             {/* Editor */}
             <div className="notion-editor-area">

@@ -12,6 +12,7 @@ import EmailActivityTimeline from "@/components/EmailActivityTimeline";
 import SendEmailModal from "@/components/SendEmailModal";
 import ScheduleEmailModal from "@/components/ScheduleEmailModal";
 import ManageContactTagsModal from "@/components/ManageContactTagsModal";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   ArrowLeft,
   Mail,
@@ -83,6 +84,8 @@ export default function ViewContact() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const canEditContacts = !permissionsLoading && hasPermission('contacts.edit');
 
   // Get return URL from query parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -454,14 +457,16 @@ export default function ViewContact() {
               <Calendar className="w-4 h-4 mr-2" />
               View Scheduled
             </Button>
-            <Button
-              variant="outline"
-              className="justify-center"
-              onClick={() => setLocation(`/contacts/edit/${contact.id}`)}
-            >
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
-            </Button>
+            {canEditContacts && (
+              <Button
+                variant="outline"
+                className="justify-center"
+                onClick={() => setLocation(`/contacts/edit/${contact.id}`)}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+            )}
           </div>
         </div>
       </div>
