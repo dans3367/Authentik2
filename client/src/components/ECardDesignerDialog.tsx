@@ -1047,7 +1047,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
           {hideTabs ? (
             <div className="w-full mt-4">
               {/* Designer Canvas - responsive width with forced LTR */}
-              <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
+              <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white dark:bg-card" dir="ltr" style={{ direction: 'ltr' }}>
                 {/* Image header */}
                 <div
                   ref={imageContainerRef}
@@ -1304,14 +1304,6 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                     )}
                   </div>
 
-                  <div className="flex items-center justify-end text-gray-500 text-xs sm:text-sm">
-                    <Input
-                      value={signature}
-                      onChange={(e) => setSignature(e.target.value)}
-                      placeholder={senderName ? t('ecards.designer.fromName', { name: senderName }) : t('ecards.designer.fromYourName')}
-                      className="w-full max-w-[180px] sm:max-w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -1359,7 +1351,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
 
               <TabsContent value="design" className="mt-4">
                 {/* Designer Canvas - responsive width with forced LTR */}
-                <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white" dir="ltr" style={{ direction: 'ltr' }}>
+                <div className="mx-auto w-full max-w-[600px] rounded-2xl overflow-hidden border bg-white dark:bg-card" dir="ltr" style={{ direction: 'ltr' }}>
                   {/* Image header */}
                   <div
                     ref={imageContainerRef}
@@ -1518,7 +1510,7 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                           )}
                           <Label
                             htmlFor="enable-custom-card-inline-tabs"
-                            className="text-sm font-medium cursor-pointer whitespace-nowrap"
+                            className="text-sm font-medium cursor-pointer whitespace-nowrap text-slate-900"
                           >
                             {customCardToggleLoading ? t('ecards.designer.updating') : t('ecards.designer.cardIsActive')}
                           </Label>
@@ -1590,14 +1582,6 @@ export function ECardDesignerDialog({ open, onOpenChange, initialThemeId, initia
                       )}
                     </div>
 
-                    <div className="flex items-center justify-end text-gray-500 text-xs sm:text-sm">
-                      <Input
-                        value={signature}
-                        onChange={(e) => setSignature(e.target.value)}
-                        placeholder={senderName ? t('ecards.designer.fromName', { name: senderName }) : t('ecards.designer.fromYourName')}
-                        className="w-full max-w-[180px] sm:max-w-[220px] text-right border-0 shadow-none px-0 focus-visible:ring-0 placeholder:text-gray-400"
-                      />
-                    </div>
                   </div>
                 </div>
 

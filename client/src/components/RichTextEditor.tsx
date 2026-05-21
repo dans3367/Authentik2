@@ -315,7 +315,7 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
     },
     editorProps: {
       attributes: {
-        class: `prose prose-sm dark:prose-invert max-w-none focus:outline-none ${className}`,
+        class: `prose prose-sm dark:prose-invert max-w-none focus:outline-none text-gray-500 dark:text-gray-400 ${className}`,
         style: 'min-height: 120px; padding: 8px;'
       },
     },
