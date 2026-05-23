@@ -483,9 +483,9 @@ html.dark,
 html.dark .Puck,
 html.dark #puck-portal-root {
   --puck-color-black: hsl(0, 0%, 95%);
-  --puck-color-white: hsl(215, 25%, 12%);
-  --puck-color-grey-12: hsl(215, 20%, 14%);
-  --puck-color-grey-11: hsl(215, 20%, 16%);
+  --puck-color-white: var(--card);
+  --puck-color-grey-12: var(--card);
+  --puck-color-grey-11: var(--card);
   --puck-color-grey-10: hsl(215, 20%, 18%);
   --puck-color-grey-09: hsl(215, 20%, 22%);
   --puck-color-grey-08: hsl(0, 0%, 50%);
@@ -516,16 +516,16 @@ html.dark .Puck [class*="FieldsPlugin"],
 html.dark .Puck [class*="PuckFields"],
 html.dark .Puck [class*="BlocksPlugin"],
 html.dark .Puck [class*="OutlinePlugin"] {
-  background: hsl(215, 25%, 12%) !important;
-  background-color: hsl(215, 25%, 12%) !important;
+  background: var(--input) !important;
+  background-color: var(--input) !important;
   color: hsl(0, 0%, 90%) !important;
-  border-color: hsl(215, 20%, 22%) !important;
+  border-color: var(--border) !important;
 }
 
 html.dark .Puck [class*="PuckLayout-inner"],
 html.dark .Puck [class*="PuckCanvas_"] {
-  background: hsl(215, 25%, 8%) !important;
-  background-color: hsl(215, 25%, 8%) !important;
+  background: var(--input) !important;
+  background-color: var(--input) !important;
 }
 
 html.dark .Puck [class*="PuckHeader-inner"],
@@ -536,7 +536,7 @@ html.dark .Puck [class*="PuckFields-field"],
 html.dark .Puck [class*="InputWrapper"],
 html.dark .Puck [class*="Input-radioGroupItems"],
 html.dark .Puck [class*="Input-radio"] {
-  border-color: hsl(215, 20%, 22%) !important;
+  border-color: var(--border) !important;
 }
 
 html.dark .Puck [class*="PuckHeader-title"],
@@ -560,10 +560,10 @@ html.dark .Puck [class*="Input-radioInner"],
 html.dark .Puck [class*="AutoField"],
 html.dark .Puck [class*="ObjectField"],
 html.dark .Puck [class*="ArrayField"] {
-  background: hsl(215, 20%, 16%) !important;
-  background-color: hsl(215, 20%, 16%) !important;
+  background: var(--card) !important;
+  background-color: var(--card) !important;
   color: hsl(0, 0%, 90%) !important;
-  border-color: hsl(215, 20%, 25%) !important;
+  border-color: var(--border) !important;
 }
 
 html.dark .Puck [class*="Input-input"]::placeholder,
@@ -575,10 +575,10 @@ html.dark .Puck textarea::placeholder {
 html.dark .Puck [class*="PuckHeader"] button,
 html.dark .Puck [class*="MenuBar"] button,
 html.dark .Puck [class*="IconButton"] {
-  background: hsl(215, 20%, 16%) !important;
-  background-color: hsl(215, 20%, 16%) !important;
+  background: var(--card) !important;
+  background-color: var(--card) !important;
   color: hsl(0, 0%, 85%) !important;
-  border-color: hsl(215, 20%, 25%) !important;
+  border-color: var(--border) !important;
 }
 
 html.dark .Puck [class*="PuckHeader"] button:hover,
@@ -656,9 +656,9 @@ html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
 .dark [class*="ComponentList"],
 .dark [class*="Fields-"],
 .dark [class*="FieldLabel"] {
-  background: hsl(215, 25%, 12%) !important;
+  background: var(--input) !important;
   color: hsl(0, 0%, 90%) !important;
-  border-color: hsl(215, 20%, 22%) !important;
+  border-color: var(--border) !important;
 }
 
 .dark [class*="SidebarSection-title"] {
@@ -666,7 +666,7 @@ html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
 }
 
 .dark [class*="SidebarSection-content"] {
-  background: hsl(215, 25%, 12%) !important;
+  background: var(--input) !important;
 }
 
 /* Puck field inputs in sidebar */
@@ -674,9 +674,9 @@ html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
 .dark [class*="Input-input"] input,
 .dark [class*="Input-input"] textarea,
 .dark [class*="Input-input"] select {
-  background: hsl(215, 20%, 16%) !important;
+  background: var(--card) !important;
   color: hsl(0, 0%, 90%) !important;
-  border-color: hsl(215, 20%, 25%) !important;
+  border-color: var(--border) !important;
 }
 
 .dark [class*="Input-label"],
@@ -686,8 +686,8 @@ html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
 
 /* Puck action bar & item overlays */
 .dark [class*="ActionBar"] {
-  background: hsl(215, 25%, 14%) !important;
-  border-color: hsl(215, 20%, 25%) !important;
+  background: var(--card) !important;
+  border-color: var(--border) !important;
 }
 
 .dark [class*="ActionBar"] button,
@@ -698,18 +698,18 @@ html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
 /* Puck canvas area */
 .dark [class*="Puck-frame"],
 .dark [class*="Puck-canvas"] {
-  background: hsl(215, 25%, 8%) !important;
+  background: var(--input) !important;
 }
 
 /* Puck draggable component list items */
 .dark [class*="ComponentList-item"] {
-  background: hsl(215, 20%, 16%) !important;
+  background: var(--card) !important;
   color: hsl(0, 0%, 85%) !important;
-  border-color: hsl(215, 20%, 22%) !important;
+  border-color: var(--border) !important;
 }
 
 .dark [class*="ComponentList-item"]:hover {
-  background: hsl(215, 20%, 20%) !important;
+  background: var(--bg-3) !important;
 }
 
 .dark [class*="ComponentList-item"] svg {
@@ -719,7 +719,7 @@ html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
 /* Puck layer tree */
 .dark [class*="LayerTree"],
 .dark [class*="LayerTree-item"] {
-  background: hsl(215, 25%, 12%) !important;
+  background: var(--input) !important;
   color: hsl(0, 0%, 85%) !important;
 }
 
@@ -738,13 +738,13 @@ html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
 
 /* RichText panel editor (inline styles injected in RichText block) */
 .dark .puck-panel-editor-wrap {
-  background: hsl(215, 20%, 16%) !important;
-  border-color: hsl(215, 20%, 25%) !important;
+  background: var(--card) !important;
+  border-color: var(--border) !important;
 }
 
 .dark .puck-panel-toolbar {
-  background: hsl(215, 20%, 14%) !important;
-  border-color: hsl(215, 20%, 22%) !important;
+  background: var(--card) !important;
+  border-color: var(--border) !important;
 }
 
 .dark .puck-panel-toolbar button {
@@ -752,7 +752,7 @@ html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
 }
 
 .dark .puck-panel-toolbar button:hover {
-  background: hsl(215, 20%, 22%) !important;
+  background: var(--bg-3) !important;
 }
 
 .dark .puck-panel-toolbar button.active {
@@ -761,7 +761,7 @@ html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
 }
 
 .dark .puck-panel-toolbar .sep {
-  background: hsl(215, 20%, 25%) !important;
+  background: var(--border) !important;
 }
 
 .dark .puck-panel-content .tiptap {
@@ -893,13 +893,13 @@ html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
 
 /* Puck header toolbar buttons (viewport, zoom, etc.) */
 .dark [class*="Puck-header"] button {
-  background: hsl(215, 20%, 16%) !important;
+  background: var(--card) !important;
   color: hsl(0, 0%, 85%) !important;
-  border-color: hsl(215, 20%, 25%) !important;
+  border-color: var(--border) !important;
 }
 
 .dark [class*="Puck-header"] button:hover {
-  background: hsl(215, 20%, 22%) !important;
+  background: var(--bg-3) !important;
 }
 
 /* Keep explicitly colored buttons (Send Preview, Ready, etc.) */
@@ -938,9 +938,9 @@ html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
 /* Puck drawer / modal overlays */
 .dark [class*="Drawer"],
 .dark [class*="Modal"] {
-  background: hsl(215, 25%, 12%) !important;
+  background: var(--card) !important;
   color: hsl(0, 0%, 90%) !important;
-  border-color: hsl(215, 20%, 22%) !important;
+  border-color: var(--border) !important;
 }
 
 /* Puck empty state / drop zones */

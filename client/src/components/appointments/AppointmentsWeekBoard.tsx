@@ -366,7 +366,7 @@ export function AppointmentsWeekBoard({
             })}
           </div>
 
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="pt-2 border-t border-border">
             <p className="text-[11px] font-semibold tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400 mb-2">
               {t('reminders.board.allAppointments')}
             </p>
@@ -385,7 +385,7 @@ export function AppointmentsWeekBoard({
             </Select>
           </div>
 
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="pt-2 border-t border-border">
             <div className="flex items-baseline justify-between mb-2">
               <span
                 className={`text-[11px] font-medium tracking-[0.15em] uppercase ${
@@ -429,7 +429,7 @@ export function AppointmentsWeekBoard({
       {/* RIGHT: Main table */}
       <Card className="shadow-sm">
         <CardContent className="p-0">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 border-b border-border">
             <div className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-slate-700 dark:text-slate-300" />
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -519,7 +519,7 @@ export function AppointmentsWeekBoard({
             </div>
           </div>
 
-          <div className="flex items-center gap-1 px-5 py-3 border-b border-slate-200 dark:border-slate-800 overflow-x-auto">
+          <div className="flex items-center gap-1 px-5 py-3 border-b border-border overflow-x-auto">
             <TabPill active={effectiveListTab === "all"} onClick={() => setListTab("all")} count={monthAppointments.length}>
               {t('reminders.board.tabs.all')}
             </TabPill>
@@ -650,7 +650,7 @@ export function AppointmentsWeekBoard({
             </Table>
           )}
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-t border-slate-200 dark:border-slate-800 text-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-t border-border text-sm">
             <div className="text-slate-500 dark:text-slate-400">
               {t('reminders.board.showing')} <span className="font-medium text-slate-700 dark:text-slate-300">{visible.length}</span>{" "}
               {t('reminders.board.of')} <span className="font-medium text-slate-700 dark:text-slate-300">{filtered.length}</span>

@@ -8,9 +8,9 @@ const colorPickerRender = ({ value, onChange, field }: { value: string | undefin
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const labelColor = isDark ? "#d1d5db" : "#374151";
-  const inputBg = isDark ? "hsl(215, 20%, 16%)" : "#ffffff";
+  const inputBg = isDark ? "var(--card)" : "#ffffff";
   const inputColor = isDark ? "#e5e7eb" : "#111827";
-  const borderColor = isDark ? "hsl(215, 20%, 25%)" : "#d1d5db";
+  const borderColor = isDark ? "var(--border)" : "#d1d5db";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>

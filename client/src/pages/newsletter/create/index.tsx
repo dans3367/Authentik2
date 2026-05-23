@@ -186,19 +186,19 @@ export default function NewsletterCreatePage() {
   const isDark = theme === 'dark';
   const queryClient = useQueryClient();
   const editorSurface = {
-    appBg: isDark ? "hsl(215, 25%, 8%)" : "#f7fafc",
-    chromeBg: isDark ? "hsl(215, 25%, 10%)" : "#ffffff",
+    appBg: "var(--input)",
+    chromeBg: "var(--input)",
     chromeHover: isDark ? "hsl(215, 20%, 18%)" : "#f3f4f6",
-    border: isDark ? "hsl(215, 20%, 22%)" : "#e5e7eb",
+    border: "var(--border)",
     borderStrong: isDark ? "hsl(215, 20%, 28%)" : "#d1d5db",
     text: isDark ? "#f3f4f6" : "#111827",
     textSoft: isDark ? "#d1d5db" : "#374151",
     textMuted: isDark ? "#9ca3af" : "#6b7280",
     textSubtle: isDark ? "#64748b" : "#94a3b8",
-    cardBg: isDark ? "hsl(215, 22%, 13%)" : "#ffffff",
-    cardBgAlt: isDark ? "hsl(215, 22%, 11%)" : "#f8fafc",
+    cardBg: isDark ? "var(--card)" : "#ffffff",
+    cardBgAlt: isDark ? "var(--muted)" : "#f8fafc",
     cardShadow: isDark
-      ? "0 0 0 1px hsla(215, 20%, 28%, 0.95), 0 18px 42px rgba(0,0,0,0.35)"
+      ? "0 0 0 1px var(--border), 0 18px 42px rgba(0,0,0,0.35)"
       : "0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)",
     controlBg: isDark ? "hsl(215, 20%, 16%)" : "#ffffff",
     controlBorder: isDark ? "hsl(215, 20%, 25%)" : "#e5e7eb",
