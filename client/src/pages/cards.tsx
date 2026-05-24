@@ -73,7 +73,7 @@ export default function CardsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
         {/* Page Header */}
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">

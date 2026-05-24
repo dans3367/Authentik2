@@ -1261,7 +1261,7 @@ export function BirthdayCardsContent() {
                 <Label className="text-[11.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                   Choose a Template
                 </Label>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-3">
                   {[
                     { id: 'default', name: 'Default' },
                     { id: 'confetti', name: 'Confetti' },

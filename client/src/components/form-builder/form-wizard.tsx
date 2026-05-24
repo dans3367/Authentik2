@@ -4,7 +4,7 @@ import { StyleStep } from './wizard-steps/style-step';
 import { PreviewStep } from './wizard-steps/preview-step';
 import { FormQRCode } from './form-qr-code';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Loader2, Store } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/store';
@@ -13,6 +13,8 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 interface FormWizardProps {
   editMode?: boolean;
@@ -34,12 +36,31 @@ export function FormWizard({ editMode = false, formData: existingFormData }: For
   const { isAuthenticated, isLoading: authLoading } = useReduxAuth();
   const { hasInitialized } = useAuth();
   const selectedShopId = useAppSelector((state) => state.shop.selectedShopId);
-const [, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
   const [createdFormData, setCreatedFormData] = useState<{ id: string; title: string } | null>(null);
   const scrollPositions = useRef<Record<string, number>>({});
+
+  // Support retrieving shopId from URL query parameter or fallback to selection modal
+  const params = new URLSearchParams(window.location.search);
+  const queryShopId = params.get('shopId');
+  const [chosenShopId, setChosenShopId] = useState<string | null>(queryShopId || null);
+  const [shopPickerOpen, setShopPickerOpen] = useState(!editMode && !selectedShopId && !queryShopId);
+  const [shopPickerSelection, setShopPickerSelection] = useState<string | null>(null);
+
+  const requireShopSelection = !editMode && !selectedShopId && !chosenShopId;
+  const { data: shopsData } = useQuery<{ shops: Array<{ id: string; name: string; status: string }> }>({
+    queryKey: ['/api/shops', { limit: 100 }],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/shops?limit=100');
+      return response.json();
+    },
+    enabled: requireShopSelection,
+    staleTime: 5 * 60 * 1000,
+  });
+  const allShops = shopsData?.shops || [];
 
   // Redirect unauthenticated users immediately
   if (hasInitialized && !isAuthenticated) {
@@ -132,7 +153,8 @@ const [, setLocation] = useLocation();
           name: wizardState.selectedTheme.name,
           customColors: wizardState.selectedTheme.customColors || null
         }),
-        tags: wizardState.formData.tags || []
+        tags: wizardState.formData.tags || [],
+        shopId: chosenShopId || selectedShopId || undefined
       };
 
       console.log(`${editMode ? 'Updating' : 'Creating'} form:`, formDataToSave);
@@ -433,6 +455,76 @@ const [, setLocation] = useLocation();
           </div>
         </div>
       </footer>
+
+      {/* ──────── SHOP PICKER DIALOG FALLBACK ──────── */}
+      <Dialog open={shopPickerOpen} onOpenChange={(open) => {
+        setShopPickerOpen(open);
+        if (!open && !chosenShopId) {
+          // If they close the picker without selecting a shop, send them back to /forms
+          setLocation('/forms');
+        }
+      }}>
+        <DialogContent className="sm:max-w-[520px] p-0 gap-0 overflow-hidden border-stone-200 dark:border-neutral-800">
+          <DialogHeader className="px-6 pt-6 pb-2">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Store className="w-5 h-5 text-amber-500" />
+              Select a Shop
+            </DialogTitle>
+            <DialogDescription className="text-sm text-stone-500 dark:text-stone-400">
+              Choose which shop this form will be created for.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="px-6 py-4 space-y-2 max-h-[360px] overflow-y-auto">
+            {allShops.filter((s) => s.status === 'active').map((shop) => (
+              <button
+                key={shop.id}
+                type="button"
+                onClick={() => setShopPickerSelection(shop.id)}
+                className={`relative w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${
+                  shopPickerSelection === shop.id
+                    ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20 shadow-md ring-1 ring-amber-500/20'
+                    : 'border-stone-200 dark:border-neutral-800 bg-background hover:border-stone-400 dark:hover:border-neutral-700 hover:bg-stone-50 dark:hover:bg-neutral-800/50'
+                }`}
+              >
+                <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+                  shopPickerSelection === shop.id
+                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400'
+                    : 'bg-stone-100 dark:bg-neutral-800 text-stone-500 dark:text-neutral-400'
+                }`}>
+                  <Store className="w-5 h-5" />
+                </div>
+                <span className="font-medium text-sm flex-1 text-stone-800 dark:text-stone-200">{shop.name}</span>
+                {shopPickerSelection === shop.id && (
+                  <div className="w-5 h-5 rounded-full bg-amber-500 flex-shrink-0 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="px-6 pb-6 pt-3 flex justify-end gap-3 border-t border-stone-100 dark:border-neutral-800 bg-stone-50/50 dark:bg-neutral-900/20">
+            <Button variant="outline" onClick={() => setLocation('/forms')} className="border-stone-300 dark:border-neutral-700">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (shopPickerSelection) {
+                  setChosenShopId(shopPickerSelection);
+                  setShopPickerOpen(false);
+                }
+              }}
+              disabled={!shopPickerSelection}
+              className="gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-sm shadow-amber-500/20"
+            >
+              Confirm Shop
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

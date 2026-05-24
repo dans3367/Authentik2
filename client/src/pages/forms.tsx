@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Calendar, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText, ClipboardList, FileQuestion, Mail, MessageSquare, CheckCircle2, TrendingUp, Clock } from 'lucide-react';
+import { Plus, Loader2, Calendar, MoreVertical, Eye, Edit, Trash2, RefreshCw, QrCode, LayoutDashboard, FileText, ClipboardList, FileQuestion, Mail, MessageSquare, CheckCircle2, TrendingUp, Clock, Store, ArrowRight } from 'lucide-react';
 import { useReduxAuth } from '@/hooks/useReduxAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/store';
@@ -16,7 +16,7 @@ import { useSetBreadcrumbs } from '@/contexts/PageTitleContext';
 import { FormPreviewModal } from '@/components/form-preview-modal';
 import { FormQRCode } from '@/components/form-builder/form-qr-code';
 import { FormResponses } from '@/components/form-builder/form-responses';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface Form {
   id: string;
@@ -309,6 +309,26 @@ export default function Forms2() {
   const [responsesForm, setResponsesForm] = useState<Form | null>(null);
   const [isResponsesModalOpen, setIsResponsesModalOpen] = useState(false);
 
+  // Shop picker states for "All Shops" mode
+  const [shopPickerOpen, setShopPickerOpen] = useState(false);
+  const [shopPickerSelection, setShopPickerSelection] = useState<string | null>(null);
+
+  const handleNewFormClick = () => {
+    if (!selectedShopId && allShops.length > 1) {
+      setShopPickerSelection(null);
+      setShopPickerOpen(true);
+    } else {
+      setLocation("/forms/add");
+    }
+  };
+
+  const handleShopPickerConfirm = () => {
+    if (shopPickerSelection) {
+      setShopPickerOpen(false);
+      setLocation(`/forms/add?shopId=${shopPickerSelection}`);
+    }
+  };
+
   // Handle refresh with timestamp update
   const handleRefresh = () => {
     refetch();
@@ -330,6 +350,8 @@ export default function Forms2() {
     enabled: isAuthenticated && isInitialized,
     staleTime: 60000,
   });
+
+  const allShops: any[] = shopsData?.shops || [];
 
   const shopsMap = new Map<string, string>();
   if (shopsData?.shops) {
@@ -693,12 +715,10 @@ export default function Forms2() {
           Refresh
         </Button>
         {canCreateForms && (
-          <Link href="/forms/add">
-            <Button className="h-9 rounded-[10px] bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="mr-2 h-3.5 w-3.5" strokeWidth={2} />
-              New form
-            </Button>
-          </Link>
+          <Button onClick={handleNewFormClick} className="h-9 rounded-[10px] bg-primary text-primary-foreground hover:bg-primary/90">
+            <Plus className="mr-2 h-3.5 w-3.5" strokeWidth={2} />
+            New form
+          </Button>
         )}
       </div>
     </div>
@@ -869,12 +889,10 @@ export default function Forms2() {
               <p className="text-xs text-muted-foreground mt-0.5">Start collecting information and responses.</p>
             </div>
             {canCreateForms && (
-              <Link href="/forms/add" className="mt-1">
-                <Button className="rounded-[10px] bg-primary text-primary-foreground hover:bg-primary/90">
-                  <Plus className="mr-2 h-3.5 w-3.5" strokeWidth={2} />
-                  Create your first form
-                </Button>
-              </Link>
+              <Button onClick={handleNewFormClick} className="mt-1 rounded-[10px] bg-primary text-primary-foreground hover:bg-primary/90">
+                <Plus className="mr-2 h-3.5 w-3.5" strokeWidth={2} />
+                Create your first form
+              </Button>
             )}
           </CardContent>
         </Card>
@@ -967,6 +985,66 @@ export default function Forms2() {
           }}
         />
       )}
+
+      {/* ──────── SHOP PICKER DIALOG ──────── */}
+      <Dialog open={shopPickerOpen} onOpenChange={setShopPickerOpen}>
+        <DialogContent className="sm:max-w-[520px] p-0 gap-0 overflow-hidden border-stone-200 dark:border-neutral-800">
+          <DialogHeader className="px-6 pt-6 pb-2">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Store className="w-5 h-5 text-amber-500" />
+              Select a Shop for New Form
+            </DialogTitle>
+            <DialogDescription className="text-sm text-stone-500 dark:text-stone-400">
+              Choose which shop this form will be created for before entering the builder.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="px-6 py-4 space-y-2 max-h-[360px] overflow-y-auto">
+            {allShops.filter((s) => s.status === 'active').map((shop) => (
+              <button
+                key={shop.id}
+                type="button"
+                onClick={() => setShopPickerSelection(shop.id)}
+                className={`relative w-full flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all text-left ${
+                  shopPickerSelection === shop.id
+                    ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20 shadow-md ring-1 ring-amber-500/20'
+                    : 'border-stone-200 dark:border-neutral-800 bg-background hover:border-stone-400 dark:hover:border-neutral-700 hover:bg-stone-50 dark:hover:bg-neutral-800/50'
+                }`}
+              >
+                <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+                  shopPickerSelection === shop.id
+                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400'
+                    : 'bg-stone-100 dark:bg-neutral-800 text-stone-500 dark:text-neutral-400'
+                }`}>
+                  <Store className="w-5 h-5" />
+                </div>
+                <span className="font-medium text-sm flex-1 text-stone-800 dark:text-stone-200">{shop.name}</span>
+                {shopPickerSelection === shop.id && (
+                  <div className="w-5 h-5 rounded-full bg-amber-500 flex-shrink-0 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="px-6 pb-6 pt-3 flex justify-end gap-3 border-t border-stone-100 dark:border-neutral-800 bg-stone-50/50 dark:bg-neutral-900/20">
+            <Button variant="outline" onClick={() => setShopPickerOpen(false)} className="border-stone-300 dark:border-neutral-700">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleShopPickerConfirm}
+              disabled={!shopPickerSelection}
+              className="gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-sm shadow-amber-500/20"
+            >
+              Next
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

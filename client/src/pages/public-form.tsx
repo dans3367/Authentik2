@@ -643,7 +643,11 @@ const PublicFormPage: React.FC = () => {
     // Validate required fields
     const errors: Record<string, string> = {};
     for (const element of form.formData.elements || []) {
-      if (!element.required) continue;
+      const isEmailField = element.type === 'email' || element.type === 'email-input';
+      const isRequired = element.required || (form.category === 'email-signup' && isEmailField);
+
+      if (!isRequired) continue;
+
       const val = formValues[element.id];
       const isEmpty = val === undefined || val === null || val === '';
       if (element.type === 'full-name') {
@@ -652,6 +656,8 @@ const PublicFormPage: React.FC = () => {
         }
       } else if (isEmpty) {
         errors[element.id] = 'This field is required';
+      } else if (isEmailField && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+        errors[element.id] = 'Please enter a valid email address';
       }
     }
     if (Object.keys(errors).length > 0) {
@@ -710,8 +716,6 @@ const PublicFormPage: React.FC = () => {
     switch (type) {
       case 'text':
       case 'text-input':
-      case 'email':
-      case 'email-input':
       case 'tel':
       case 'url':
         return (
@@ -721,9 +725,30 @@ const PublicFormPage: React.FC = () => {
             </label>
             <input
               id={id}
-              type={type === 'text-input' ? 'text' : type === 'email-input' ? 'email' : type}
+              type={type === 'text-input' ? 'text' : type}
               placeholder={placeholder}
               required={required}
+              value={formValues[id] || ''}
+              onChange={(e) => handleInputChange(id, e.target.value)}
+              className={theme?.input || 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'}
+            />
+            {renderFieldError(id)}
+          </div>
+        );
+
+      case 'email':
+      case 'email-input':
+        const isEmailRequired = required || form?.category === 'email-signup';
+        return (
+          <div key={id} className="space-y-2">
+            <label htmlFor={id} className={theme?.label || 'text-sm font-medium text-gray-700'}>
+              {label} {isEmailRequired && <span className="text-red-500">*</span>}
+            </label>
+            <input
+              id={id}
+              type="email"
+              placeholder={placeholder}
+              required={isEmailRequired}
               value={formValues[id] || ''}
               onChange={(e) => handleInputChange(id, e.target.value)}
               className={theme?.input || 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'}

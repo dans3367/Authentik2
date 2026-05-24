@@ -1471,7 +1471,7 @@ export function ECardsContent() {
               </div>
 
               <div>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-6">
                   {holidaySections.flatMap((section) => {
                     const isDisabled = disabledSet.has(section.id);
                     const shouldShow = (cardFilter === 'active' && !isDisabled) || (cardFilter === 'inactive' && isDisabled);
@@ -1495,7 +1495,7 @@ export function ECardsContent() {
                 {/* Custom Cards Section */}
                 {cardFilter === "active" && (
                   <div className="mt-8">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
                       <Label className="text-lg font-semibold">{t('ecards.cards.custom')}</Label>
                       <Button
                         onClick={() => {
@@ -1504,7 +1504,7 @@ export function ECardsContent() {
                           setDesignerOpen(true);
                         }}
                         size="sm"
-                        className="flex items-center gap-2"
+                        className="flex items-center gap-2 shrink-0"
                       >
                         <Plus className="h-4 w-4" />
                         {t('ecards.cards.createCustom')}
@@ -1529,7 +1529,7 @@ export function ECardsContent() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {customCards.filter(c => c.active !== false).map((card) => {
                           console.log('🖼️ Rendering custom card:', { id: card.id, name: card.name, imageUrl: card.data.imageUrl, hasImageUrl: !!card.data.imageUrl });
                           const isSelected = eCardSettings?.emailTemplate === card.id;
@@ -1583,22 +1583,23 @@ export function ECardsContent() {
                                 </div>
                               </div>
                               <div className="mt-2 space-y-2">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="flex-1"
+                                    className="flex-1 min-w-0"
                                     onClick={() => {
                                       setDesignerThemeId(card.id);
                                       setDesignerOpen(true);
                                     }}
                                   >
-                                    <Edit className="h-3 w-3 mr-1" />
-                                    {t('common.edit')}
+                                    <Edit className="h-3 w-3 mr-1 shrink-0" />
+                                    <span className="truncate">{t('common.edit')}</span>
                                   </Button>
                                   <Button
                                     variant="outline"
                                     size="sm"
+                                    className="shrink-0"
                                     onClick={async () => {
                                       if (confirm(`Delete "${card.name}"? This cannot be undone.`)) {
                                         try {
@@ -1651,7 +1652,7 @@ export function ECardsContent() {
                         <p className="text-sm text-gray-500 dark:text-gray-400">{t('ecards.cards.noInactiveCardsDescription')}</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
                         {customCards.filter(card => card.active === false).map((card) => (
                           <div
                             key={card.id}

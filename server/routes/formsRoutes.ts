@@ -421,7 +421,7 @@ formsRoutes.get("/:id", authenticateToken, requireTenant, requirePermission('for
 // Create new form
 formsRoutes.post("/", authenticateToken, requireTenant, requirePermission('forms.create'), async (req: any, res) => {
   try {
-    const { title, description, formData, theme, category } = req.body;
+    const { title, description, formData, theme, category, shopId: bodyShopId } = req.body;
 
     if (!title || !formData) {
       return res.status(400).json({ message: 'Title and formData are required' });
@@ -439,8 +439,8 @@ formsRoutes.post("/", authenticateToken, requireTenant, requirePermission('forms
       return res.status(400).json({ message: 'Invalid formData: must be valid JSON' });
     }
 
-    // Resolve shopId from header or tenant default
-    const formShopId = await resolveShopId(req.shopId, req.user.tenantId);
+    // Resolve shopId from body, header or tenant default
+    const formShopId = await resolveShopId(bodyShopId || req.shopId, req.user.tenantId);
 
     const newForm = await db.insert(forms).values({
       title: sanitizedTitle,
@@ -941,6 +941,18 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
 
     if (!form) {
       return res.status(404).json({ message: 'Form not found or not active' });
+    }
+
+    // For email-signup forms, validate that a valid email address is provided in the submission data
+    if (form.category === 'email-signup') {
+      const submittedData = typeof data === 'object' ? data : {};
+      const submittedEmail = Object.values(submittedData).find(
+        (val) => typeof val === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+      ) as string | undefined;
+
+      if (!submittedEmail) {
+        return res.status(400).json({ message: 'A valid email address is required for subscription' });
+      }
     }
 
     // Resolve shop from form or tenant default
