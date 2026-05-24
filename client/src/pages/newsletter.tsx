@@ -124,6 +124,7 @@ export default function NewsletterPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [archivedPage, setArchivedPage] = useState(1);
   const [archivedPageSize, setArchivedPageSize] = useState(20);
+  const [archivedSearchQuery, setArchivedSearchQuery] = useState("");
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
@@ -306,11 +307,29 @@ export default function NewsletterPage() {
   const { newsletters: realtimeArchivedNewsletters } = useRealtimeNewsletters(archivedNewslettersData, tenantId, selectedShopId, true, "newsletter");
   const archivedNewsletters: NewsletterListItem[] = realtimeArchivedNewsletters || [];
 
-  const archivedTotalPages = Math.max(1, Math.ceil(archivedNewsletters.length / archivedPageSize));
+  const filteredArchivedNewsletters = useMemo(() => {
+    const q = archivedSearchQuery.trim().toLowerCase();
+    if (!q) return archivedNewsletters;
+    return archivedNewsletters.filter((n) => {
+      const title = (n.title || "").toLowerCase();
+      const subject = (n.subject || "").toLowerCase();
+      const firstName = (n.user?.firstName || "").toLowerCase();
+      const lastName = (n.user?.lastName || "").toLowerCase();
+      return (
+        title.includes(q) ||
+        subject.includes(q) ||
+        firstName.includes(q) ||
+        lastName.includes(q) ||
+        `${firstName} ${lastName}`.includes(q)
+      );
+    });
+  }, [archivedNewsletters, archivedSearchQuery]);
+
+  const archivedTotalPages = Math.max(1, Math.ceil(filteredArchivedNewsletters.length / archivedPageSize));
   const archivedCurrentPage = Math.min(archivedPage, archivedTotalPages);
   const archivedStartIndex = (archivedCurrentPage - 1) * archivedPageSize;
   const archivedEndIndex = archivedStartIndex + archivedPageSize;
-  const paginatedArchivedNewsletters = archivedNewsletters.slice(archivedStartIndex, archivedEndIndex);
+  const paginatedArchivedNewsletters = filteredArchivedNewsletters.slice(archivedStartIndex, archivedEndIndex);
 
   const handleEditRecipientsSegmentSelected = async (segmentData: {
     segmentListId: string | null;
@@ -752,15 +771,40 @@ export default function NewsletterPage() {
                   </div>
                 ) : (
                   <div className="border border-border/40 rounded-2xl overflow-hidden bg-card">
-                    <div className="px-5 py-3 border-b border-border/30">
-                      <div className="flex items-center gap-2">
-                        <Archive className="h-3.5 w-3.5 text-muted-foreground/40" />
-                        <h3 className="text-xs font-bold text-foreground/70 uppercase tracking-wider">
+                    <div className="px-5 py-3 border-b border-border/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Archive className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                        <h3 className="text-xs font-bold text-foreground/70 uppercase tracking-wider whitespace-nowrap">
                           {t('newsletter.archived.title', 'Archived Newsletters')}
                         </h3>
-                        <span className="text-[10px] text-muted-foreground/30 ml-1">
+                        <span className="text-[10px] text-muted-foreground/30 ml-1 truncate hidden sm:inline">
                           — {t('newsletter.archived.subtitle', 'Sent newsletters that have been archived')}
                         </span>
+                      </div>
+                      <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 pointer-events-none" />
+                        <Input
+                          value={archivedSearchQuery}
+                          onChange={(e) => {
+                            setArchivedSearchQuery(e.target.value);
+                            setArchivedPage(1);
+                          }}
+                          placeholder={t('newsletter.archived.searchPlaceholder', 'Search archived…')}
+                          className="h-8 pl-8 pr-8 text-xs rounded-lg"
+                        />
+                        {archivedSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setArchivedSearchQuery("");
+                              setArchivedPage(1);
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground/70"
+                            aria-label={t('newsletter.archived.clearSearch', 'Clear search')}
+                          >
+                            <XCircle className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="overflow-x-auto">
@@ -776,6 +820,13 @@ export default function NewsletterPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/20">
+                          {paginatedArchivedNewsletters.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="px-5 py-8 text-center text-[11px] text-muted-foreground/40">
+                                {t('newsletter.archived.noMatches', 'No archived newsletters match your search.')}
+                              </td>
+                            </tr>
+                          )}
                           {paginatedArchivedNewsletters.map((newsletter) => (
                             <tr
                               key={newsletter.id}
@@ -842,9 +893,9 @@ export default function NewsletterPage() {
                         </Select>
                         <span className="ml-2">
                           {t('newsletter.archived.pageRange', '{{start}}–{{end}} of {{total}}', {
-                            start: archivedNewsletters.length === 0 ? 0 : archivedStartIndex + 1,
-                            end: Math.min(archivedEndIndex, archivedNewsletters.length),
-                            total: archivedNewsletters.length,
+                            start: filteredArchivedNewsletters.length === 0 ? 0 : archivedStartIndex + 1,
+                            end: Math.min(archivedEndIndex, filteredArchivedNewsletters.length),
+                            total: filteredArchivedNewsletters.length,
                           })}
                         </span>
                       </div>
