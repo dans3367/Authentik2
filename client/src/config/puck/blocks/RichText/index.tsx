@@ -144,7 +144,7 @@ const RichTextInner: ComponentConfig<RichTextProps> = {
       return (
         <Section maxWidth={maxWidth}>
           <style>{EDITOR_STYLES}</style>
-          <div className="puck-richtext-editor" dangerouslySetInnerHTML={{ __html: html || "" }} />
+          <div className="puck-richtext-editor" style={{ color: "#0f0f0f" }} dangerouslySetInnerHTML={{ __html: html || "" }} />
         </Section>
       );
     }

@@ -95,6 +95,7 @@ const HeadingInternal: ComponentConfig<HeadingProps> = {
                     fontWeight: 700,
                     lineHeight: 1.1,
                     margin: 0,
+                    color: "#0f0f0f",
                   }}
                 >
                   {text}

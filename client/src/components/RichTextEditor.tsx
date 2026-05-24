@@ -462,9 +462,9 @@ export default function RichTextEditor({ value, onChange, placeholder = "Start t
   }, [contextMenu]);
 
   return (
-    <div ref={containerRef} className="relative min-h-[150px] border dark:border-neutral-700 rounded-md bg-white dark:bg-neutral-900">
+    <div ref={containerRef} className="relative min-h-[150px] border dark:border-border rounded-md bg-white dark:bg-background">
       {/* Permanent top toolbar */}
-      <div className="bg-neutral-900 text-white rounded-t-md shadow-lg px-2 py-1 flex flex-wrap items-center gap-1 border-b overflow-x-auto">
+      <div className="bg-neutral-900 dark:bg-background text-white rounded-t-md shadow-lg px-2 py-1 flex flex-wrap items-center gap-1 border-b dark:border-border overflow-x-auto">
         <Button
           type="button"
           variant="ghost"
