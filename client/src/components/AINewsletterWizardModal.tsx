@@ -60,6 +60,7 @@ interface AINewsletterWizardModalProps {
   onOpenChange: (open: boolean) => void;
   shopId?: string | null;
   createBasePath?: string;
+  targetEditor?: 'classic' | 'notion';
 }
 
 export function AINewsletterWizardModal({
@@ -67,6 +68,7 @@ export function AINewsletterWizardModal({
   onOpenChange,
   shopId,
   createBasePath = "/newsletter/create",
+  targetEditor = 'classic',
 }: AINewsletterWizardModalProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -273,6 +275,7 @@ export function AINewsletterWizardModal({
         title: title.trim(),
         subject: subject.trim(),
         puckData,
+        editor: targetEditor,
         selections: imageSlots.map((slot) => {
           const pick = selections[slot.blockId];
           return {
@@ -560,7 +563,9 @@ export function AINewsletterWizardModal({
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                A draft will be created and opened in the classic editor so you can fine-tune the copy.
+                {targetEditor === 'notion'
+                  ? 'A draft will be created and opened in the Notion-like editor so you can fine-tune the copy.'
+                  : 'A draft will be created and opened in the classic editor so you can fine-tune the copy.'}
               </p>
             </div>
           )}

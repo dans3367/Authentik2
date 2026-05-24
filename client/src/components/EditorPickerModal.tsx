@@ -70,8 +70,9 @@ export function EditorPickerModal({ open, onOpenChange, createBasePath = '/newsl
   });
 
   const preferredEditor = blogDesignData?.newsletterEditorType || 'classic';
-  const [selected, setSelected] = useState<'classic' | 'notion' | 'ai'>(preferredEditor as 'classic' | 'notion');
+  const [selected, setSelected] = useState<'classic' | 'notion' | 'ai' | 'ai-notion'>(preferredEditor as 'classic' | 'notion');
   const [aiWizardOpen, setAiWizardOpen] = useState(false);
+  const [aiWizardTarget, setAiWizardTarget] = useState<'classic' | 'notion'>('classic');
 
   // Sync selection when preference loads
   useEffect(() => {
@@ -86,7 +87,8 @@ export function EditorPickerModal({ open, onOpenChange, createBasePath = '/newsl
   };
 
   const handleContinue = () => {
-    if (selected === 'ai') {
+    if (selected === 'ai' || selected === 'ai-notion') {
+      setAiWizardTarget(selected === 'ai-notion' ? 'notion' : 'classic');
       onOpenChange(false);
       setAiWizardOpen(true);
       return;
@@ -290,6 +292,46 @@ export function EditorPickerModal({ open, onOpenChange, createBasePath = '/newsl
                   </div>
                 )}
               </button>
+
+              {/* Create with AI Notion */}
+              <button
+                type="button"
+                onClick={() => setSelected('ai-notion')}
+                className={`relative w-full flex items-start gap-4 p-4 rounded-xl border-2 transition-all text-left ${
+                  selected === 'ai-notion'
+                    ? 'border-fuchsia-500 bg-fuchsia-50/50 dark:bg-fuchsia-950/20 shadow-md ring-1 ring-fuchsia-500/20'
+                    : 'border-border bg-background hover:border-muted-foreground/30 hover:bg-muted/50'
+                }`}
+              >
+                <div className={`flex-shrink-0 w-11 h-11 rounded-lg flex items-center justify-center ${
+                  selected === 'ai-notion'
+                    ? 'bg-fuchsia-100 dark:bg-fuchsia-900/40 text-fuchsia-600 dark:text-fuchsia-400'
+                    : 'bg-muted text-muted-foreground'
+                }`}>
+                  <Wand2 className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">
+                      {t("newsletter.editorPicker.aiNotion", "Create with AI Notion")}
+                    </span>
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-fuchsia-100 dark:bg-fuchsia-900/40 text-fuchsia-600 dark:text-fuchsia-400 flex items-center gap-0.5">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      {t("newsletter.editorPicker.beta", "Beta")}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    {t("newsletter.editorPicker.aiNotionDesc", "Same AI draft, opened in the Notion-like editor. Best for clean, content-focused writing with slash commands.")}
+                  </p>
+                </div>
+                {selected === 'ai-notion' && (
+                  <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-fuchsia-500 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
             </div>
 
             <div className="px-6 pb-6 pt-2 flex justify-end gap-3">
@@ -316,6 +358,7 @@ export function EditorPickerModal({ open, onOpenChange, createBasePath = '/newsl
       onOpenChange={setAiWizardOpen}
       shopId={aiShopId}
       createBasePath={createBasePath}
+      targetEditor={aiWizardTarget}
     />
     </>
   );

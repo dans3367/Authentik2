@@ -30,6 +30,20 @@ import {
 const AUTOSAVE_INTERVAL = 20000;
 
 /**
+ * Remove "Photo by … (on Unsplash|Pexels)" attribution from notion-editor HTML.
+ * Defensive: covers newsletters created before the server stopped emitting credits.
+ */
+function stripNotionPhotoCredits(html: string): string {
+  if (!html) return html;
+  let out = html;
+  out = out.replace(/<figcaption[^>]*>[^<]*photo\s+by[^<]*<\/figcaption>/gi, '');
+  out = out.replace(/<figure[^>]*>\s*(<img[^>]*>)\s*<\/figure>/gi, '<p>$1</p>');
+  out = out.replace(/<p[^>]*>\s*Photo\s+by\s+[^<]*?<\/p>/gi, '');
+  out = out.replace(/\s*(?:—|–|-|·|\|)?\s*Photo\s+by\s+[^<.]*?(?:\s+on\s+(?:Unsplash|Pexels))?\s*(?=<\/p>|<br\s*\/?>)/gi, '');
+  return out;
+}
+
+/**
  * Self-updating save status indicator that reads from refs.
  * Polls refs every 300ms so puckOverrides stays referentially stable.
  */
@@ -266,7 +280,7 @@ export default function NewsletterCreatePage() {
           // Detect which editor created this newsletter and always reopen with that editor
           if (parsed.notionHtml) {
             setDetectedEditorType('notion');
-            setNotionHtmlContent(parsed.notionHtml);
+            setNotionHtmlContent(stripNotionPhotoCredits(parsed.notionHtml));
           } else {
             setDetectedEditorType('classic');
             // Ensure root props include title/subject from DB for the Puck fields
@@ -990,15 +1004,22 @@ export default function NewsletterCreatePage() {
 
                             {/* Body content zone — editor lives here */}
                             <div className="notion-editor-embedded" style={{ padding: '20px 24px 32px 24px', fontSize: '16px', lineHeight: '1.625', color: editorSurface.textSoft }}>
-                              <LazyNotionEditor
-                                content={notionHtmlContent}
-                                onChange={(html) => {
-                                  setNotionHtmlContent(html);
-                                  setHasUnsavedChanges(true);
-                                }}
-                                placeholder={undefined}
-                                className="notion-editor-embedded"
-                              />
+                              {dataReady ? (
+                                <LazyNotionEditor
+                                  key={puckKeyRef.current}
+                                  content={notionHtmlContent}
+                                  onChange={(html) => {
+                                    setNotionHtmlContent(html);
+                                    setHasUnsavedChanges(true);
+                                  }}
+                                  placeholder={undefined}
+                                  className="notion-editor-embedded"
+                                />
+                              ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
+                                  <Loader2 className="h-8 w-8 animate-spin" style={{ color: editorSurface.textMuted }} />
+                                </div>
+                              )}
                             </div>
 
                             {/* Branded email footer */}
