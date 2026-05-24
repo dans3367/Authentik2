@@ -1,4 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery as useConvexQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -158,7 +161,59 @@ export default function ContactViewDrawer({ contactId, open, onOpenChange }: Con
 
   // Extract contact from response
   const contact: Contact | undefined = response?.contact;
-  const engagementStats = statsResponse?.stats;
+  const baseStats = statsResponse?.stats;
+
+  // Live engagement overlay from Convex — opens/clicks update the moment
+  // webhooks fire, without round-tripping through Postgres or polling.
+  const { user } = useAuth();
+  const tenantId = (user as any)?.tenantId as string | undefined;
+  const liveEngagement = useConvexQuery(
+    api.emailTracking.getRecipientEngagement,
+    tenantId && contact?.email
+      ? { tenantId, recipientEmail: contact.email }
+      : "skip",
+  );
+
+  const engagementStats = baseStats
+    ? {
+        ...baseStats,
+        emailsSent: Math.max(baseStats.emailsSent ?? 0, liveEngagement?.sent ?? 0),
+        emailsOpened: Math.max(baseStats.emailsOpened ?? 0, liveEngagement?.opened ?? 0),
+        emailsClicked: Math.max(baseStats.emailsClicked ?? 0, liveEngagement?.clicked ?? 0),
+        emailsBounced: Math.max(baseStats.emailsBounced ?? 0, liveEngagement?.bounced ?? 0),
+        openRate: (() => {
+          const sent = Math.max(baseStats.emailsSent ?? 0, liveEngagement?.sent ?? 0);
+          const opened = Math.max(baseStats.emailsOpened ?? 0, liveEngagement?.opened ?? 0);
+          return sent > 0 ? Math.round((opened / sent) * 100) : 0;
+        })(),
+        clickRate: (() => {
+          const sent = Math.max(baseStats.emailsSent ?? 0, liveEngagement?.sent ?? 0);
+          const clicked = Math.max(baseStats.emailsClicked ?? 0, liveEngagement?.clicked ?? 0);
+          return sent > 0 ? Math.round((clicked / sent) * 100) : 0;
+        })(),
+        bounceRate: (() => {
+          const sent = Math.max(baseStats.emailsSent ?? 0, liveEngagement?.sent ?? 0);
+          const bounced = Math.max(baseStats.emailsBounced ?? 0, liveEngagement?.bounced ?? 0);
+          return sent > 0 ? Math.round((bounced / sent) * 100) : 0;
+        })(),
+      }
+    : liveEngagement
+      ? {
+          emailsSent: liveEngagement.sent,
+          emailsOpened: liveEngagement.opened,
+          emailsClicked: liveEngagement.clicked,
+          emailsBounced: liveEngagement.bounced,
+          openRate: liveEngagement.sent > 0
+            ? Math.round((liveEngagement.opened / liveEngagement.sent) * 100)
+            : 0,
+          clickRate: liveEngagement.sent > 0
+            ? Math.round((liveEngagement.clicked / liveEngagement.sent) * 100)
+            : 0,
+          bounceRate: liveEngagement.sent > 0
+            ? Math.round((liveEngagement.bounced / liveEngagement.sent) * 100)
+            : 0,
+        }
+      : undefined;
 
   // Delete contact mutation
   const deleteContactMutation = useMutation({

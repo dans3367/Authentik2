@@ -52,3 +52,44 @@ export const exportAllStats = query({
     });
   },
 });
+
+// Unified trackedEmail* exports. New data (newsletter + individual) flows here.
+// Use these in place of the legacy newsletter* exports above once migration completes.
+export const exportAllTrackedSends = query({
+  args: {
+    cursor: v.optional(v.union(v.string(), v.null())),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.query("trackedEmailSends").paginate({
+      cursor: args.cursor ?? null,
+      numItems: getPageSize(args.limit),
+    });
+  },
+});
+
+export const exportAllTrackedEvents = query({
+  args: {
+    cursor: v.optional(v.union(v.string(), v.null())),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.query("trackedEmailEvents").paginate({
+      cursor: args.cursor ?? null,
+      numItems: getPageSize(args.limit),
+    });
+  },
+});
+
+export const exportAllTrackedStats = query({
+  args: {
+    cursor: v.optional(v.union(v.string(), v.null())),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.query("trackedEmailStats").paginate({
+      cursor: args.cursor ?? null,
+      numItems: getPageSize(args.limit),
+    });
+  },
+});

@@ -42,16 +42,17 @@ export const handleResendWebhook = action({
         return;
       }
 
-      // Derive tenantId + newsletterId from the existing newsletterSends record
+      // Derive tenantId + campaignId + sendType from the trackedEmailSends record
       const ids = await resolveIds(ctx, providerMessageId, recipientEmail);
 
       if (ids) {
         // For delivered/opened/clicked: ensure "sent" event exists first
         // so the status progression is always Queued → Sent → Delivered → Opened
         if (normalisedType === "delivered" || normalisedType === "opened" || normalisedType === "clicked") {
-          await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+          await ctx.runMutation(internal.emailTracking.trackEmailEvent, {
             tenantId: ids.tenantId,
-            newsletterId: ids.newsletterId,
+            sendType: ids.sendType,
+            campaignId: ids.campaignId,
             recipientEmail,
             providerMessageId,
             eventType: "sent" as any,
@@ -59,9 +60,10 @@ export const handleResendWebhook = action({
           });
         }
 
-        await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+        await ctx.runMutation(internal.emailTracking.trackEmailEvent, {
           tenantId: ids.tenantId,
-          newsletterId: ids.newsletterId,
+          sendType: ids.sendType,
+          campaignId: ids.campaignId,
           recipientEmail,
           providerMessageId,
           eventType: normalisedType as any,
@@ -69,7 +71,7 @@ export const handleResendWebhook = action({
         });
       } else {
         console.log(
-          `No matching newsletterSend for providerMessageId=${providerMessageId}, email=${recipientEmail}`,
+          `No matching trackedEmailSend for providerMessageId=${providerMessageId}, email=${recipientEmail}`,
         );
       }
     } catch (error) {
@@ -123,9 +125,10 @@ export const handlePostmarkWebhook = action({
         // For delivered/opened/clicked: ensure "sent" event exists first
         // so the status progression is always Queued → Sent → Delivered → Opened
         if (normalisedType === "delivered" || normalisedType === "opened" || normalisedType === "clicked") {
-          await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+          await ctx.runMutation(internal.emailTracking.trackEmailEvent, {
             tenantId: ids.tenantId,
-            newsletterId: ids.newsletterId,
+            sendType: ids.sendType,
+            campaignId: ids.campaignId,
             recipientEmail,
             providerMessageId,
             eventType: "sent" as any,
@@ -133,9 +136,10 @@ export const handlePostmarkWebhook = action({
           });
         }
 
-        await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+        await ctx.runMutation(internal.emailTracking.trackEmailEvent, {
           tenantId: ids.tenantId,
-          newsletterId: ids.newsletterId,
+          sendType: ids.sendType,
+          campaignId: ids.campaignId,
           recipientEmail,
           providerMessageId,
           eventType: normalisedType as any,
@@ -143,7 +147,7 @@ export const handlePostmarkWebhook = action({
         });
       } else {
         console.log(
-          `No matching newsletterSend for providerMessageId=${providerMessageId}, email=${recipientEmail}`,
+          `No matching trackedEmailSend for providerMessageId=${providerMessageId}, email=${recipientEmail}`,
         );
       }
     } catch (error) {
@@ -221,9 +225,10 @@ export const handleAhaSendWebhook = action({
         // For delivered/opened/clicked: ensure "sent" event exists first
         // so the status progression is always Queued → Sent → Delivered → Opened
         if (normalisedType === "delivered" || normalisedType === "opened" || normalisedType === "clicked") {
-          await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+          await ctx.runMutation(internal.emailTracking.trackEmailEvent, {
             tenantId: ids.tenantId,
-            newsletterId: ids.newsletterId,
+            sendType: ids.sendType,
+            campaignId: ids.campaignId,
             recipientEmail,
             providerMessageId,
             eventType: "sent" as any,
@@ -231,9 +236,10 @@ export const handleAhaSendWebhook = action({
           });
         }
 
-        await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+        await ctx.runMutation(internal.emailTracking.trackEmailEvent, {
           tenantId: ids.tenantId,
-          newsletterId: ids.newsletterId,
+          sendType: ids.sendType,
+          campaignId: ids.campaignId,
           recipientEmail,
           providerMessageId,
           eventType: normalisedType as any,
@@ -241,7 +247,7 @@ export const handleAhaSendWebhook = action({
         });
       } else {
         console.log(
-          `No matching newsletterSend for AhaSend providerMessageId=${providerMessageId}, email=${recipientEmail}`,
+          `No matching trackedEmailSend for AhaSend providerMessageId=${providerMessageId}, email=${recipientEmail}`,
         );
       }
     } catch (error) {
@@ -313,9 +319,10 @@ export const handleSESWebhook = action({
         // For delivered/opened/clicked: ensure "sent" event exists first
         // so the status progression is always Queued → Sent → Delivered → Opened
         if (normalisedType === "delivered" || normalisedType === "opened" || normalisedType === "clicked") {
-          await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+          await ctx.runMutation(internal.emailTracking.trackEmailEvent, {
             tenantId: ids.tenantId,
-            newsletterId: ids.newsletterId,
+            sendType: ids.sendType,
+            campaignId: ids.campaignId,
             recipientEmail,
             providerMessageId,
             eventType: "sent" as any,
@@ -323,9 +330,10 @@ export const handleSESWebhook = action({
           });
         }
 
-        await ctx.runMutation(internal.newsletterTracking.trackEmailEvent, {
+        await ctx.runMutation(internal.emailTracking.trackEmailEvent, {
           tenantId: ids.tenantId,
-          newsletterId: ids.newsletterId,
+          sendType: ids.sendType,
+          campaignId: ids.campaignId,
           recipientEmail,
           providerMessageId,
           eventType: normalisedType as any,
@@ -333,7 +341,7 @@ export const handleSESWebhook = action({
         });
       } else {
         console.log(
-          `No matching newsletterSend for SES providerMessageId=${providerMessageId}, email=${recipientEmail}`,
+          `No matching trackedEmailSend for SES providerMessageId=${providerMessageId}, email=${recipientEmail}`,
         );
       }
     } catch (error) {
@@ -414,32 +422,30 @@ export const sesWebhook = httpAction(async (ctx, request) => {
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 /**
- * Look up tenantId + newsletterId from an existing newsletterSends record,
- * first by providerMessageId, then by recipientEmail.
+ * Look up tenantId + campaignId + sendType from an existing trackedEmailSends
+ * record, first by providerMessageId, then by recipientEmail.
  */
 async function resolveIds(
   ctx: any,
   providerMessageId: string | undefined,
   recipientEmail: string,
-): Promise<{ tenantId: string; newsletterId: string } | null> {
-  // Try by providerMessageId first
+): Promise<{ tenantId: string; campaignId: string; sendType: string } | null> {
   if (providerMessageId) {
     const send = await ctx.runQuery(
-      api.newsletterTracking.findSendByProviderMessageId,
+      api.emailTracking.findSendByProviderMessageId,
       { providerMessageId },
     );
     if (send) {
-      return { tenantId: send.tenantId, newsletterId: send.newsletterId };
+      return { tenantId: send.tenantId, campaignId: send.campaignId, sendType: send.sendType };
     }
   }
 
-  // Fallback: most recent send for this email
   const send = await ctx.runQuery(
-    api.newsletterTracking.findSendByRecipientEmail,
+    api.emailTracking.findSendByRecipientEmail,
     { recipientEmail },
   );
   if (send) {
-    return { tenantId: send.tenantId, newsletterId: send.newsletterId };
+    return { tenantId: send.tenantId, campaignId: send.campaignId, sendType: send.sendType };
   }
 
   return null;

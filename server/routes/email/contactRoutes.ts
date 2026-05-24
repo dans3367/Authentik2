@@ -16,6 +16,12 @@ import { replaceEmailPlaceholders } from '../../utils/emailPlaceholders';
 import { appendPromotionTermsLink } from '../../utils/promotionTerms';
 import { sanitizeEmailHtml, sanitizeFontFamily, escapeHtml, isValidHttpUrl, maskEmail, renderBirthdayTemplate, enqueuePromotionalEmailJob } from './emailUtils';
 import { resolveShopId } from '../../utils/defaultShop';
+import {
+  initEmailCampaign,
+  trackEmailCampaignSend,
+  completeEmailCampaign,
+  buildCampaignId,
+} from '../../utils/convexEmailTracker';
 import multer from 'multer';
 import Papa from 'papaparse';
 
@@ -2498,6 +2504,41 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
           });
         }
 
+        // Mirror to Convex for live tracking. campaignId is synthetic from the
+        // primary emailSends row id so webhook events (open/click) can resolve
+        // back here. Fire-and-forget — failures must not block the send.
+        const primarySendId = emailSendRows[0].id as string;
+        const campaignId = buildCampaignId('individual', primarySendId);
+        const totalRecipients = emailSendRows.length;
+        (async () => {
+          await initEmailCampaign({
+            tenantId,
+            sendType: 'individual',
+            campaignId,
+            totalRecipients,
+            shopId: recipientContact.shopId || undefined,
+          });
+          for (const row of emailSendRows) {
+            await trackEmailCampaignSend({
+              tenantId,
+              sendType: 'individual',
+              campaignId,
+              recipientEmail: row.recipientEmail,
+              recipientId: row.contactId || undefined,
+              recipientName: row.recipientName || undefined,
+              providerMessageId: providerMessageId || undefined,
+              status: 'sent',
+            });
+          }
+          await completeEmailCampaign({
+            campaignId,
+            sentCount: totalRecipients,
+            failedCount: 0,
+          });
+        })().catch((err) => {
+          console.error('[SendEmail] Convex live tracking failed (non-fatal):', err);
+        });
+
         try {
 	          const activityRows: Array<typeof emailActivity.$inferInsert> = [
 	            {
@@ -2589,10 +2630,13 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
       console.error(`⚠️ [SendEmail] Failed to log to activity_logs:`, activityLogError);
     }
 
-    // Update contact stats - update lastActivity (emailsSent increment is handled by internal callback)
+    // Increment emailsSent and refresh lastActivity. Provider webhooks only call
+    // updateContactMetrics for delivery/open/click events, not direct sends, so this counter
+    // must be bumped here to keep Engagement Statistics in sync with the activity log.
 	    for (const recipientContact of allContactRecipients) {
 	      await db.update(emailContacts)
 	        .set({
+	          emailsSent: sql`COALESCE(${emailContacts.emailsSent}, 0) + 1`,
 	          lastActivity: new Date(),
           updatedAt: new Date()
         })

@@ -185,7 +185,7 @@ export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
   const activeItems = paused ? (frozen?.activeItems ?? liveActiveItems) : liveActiveItems;
   const recentEvents = paused ? (frozen?.recentEvents ?? liveRecentEvents) : liveRecentEvents;
 
-  const titleByNewsletter = useMemo(() => {
+  const titleByCampaign = useMemo(() => {
     const map = new Map<string, string>();
     (activeItems ?? []).forEach((i) =>
       map.set(i.newsletterId, i.title || i.subject || "Untitled"),
@@ -200,7 +200,11 @@ export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
 
   const events = useMemo(() => {
     if (!recentEvents || !activeIds) return null;
-    return recentEvents.filter((e) => activeIds.has(e.newsletterId));
+    // Newsletter events: only show those tied to an active list item.
+    // Individual events: always show — they don't have a listItem row.
+    return recentEvents.filter(
+      (e: any) => e.sendType === "individual" || activeIds.has(e.campaignId),
+    );
   }, [recentEvents, activeIds]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -308,7 +312,10 @@ export function LiveStatsCard({ tenantId, shopId }: LiveStatsCardProps) {
             const effectiveType = reactionEmoji ? "reacted" : event.eventType;
             const cfg = EVENT_CONFIG[effectiveType] ?? EVENT_CONFIG.queued;
             const Icon = cfg.icon;
-            const title = titleByNewsletter.get(event.newsletterId) ?? "Newsletter";
+            const isIndividual = (event as any).sendType === "individual";
+            const title = isIndividual
+              ? "Direct email"
+              : titleByCampaign.get((event as any).campaignId) ?? "Newsletter";
             const clickedPath =
               event.eventType === "clicked" && linkFromMetadata && !reactionEmojiFromClick
                 ? (() => {

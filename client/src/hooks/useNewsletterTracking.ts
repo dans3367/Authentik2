@@ -1,9 +1,11 @@
 /**
- * Real-time Newsletter Tracking Hooks
- * 
- * Uses Convex's useQuery for live-updating newsletter stats,
- * individual email sends, and event feeds.
- * 
+ * Real-time email tracking hooks.
+ *
+ * Backed by Convex's emailTracking module which unifies newsletter and
+ * individual one-off email events. Hook names retain the "Newsletter"
+ * prefix for backwards compat with existing call sites — for newsletter
+ * data, pass the newsletter UUID as the campaignId.
+ *
  * These hooks automatically re-render when data changes in Convex,
  * providing real-time updates without polling.
  */
@@ -12,52 +14,40 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
-/**
- * Get real-time stats for a specific newsletter.
- * Returns live-updating counts for sent, delivered, opened, clicked, etc.
- */
 export function useNewsletterStats(newsletterId: string | undefined) {
   return useQuery(
-    api.newsletterTracking.getNewsletterStats,
-    newsletterId ? { newsletterId } : "skip"
+    api.emailTracking.getCampaignStats,
+    newsletterId ? { campaignId: newsletterId } : "skip"
   );
 }
 
-/**
- * Get all newsletter stats for the current tenant (dashboard overview).
- */
 export function useTenantNewsletterStats(tenantId: string | undefined) {
   return useQuery(
-    api.newsletterTracking.getTenantNewsletterStats,
-    tenantId ? { tenantId } : "skip"
+    api.emailTracking.getTenantCampaignStats,
+    tenantId ? { tenantId, sendType: "newsletter" } : "skip"
   );
 }
 
-/**
- * Get recent events across all newsletters for a tenant (live activity feed).
- */
 export function useTenantRecentEvents(
   tenantId: string | undefined,
   limit?: number,
+  sendType?: "newsletter" | "individual",
 ) {
   return useQuery(
-    api.newsletterTracking.getTenantRecentEvents,
-    tenantId ? { tenantId, limit } : "skip",
+    api.emailTracking.getTenantRecentEvents,
+    tenantId ? { tenantId, limit, sendType } : "skip",
   );
 }
 
-/**
- * Get individual email sends for a newsletter (paginated list).
- */
 export function useNewsletterSends(
   newsletterId: string | undefined,
   options?: { status?: string; limit?: number }
 ) {
   return useQuery(
-    api.newsletterTracking.getNewsletterSends,
+    api.emailTracking.getCampaignSends,
     newsletterId
       ? {
-          newsletterId,
+          campaignId: newsletterId,
           status: options?.status,
           limit: options?.limit,
         }
@@ -65,18 +55,15 @@ export function useNewsletterSends(
   );
 }
 
-/**
- * Get recent events for a newsletter (live event feed).
- */
 export function useNewsletterEvents(
   newsletterId: string | undefined,
   options?: { eventType?: string; limit?: number }
 ) {
   return useQuery(
-    api.newsletterTracking.getNewsletterEvents,
+    api.emailTracking.getCampaignEvents,
     newsletterId
       ? {
-          newsletterId,
+          campaignId: newsletterId,
           eventType: options?.eventType,
           limit: options?.limit,
         }
@@ -84,22 +71,16 @@ export function useNewsletterEvents(
   );
 }
 
-/**
- * Get the full trajectory of a single email send.
- */
-export function useEmailTrajectory(newsletterSendId: Id<"newsletterSends"> | undefined) {
+export function useEmailTrajectory(trackedSendId: Id<"trackedEmailSends"> | undefined) {
   return useQuery(
-    api.newsletterTracking.getEmailTrajectory,
-    newsletterSendId ? { newsletterSendId } : "skip"
+    api.emailTracking.getEmailTrajectory,
+    trackedSendId ? { trackedSendId } : "skip"
   );
 }
 
-/**
- * Get status breakdown for charts (pie/bar).
- */
 export function useStatusBreakdown(newsletterId: string | undefined) {
   return useQuery(
-    api.newsletterTracking.getStatusBreakdown,
-    newsletterId ? { newsletterId } : "skip"
+    api.emailTracking.getStatusBreakdown,
+    newsletterId ? { campaignId: newsletterId } : "skip"
   );
 }

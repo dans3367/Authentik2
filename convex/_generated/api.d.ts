@@ -9,7 +9,9 @@
  */
 
 import type * as convexExport from "../convexExport.js";
+import type * as emailTracking from "../emailTracking.js";
 import type * as http from "../http.js";
+import type * as migrations from "../migrations.js";
 import type * as newsletterListItems from "../newsletterListItems.js";
 import type * as newsletterTracking from "../newsletterTracking.js";
 import type * as webhookHandlers from "../webhookHandlers.js";
@@ -22,7 +24,9 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   convexExport: typeof convexExport;
+  emailTracking: typeof emailTracking;
   http: typeof http;
+  migrations: typeof migrations;
   newsletterListItems: typeof newsletterListItems;
   newsletterTracking: typeof newsletterTracking;
   webhookHandlers: typeof webhookHandlers;

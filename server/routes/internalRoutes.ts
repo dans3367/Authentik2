@@ -5,6 +5,12 @@ import { authenticateInternalService, InternalServiceRequest } from '../middlewa
 import crypto from 'crypto';
 import { sql, eq, and, or, ne } from 'drizzle-orm';
 import { wrapNewsletterContent } from '../utils/newsletterEmailWrapper';
+import {
+  initEmailCampaign,
+  trackEmailCampaignSend,
+  completeEmailCampaign,
+  buildCampaignId,
+} from '../utils/convexEmailTracker';
 
 const router = Router();
 
@@ -355,6 +361,42 @@ router.post(
         } catch (metricsUpdateError) {
           console.warn(`⚠️ [Internal API] Failed to update contact emailsSent:`, metricsUpdateError);
         }
+      }
+
+      // Mirror to Convex live tracking for individual email sends (scheduled,
+      // direct-send retries, etc.). campaignId mirrors the Postgres emailSends.id
+      // so webhook events resolve back here. Fire-and-forget.
+      const sendRow = result[0];
+      if (validatedStatus === 'sent' || validatedStatus === 'failed' || validatedStatus === 'suppressed') {
+        const campaignId = buildCampaignId('individual', sendRow.id);
+        const trackStatus: 'sent' | 'failed' | 'suppressed' = validatedStatus;
+        (async () => {
+          await initEmailCampaign({
+            tenantId: sendRow.tenantId,
+            sendType: 'individual',
+            campaignId,
+            totalRecipients: 1,
+            shopId: sendRow.shopId || undefined,
+          });
+          await trackEmailCampaignSend({
+            tenantId: sendRow.tenantId,
+            sendType: 'individual',
+            campaignId,
+            recipientEmail: sendRow.recipientEmail,
+            recipientId: sendRow.contactId || undefined,
+            recipientName: sendRow.recipientName || undefined,
+            providerMessageId: providerMessageId || undefined,
+            status: trackStatus,
+            error: errorMessage ? String(errorMessage).slice(0, 500) : undefined,
+          });
+          await completeEmailCampaign({
+            campaignId,
+            sentCount: trackStatus === 'sent' ? 1 : 0,
+            failedCount: trackStatus === 'sent' ? 0 : 1,
+          });
+        })().catch((convexErr) => {
+          console.warn('[Internal API] Convex live tracking failed (non-fatal):', convexErr);
+        });
       }
 
       console.log(`✅ [Internal API] Updated email_sends record ${result[0].id} with status ${validatedStatus}${providerMessageId ? ` and provider ID ${providerMessageId}` : ''}`);

@@ -56,9 +56,10 @@ export function useRealtimeNewsletters(
     // Build a map of Convex items by newsletterId for O(1) lookup
     const convexMap = new Map(convexItems.map((item) => [item.newsletterId, item]));
 
-    // Build a stats map for live metrics overlay
+    // Build a stats map for live metrics overlay. Unified trackedEmailStats
+    // uses campaignId — for newsletter rows this equals the newsletter UUID.
     const statsMap = new Map(
-      (tenantStats ?? []).map((s: any) => [s.newsletterId, s]),
+      (tenantStats ?? []).map((s: any) => [s.campaignId ?? s.newsletterId, s]),
     );
 
     // Overlay mutable fields from Convex onto TanStack items
