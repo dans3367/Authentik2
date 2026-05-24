@@ -510,10 +510,11 @@ newsletterRoutes.get("/page-data", newsletterListRateLimiter, authenticateToken,
       shop: { columns: { id: true, name: true } as const },
     };
 
-    // Run all queries in parallel
+    // Run all queries in parallel. Archived rows are lazy-loaded via
+    // GET /api/newsletters/page-data/archived when the user expands the section,
+    // so only the count is fetched here.
     const [
       activeNewsletters,
-      archivedNewsletters,
       activeCountResult,
       archivedCountResult,
       reviewerSettingsRow,
@@ -523,12 +524,6 @@ newsletterRoutes.get("/page-data", newsletterListRateLimiter, authenticateToken,
     ] = await Promise.all([
       db.query.newsletters.findMany({
         where: activeWhere,
-        orderBy: desc(newsletters.createdAt),
-        limit: 50,
-        with: withRelations,
-      }),
-      db.query.newsletters.findMany({
-        where: archivedWhere,
         orderBy: desc(newsletters.createdAt),
         limit: 50,
         with: withRelations,
@@ -564,7 +559,6 @@ newsletterRoutes.get("/page-data", newsletterListRateLimiter, authenticateToken,
 
     res.json({
       newsletters: activeNewsletters,
-      archivedNewsletters,
       activeCount: activeCountResult[0]?.count ?? 0,
       archivedCount: archivedCountResult[0]?.count ?? 0,
       reviewerSettings: {
@@ -590,6 +584,39 @@ newsletterRoutes.get("/page-data", newsletterListRateLimiter, authenticateToken,
   } catch (error) {
     console.error('Get newsletter page data error:', error);
     res.status(500).json({ message: 'Failed to get newsletter page data' });
+  }
+});
+
+// Lazy-loaded archived list for the newsletter page. Split from /page-data so the
+// initial dashboard render skips the archived findMany until the user expands the section.
+newsletterRoutes.get("/page-data/archived", newsletterListRateLimiter, authenticateToken, requireTenant, requirePermission('newsletters.view'), async (req: any, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { emailType = 'newsletter', shopId } = req.query;
+    const resolvedType = (emailType as string) || 'newsletter';
+
+    let baseWhere = sql`${newsletters.tenantId} = ${tenantId} AND ${newsletters.deletedAt} IS NULL`;
+    if (shopId) {
+      baseWhere = sql`${baseWhere} AND ${newsletters.shopId} = ${shopId}`;
+    }
+    const typeFilter = sql`(${newsletters.emailType} = ${resolvedType} OR (${newsletters.emailType} IS NULL AND ${resolvedType} = 'newsletter'))`;
+    const archivedWhere = sql`${baseWhere} AND ${newsletters.archivedAt} IS NOT NULL AND ${typeFilter}`;
+
+    const archivedNewsletters = await db.query.newsletters.findMany({
+      where: archivedWhere,
+      orderBy: desc(newsletters.createdAt),
+      limit: 200,
+      with: {
+        user: { columns: { id: true, firstName: true, lastName: true } as const },
+        tenant: { columns: { id: true, name: true, slug: true } as const },
+        shop: { columns: { id: true, name: true } as const },
+      },
+    });
+
+    res.json({ archivedNewsletters });
+  } catch (error) {
+    console.error('Get archived newsletters error:', error);
+    res.status(500).json({ message: 'Failed to get archived newsletters' });
   }
 });
 

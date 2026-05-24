@@ -175,6 +175,12 @@ export default function NewsletterPage() {
         (old: any) => old ? {
           ...old,
           newsletters: old.newsletters?.filter((n: any) => n.id !== id) || [],
+        } : old
+      );
+      queryClient.setQueryData(
+        ['/api/newsletters/page-data/archived', { emailType: 'newsletter', shopId: selectedShopId }],
+        (old: any) => old ? {
+          ...old,
           archivedNewsletters: old.archivedNewsletters?.filter((n: any) => n.id !== id) || [],
         } : old
       );
@@ -250,23 +256,31 @@ export default function NewsletterPage() {
     },
     onSuccess: (_data, id) => {
       const now = new Date().toISOString();
+      let moved: any = null;
       queryClient.setQueryData(
         ['/api/newsletters/page-data', { emailType: 'newsletter', shopId: selectedShopId }],
         (old: any) => {
           if (!old) return old;
-          const moved = (old.newsletters ?? []).find((n: any) => n.id === id);
+          moved = (old.newsletters ?? []).find((n: any) => n.id === id);
           return {
             ...old,
             newsletters: (old.newsletters ?? []).filter((n: any) => n.id !== id),
-            archivedNewsletters: moved
-              ? [{ ...moved, archivedAt: now }, ...(old.archivedNewsletters ?? [])]
-              : (old.archivedNewsletters ?? []),
             activeCount: Math.max(0, (old.activeCount ?? 0) - 1),
             archivedCount: (old.archivedCount ?? 0) + (moved ? 1 : 0),
           };
         }
       );
+      // Only patch the archived cache if it's already loaded — otherwise the next
+      // open of Show Archived will fetch it fresh.
+      queryClient.setQueryData(
+        ['/api/newsletters/page-data/archived', { emailType: 'newsletter', shopId: selectedShopId }],
+        (old: any) => old && moved ? {
+          ...old,
+          archivedNewsletters: [{ ...moved, archivedAt: now }, ...(old.archivedNewsletters ?? [])],
+        } : old
+      );
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters/page-data'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters/page-data/archived'] });
       toast({ title: t("newsletter.toast.archived", "Archived"), description: t("newsletter.toast.archivedDesc", "Newsletter has been archived.") });
     },
     onError: (error: any) => {
@@ -279,14 +293,24 @@ export default function NewsletterPage() {
       await apiRequest('POST', `/api/newsletters/${id}/unarchive`);
     },
     onSuccess: (_data, id) => {
+      let moved: any = null;
+      queryClient.setQueryData(
+        ['/api/newsletters/page-data/archived', { emailType: 'newsletter', shopId: selectedShopId }],
+        (old: any) => {
+          if (!old) return old;
+          moved = (old.archivedNewsletters ?? []).find((n: any) => n.id === id);
+          return {
+            ...old,
+            archivedNewsletters: (old.archivedNewsletters ?? []).filter((n: any) => n.id !== id),
+          };
+        }
+      );
       queryClient.setQueryData(
         ['/api/newsletters/page-data', { emailType: 'newsletter', shopId: selectedShopId }],
         (old: any) => {
           if (!old) return old;
-          const moved = (old.archivedNewsletters ?? []).find((n: any) => n.id === id);
           return {
             ...old,
-            archivedNewsletters: (old.archivedNewsletters ?? []).filter((n: any) => n.id !== id),
             newsletters: moved
               ? [{ ...moved, archivedAt: null }, ...(old.newsletters ?? [])]
               : (old.newsletters ?? []),
@@ -296,6 +320,7 @@ export default function NewsletterPage() {
         }
       );
       queryClient.invalidateQueries({ queryKey: ['/api/newsletters/page-data'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters/page-data/archived'] });
       toast({ title: t("newsletter.toast.unarchived", "Unarchived"), description: t("newsletter.toast.unarchivedDesc", "Newsletter has been restored from the archive.") });
     },
     onError: (error: any) => {
@@ -303,7 +328,21 @@ export default function NewsletterPage() {
     },
   });
 
-  const archivedNewslettersData = pageData?.archivedNewsletters;
+  // Lazy-load archived newsletters only after the user expands the section.
+  // The badge count comes from /page-data so it stays accurate without fetching rows.
+  const archivedCount: number = pageData?.archivedCount ?? 0;
+  const { data: archivedData, isLoading: isArchivedLoading } = useQuery({
+    queryKey: ['/api/newsletters/page-data/archived', { emailType: 'newsletter', shopId: selectedShopId }],
+    queryFn: async () => {
+      const params = new URLSearchParams({ emailType: 'newsletter' });
+      if (selectedShopId) params.set('shopId', selectedShopId);
+      const response = await apiRequest('GET', `/api/newsletters/page-data/archived?${params}`);
+      return response.json();
+    },
+    enabled: showArchived,
+    staleTime: 5000,
+  });
+  const archivedNewslettersData = archivedData?.archivedNewsletters;
   const { newsletters: realtimeArchivedNewsletters } = useRealtimeNewsletters(archivedNewslettersData, tenantId, selectedShopId, true, "newsletter");
   const archivedNewsletters: NewsletterListItem[] = realtimeArchivedNewsletters || [];
 
@@ -741,7 +780,7 @@ export default function NewsletterPage() {
           </div>
         )}
 
-        {(newsletters.length > 0 || showArchived || archivedNewsletters.length > 0) && (
+        {(newsletters.length > 0 || showArchived || archivedCount > 0) && (
           <div className="mt-4">
             <button
               onClick={() => setShowArchived(!showArchived)}
@@ -750,16 +789,20 @@ export default function NewsletterPage() {
               {showArchived ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               <Archive className="h-3.5 w-3.5" />
               <span>{showArchived ? t('newsletter.archived.hideArchived', 'Hide Archived') : t('newsletter.archived.showArchived', 'Show Archived')}</span>
-              {archivedNewsletters.length > 0 && (
+              {archivedCount > 0 && (
                 <span className="text-[10px] font-bold bg-muted/60 text-muted-foreground/40 px-1.5 py-0.5 rounded-md">
-                  {archivedNewsletters.length}
+                  {archivedCount}
                 </span>
               )}
             </button>
 
             {showArchived && (
               <div className="mt-3">
-                {archivedNewsletters.length === 0 ? (
+                {isArchivedLoading && archivedNewsletters.length === 0 ? (
+                  <div className="flex items-center justify-center py-10 border border-border/30 rounded-2xl bg-muted/5">
+                    <Loader2 className="h-5 w-5 text-muted-foreground/40 animate-spin" />
+                  </div>
+                ) : archivedNewsletters.length === 0 ? (
                   <div className="text-center py-10 border-2 border-dashed border-border/30 rounded-2xl bg-muted/5">
                     <Archive className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
                     <h4 className="text-sm font-semibold text-muted-foreground/40 mb-0.5">
