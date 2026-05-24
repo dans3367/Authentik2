@@ -63,9 +63,12 @@ function injectReactionBar(content: string, baseUrl: string, newsletterId: strin
  * Inject unsubscribe link into the email HTML content.
  */
 function injectUnsubscribeLink(content: string, unsubscribeUrl: string): string {
-  const unsubscribeBlock = `<div style="padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
-      <p style="margin: 0; font-size: 12px; color: #94a3b8;">
-        <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Unsubscribe</a>
+  const unsubscribeBlock = `<div style="padding: 20px 24px 24px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+      <p style="margin: 0 0 8px 0; font-size: 12px; line-height: 1.6; color: #64748b;">
+        You&rsquo;re receiving this newsletter because you signed up to hear from us.
+      </p>
+      <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #64748b;">
+        If you&rsquo;d rather not receive these emails, you can <a href="${unsubscribeUrl}" style="color: #475569; text-decoration: underline; font-weight: 500;">unsubscribe</a> at any time.
       </p>
     </div>`;
   return injectBeforeFooter(content, unsubscribeBlock);
@@ -181,6 +184,10 @@ async function sendBulkEmails(opts: {
         if (reactionsEnabled && baseUrl) {
           recipientHtml = injectReactionBar(recipientHtml, baseUrl, newsletterId, r.id);
         }
+        if (r.unsubscribeToken && baseUrl) {
+          const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(r.unsubscribeToken)}&type=newsletters`;
+          recipientHtml = injectUnsubscribeLink(recipientHtml, unsubscribeUrl);
+        }
 
         const sesResult = await sendSESEmail({
           from: { email: fromEmail },
@@ -222,6 +229,10 @@ async function sendBulkEmails(opts: {
           let recipientHtml = substituteVariables(content, r);
           if (reactionsEnabled && baseUrl) {
             recipientHtml = injectReactionBar(recipientHtml, baseUrl, newsletterId, r.id);
+          }
+          if (r.unsubscribeToken && baseUrl) {
+            const unsubscribeUrl = `${baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(r.unsubscribeToken)}&type=newsletters`;
+            recipientHtml = injectUnsubscribeLink(recipientHtml, unsubscribeUrl);
           }
 
           const ahaResult = await sendAhaEmail({
@@ -798,8 +809,8 @@ export const sendNewsletterTask = task({
       try {
         const convex = getConvex();
         if (convex) {
-          await convex.mutation("newsletterTracking:completeNewsletterSend" as any, {
-            newsletterId: data.newsletterId,
+          await convex.mutation("emailTracking:completeEmailCampaign" as any, {
+            campaignId: data.newsletterId,
             sentCount: 0,
             failedCount: 0,
           });
@@ -907,14 +918,15 @@ export const sendNewsletterTask = task({
                 try {
                   const convex = getConvex();
                   if (convex) {
-                    await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                    await convex.mutation("emailTracking:trackEmailSend" as any, {
                       tenantId: data.tenantId,
-                      newsletterId: data.newsletterId,
+                      sendType: "newsletter",
+                      campaignId: data.newsletterId,
                       groupUUID: data.groupUUID,
                       recipientEmail: result.recipientEmail,
                       recipientId: result.recipientId,
                       providerMessageId: result.providerMessageId,
-                      status: "queued",
+                      status: "sent",
                     });
                   }
                 } catch (_) { }
@@ -924,9 +936,10 @@ export const sendNewsletterTask = task({
                 try {
                   const convex = getConvex();
                   if (convex) {
-                    await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                    await convex.mutation("emailTracking:trackEmailSend" as any, {
                       tenantId: data.tenantId,
-                      newsletterId: data.newsletterId,
+                      sendType: "newsletter",
+                      campaignId: data.newsletterId,
                       groupUUID: data.groupUUID,
                       recipientEmail: result.recipientEmail,
                       recipientId: result.recipientId,
@@ -970,6 +983,12 @@ export const sendNewsletterTask = task({
             if (data.reactionsEnabled && data.baseUrl) {
               recipientHtml = injectReactionBar(recipientHtml, data.baseUrl, data.newsletterId, recipient.id);
             }
+            const unsubscribeUrl = recipient.unsubscribeToken && data.baseUrl
+              ? `${data.baseUrl}/api/email/unsubscribe?token=${encodeURIComponent(recipient.unsubscribeToken)}&type=newsletters`
+              : undefined;
+            if (unsubscribeUrl) {
+              recipientHtml = injectUnsubscribeLink(recipientHtml, unsubscribeUrl);
+            }
 
             const { data: resendData, error: resendError } = await resend.emails.send({
               from: fromEmail,
@@ -978,6 +997,10 @@ export const sendNewsletterTask = task({
               html: recipientHtml,
               text: resolved.content.replace(/<[^>]*>/g, ""),
               replyTo: data.replyTo,
+              headers: unsubscribeUrl ? {
+                'List-Unsubscribe': `<${unsubscribeUrl}>`,
+                'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+              } : undefined,
               tags: [
                 { name: "type", value: "newsletter" },
                 { name: "newsletterId", value: data.newsletterId },
@@ -1034,9 +1057,10 @@ export const sendNewsletterTask = task({
               try {
                 const convex = getConvex();
                 if (convex) {
-                  await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                  await convex.mutation("emailTracking:trackEmailSend" as any, {
                     tenantId: data.tenantId,
-                    newsletterId: data.newsletterId,
+                    sendType: "newsletter",
+                    campaignId: data.newsletterId,
                     groupUUID: data.groupUUID,
                     recipientEmail: recipient.email,
                     recipientId: recipient.id,
@@ -1050,14 +1074,15 @@ export const sendNewsletterTask = task({
               try {
                 const convex = getConvex();
                 if (convex) {
-                  await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                  await convex.mutation("emailTracking:trackEmailSend" as any, {
                     tenantId: data.tenantId,
-                    newsletterId: data.newsletterId,
+                    sendType: "newsletter",
+                    campaignId: data.newsletterId,
                     groupUUID: data.groupUUID,
                     recipientEmail: recipient.email,
                     recipientId: recipient.id,
                     providerMessageId: emailData?.id,
-                    status: "queued",
+                    status: "sent",
                   });
                 }
               } catch (_) { }
@@ -1069,9 +1094,10 @@ export const sendNewsletterTask = task({
             try {
               const convex = getConvex();
               if (convex) {
-                await convex.mutation("newsletterTracking:trackEmailSend" as any, {
+                await convex.mutation("emailTracking:trackEmailSend" as any, {
                   tenantId: data.tenantId,
-                  newsletterId: data.newsletterId,
+                  sendType: "newsletter",
+                  campaignId: data.newsletterId,
                   groupUUID: data.groupUUID,
                   recipientEmail: recipient.email,
                   recipientId: recipient.id,
@@ -1128,8 +1154,8 @@ export const sendNewsletterTask = task({
     try {
       const convex = getConvex();
       if (convex) {
-        await convex.mutation("newsletterTracking:completeNewsletterSend" as any, {
-          newsletterId: data.newsletterId,
+        await convex.mutation("emailTracking:completeEmailCampaign" as any, {
+          campaignId: data.newsletterId,
           sentCount: totalSent,
           failedCount: totalFailed,
         });

@@ -237,8 +237,25 @@ export default function NewsletterPage() {
     mutationFn: async (id: string) => {
       await apiRequest('POST', `/api/newsletters/${id}/archive`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+    onSuccess: (_data, id) => {
+      const now = new Date().toISOString();
+      queryClient.setQueryData(
+        ['/api/newsletters/page-data', { emailType: 'newsletter', shopId: selectedShopId }],
+        (old: any) => {
+          if (!old) return old;
+          const moved = (old.newsletters ?? []).find((n: any) => n.id === id);
+          return {
+            ...old,
+            newsletters: (old.newsletters ?? []).filter((n: any) => n.id !== id),
+            archivedNewsletters: moved
+              ? [{ ...moved, archivedAt: now }, ...(old.archivedNewsletters ?? [])]
+              : (old.archivedNewsletters ?? []),
+            activeCount: Math.max(0, (old.activeCount ?? 0) - 1),
+            archivedCount: (old.archivedCount ?? 0) + (moved ? 1 : 0),
+          };
+        }
+      );
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters/page-data'] });
       toast({ title: t("newsletter.toast.archived", "Archived"), description: t("newsletter.toast.archivedDesc", "Newsletter has been archived.") });
     },
     onError: (error: any) => {
@@ -250,8 +267,24 @@ export default function NewsletterPage() {
     mutationFn: async (id: string) => {
       await apiRequest('POST', `/api/newsletters/${id}/unarchive`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/newsletters'] });
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData(
+        ['/api/newsletters/page-data', { emailType: 'newsletter', shopId: selectedShopId }],
+        (old: any) => {
+          if (!old) return old;
+          const moved = (old.archivedNewsletters ?? []).find((n: any) => n.id === id);
+          return {
+            ...old,
+            archivedNewsletters: (old.archivedNewsletters ?? []).filter((n: any) => n.id !== id),
+            newsletters: moved
+              ? [{ ...moved, archivedAt: null }, ...(old.newsletters ?? [])]
+              : (old.newsletters ?? []),
+            activeCount: (old.activeCount ?? 0) + (moved ? 1 : 0),
+            archivedCount: Math.max(0, (old.archivedCount ?? 0) - 1),
+          };
+        }
+      );
+      queryClient.invalidateQueries({ queryKey: ['/api/newsletters/page-data'] });
       toast({ title: t("newsletter.toast.unarchived", "Unarchived"), description: t("newsletter.toast.unarchivedDesc", "Newsletter has been restored from the archive.") });
     },
     onError: (error: any) => {

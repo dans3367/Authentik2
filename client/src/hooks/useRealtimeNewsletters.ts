@@ -105,20 +105,27 @@ export function useRealtimeNewsletters(
       return overlaid;
     });
 
-    // Filter out items that appear deleted/archived in Convex but are still in TanStack cache
+    // Filter out items that appear deleted/archived in Convex but are still in TanStack cache.
+    // Because `listByTenant` is called with a fixed `archived` flag, the Convex query
+    // *omits* rows whose archived state doesn't match. So a missing Convex entry can mean
+    // either "not tracked in Convex" OR "filtered out because it just got archived/unarchived".
+    // We disambiguate by also honouring the TanStack row's own `archivedAt`.
     const filtered = updatedItems.filter((n) => {
       const convexItem = convexItems.find((c) => c.newsletterId === n.id);
-      if (!convexItem) return true; // Not tracked in Convex, keep from TanStack
 
-      // If this item was deleted in Convex, filter it out
-      if (convexItem.deletedAt) return false;
+      if (convexItem) {
+        if (convexItem.deletedAt) return false;
+        if (!archived && convexItem.archivedAt) return false;
+        if (archived && !convexItem.archivedAt) return false;
+        return true;
+      }
 
-      // If viewing non-archived and item is archived in Convex, filter out
-      if (!archived && convexItem.archivedAt) return false;
-
-      // If viewing archived and item is NOT archived in Convex, filter out
-      if (archived && !convexItem.archivedAt) return false;
-
+      // No Convex row matched the current view's archived filter. Trust the TanStack
+      // row's archivedAt so a freshly (un)archived item drops out of the wrong view
+      // even before Convex's subscription catches up.
+      const tanstackArchived = !!n.archivedAt;
+      if (!archived && tanstackArchived) return false;
+      if (archived && !tanstackArchived) return false;
       return true;
     });
 
