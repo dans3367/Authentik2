@@ -27,6 +27,7 @@ import {
   Archive,
   ArchiveRestore,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Undo2,
   XCircle,
@@ -65,6 +66,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAppSelector } from "@/store";
@@ -114,6 +122,8 @@ export default function NewsletterPage() {
   const [editRecipientsNewsletter, setEditRecipientsNewsletter] = useState<NewsletterListItem | null>(null);
   const [showEditorPicker, setShowEditorPicker] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [archivedPage, setArchivedPage] = useState(1);
+  const [archivedPageSize, setArchivedPageSize] = useState(20);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { t, currentLanguage } = useLanguage();
@@ -295,6 +305,12 @@ export default function NewsletterPage() {
   const archivedNewslettersData = pageData?.archivedNewsletters;
   const { newsletters: realtimeArchivedNewsletters } = useRealtimeNewsletters(archivedNewslettersData, tenantId, selectedShopId, true, "newsletter");
   const archivedNewsletters: NewsletterListItem[] = realtimeArchivedNewsletters || [];
+
+  const archivedTotalPages = Math.max(1, Math.ceil(archivedNewsletters.length / archivedPageSize));
+  const archivedCurrentPage = Math.min(archivedPage, archivedTotalPages);
+  const archivedStartIndex = (archivedCurrentPage - 1) * archivedPageSize;
+  const archivedEndIndex = archivedStartIndex + archivedPageSize;
+  const paginatedArchivedNewsletters = archivedNewsletters.slice(archivedStartIndex, archivedEndIndex);
 
   const handleEditRecipientsSegmentSelected = async (segmentData: {
     segmentListId: string | null;
@@ -760,7 +776,7 @@ export default function NewsletterPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/20">
-                          {archivedNewsletters.map((newsletter) => (
+                          {paginatedArchivedNewsletters.map((newsletter) => (
                             <tr
                               key={newsletter.id}
                               className="hover:bg-muted/20 transition-colors cursor-pointer"
@@ -802,6 +818,64 @@ export default function NewsletterPage() {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-border/30">
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground/60">
+                        <span>{t('newsletter.archived.rowsPerPage', 'Rows per page')}</span>
+                        <Select
+                          value={String(archivedPageSize)}
+                          onValueChange={(value) => {
+                            setArchivedPageSize(Number(value));
+                            setArchivedPage(1);
+                          }}
+                        >
+                          <SelectTrigger className="h-7 w-[68px] text-[11px] rounded-lg">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[5, 10, 20, 40, 60].map((size) => (
+                              <SelectItem key={size} value={String(size)} className="text-[11px]">
+                                {size}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="ml-2">
+                          {t('newsletter.archived.pageRange', '{{start}}–{{end}} of {{total}}', {
+                            start: archivedNewsletters.length === 0 ? 0 : archivedStartIndex + 1,
+                            end: Math.min(archivedEndIndex, archivedNewsletters.length),
+                            total: archivedNewsletters.length,
+                          })}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 rounded-lg text-muted-foreground/60 hover:text-foreground disabled:opacity-30"
+                          disabled={archivedCurrentPage <= 1}
+                          onClick={() => setArchivedPage((p) => Math.max(1, p - 1))}
+                          aria-label={t('newsletter.archived.prevPage', 'Previous page')}
+                        >
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="text-[11px] text-muted-foreground/60 px-2 tabular-nums">
+                          {t('newsletter.archived.pageOf', 'Page {{page}} of {{total}}', {
+                            page: archivedCurrentPage,
+                            total: archivedTotalPages,
+                          })}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 rounded-lg text-muted-foreground/60 hover:text-foreground disabled:opacity-30"
+                          disabled={archivedCurrentPage >= archivedTotalPages}
+                          onClick={() => setArchivedPage((p) => Math.min(archivedTotalPages, p + 1))}
+                          aria-label={t('newsletter.archived.nextPage', 'Next page')}
+                        >
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
