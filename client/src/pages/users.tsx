@@ -1500,239 +1500,289 @@ export default function UsersPage() {
             </div>
           </div>
 
-          {/* User Detail Side Panel */}
           <Sheet open={!!panelUser} onOpenChange={(open) => !open && setPanelUser(null)}>
-            <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+            <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto p-0 border-l border-border/40 shadow-2xl">
               {panelUser && (
-                <>
-                  <SheetHeader className="text-left">
-                    <div className="flex items-center gap-4 mb-2">
-                      <div className="relative">
-                        <Avatar className="h-16 w-16">
-                          <AvatarImage src="" />
-                          <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
-                            {getUserInitials(panelUser.firstName || undefined, panelUser.lastName || undefined)}
-                          </AvatarFallback>
-                        </Avatar>
-                        {panelUser.isActive && (
-                          <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-green-500 border-2 border-card"></div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <SheetTitle className="truncate">
-                          {panelUser.firstName || panelUser.lastName
-                            ? `${panelUser.firstName || ''} ${panelUser.lastName || ''}`.trim()
-                            : t('users.table.noName')}
-                        </SheetTitle>
-                        <SheetDescription className="truncate">{panelUser.email}</SheetDescription>
-                      </div>
-                    </div>
-                  </SheetHeader>
-
-                  <div className="mt-6 space-y-5">
-                    {/* Role & Status */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                          {t('users.cardView.role')}
-                        </p>
-                        <Badge
-                          variant="secondary"
-                          className={`${
-                            panelUser.role === 'Owner'
-                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400'
-                              : panelUser.role === 'Administrator'
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                              : panelUser.role === 'Manager'
-                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                              : 'bg-muted text-muted-foreground'
-                          } hover:bg-opacity-80 font-normal border-0`}
-                        >
-                          {t(getRoleTranslationKey(panelUser.role || ''))}
-                        </Badge>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                          {t('users.table.status')}
-                        </p>
-                        {panelUser.isActive ? (
-                          <div className="flex items-center gap-1.5">
-                            <UserCheck className="h-4 w-4 text-green-600" />
-                            <span className="text-green-600 font-medium text-sm">{t('users.status.active')}</span>
-                          </div>
-                        ) : (panelUser as any).suspendedByDowngrade ? (
-                          <div className="flex items-center gap-1.5">
-                            <UserX className="h-4 w-4 text-amber-600" />
-                            <span className="text-amber-600 font-medium text-sm">Suspended (plan limit)</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            <UserX className="h-4 w-4 text-red-600" />
-                            <span className="text-red-600 font-medium text-sm">{t('users.status.inactive')}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="h-px bg-border" />
-
-                    {/* Contact / Identity */}
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <Mail className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Email</p>
-                          <p className="text-sm text-foreground break-all">{panelUser.email}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        {panelUser.emailVerified ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Email Verified</p>
-                          <p className="text-sm text-foreground">{panelUser.emailVerified ? 'Yes' : 'No'}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <UserIcon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">First Name</p>
-                          <p className="text-sm text-foreground">{panelUser.firstName || '—'}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <UserIcon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Last Name</p>
-                          <p className="text-sm text-foreground">{panelUser.lastName || '—'}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="h-px bg-border" />
-
-                    {/* Activity */}
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Last Login</p>
-                          <p className="text-sm text-foreground">
-                            {panelUser.lastLoginAt
-                              ? `${format(new Date(panelUser.lastLoginAt), 'MMM d, yyyy, h:mm a')} (${formatDistanceToNow(new Date(panelUser.lastLoginAt), { addSuffix: true })})`
-                              : t('users.table.never')}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <Calendar className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Joined</p>
-                          <p className="text-sm text-foreground">
-                            {panelUser.createdAt
-                              ? format(new Date(panelUser.createdAt), 'MMM d, yyyy, h:mm a')
-                              : '—'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <Calendar className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Last Updated</p>
-                          <p className="text-sm text-foreground">
-                            {panelUser.updatedAt
-                              ? format(new Date(panelUser.updatedAt), 'MMM d, yyyy, h:mm a')
-                              : '—'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="h-px bg-border" />
-
-                    {/* IDs */}
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <Hash className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">User ID</p>
-                          <p className="text-xs text-foreground font-mono break-all">{panelUser.id}</p>
-                        </div>
-                      </div>
-
-                      {(panelUser as any).tenantId && (
-                        <div className="flex items-start gap-3">
-                          <Hash className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Tenant ID</p>
-                            <p className="text-xs text-foreground font-mono break-all">{(panelUser as any).tenantId}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    {panelUser.id !== currentUser.id && canActOnUser(currentUser.role || '', panelUser.role || '') && (
-                      <>
-                        <div className="h-px bg-border" />
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {canEditUsers && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const u = panelUser;
-                                setPanelUser(null);
-                                handleEditUser(u);
-                              }}
-                            >
-                              <Edit className="h-4 w-4 mr-1.5" />
-                              Edit
-                            </Button>
-                          )}
-                          {canEditUsers && canSetPasswordFor(panelUser.role || '') && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const u = panelUser;
-                                setPanelUser(null);
-                                handleOpenSetPassword(u);
-                              }}
-                            >
-                              <KeyRound className="h-4 w-4 mr-1.5" />
-                              Set Password
-                            </Button>
-                          )}
-                          {canDeleteUsers && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-                              onClick={() => {
-                                if (confirm(`Are you sure you want to delete ${panelUser.firstName} ${panelUser.lastName}?`)) {
-                                  handleDeleteUser(panelUser.id);
-                                  setPanelUser(null);
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-1.5" />
-                              Delete
-                            </Button>
+                <div className="flex flex-col h-full">
+                  {/* Header Area with Subtle Gradient/Background */}
+                  <div className="relative bg-gradient-to-b from-primary/5 to-transparent px-6 pt-12 pb-8 border-b border-border/40">
+                    <SheetHeader className="text-left">
+                      <div className="flex flex-col items-center gap-4 text-center">
+                        <div className="relative">
+                          <Avatar className="h-24 w-24 ring-4 ring-background shadow-xl">
+                            <AvatarImage src={panelUser.image || ""} />
+                            <AvatarFallback className="bg-primary/10 text-primary text-3xl font-bold">
+                              {getUserInitials(panelUser.firstName || undefined, panelUser.lastName || undefined)}
+                            </AvatarFallback>
+                          </Avatar>
+                          {panelUser.isActive && (
+                            <div className="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-green-500 border-4 border-background shadow-sm"></div>
                           )}
                         </div>
-                      </>
-                    )}
+                        <div className="space-y-1.5">
+                          <SheetTitle className="text-2xl font-semibold tracking-tight">
+                            {panelUser.firstName || panelUser.lastName
+                              ? `${panelUser.firstName || ''} ${panelUser.lastName || ''}`.trim()
+                              : t('users.table.noName')}
+                          </SheetTitle>
+                          <SheetDescription className="text-base font-medium text-muted-foreground">
+                            {panelUser.email}
+                          </SheetDescription>
+                        </div>
+                        
+                        {/* Quick Status & Role Badges */}
+                        <div className="flex items-center justify-center gap-2 mt-3">
+                          <Badge
+                            variant="secondary"
+                            className={`px-3 py-1 text-xs font-medium rounded-full ${
+                              panelUser.role === 'Owner'
+                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                                : panelUser.role === 'Administrator'
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                : panelUser.role === 'Manager'
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                : 'bg-muted text-muted-foreground'
+                            } border-0 shadow-sm`}
+                          >
+                            {t(getRoleTranslationKey(panelUser.role || ''))}
+                          </Badge>
+                          {panelUser.isActive ? (
+                            <Badge variant="secondary" className="px-3 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-0 rounded-full font-medium shadow-sm">
+                              {t('users.status.active')}
+                            </Badge>
+                          ) : (panelUser as any).suspendedByDowngrade ? (
+                            <Badge variant="secondary" className="px-3 py-1 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-0 rounded-full font-medium shadow-sm">
+                              Suspended
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="px-3 py-1 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 border-0 rounded-full font-medium shadow-sm">
+                              {t('users.status.inactive')}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </SheetHeader>
                   </div>
-                </>
+
+                  {/* Scrollable Content */}
+                  <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+                    
+                    {/* Contact & Identity Section */}
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">Contact Information</h4>
+                      <div className="grid gap-4 p-5 rounded-2xl bg-card border border-border/40 shadow-sm transition-all hover:shadow-md">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary shrink-0">
+                            <Mail className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-muted-foreground mb-0.5">Email Address</p>
+                            <p className="text-sm font-medium text-foreground truncate">{panelUser.email}</p>
+                          </div>
+                          {panelUser.emailVerified ? (
+                            <TooltipProvider><Tooltip><TooltipTrigger><CheckCircle2 className="h-5 w-5 text-green-500" /></TooltipTrigger><TooltipContent>Verified</TooltipContent></Tooltip></TooltipProvider>
+                          ) : (
+                            <TooltipProvider><Tooltip><TooltipTrigger><AlertTriangle className="h-5 w-5 text-amber-500" /></TooltipTrigger><TooltipContent>Unverified</TooltipContent></Tooltip></TooltipProvider>
+                          )}
+                        </div>
+                        <div className="h-px bg-border/40 ml-[3.25rem]" />
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary shrink-0">
+                            <UserIcon className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-muted-foreground mb-0.5">Full Name</p>
+                            <p className="text-sm font-medium text-foreground">
+                                {panelUser.firstName || panelUser.lastName
+                                  ? `${panelUser.firstName || ''} ${panelUser.lastName || ''}`.trim()
+                                  : 'Not provided'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Activity Section */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">Activity & History</h4>
+                      {(() => {
+                        type TimelineEvent = {
+                          key: string;
+                          date: Date;
+                          title: string;
+                          description: string;
+                          icon: typeof Clock;
+                          dotClass: string;
+                          iconClass: string;
+                          lineClass: string;
+                        };
+                        const events: TimelineEvent[] = [];
+                        if (panelUser.lastLoginAt) {
+                          const d = new Date(panelUser.lastLoginAt);
+                          events.push({
+                            key: 'last-login',
+                            date: d,
+                            title: 'Last Login',
+                            description: `Signed in on ${format(d, 'MMM d, yyyy')} at ${format(d, 'h:mm a')}.`,
+                            icon: Clock,
+                            dotClass: 'bg-blue-500/15',
+                            iconClass: 'text-blue-500',
+                            lineClass: 'bg-blue-500',
+                          });
+                        }
+                        if (panelUser.updatedAt && panelUser.createdAt && new Date(panelUser.updatedAt).getTime() - new Date(panelUser.createdAt).getTime() > 60_000) {
+                          const d = new Date(panelUser.updatedAt);
+                          events.push({
+                            key: 'updated',
+                            date: d,
+                            title: 'Profile Updated',
+                            description: `Account details were last updated on ${format(d, 'MMM d, yyyy')}.`,
+                            icon: Edit,
+                            dotClass: 'bg-amber-500/15',
+                            iconClass: 'text-amber-500',
+                            lineClass: 'bg-amber-500',
+                          });
+                        }
+                        if (panelUser.createdAt) {
+                          const d = new Date(panelUser.createdAt);
+                          events.push({
+                            key: 'created',
+                            date: d,
+                            title: 'Account Created',
+                            description: `User profile was created on ${format(d, 'MMMM d, yyyy')}.`,
+                            icon: UserCheck,
+                            dotClass: 'bg-purple-500/15',
+                            iconClass: 'text-purple-500',
+                            lineClass: 'bg-purple-500',
+                          });
+                        }
+                        events.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+                        if (events.length === 0) {
+                          return (
+                            <div className="p-5 rounded-2xl bg-card border border-border/40 shadow-sm">
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Clock className="h-3.5 w-3.5" />
+                                <span>No activity recorded yet.</span>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="p-5 rounded-2xl bg-card border border-border/40 shadow-sm">
+                            <ol className="relative">
+                              {events.map((event, idx) => {
+                                const Icon = event.icon;
+                                const isLast = idx === events.length - 1;
+                                return (
+                                  <li key={event.key} className="relative pl-10 pb-5 last:pb-0">
+                                    {!isLast && (
+                                      <span
+                                        aria-hidden="true"
+                                        className="absolute left-[11px] top-7 bottom-0 w-px bg-border"
+                                      />
+                                    )}
+                                    <span
+                                      className={`absolute left-0 top-0.5 flex h-6 w-6 items-center justify-center rounded-full ring-4 ring-card ${event.dotClass} ${event.iconClass}`}
+                                    >
+                                      <Icon className="h-3 w-3" />
+                                    </span>
+                                    <div className="flex items-baseline justify-between gap-3">
+                                      <p className="text-sm font-semibold text-foreground">{event.title}</p>
+                                      <time
+                                        dateTime={event.date.toISOString()}
+                                        className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground whitespace-nowrap"
+                                      >
+                                        {formatDistanceToNow(event.date, { addSuffix: true })}
+                                      </time>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                      {event.description}
+                                    </p>
+                                  </li>
+                                );
+                              })}
+                            </ol>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* System Info Section */}
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">System Info</h4>
+                      <div className="grid gap-3 p-5 rounded-2xl bg-muted/30 border border-border/40">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                            <p className="text-xs font-medium text-muted-foreground">User ID</p>
+                          </div>
+                          <p className="text-xs font-mono text-foreground/80 bg-background/80 p-2 rounded-md border border-border/40 break-all">{panelUser.id}</p>
+                        </div>
+                        {(panelUser as any).tenantId && (
+                          <div className="flex flex-col gap-1.5 mt-2">
+                            <div className="flex items-center gap-2">
+                              <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                              <p className="text-xs font-medium text-muted-foreground">Tenant ID</p>
+                            </div>
+                            <p className="text-xs font-mono text-foreground/80 bg-background/80 p-2 rounded-md border border-border/40 break-all">{(panelUser as any).tenantId}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer Actions (Sticky) */}
+                  {panelUser.id !== currentUser.id && canActOnUser(currentUser.role || '', panelUser.role || '') && (
+                    <div className="p-6 border-t border-border/40 bg-card/80 backdrop-blur-sm mt-auto">
+                      <div className="flex gap-3">
+                        {canEditUsers && (
+                          <Button
+                            className="flex-1 shadow-sm transition-all bg-primary hover:bg-primary/90 text-primary-foreground h-11"
+                            onClick={() => {
+                              const u = panelUser;
+                              setPanelUser(null);
+                              handleEditUser(u);
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Profile
+                          </Button>
+                        )}
+                        {canEditUsers && canSetPasswordFor(panelUser.role || '') && (
+                          <Button
+                            variant="outline"
+                            className="shadow-sm transition-all h-11 px-4"
+                            onClick={() => {
+                              const u = panelUser;
+                              setPanelUser(null);
+                              handleOpenSetPassword(u);
+                            }}
+                            title="Set Password"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canDeleteUsers && (
+                          <Button
+                            variant="destructive"
+                            className="shadow-sm transition-all bg-red-600 hover:bg-red-700 h-11 px-4"
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete ${panelUser.firstName} ${panelUser.lastName}?`)) {
+                                handleDeleteUser(panelUser.id);
+                                setPanelUser(null);
+                              }
+                            }}
+                            title="Delete User"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </SheetContent>
           </Sheet>
