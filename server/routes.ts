@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import cookieParser from "cookie-parser";
+import { setSessionCookie } from "./utils/sessionCookie";
 
 // Import route modules
 // Note: authRoutes removed - better-auth handles authentication now
@@ -57,7 +58,6 @@ import { translationRoutes } from "./routes/translationRoutes";
 import { db } from "./db";
 import { betterAuthSession } from "@shared/schema";
 import { eq, like, and, gt, sql } from "drizzle-orm";
-import { createHmac } from "crypto";
 import { invalidateTenantPlanCache } from "./utils/userSecurityCache";
 
 // Import middleware
@@ -119,17 +119,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!session) return res.status(400).send('Invalid or expired impersonation link');
 
-      // Better Auth expects a signed cookie: "{token}.{HMAC-SHA256 base64 signature}"
-      const signature = createHmac('sha256', getAuthSecret()).update(session.token).digest('base64');
-      const signedToken = `${session.token}.${signature}`;
-
-      res.cookie('better-auth.session_token', signedToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 1000,
-        path: '/',
-      });
+      // Use the shared signer so impersonation, primary login, and 2FA
+      // verification all produce identically-formatted Better-Auth
+      // session cookies. Impersonation sessions are scoped to 1 hour
+      // (vs. the 7-day standard) via the maxAgeMs override.
+      setSessionCookie(res, session.token, { maxAgeMs: 60 * 60 * 1000 });
 
       return res.redirect('/');
     } catch (err) {

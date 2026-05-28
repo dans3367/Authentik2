@@ -4,12 +4,41 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <!-- CSP is handled by server-side helmet configuration for better development/production flexibility -->
+
+    <!-- Font loading strategy -->
+    <!--
+      1. preconnect (already): warm the TCP+TLS handshake to Google's font origins
+         before the parser discovers the stylesheet URL.
+      2. preload + onload swap: load the stylesheet as a non-render-blocking
+         resource so first paint isn't gated on font CSS roundtrip. The
+         `media="print"` trick lets the browser fetch immediately at low priority,
+         and the onload handler swaps it back to `all` so the rules apply.
+      3. <noscript> fallback: users with JS disabled still get fonts (blocking).
+      4. font-display: swap is already in the URL so text renders in fallback
+         immediately and swaps when the woff2 lands.
+      Inter Tight is the body face; Instrument Serif (form preview) and
+      JetBrains Mono (stats / handlebar pills) load alongside but no
+      longer block first paint.
+    -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
     />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      />
+    </noscript>
   </head>
   <body>
     <div id="root"></div>

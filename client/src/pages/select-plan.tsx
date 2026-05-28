@@ -5,6 +5,12 @@ import { Check, Loader2, ArrowRight, LogOut, Sparkles, Users, Store, Mail, HardD
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useReduxAuth, useReduxLogout } from "@/hooks/useReduxAuth";
+import {
+  writeCachedFlag,
+  clearCachedFlag,
+  onboardingCacheKey,
+  subscriptionCacheKey,
+} from "@/lib/protectedFlagCache";
 
 interface SubscriptionPlan {
   id: string;
@@ -77,8 +83,11 @@ export default function SelectPlanPage() {
     onSuccess: (data) => {
       if (data.success) {
         if (user?.id) {
-          localStorage.setItem(`subscriptionActive:${user.id}`, 'true');
-          localStorage.removeItem(`onboardingCompleted:${user.id}`);
+          // Use the shared TTL-wrapped writer so ProtectedRoute's cache
+          // accepts this entry without re-checking the server immediately.
+          // Clear onboarding so the post-payment onboarding flow runs.
+          writeCachedFlag(subscriptionCacheKey(user.id));
+          clearCachedFlag(onboardingCacheKey(user.id));
         }
         toast({ title: "Welcome!", description: "Your subscription is active. Let's set up your account..." });
         setTimeout(() => { window.location.href = "/onboarding"; }, 1000);
@@ -104,7 +113,7 @@ export default function SelectPlanPage() {
 
   useEffect(() => {
     if (subCheck?.hasSubscription && subCheck?.status === "active") {
-      if (user?.id) localStorage.setItem(`subscriptionActive:${user.id}`, 'true');
+      if (user?.id) writeCachedFlag(subscriptionCacheKey(user.id));
       window.location.href = "/dashboard";
     }
   }, [subCheck]);

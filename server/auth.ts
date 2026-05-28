@@ -1,3 +1,29 @@
+// ---------------------------------------------------------------------------
+// SECURITY NOTE (session token storage):
+//
+// Better Auth stores the session token's raw value in
+// better_auth_session.token — the same value sent to the browser as the
+// session cookie. A read-only DB compromise therefore yields full session
+// hijack for every active user (no offline cracking required).
+//
+// Switching to a server-side hash (e.g. SHA-256 of the token) would be the
+// ideal mitigation but requires forking Better Auth's session-lookup path,
+// which is out of scope here. To compensate, this codebase MUST:
+//
+//   1. Keep all session cookies HttpOnly + Secure (in prod) + SameSite=Lax
+//      or stricter so the cookie can't be exfiltrated via XSS / cross-site.
+//      (See cookie options on every `res.cookie('better-auth.session_token',
+//      …)` call site.)
+//   2. Encrypt the database at rest, and tightly restrict who/what can run
+//      read-only queries against better_auth_session.
+//   3. Rotate BETTER_AUTH_SECRET on suspicion of leak — doing so invalidates
+//      every existing session because Better Auth signs cookies with this
+//      secret, forcing a global re-login.
+//   4. Prefer mass-revoking sessions via the existing
+//      `db.delete(betterAuthSession).where(eq(userId, …))` paths on any
+//      meaningful security event (password reset, deactivation, email
+//      change, etc.) so the read-only-DB-leak window is short-lived.
+// ---------------------------------------------------------------------------
 import { betterAuth, APIError } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
@@ -6,6 +32,7 @@ import { betterAuthUser, betterAuthSession, betterAuthAccount, betterAuthVerific
 import { triggerTransactionalEmail } from "./lib/trigger";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import { cookiesShouldBeSecure } from "./utils/cookieSecurity";
 
 export function getAuthSecret(): string {
   const secret = process.env.BETTER_AUTH_SECRET;
@@ -73,23 +100,34 @@ const authInstance = betterAuth({
   },
   baseURL: process.env.BASE_URL || `http://localhost:${process.env.PORT || "5002"}`,
   secret: getAuthSecret(),
+  // Trusted origins.
+  //
+  // In production this is FAIL-CLOSED: only origins explicitly provided
+  // via TRUSTED_ORIGINS (comma-separated) or the BASE_URL itself are
+  // trusted. The hard-coded `https://weby.zendwise.work` etc. defaults
+  // that lived here historically have been removed from the production
+  // path so a misconfigured deploy can't silently trust the wrong host.
+  //
+  // The plain-HTTP development entries below are gated on NODE_ENV ===
+  // 'development' (NOT just "!= production"), so if NODE_ENV is ever
+  // unset in a deployment those origins do NOT become trusted.
   trustedOrigins: [
-    `http://localhost:${process.env.PORT || "5002"}`,
-    "http://localhost:5173",
-    "https://weby.zendwise.work",
-    "https://websy.zendwise.work",
-    "https://webx.zendwise.work",
-    process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "",
+    process.env.BASE_URL,
     // Additional trusted origins from environment (comma-separated)
     ...(process.env.TRUSTED_ORIGINS?.split(",").map(o => o.trim()) || []),
-    // Development-only: allow local network access
-    ...(process.env.NODE_ENV !== "production" ? [
+    // Development-only convenience entries. NOTE: scoped to NODE_ENV
+    // === 'development' explicitly — NOT "!= production" — so an
+    // unset NODE_ENV doesn't accidentally trust plain-HTTP hosts.
+    ...(process.env.NODE_ENV === "development" ? [
+      `http://localhost:${process.env.PORT || "5002"}`,
+      "http://localhost:5173",
       "http://127.0.0.1:35145",
       "http://weby.zendwise.work:3001",
       "http://websy.zendwise.work:3001",
       "http://webx.zendwise.work",
+      process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "",
     ] : []),
-  ].filter(Boolean),
+  ].filter(Boolean) as string[],
   // Add session callback to include custom user fields
   session: {
     updateAge: 24 * 60 * 60, // 24 hours
@@ -106,7 +144,10 @@ const authInstance = betterAuth({
     },
     defaultCookieAttributes: {
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      // Centralised in server/utils/cookieSecurity.ts so every Set-Cookie
+      // site in the codebase agrees. See that file for the derivation
+      // rules (COOKIES_SECURE env, BASE_URL scheme, NODE_ENV fallback).
+      secure: cookiesShouldBeSecure(),
       httpOnly: true,
       path: "/",
     },

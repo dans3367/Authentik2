@@ -2,7 +2,7 @@ import { Switch, Route, useLocation } from "wouter";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { LazyConvexProvider } from "@/components/LazyConvexProvider";
 import { store, persistor } from "@/store";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,10 +13,17 @@ import { setGlobalNavigate } from "@/lib/authErrorHandler";
 import { lazy, Suspense, useEffect, useState, Component, ReactNode } from "react";
 import { useAuthErrorHandler, setGlobalAuthErrorHandler } from "@/hooks/useAuthErrorHandler";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import {
+  readCachedFlag,
+  writeCachedFlag,
+  onboardingCacheKey as onboardingCacheKeyFor,
+  subscriptionCacheKey as subscriptionCacheKeyFor,
+} from "@/lib/protectedFlagCache";
+import { FullPageSkeleton, ContentSkeleton } from "@/components/PageSkeletons";
 
-// Initialize Convex client for real-time newsletter tracking
-const convexUrl = import.meta.env.VITE_CONVEX_URL;
-const convex = convexUrl ? new ConvexReactClient(convexUrl) : null;
+// Convex client is dynamic-imported by `LazyConvexProvider` so the
+// ~50-80 KB `convex/react` runtime no longer ships with the entry chunk.
+// See client/src/components/LazyConvexProvider.tsx.
 
 // Lazy load components for code splitting
 const AuthPage = lazy(() => import("@/pages/auth"));
@@ -83,6 +90,10 @@ const PublicNewsletterHub = lazy(() => import("@/pages/public-newsletter"));
 const PublicNewsletterView = lazy(() => import("@/pages/public-newsletter-view"));
 const PublicPromotionTerms = lazy(() => import("@/pages/public-promotion-terms"));
 
+// Cache helpers + key builders live in @/lib/protectedFlagCache so other
+// pages (subscribe / select-plan / onboarding) that write these flags
+// agree on shape + TTL.
+
 // Redirect components for legacy routes
 function BirthdaysRedirect() {
   const [, setLocation] = useLocation();
@@ -100,19 +111,12 @@ function ECardsRedirect() {
   return null;
 }
 
-// Loading component for Suspense fallback
-const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-  </div>
-);
-
-// Content loader for pages within AppLayout
-const ContentLoader = () => (
-  <div className="flex items-center justify-center py-12">
-    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-  </div>
-);
+// Suspense fallbacks now render layout-shaped skeletons instead of a
+// centered spinner — see @/components/PageSkeletons. Eliminates the CLS
+// jump when chunks finish loading and makes the app feel instant during
+// route transitions.
+const PageLoader = FullPageSkeleton;
+const ContentLoader = ContentSkeleton;
 
 // Error Boundary to catch React errors
 class ErrorBoundary extends Component<
@@ -202,148 +206,138 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     setNeedsOnboarding(false);
   }, [userId]);
 
-  // Check onboarding status once per authenticated user
-  // New flow: if user has no company (pre-payment), skip onboarding and go to /select-plan
-  // Onboarding happens AFTER payment creates the tenant+company
+  // Check onboarding + subscription status in PARALLEL on first authenticated
+  // load. Previously these two `/api/company` and `/api/subscription/check-
+  // subscription` calls ran sequentially in two separate effects, which added
+  // a full round-trip to every cold load. They have no data dependency on
+  // each other — the subscription check doesn't read the company response —
+  // so `Promise.all` shaves one RTT.
+  //
+  // Both results are cached in localStorage with a short TTL (see
+  // readCachedFlag below) so a subsequent navigation in the same hour skips
+  // the network entirely, while a lapsed subscription / setup change is
+  // re-checked at most an hour later. Previously the cache had no expiry,
+  // which let a canceled subscription stay accessible for the entire tab
+  // lifetime — addressed here together with the parallelisation.
   useEffect(() => {
     if (!isAuthenticated || !isInitialized || !userId || isEmailVerified !== true) {
       return;
     }
 
-    // Check localStorage cache first — skip API call entirely if already completed
-    const cacheKey = `onboardingCompleted:${userId}`;
-    if (localStorage.getItem(cacheKey) === 'true') {
+    const onboardingCacheKey = onboardingCacheKeyFor(userId);
+    const subscriptionCacheKey = subscriptionCacheKeyFor(userId);
+
+    const onboardingCached = readCachedFlag(onboardingCacheKey);
+    const subscriptionCached = readCachedFlag(subscriptionCacheKey);
+
+    // Fast path: both cached and still fresh → no network at all.
+    if (onboardingCached && subscriptionCached) {
       setOnboardingChecked(true);
-      // If user somehow landed on /onboarding but already completed, redirect away
+      setNeedsOnboarding(false);
+      setSubscriptionChecked(true);
       if (location === '/onboarding') {
         setLocation('/select-plan');
       }
       return;
     }
 
-    // Only fetch once
     let cancelled = false;
-    const checkStatus = async () => {
-      try {
-        const response = await fetch('/api/company', { credentials: 'include' });
-        if (cancelled) return;
 
-        if (response.status === 404) {
-          // No company exists yet — user hasn't paid. Skip onboarding, go to plan selection.
-          setNeedsOnboarding(false);
-          if (location !== '/select-plan' && !signupFlowPages.includes(location)) {
-            console.log('🔒 [ProtectedRoute] No company found (pre-payment), redirecting to /select-plan');
-            setLocation('/select-plan');
-          }
-        } else if (response.ok) {
-          const company = await response.json();
+    const fetchCompany = onboardingCached
+      ? Promise.resolve<'cached'>('cached')
+      : fetch('/api/company', { credentials: 'include' }).catch((err) => {
+          console.error('Failed to fetch /api/company:', err);
+          return null;
+        });
+
+    const fetchSubscription = subscriptionCached
+      ? Promise.resolve<'cached'>('cached')
+      : fetch('/api/subscription/check-subscription', { credentials: 'include' }).catch((err) => {
+          console.error('Failed to fetch /api/subscription/check-subscription:', err);
+          return null;
+        });
+
+    (async () => {
+      const [companyRes, subRes] = await Promise.all([fetchCompany, fetchSubscription]);
+      if (cancelled) return;
+
+      // ---------- Onboarding / company resolution ----------
+      let resolvedNeedsOnboarding = false;
+      if (companyRes === 'cached') {
+        // Already known good — nothing to do.
+      } else if (companyRes && companyRes.status === 404) {
+        // No company yet — user hasn't paid. Skip onboarding, go to plan selection.
+        if (location !== '/select-plan' && !signupFlowPages.includes(location)) {
+          console.log('🔒 [ProtectedRoute] No company found (pre-payment), redirecting to /select-plan');
+          setLocation('/select-plan');
+        }
+      } else if (companyRes && companyRes.ok) {
+        try {
+          const company = await companyRes.json();
           if (company && !company.setupCompleted) {
-            // Company exists but onboarding not done — redirect to onboarding
+            resolvedNeedsOnboarding = true;
             if (location !== '/onboarding' && location !== '/select-plan') {
-              setNeedsOnboarding(true);
               setLocation('/onboarding');
             }
           } else {
-            localStorage.setItem(cacheKey, 'true');
-            setNeedsOnboarding(false);
+            writeCachedFlag(onboardingCacheKey);
             if (location === '/onboarding') {
               setLocation('/select-plan');
             }
           }
+        } catch (jsonErr) {
+          console.error('Failed to parse /api/company response:', jsonErr);
         }
-      } catch (error) {
-        console.error('Failed to check onboarding status:', error);
-      } finally {
-        if (!cancelled) setOnboardingChecked(true);
       }
-    };
+      if (cancelled) return;
+      setNeedsOnboarding(resolvedNeedsOnboarding);
+      setOnboardingChecked(true);
 
-    checkStatus();
+      // ---------- Subscription resolution ----------
+      // We always SEND the request in parallel (no waterfall) but only ACT on
+      // it when onboarding is actually complete — otherwise the user belongs
+      // on /onboarding regardless of subscription state.
+      if (!resolvedNeedsOnboarding) {
+        if (subRes === 'cached') {
+          // Cached as active — nothing to do.
+        } else if (subRes && subRes.ok) {
+          try {
+            const data = await subRes.json();
+            if (data.hasSubscription && data.status === 'active') {
+              writeCachedFlag(subscriptionCacheKey);
+            } else if (!signupFlowPages.includes(location)) {
+              console.log('🔒 [ProtectedRoute] No active subscription, redirecting to /select-plan');
+              setLocation('/select-plan');
+            }
+          } catch (jsonErr) {
+            console.error('Failed to parse /api/subscription/check-subscription response:', jsonErr);
+          }
+        }
+        // On network error we deliberately do NOT block the user; the next
+        // navigation will retry.
+      }
+      if (cancelled) return;
+      setSubscriptionChecked(true);
+    })();
+
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isInitialized, userId, isEmailVerified]);
-
-  // Check subscription status — only after onboarding is confirmed complete
-  useEffect(() => {
-    if (!isAuthenticated || !isInitialized || !userId || isEmailVerified !== true) {
-      return;
-    }
-
-    // Wait until onboarding check is done
-    if (!onboardingChecked) {
-      return;
-    }
-
-    // If user still needs onboarding, don't check subscription yet
-    if (needsOnboarding) {
-      return;
-    }
-
-    // Check localStorage cache first — skip API call if subscription already confirmed
-    const subCacheKey = `subscriptionActive:${userId}`;
-    if (localStorage.getItem(subCacheKey) === 'true') {
-      setSubscriptionChecked(true);
-      return;
-    }
-
-    let cancelled = false;
-    const checkSubscription = async () => {
-      try {
-        const response = await fetch('/api/subscription/check-subscription', { credentials: 'include' });
-        if (cancelled) return;
-        if (response.ok) {
-          const data = await response.json();
-          if (data.hasSubscription && data.status === 'active') {
-            // Subscription is active — cache it and allow through
-            localStorage.setItem(subCacheKey, 'true');
-          } else if (!signupFlowPages.includes(location)) {
-            // No active subscription — redirect to plan selection (skip redirect on signup flow pages)
-            console.log('🔒 [ProtectedRoute] No active subscription, redirecting to /select-plan');
-            setLocation('/select-plan');
-          }
-        }
-      } catch (error) {
-        console.error('Failed to check subscription status:', error);
-        // On error, don't block the user — let them through
-      } finally {
-        if (!cancelled) setSubscriptionChecked(true);
-      }
-    };
-
-    checkSubscription();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, isInitialized, userId, isEmailVerified, onboardingChecked, needsOnboarding, location]);
 
   // Determine if we need to gate rendering behind signup checks
   const isOnSignupFlowPage = signupFlowPages.includes(location);
   const isFullyAuthenticated = isAuthenticated && isEmailVerified === true && isInitialized;
 
-  // Block dashboard/protected pages from rendering until both checks pass
-  // Don't block signup flow pages — they manage their own state
+  // Block dashboard/protected pages from rendering until both checks pass.
+  // Don't block signup flow pages — they manage their own state.
+  //
+  // Use the layout-shaped skeleton instead of a centered spinner so the
+  // user immediately sees the page structure they're about to interact
+  // with. With the parallelised onboarding+subscription check this branch
+  // is usually <300 ms on cold loads.
   if (isFullyAuthenticated && !isOnSignupFlowPage) {
-    // If onboarding check hasn't completed yet, show a loading spinner
-    if (!onboardingChecked) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="text-sm text-muted-foreground">Verifying account setup...</p>
-          </div>
-        </div>
-      );
-    }
-
-    // If subscription check hasn't completed yet (and onboarding passed), show loading
-    if (!needsOnboarding && !subscriptionChecked) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="text-sm text-muted-foreground">Checking subscription status...</p>
-          </div>
-        </div>
-      );
+    if (!onboardingChecked || (!needsOnboarding && !subscriptionChecked)) {
+      return <FullPageSkeleton />;
     }
   }
 
@@ -492,10 +486,9 @@ function Router() {
 }
 
 function AppWithProviders({ children }: { children: ReactNode }) {
-  if (convex) {
-    return <ConvexProvider client={convex}>{children}</ConvexProvider>;
-  }
-  return <>{children}</>;
+  // Convex provider mounts asynchronously — see LazyConvexProvider.
+  // Children render immediately; once Convex resolves it rewraps the tree.
+  return <LazyConvexProvider>{children}</LazyConvexProvider>;
 }
 
 function App() {

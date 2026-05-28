@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { prefetchOn } from "@/lib/routePrefetch";
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
@@ -245,7 +246,7 @@ export function AppSidebar() {
                           )}
                           tooltip={item.name}
                         >
-                          <Link href={item.href} className="flex items-center gap-3 w-full group-data-[collapsible=icon]:justify-center" onClick={handleMobileNavClick}>
+                          <Link href={item.href} className="flex items-center gap-3 w-full group-data-[collapsible=icon]:justify-center" onClick={handleMobileNavClick} {...prefetchOn(item.href)}>
                             <Icon className="h-5 w-5 flex-shrink-0" />
                             <span className="group-data-[collapsible=icon]:hidden font-medium">{item.name}</span>
                           </Link>
@@ -267,7 +268,7 @@ export function AppSidebar() {
                             )}
                             tooltip={item.name}
                           >
-                            <Link href={item.href} className="flex items-center gap-3" onClick={handleMobileNavClick}>
+                            <Link href={item.href} className="flex items-center gap-3" onClick={handleMobileNavClick} {...prefetchOn(item.href)}>
                               <Icon className="h-5 w-5 flex-shrink-0" />
                               <span className="font-medium">{item.name}</span>
                             </Link>
@@ -293,7 +294,7 @@ export function AppSidebar() {
                               return (
                                 <SidebarMenuSubItem key={child.name}>
                                   <SidebarMenuSubButton asChild isActive={childActive}>
-                                    <Link href={child.href} className="flex items-center gap-2" onClick={handleMobileNavClick}>
+                                    <Link href={child.href} className="flex items-center gap-2" onClick={handleMobileNavClick} {...prefetchOn(child.href)}>
                                       {ChildIcon && <ChildIcon className="h-4 w-4" />}
                                       <span>{child.name}</span>
                                     </Link>
@@ -319,7 +320,7 @@ export function AppSidebar() {
                       )}
                       tooltip={item.name}
                     >
-                      <Link href={item.href} className="flex items-center gap-3 w-full group-data-[collapsible=icon]:justify-center" onClick={handleMobileNavClick}>
+                      <Link href={item.href} className="flex items-center gap-3 w-full group-data-[collapsible=icon]:justify-center" onClick={handleMobileNavClick} {...prefetchOn(item.href)}>
                         <Icon className="h-5 w-5 flex-shrink-0" />
                         <span className="group-data-[collapsible=icon]:hidden font-medium">{item.name}</span>
                       </Link>

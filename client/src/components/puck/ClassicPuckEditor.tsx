@@ -7,6 +7,10 @@ import { templatesPlugin } from "@/config/puck/templates-plugin";
 import { usePreviewColors } from "@/components/puck/PreviewWrapper";
 import type { UserData } from "@/config/puck/puck-shared";
 import "@puckeditor/core/puck.css";
+// Editor-only dark-mode overrides. Extracted from index.css so the
+// ~50 KB of `.Puck` / `[class*="Puck"]` selectors only ship with this
+// lazy-loaded route, not with every page in the app.
+import "@/styles/puck-dark-overrides.css";
 
 interface SaveStatusIndicatorProps {
   justSavedRef: React.MutableRefObject<boolean>;

@@ -8,7 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { LanguageSelector } from '@/components/ui/language-selector';
 import { Fragment, useState, useEffect } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
-import { ChevronUpDownIcon, CheckIcon } from '@heroicons/react/24/outline';
+// Swapped from @heroicons/react to lucide-react so the build only ships
+// one icon set. Mapping: ChevronUpDownIcon → ChevronsUpDown, CheckIcon → Check.
+import { ChevronsUpDown as ChevronUpDownIcon, Check as CheckIcon } from 'lucide-react';
 import { validateFieldName, normalizeFieldName } from '@/hooks/use-form-builder';
 
 interface PropertiesPanelProps {

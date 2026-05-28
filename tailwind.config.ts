@@ -2,10 +2,12 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: ["class"],
+  // Tight content globs so Tailwind's JIT only scans real source.
+  // Backups were moved to .trash-backups/ outside src/ so dead files
+  // don't keep utility classes alive in the final CSS.
   content: [
-    "./client/index.html", 
+    "./client/index.html",
     "./client/src/**/*.{js,jsx,ts,tsx}",
-
   ],
   theme: {
     extend: {

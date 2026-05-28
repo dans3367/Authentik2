@@ -1,6 +1,7 @@
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import mongoSanitize from "express-mongo-sanitize";
+import { getRedisSync } from "../utils/redisClient";
 import xss from "xss";
 import { validationResult, ValidationChain } from "express-validator";
 import { Request, Response, NextFunction } from "express";
@@ -81,16 +82,55 @@ export const helmetMiddleware = helmet({
 });
 
 // Rate limiting configurations
+//
+// When REDIS_URL is configured we back express-rate-limit with
+// `rate-limit-redis` so counters are shared across workers / pods and
+// survive process restarts. Otherwise we fall back to the default
+// in-memory store, which is partition-per-process and resets on restart
+// (acceptable for local dev, NOT for production at scale).
+//
+// `rate-limit-redis` is loaded lazily via dynamic import, kicked off at
+// module-load but NOT awaited at the top level (which would force the
+// host module to be ES2022+). If the dep is missing we silently fall
+// back to the in-memory store; createRateLimiter() only consults the
+// factory after this has resolved (the early ms of process startup will
+// briefly use memory store, which is acceptable).
+let redisRateLimitStoreFactory: ((prefix: string) => any) | null = null;
+void (async () => {
+  try {
+    // @ts-ignore optional peer dep
+    const mod: any = await import('rate-limit-redis');
+    const RedisStore = mod.default || mod.RedisStore || mod;
+    redisRateLimitStoreFactory = (prefix: string) => {
+      const client = getRedisSync();
+      if (!client) return undefined;
+      return new RedisStore({
+        // ioredis exposes .call() which rate-limit-redis uses for SCRIPT etc.
+        sendCommand: (...args: string[]) => client.call(...args),
+        prefix: `rl:${prefix}:`,
+      });
+    };
+  } catch {
+    // rate-limit-redis not installed — silently fall back to memory store.
+    redisRateLimitStoreFactory = null;
+  }
+})();
+
+let rateLimiterCounter = 0;
 export const createRateLimiter = (options: {
   windowMs?: number;
   max?: number;
   message?: string;
   skipSuccessfulRequests?: boolean;
+  name?: string;
 }) => {
   // Allow disabling rate limiting in development
   if (process.env.DISABLE_RATE_LIMITING === 'true') {
     return (req: any, res: any, next: any) => next();
   }
+
+  const prefix = options.name || `g${++rateLimiterCounter}`;
+  const store = redisRateLimitStoreFactory ? redisRateLimitStoreFactory(prefix) : undefined;
 
   return rateLimit({
     windowMs: options.windowMs || 15 * 60 * 1000, // 15 minutes default
@@ -99,16 +139,19 @@ export const createRateLimiter = (options: {
     standardHeaders: true,
     legacyHeaders: false,
     skipSuccessfulRequests: options.skipSuccessfulRequests || false,
+    ...(store ? { store } : {}),
   });
 };
 
 // Default rate limiters
 export const generalRateLimiter = createRateLimiter({
+  name: 'general',
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 1000,
 });
 
 export const authRateLimiter = createRateLimiter({
+  name: 'auth',
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 50,
   message: "Too many authentication attempts, please try again later.",
@@ -116,11 +159,13 @@ export const authRateLimiter = createRateLimiter({
 });
 
 export const apiRateLimiter = createRateLimiter({
+  name: 'api',
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 300,
 });
 
 export const jwtTokenRateLimiter = createRateLimiter({
+  name: 'jwt',
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,
   message: "Too many token generation requests. Please try again later.",
@@ -129,6 +174,7 @@ export const jwtTokenRateLimiter = createRateLimiter({
 
 // Stricter rate limiter for credential-checking endpoints (login, 2FA check)
 export const loginRateLimiter = createRateLimiter({
+  name: 'login',
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,
   message: "Too many login attempts. Please try again later.",
@@ -137,6 +183,7 @@ export const loginRateLimiter = createRateLimiter({
 
 // Rate limiter for 2FA verification attempts
 export const twoFactorRateLimiter = createRateLimiter({
+  name: '2fa',
   windowMs: 10 * 60 * 1000, // 10 minutes (matches temp session TTL)
   max: 5,
   message: "Too many 2FA verification attempts. Please try again later.",
@@ -145,23 +192,44 @@ export const twoFactorRateLimiter = createRateLimiter({
 
 // Rate limiter for activity log endpoints (read-heavy, prevent abuse)
 export const activityLogRateLimiter = createRateLimiter({
+  name: 'activity',
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 60,
   message: "Too many activity log requests. Please try again shortly.",
 });
 
-// Rate limiter for password reset requests
-export const passwordResetRateLimiter = createRateLimiter({
+// Rate limiter for password reset REQUESTS (/forgot-password). Caps how
+// often an IP can mint reset tokens / trigger reset emails.
+export const forgotPasswordRateLimiter = createRateLimiter({
+  name: 'pwreset-request',
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5,
   message: "Too many password reset requests. Please try again later.",
   skipSuccessfulRequests: false,
 });
 
+// Rate limiter for actually CONSUMING a reset token (/reset-password).
+// Decoupled from /forgot-password so an attacker spamming /forgot-password
+// from the same NAT/IP cannot lock a legitimate user out of redeeming the
+// reset link they just received. Successful resets don't count toward the
+// limit (skipSuccessfulRequests) so the common-case flow is never blocked.
+export const resetPasswordRateLimiter = createRateLimiter({
+  name: 'pwreset-consume',
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  message: "Too many password reset attempts. Please try again later.",
+  skipSuccessfulRequests: true,
+});
+
+// Back-compat alias — callers that still import `passwordResetRateLimiter`
+// keep the old, request-side semantics. Prefer the explicit names above.
+export const passwordResetRateLimiter = forgotPasswordRateLimiter;
+
 // Rate limiter for /verify-email token consumption.
 // JWT decode + DB lookups per hit — cap per-IP to block brute-force token guessing
 // and "resend" spam from the verification page.
 export const verifyEmailRateLimiter = createRateLimiter({
+  name: 'verifyemail',
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20,
   message: "Too many verification attempts. Please try again later.",
@@ -172,6 +240,7 @@ export const verifyEmailRateLimiter = createRateLimiter({
 // in the handler via better_auth_user.last_verification_email_sent; this IP
 // limiter stops spraying across many different email addresses from one source.
 export const resendVerificationRateLimiter = createRateLimiter({
+  name: 'resendverif',
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 10,
   message: "Too many verification email requests. Please try again later.",

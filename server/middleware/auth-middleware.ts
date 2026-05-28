@@ -220,6 +220,23 @@ export function getAssignableRoles(currentRole: string): string[] {
     .map(([role]) => role);
 }
 
+/**
+ * Role gate (HIERARCHICAL / at-least).
+ *
+ * `requireRole('Manager')` admits Manager, Administrator AND Owner because
+ * the hierarchy is Owner > Administrator > Manager > Employee. This is the
+ * intended behaviour for permission-style gates ("any role at this level
+ * or above"), but it means an Owner can invoke routes intended only for a
+ * lower role — e.g. employee-only self-service actions that an admin
+ * arguably should not impersonate.
+ *
+ * Use `requireExactRole(...)` below if a route must be invoked by exactly
+ * a specific role (or one of a fixed set) regardless of hierarchy.
+ *
+ * AUDIT NOTE: every existing `requireRole(...)` call site should be
+ * reviewed to confirm at-least semantics are actually desired. Switch any
+ * "only X may do this" routes to `requireExactRole`.
+ */
 export const requireRole = (requiredRole: string | string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
@@ -245,6 +262,30 @@ export const requireRole = (requiredRole: string | string[]) => {
       });
     }
 
+    next();
+  };
+};
+
+/**
+ * Role gate (EXACT membership).
+ *
+ * `requireExactRole('Employee')` admits ONLY Employees. Owners and
+ * Administrators are rejected with 403 even though they sit higher in the
+ * hierarchy. Use for routes that represent role-specific responsibilities
+ * (self-service actions, peer-only flows, segregation-of-duties) rather
+ * than capability tiers.
+ */
+export const requireExactRole = (allowedRoles: string | string[]) => {
+  const allowed = new Set(Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles]);
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+    if (!allowed.has(req.user.role)) {
+      return res.status(403).json({
+        message: 'This action is not available for your role',
+      });
+    }
     next();
   };
 };

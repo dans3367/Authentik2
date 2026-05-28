@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { sql, and, eq } from 'drizzle-orm';
-import { betterAuthUser, tenants, companies, forms, refreshTokens } from '@shared/schema';
+import { betterAuthUser, tenants, companies, forms, refreshTokens, temp2faSessions, betterAuthSession } from '@shared/schema';
 import { authenticateToken, requireRole } from '../middleware/auth-middleware';
 import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
@@ -363,6 +363,18 @@ adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Admin
         eq(betterAuthUser.id, userId),
         eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
+
+    // On deactivation, revoke all active sessions AND any in-flight temp 2FA
+    // sessions so a user who already passed credential check cannot still
+    // complete /verify-2fa within the 10-minute window.
+    if (!isActive) {
+      await db.delete(betterAuthSession)
+        .where(eq(betterAuthSession.userId, userId))
+        .catch(err => console.warn('⚠️ [Admin Status] Failed to revoke sessions:', err));
+      await db.delete(temp2faSessions)
+        .where(eq(temp2faSessions.userId, userId))
+        .catch(err => console.warn('⚠️ [Admin Status] Failed to revoke temp 2FA sessions:', err));
+    }
 
     // Invalidate security cache — isActive changed
     invalidateUserSecurity(userId, 'status_change', {

@@ -3,7 +3,7 @@ import { authenticateToken, requirePermission, requirePlanFeature, getEffectiveP
 import { validatePasswordStrength } from '../middleware/security-enhanced';
 import { storage } from '../storage';
 import { db } from '../db';
-import { betterAuthUser, betterAuthSession, subscriptionPlans, shops, createUserSchema } from '@shared/schema';
+import { betterAuthUser, betterAuthSession, subscriptionPlans, shops, createUserSchema, temp2faSessions } from '@shared/schema';
 import { sql, eq, and, count } from 'drizzle-orm';
 import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
@@ -624,6 +624,18 @@ userRoutes.patch("/:userId/status", authenticateToken, requirePlanFeature('allow
         eq(betterAuthUser.tenantId, req.user.tenantId)
       ));
 
+    // On deactivation, revoke all active sessions AND any in-flight temp 2FA
+    // sessions so a user who already passed credential check cannot still
+    // complete /verify-2fa within the 10-minute window.
+    if (!isActive) {
+      await db.delete(betterAuthSession)
+        .where(eq(betterAuthSession.userId, userId))
+        .catch(err => console.warn('⚠️ [User Status] Failed to revoke sessions:', err));
+      await db.delete(temp2faSessions)
+        .where(eq(temp2faSessions.userId, userId))
+        .catch(err => console.warn('⚠️ [User Status] Failed to revoke temp 2FA sessions:', err));
+    }
+
     // Invalidate security cache — isActive changed
     invalidateUserSecurity(userId, 'status_change', {
       tenantId: req.user.tenantId,
@@ -755,6 +767,11 @@ userRoutes.post("/:userId/set-password", authenticateToken, requirePlanFeature('
     if (currentUserId !== userId) {
       await db.delete(betterAuthSession)
         .where(eq(betterAuthSession.userId, userId));
+      // Also revoke in-flight temp 2FA sessions so a stale post-credential
+      // temp token cannot complete login after the password has been changed.
+      await db.delete(temp2faSessions)
+        .where(eq(temp2faSessions.userId, userId))
+        .catch(err => console.warn('⚠️ [Set Password] Failed to revoke temp 2FA sessions:', err));
     }
 
     console.log(`✅ [Set Password] Password set for user ${targetUser.email} by ${req.user.email}`);

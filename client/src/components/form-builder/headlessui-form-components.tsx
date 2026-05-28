@@ -1,6 +1,8 @@
 import React from 'react';
 import { Switch, RadioGroup, Checkbox, Listbox, Transition } from '@headlessui/react';
-import { ChevronUpDownIcon, CheckIcon } from '@heroicons/react/24/outline';
+// Swapped from @heroicons/react to lucide-react so the build only ships
+// one icon set. Mapping: ChevronUpDownIcon → ChevronsUpDown, CheckIcon → Check.
+import { ChevronsUpDown as ChevronUpDownIcon, Check as CheckIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FormTheme } from '@/types/form-builder';
 

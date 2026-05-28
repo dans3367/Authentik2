@@ -9,6 +9,7 @@ import { Check, Star, Loader2, CreditCard, Calendar, Users, Settings, TrendingUp
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useReduxAuth } from "@/hooks/useReduxAuth";
+import { clearCachedFlag, subscriptionCacheKey } from "@/lib/protectedFlagCache";
 import type { SubscriptionPlan, UserSubscriptionResponse } from "@shared/schema";
 
 interface SubscriptionManagementProps {
@@ -342,10 +343,9 @@ export default function Subscribe() {
           title: "Plan Upgraded!",
           description: "Your subscription has been updated successfully.",
         });
-        // Clear subscription cache so ProtectedRoute re-checks
-        if (user?.id) {
-          localStorage.removeItem(`subscriptionActive:${user.id}`);
-        }
+        // Clear subscription cache so ProtectedRoute re-checks against the
+        // server (the plan changed; the cached `active` flag is now stale).
+        if (user?.id) clearCachedFlag(subscriptionCacheKey(user.id));
         // Reload to show updated subscription data
         setTimeout(() => {
           window.location.href = '/subscribe';

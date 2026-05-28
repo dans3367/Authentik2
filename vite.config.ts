@@ -26,56 +26,44 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          // Core React libraries
+          // Core React libraries — long-lived, cacheable across deploys.
           'react-vendor': ['react', 'react-dom'],
 
-          // State management
+          // State management — touched by nearly every page; small enough
+          // that bundling together avoids per-route duplication.
           'state-vendor': ['@reduxjs/toolkit', 'react-redux', 'redux-persist'],
 
-          // Data fetching
+          // Data fetching — same rationale as state-vendor.
           'query-vendor': ['@tanstack/react-query', '@tanstack/react-table'],
 
-          // UI component libraries
-          'radix-vendor': [
-            '@radix-ui/react-accordion',
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-label',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-select',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-tooltip'
-          ],
-
-          // Form handling
+          // Form handling — used on most input-heavy pages; co-locating
+          // keeps zod in one place instead of inlined per page.
           'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
 
-          // NOTE: recharts is NOT in manual chunks - it will be code-split 
-          // with email-analytics page for better initial load performance
-
-          // Icons and styling
-          'ui-vendor': [
-            'lucide-react',
-            'class-variance-authority',
-            'clsx',
-            'tailwind-merge'
-          ],
-
-          // Date and utility libraries
+          // Date and utility libraries — cheap and shared widely.
           'utils-vendor': ['date-fns', 'nanoid'],
 
-          // Payment processing (Stripe Checkout — no client-side Stripe SDK needed)
-
-          // AWS and cloud services
-          'aws-vendor': ['@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner']
+          // NOTE: deliberately removed from manualChunks (Vite will
+          // split them per-route via its import graph):
+          //   * @radix-ui/* — 12 primitives bundled all-or-nothing as
+          //     `radix-vendor` (~276 KB) loaded modulepreloaded on every
+          //     route, even pages using 3-4 primitives.
+          //   * lucide-react / class-variance-authority / clsx /
+          //     tailwind-merge — were `ui-vendor` (~115 KB); lucide
+          //     tree-shakes very well per icon set used per page.
+          //   * @aws-sdk/* — server-only deps. Used by R2/S3 (avatars,
+          //     newsletter images, card images) and SES (transactional
+          //     email). Manualchunking them caused Vite to emit an
+          //     `aws-vendor` chunk and modulepreload it on every cold
+          //     load even though no client code imports them.
+          // recharts stays out so it ships only with /email-analytics
+          // and /analytics (already lazy-loaded routes).
         }
       }
     },
-    // Increase chunk size warning limit to 1000kb
+    // Most route chunks are well below 500 KB; large editor / chart
+    // chunks (ClassicPuckEditor, AreaChart) are knowingly lazy-loaded
+    // and don't affect cold start.
     chunkSizeWarningLimit: 1000
   },
   server: {

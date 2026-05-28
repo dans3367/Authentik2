@@ -18,6 +18,7 @@ import {
     Check
 } from 'lucide-react';
 import { clearAllAuthState, setIntentionalLogout } from '@/lib/clearAuthState';
+import { writeCachedFlag, onboardingCacheKey } from '@/lib/protectedFlagCache';
 
 interface OnboardingData {
     geographicalLocation: string;
@@ -77,7 +78,10 @@ export default function OnboardingPage() {
         try {
             const parsed = JSON.parse(userDataStr);
             const user = JSON.parse(parsed.user || '{}');
-            if (user.id) localStorage.setItem(`onboardingCompleted:${user.id}`, 'true');
+            // Use the shared TTL-wrapped writer so ProtectedRoute's cache
+            // read accepts this entry without forcing a redundant network
+            // check on the next navigation.
+            if (user.id) writeCachedFlag(onboardingCacheKey(user.id));
         } catch { /* ignore */ }
     };
 

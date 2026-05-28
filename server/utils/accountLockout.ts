@@ -1,9 +1,15 @@
 /**
  * Account Lockout System
- * Implements progressive delays and temporary lockouts for failed login attempts
+ * Implements progressive delays and temporary lockouts for failed login attempts.
+ *
+ * State is stored in Redis when REDIS_URL is configured, so counters survive
+ * process restarts and are shared across workers / pods. Falls back to an
+ * in-memory Map if Redis is unavailable — that fallback is only safe for
+ * single-process dev environments.
  */
 
 import { logger } from './logger';
+import { getRedis, getRedisSync, type RedisLike } from './redisClient';
 
 interface AccountAttempt {
   count: number;
@@ -13,264 +19,276 @@ interface AccountAttempt {
 }
 
 interface LockoutConfig {
-  // Progressive delay thresholds and delays (in milliseconds)
-  progressiveDelays: {
-    after: number;    // After this many attempts
-    delay: number;    // Delay in milliseconds
-  }[];
-
-  // Temporary lockout settings
-  temporaryLockouts: {
-    after: number;    // After this many attempts
-    duration: number; // Lockout duration in milliseconds
-  }[];
-
-  // Reset settings
-  resetAfter: number; // Reset attempts after this time (successful login)
-  maxTrackingTime: number; // Don't track attempts older than this
-
-  // Database persistence (for better reliability)
-  persistToDb: boolean;
+  progressiveDelays: { after: number; delay: number }[];
+  temporaryLockouts: { after: number; duration: number }[];
+  resetAfter: number;
+  maxTrackingTime: number;
 }
 
 const defaultConfig: LockoutConfig = {
   progressiveDelays: [
-    { after: 3, delay: 1000 },      // 1 second after 3 attempts
-    { after: 5, delay: 5000 },      // 5 seconds after 5 attempts
-    { after: 7, delay: 15000 },     // 15 seconds after 7 attempts
-    { after: 10, delay: 60000 },    // 1 minute after 10 attempts
+    { after: 3, delay: 1000 },
+    { after: 5, delay: 5000 },
+    { after: 7, delay: 15000 },
+    { after: 10, delay: 60000 },
   ],
-
   temporaryLockouts: [
-    { after: 15, duration: 15 * 60 * 1000 },   // 15 minutes after 15 attempts
-    { after: 20, duration: 60 * 60 * 1000 },   // 1 hour after 20 attempts
-    { after: 25, duration: 24 * 60 * 60 * 1000 }, // 24 hours after 25 attempts
+    { after: 15, duration: 15 * 60 * 1000 },
+    { after: 20, duration: 60 * 60 * 1000 },
+    { after: 25, duration: 24 * 60 * 60 * 1000 },
   ],
-
-  resetAfter: 24 * 60 * 60 * 1000, // Reset after 24 hours of no attempts
-  maxTrackingTime: 7 * 24 * 60 * 60 * 1000, // Track for max 7 days
-  persistToDb: false, // Set to true if you want DB persistence
+  resetAfter: 24 * 60 * 60 * 1000,
+  maxTrackingTime: 7 * 24 * 60 * 60 * 1000,
 };
 
+// --- Key helpers -------------------------------------------------------------
+
+const REDIS_NS = 'lockout';
+function attemptsKey(id: string) { return `${REDIS_NS}:a:${id}`; }
+function lockoutKey(id: string) { return `${REDIS_NS}:l:${id}`; }
+
+// --- Implementation ----------------------------------------------------------
+
 class AccountLockoutManager {
-  private attempts = new Map<string, AccountAttempt>();
+  private attempts = new Map<string, AccountAttempt>(); // fallback only
   private config: LockoutConfig;
 
   constructor(config: Partial<LockoutConfig> = {}) {
     this.config = { ...defaultConfig, ...config };
   }
 
-  /**
-   * Check if an account is currently locked out
-   */
-  isLocked(identifier: string): { locked: boolean; remainingTime?: number; reason?: string } {
-    const attempt = this.attempts.get(identifier);
+  // Treat Redis as the source of truth when configured. We expose async
+  // methods so callers can `await` Redis ops. Where the legacy in-memory
+  // API was synchronous (isLocked / recordFailedAttempt / recordSuccessfulLogin),
+  // we keep them async — call sites already use `await`.
 
-    if (!attempt) {
-      return { locked: false };
-    }
-
-    // Clean up expired attempts
-    this.cleanup(identifier);
-
-    // Check if currently locked out
-    if (attempt.lockoutUntil && attempt.lockoutUntil > Date.now()) {
-      const remainingTime = attempt.lockoutUntil - Date.now();
-      return {
-        locked: true,
-        remainingTime,
-        reason: `Temporary lockout due to ${attempt.totalAttempts} failed attempts`
-      };
-    }
-
-    return { locked: false };
+  private getRedis(): RedisLike | null {
+    return getRedisSync();
   }
 
   /**
-   * Record a failed login attempt
+   * Check if an account is currently locked out.
    */
-  recordFailedAttempt(identifier: string, ip: string): { shouldDelay: boolean; delayMs?: number; locked?: boolean } {
-    const now = Date.now();
-    let attempt = this.attempts.get(identifier);
+  async isLocked(identifier: string): Promise<{ locked: boolean; remainingTime?: number; reason?: string }> {
+    const redis = this.getRedis();
+    if (redis) {
+      try {
+        const [until, total] = await Promise.all([
+          redis.get(lockoutKey(identifier)),
+          redis.get(attemptsKey(identifier)),
+        ]);
+        const untilMs = until ? Number(until) : 0;
+        if (untilMs && untilMs > Date.now()) {
+          return {
+            locked: true,
+            remainingTime: untilMs - Date.now(),
+            reason: `Temporary lockout due to ${total || '?'} failed attempts`,
+          };
+        }
+        return { locked: false };
+      } catch (err: any) {
+        logger.warn('[Lockout] Redis isLocked failed, falling back to memory', { error: err?.message });
+        // fall through to memory
+      }
+    }
+    return this.isLockedMemory(identifier);
+  }
 
-    if (!attempt) {
-      attempt = {
-        count: 0,
-        lastAttempt: now,
-        totalAttempts: 0
+  /**
+   * Record a failed login attempt.
+   * Returns whether to delay the response, and/or whether the account is now locked.
+   */
+  async recordFailedAttempt(
+    identifier: string,
+    ip: string,
+  ): Promise<{ shouldDelay: boolean; delayMs?: number; locked?: boolean }> {
+    const redis = this.getRedis();
+    if (redis) {
+      try {
+        // Atomic increment with TTL refresh. We use the maxTrackingTime TTL
+        // (in seconds) so abandoned counters expire on their own.
+        const ttlSec = Math.ceil(this.config.maxTrackingTime / 1000);
+        const totalAttempts = await redis.incr(attemptsKey(identifier));
+        // Only set TTL on the first increment; we don't want to keep
+        // pushing the window out indefinitely.
+        if (totalAttempts === 1) {
+          await redis.expire(attemptsKey(identifier), ttlSec);
+        }
+
+        const progressiveDelay = this.getProgressiveDelay(totalAttempts);
+        const lockout = this.getTemporaryLockout(totalAttempts);
+
+        if (lockout) {
+          const lockoutUntil = Date.now() + lockout.duration;
+          await redis.set(
+            lockoutKey(identifier),
+            String(lockoutUntil),
+            'PX',
+            lockout.duration,
+          );
+          logger.security('ACCOUNT_LOCKOUT', {
+            identifier, ip,
+            attemptCount: totalAttempts,
+            lockoutDuration: lockout.duration,
+            lockoutUntil: new Date(lockoutUntil).toISOString(),
+            store: 'redis',
+          });
+          return { shouldDelay: false, locked: true };
+        }
+
+        if (progressiveDelay) {
+          logger.security('PROGRESSIVE_DELAY', {
+            identifier, ip,
+            attemptCount: totalAttempts,
+            delayMs: progressiveDelay,
+            store: 'redis',
+          });
+          return { shouldDelay: true, delayMs: progressiveDelay };
+        }
+        return { shouldDelay: false };
+      } catch (err: any) {
+        logger.warn('[Lockout] Redis recordFailedAttempt failed, falling back to memory', { error: err?.message });
+        // fall through to memory
+      }
+    }
+    return this.recordFailedAttemptMemory(identifier, ip);
+  }
+
+  /**
+   * Record a successful login (resets the attempt counter).
+   */
+  async recordSuccessfulLogin(identifier: string, ip: string): Promise<void> {
+    const redis = this.getRedis();
+    if (redis) {
+      try {
+        const total = await redis.get(attemptsKey(identifier));
+        if (total && Number(total) > 0) {
+          logger.security('ACCOUNT_UNLOCKED', {
+            identifier, ip,
+            previousAttempts: Number(total),
+            store: 'redis',
+          });
+        }
+        await redis.del(attemptsKey(identifier), lockoutKey(identifier));
+        return;
+      } catch (err: any) {
+        logger.warn('[Lockout] Redis recordSuccessfulLogin failed, falling back to memory', { error: err?.message });
+        // fall through to memory
+      }
+    }
+    this.recordSuccessfulLoginMemory(identifier, ip);
+  }
+
+  // ------------- In-memory fallback (single-process only) -------------------
+
+  private isLockedMemory(identifier: string): { locked: boolean; remainingTime?: number; reason?: string } {
+    const attempt = this.attempts.get(identifier);
+    if (!attempt) return { locked: false };
+    this.cleanupMemory(identifier);
+    if (attempt.lockoutUntil && attempt.lockoutUntil > Date.now()) {
+      return {
+        locked: true,
+        remainingTime: attempt.lockoutUntil - Date.now(),
+        reason: `Temporary lockout due to ${attempt.totalAttempts} failed attempts`,
       };
     }
+    return { locked: false };
+  }
 
-    // Increment counters
+  private recordFailedAttemptMemory(
+    identifier: string, ip: string,
+  ): { shouldDelay: boolean; delayMs?: number; locked?: boolean } {
+    const now = Date.now();
+    let attempt = this.attempts.get(identifier);
+    if (!attempt) attempt = { count: 0, lastAttempt: now, totalAttempts: 0 };
     attempt.count++;
     attempt.totalAttempts++;
     attempt.lastAttempt = now;
 
-    // Check for progressive delays
     const progressiveDelay = this.getProgressiveDelay(attempt.totalAttempts);
     if (progressiveDelay) {
-      logger.security('PROGRESSIVE_DELAY', {
-        identifier,
-        ip,
-        attemptCount: attempt.totalAttempts,
-        delayMs: progressiveDelay,
-        timestamp: new Date().toISOString()
-      });
-
+      logger.security('PROGRESSIVE_DELAY', { identifier, ip, attemptCount: attempt.totalAttempts, delayMs: progressiveDelay, store: 'memory' });
       this.attempts.set(identifier, attempt);
       return { shouldDelay: true, delayMs: progressiveDelay };
     }
-
-    // Check for temporary lockouts
     const lockout = this.getTemporaryLockout(attempt.totalAttempts);
     if (lockout) {
       attempt.lockoutUntil = now + lockout.duration;
-
-      logger.security('ACCOUNT_LOCKOUT', {
-        identifier,
-        ip,
-        attemptCount: attempt.totalAttempts,
-        lockoutDuration: lockout.duration,
-        lockoutUntil: new Date(attempt.lockoutUntil).toISOString(),
-        timestamp: new Date().toISOString()
-      });
-
+      logger.security('ACCOUNT_LOCKOUT', { identifier, ip, attemptCount: attempt.totalAttempts, lockoutDuration: lockout.duration, lockoutUntil: new Date(attempt.lockoutUntil).toISOString(), store: 'memory' });
       this.attempts.set(identifier, attempt);
       return { shouldDelay: false, locked: true };
     }
-
     this.attempts.set(identifier, attempt);
     return { shouldDelay: false };
   }
 
-  /**
-   * Record a successful login (resets the attempt counter)
-   */
-  recordSuccessfulLogin(identifier: string, ip: string): void {
+  private recordSuccessfulLoginMemory(identifier: string, ip: string): void {
     const attempt = this.attempts.get(identifier);
-
     if (attempt && attempt.totalAttempts > 0) {
-      logger.security('ACCOUNT_UNLOCKED', {
-        identifier,
-        ip,
-        previousAttempts: attempt.totalAttempts,
-        timestamp: new Date().toISOString()
-      });
+      logger.security('ACCOUNT_UNLOCKED', { identifier, ip, previousAttempts: attempt.totalAttempts, store: 'memory' });
     }
-
-    // Clear the attempt record on successful login
     this.attempts.delete(identifier);
   }
 
-  /**
-   * Get progressive delay for current attempt count
-   */
   private getProgressiveDelay(attemptCount: number): number | null {
-    // Find the highest threshold we've crossed
     for (let i = this.config.progressiveDelays.length - 1; i >= 0; i--) {
-      const delay = this.config.progressiveDelays[i];
-      if (attemptCount >= delay.after) {
-        return delay.delay;
-      }
+      const d = this.config.progressiveDelays[i];
+      if (attemptCount >= d.after) return d.delay;
     }
     return null;
   }
 
-  /**
-   * Get temporary lockout for current attempt count
-   */
   private getTemporaryLockout(attemptCount: number): { duration: number } | null {
-    // Find the highest threshold we've crossed
     for (let i = this.config.temporaryLockouts.length - 1; i >= 0; i--) {
-      const lockout = this.config.temporaryLockouts[i];
-      if (attemptCount >= lockout.after) {
-        return { duration: lockout.duration };
-      }
+      const l = this.config.temporaryLockouts[i];
+      if (attemptCount >= l.after) return { duration: l.duration };
     }
     return null;
   }
 
-  /**
-   * Clean up expired attempts
-   */
-  private cleanup(identifier: string): void {
+  private cleanupMemory(identifier: string): void {
     const attempt = this.attempts.get(identifier);
     if (!attempt) return;
-
     const now = Date.now();
-
-    // Remove if no attempts in reset window
     if (now - attempt.lastAttempt > this.config.resetAfter) {
       this.attempts.delete(identifier);
       return;
     }
-
-    // Remove if max tracking time exceeded
     if (now - attempt.lastAttempt > this.config.maxTrackingTime) {
       this.attempts.delete(identifier);
       return;
     }
-
-    // Clear expired lockouts
     if (attempt.lockoutUntil && attempt.lockoutUntil < now) {
       attempt.lockoutUntil = undefined;
       this.attempts.set(identifier, attempt);
     }
   }
 
-  /**
-   * Get statistics for monitoring
-   */
-  getStats(): {
-    totalTracked: number;
-    currentlyLocked: number;
-    totalAttempts: number;
-  } {
+  getStats(): { totalTracked: number; currentlyLocked: number; totalAttempts: number } {
     let currentlyLocked = 0;
     let totalAttempts = 0;
-
-    for (const attempt of this.attempts.values()) {
-      if (attempt.lockoutUntil && attempt.lockoutUntil > Date.now()) {
-        currentlyLocked++;
-      }
-      totalAttempts += attempt.totalAttempts;
+    for (const a of this.attempts.values()) {
+      if (a.lockoutUntil && a.lockoutUntil > Date.now()) currentlyLocked++;
+      totalAttempts += a.totalAttempts;
     }
-
-    return {
-      totalTracked: this.attempts.size,
-      currentlyLocked,
-      totalAttempts
-    };
+    return { totalTracked: this.attempts.size, currentlyLocked, totalAttempts };
   }
 
-  /**
-   * Manual cleanup of old entries (call periodically)
-   */
   cleanupExpired(): void {
     const now = Date.now();
     const toDelete: string[] = [];
-
-    for (const [identifier, attempt] of this.attempts.entries()) {
-      if (now - attempt.lastAttempt > this.config.maxTrackingTime) {
-        toDelete.push(identifier);
-      }
+    for (const [id, a] of this.attempts.entries()) {
+      if (now - a.lastAttempt > this.config.maxTrackingTime) toDelete.push(id);
     }
-
     toDelete.forEach(id => this.attempts.delete(id));
-
-    if (toDelete.length > 0) {
-      logger.debug(`Cleaned up ${toDelete.length} expired lockout records`);
-    }
+    if (toDelete.length > 0) logger.debug(`Cleaned up ${toDelete.length} expired lockout records`);
   }
 }
 
-// Global instance
 export const accountLockout = new AccountLockoutManager();
 
-// Periodic cleanup (every 30 minutes)
-setInterval(() => {
-  accountLockout.cleanupExpired();
-}, 30 * 60 * 1000);
+// Periodic cleanup of the memory fallback (Redis keys expire on their own).
+setInterval(() => accountLockout.cleanupExpired(), 30 * 60 * 1000);
 
-
-
+// Ensure Redis client initialisation kicks off on module load.
+void getRedis();

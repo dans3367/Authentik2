@@ -5,119 +5,90 @@ import { eq, and, sql, lt, not } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 import { z } from 'zod';
 import { authenticateToken } from '../middleware/auth-middleware';
-import { auth, getAuthSecret } from '../auth';
+import { getAuthSecret } from '../auth';
 // bcrypt removed — Better Auth uses scrypt via hashPassword
 import jwt from 'jsonwebtoken';
 import { triggerTransactionalEmail } from '../lib/trigger';
-import { randomBytes } from 'crypto';
-import { twoFactorRateLimiter, passwordResetRateLimiter, loginRateLimiter, verifyEmailRateLimiter, resendVerificationRateLimiter } from '../middleware/security';
+import { randomBytes, createHash, timingSafeEqual } from 'crypto';
+import { twoFactorRateLimiter, forgotPasswordRateLimiter, resetPasswordRateLimiter, loginRateLimiter, verifyEmailRateLimiter, resendVerificationRateLimiter } from '../middleware/security';
 import { validatePasswordStrength } from '../middleware/security-enhanced';
 import { invalidateUserSecurity } from '../utils/userSecurityCache';
 import { accountLockout } from '../utils/accountLockout';
 import { redactEmail } from '../utils/logger';
+import { runScheduledJob } from '../utils/scheduledJobs';
+import { checkCooldown, armCooldown, pruneMemoryCooldowns } from '../utils/sharedCooldown';
+import { cookiesShouldBeSecure } from '../utils/cookieSecurity';
+import { setSessionCookie } from '../utils/sessionCookie';
 
 const sleepMs = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
-// Hard cap on failed TOTP attempts per temp session token. After this many
+// Hard cap on failed TOTP attempts per temp session row. After this many
 // wrong codes we delete the temp 2FA session row so the attacker has to
 // restart the login flow (which re-trips loginRateLimiter + accountLockout).
-// Keeps TOTP brute-force bounded even if attacker rotates IPs past
+// Keeps TOTP brute-force bounded even if the attacker rotates IPs past
 // twoFactorRateLimiter.
+//
+// The counter lives on the row itself (temp_2fa_sessions.attempt_count) and
+// is incremented atomically via UPDATE ... RETURNING. Previously this was an
+// in-process Map with an opportunistic 5000-key cap; an attacker could
+// inflate the map (by spraying /check-2fa-requirement) to evict their own
+// counter and get free retries, and the counter also reset on every
+// process restart / deploy.
 const MAX_2FA_ATTEMPTS_PER_TEMP_SESSION = 5;
-const twoFactorAttemptCounts = new Map<string, number>();
-function bumpTwoFactorAttempts(token: string): number {
-  const next = (twoFactorAttemptCounts.get(token) || 0) + 1;
-  twoFactorAttemptCounts.set(token, next);
-  // Opportunistic bound on map size — entries without a matching temp session
-  // will never be cleared otherwise.
-  if (twoFactorAttemptCounts.size > 5000) {
-    const keys = Array.from(twoFactorAttemptCounts.keys()).slice(0, 1000);
-    keys.forEach(k => twoFactorAttemptCounts.delete(k));
-  }
-  return next;
-}
-function clearTwoFactorAttempts(token: string) {
-  twoFactorAttemptCounts.delete(token);
+
+// HttpOnly cookie used to carry the temp 2FA session token between
+// /check-2fa-requirement and /verify-2fa. The token is no longer returned in
+// the JSON body (where it could leak via logs/telemetry/referer/extensions)
+// — the browser holds it only as a Secure, SameSite=Strict, HttpOnly cookie
+// scoped to the auth endpoint.
+const TEMP_2FA_COOKIE_NAME = 'temp_2fa_session';
+const TEMP_2FA_COOKIE_PATH = '/api/auth';
+
+function tempCookieOptions(maxAgeMs?: number) {
+  const opts: Record<string, any> = {
+    httpOnly: true,
+    secure: cookiesShouldBeSecure(),
+    sameSite: 'strict' as const,
+    path: TEMP_2FA_COOKIE_PATH,
+  };
+  if (typeof maxAgeMs === 'number') opts.maxAge = maxAgeMs;
+  return opts;
 }
 
+function clearTempTwoFactorCookie(res: any) {
+  res.clearCookie(TEMP_2FA_COOKIE_NAME, tempCookieOptions());
+}
+
+// Derive the client identity that the temp 2FA session is bound to. We hash
+// `${ip}|${ua}` with SHA-256 so the stored value is opaque (not directly
+// usable to track or impersonate) and fixed-size. The exact same derivation
+// must be used at /check-2fa-requirement and /verify-2fa.
+function computeClientBinding(req: any): string {
+  const ip =
+    (typeof req.ip === 'string' && req.ip) ||
+    req.socket?.remoteAddress ||
+    'unknown';
+  const ua = (typeof req.get === 'function' && req.get('user-agent')) || '';
+  return createHash('sha256').update(`${ip}|${ua}`).digest('hex');
+}
+
+function bindingMatches(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const ba = Buffer.from(a, 'hex');
+  const bb = Buffer.from(b, 'hex');
+  if (ba.length === 0 || ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
 export const loginRoutes = Router();
 
-function getAuthOrigin(req: any) {
-  return process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-}
-
-async function completeBrowserSignIn(req: any, res: any, email: string, password: string, rememberMe: boolean) {
-  // Only forward a minimal, audited set of headers into the internal Better
-  // Auth handler. Client-supplied `cookie` is intentionally NOT forwarded —
-  // an attacker could otherwise seed Better Auth with their own rate-limit
-  // or session state, and there is no legitimate reason for the internal
-  // sign-in call to inherit the client's cookie jar. Origin/referer are
-  // pinned to our own auth origin so Better Auth's trustedOrigins check
-  // passes regardless of what the client sent.
-  const authOrigin = getAuthOrigin(req);
-  const headers: Record<string, string> = {
-    'content-type': 'application/json',
-    origin: authOrigin,
-    referer: authOrigin,
-  };
-
-  const userAgent = req.headers['user-agent'];
-  if (typeof userAgent === 'string') {
-    headers['user-agent'] = userAgent;
-  }
-
-  const forwardedFor = req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress;
-  if (forwardedFor) {
-    headers['x-forwarded-for'] = String(forwardedFor);
-  }
-
-  const signInUrl = `${authOrigin}/api/auth/sign-in/email`;
-  console.log(`🔍 [completeBrowserSignIn] Making internal request to: ${signInUrl}`);
-
-  // Better Auth's sign-in/email honors `rememberMe`: when false it emits a
-  // session-only cookie (no Max-Age) and marks the session row accordingly,
-  // so forwarding the flag is enough — no cookie post-processing needed.
-  const signInRequest = new Request(signInUrl, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ email, password, rememberMe }),
-  });
-
-  const signInResponse = await auth.handler(signInRequest);
-  console.log(`🔍 [completeBrowserSignIn] Better Auth response status: ${signInResponse.status}`);
-
-  if (!signInResponse.ok) {
-    const errorText = await signInResponse.text().catch(() => '');
-    throw new Error(errorText || 'Failed to create authenticated session');
-  }
-
-  // Extract Set-Cookie headers from the Web Response object returned by auth.handler()
-  // auth.handler() returns a standard Web API Response — cookies are in its headers,
-  // NOT set via Express's res.setHeader. We must read them from the Response and
-  // forward them onto the Express response so the browser receives them.
-  const responseCookies: string[] = [];
-  const rawSetCookie = signInResponse.headers.getSetCookie?.();
-  if (rawSetCookie && rawSetCookie.length > 0) {
-    responseCookies.push(...rawSetCookie);
-  } else {
-    // Fallback: some environments don't support getSetCookie(), try get()
-    const cookieHeader = signInResponse.headers.get('set-cookie');
-    if (cookieHeader) {
-      // Multiple cookies may be comma-separated; split carefully (cookies contain '=' and ';')
-      responseCookies.push(cookieHeader);
-    }
-  }
-
-  console.log(`🔍 [completeBrowserSignIn] Extracted ${responseCookies.length} cookies from auth response:`, responseCookies.map(c => c.split(';')[0]));
-
-  if (responseCookies.length > 0) {
-    const existingCookies = (res.getHeader('set-cookie') as string | string[] | undefined) || [];
-    const allCookies = Array.isArray(existingCookies)
-      ? [...existingCookies, ...responseCookies]
-      : existingCookies ? [existingCookies, ...responseCookies] : responseCookies;
-    res.setHeader('Set-Cookie', allCookies);
-  }
-}
+// NOTE: an earlier `completeBrowserSignIn(req, res, email, password, …)`
+// helper used to forward the credential check into Better Auth's internal
+// `/sign-in/email` handler so non-2FA users got Better-Auth-issued cookies.
+// It was removed because /check-2fa-requirement now writes the session row
+// directly (matching /verify-2fa and /verify-email). Keeping the helper
+// around invited regressions on the x-forwarded-for header (see fix #7)
+// and made the success path depend on Better Auth's pre-conditions never
+// changing. Direct insertion is simpler and audit-friendly.
 
 // Cooldown between consecutive resend-verification requests for the same user.
 // Enforced against better_auth_user.last_verification_email_sent so the limit
@@ -183,6 +154,11 @@ loginRoutes.post('/resend-verification', resendVerificationRateLimiter, async (r
       const verificationToken = jwt.sign(
         {
           email: user.email,
+          // Typed-key discipline: BETTER_AUTH_SECRET is reused across email
+          // verification, password reset, etc. Stamping an explicit purpose
+          // claim (and enforcing it on the verify side) prevents a token
+          // minted for one flow from being replayed against another.
+          purpose: 'email-verification',
           iat: Math.floor(Date.now() / 1000)
         },
         secret,
@@ -251,22 +227,19 @@ loginRoutes.post('/resend-verification', resendVerificationRateLimiter, async (r
   }
 });
 
-// Clean up expired temporary 2FA sessions every 5 minutes
-setInterval(async () => {
-  try {
-    const now = new Date();
-    // Use drizzle's lt() function instead of raw SQL to properly handle Date objects
-    const deletedSessions = await db.delete(temp2faSessions)
-      .where(lt(temp2faSessions.expiresAt, now))
-      .returning({ id: temp2faSessions.id });
-
-    if (deletedSessions.length > 0) {
-      console.log(`🧹 [Cleanup] Removed ${deletedSessions.length} expired temporary 2FA sessions`);
-    }
-  } catch (error) {
-    console.error('Error cleaning up expired temp 2FA sessions:', error);
+// Clean up expired temporary 2FA sessions every 5 minutes.
+// Wrapped in runScheduledJob so that only one worker / pod performs the
+// DELETE per interval (Redis-lock leader election when REDIS_URL is set,
+// otherwise gated by RUN_SCHEDULED_JOBS=true).
+runScheduledJob('temp-2fa-cleanup', 5 * 60 * 1000, async () => {
+  const now = new Date();
+  const deletedSessions = await db.delete(temp2faSessions)
+    .where(lt(temp2faSessions.expiresAt, now))
+    .returning({ id: temp2faSessions.id });
+  if (deletedSessions.length > 0) {
+    console.log(`🧹 [Cleanup] Removed ${deletedSessions.length} expired temporary 2FA sessions`);
   }
-}, 5 * 60 * 1000);
+});
 
 // Check if user requires 2FA verification before login
 // Verifies credentials WITHOUT creating a Better Auth session to avoid orphaned
@@ -289,7 +262,7 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
     // Identity-based lockout. Complements the IP-based loginRateLimiter so a
     // distributed credential-stuffing attack against a single account still
     // hits progressive delays and temporary lockouts.
-    const lockStatus = accountLockout.isLocked(normalizedEmail);
+    const lockStatus = await accountLockout.isLocked(normalizedEmail);
     if (lockStatus.locked) {
       const retryAfterSec = Math.ceil((lockStatus.remainingTime || 0) / 1000);
       res.setHeader('Retry-After', String(retryAfterSec));
@@ -305,7 +278,7 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
     // let an attacker who already has the correct password enumerate which
     // accounts are disabled.
     const invalidCredentials = async () => {
-      const result = accountLockout.recordFailedAttempt(normalizedEmail, requestIp);
+      const result = await accountLockout.recordFailedAttempt(normalizedEmail, requestIp);
       if (result.shouldDelay && result.delayMs) {
         await sleepMs(result.delayMs);
       }
@@ -358,18 +331,55 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
     }
 
     // Credentials confirmed valid — clear the failed-attempt counter.
-    accountLockout.recordSuccessfulLogin(normalizedEmail, requestIp);
+    await accountLockout.recordSuccessfulLogin(normalizedEmail, requestIp);
 
     console.log(`🔍 [2FA Check] Credentials valid for user: ${userRecord.id}`);
 
     // Step 2: Check if user has 2FA enabled
     if (!userRecord.twoFactorEnabled || !userRecord.twoFactorSecret) {
-      // No 2FA — create the browser session through Better Auth itself so the
-      // client receives the exact cookies Better Auth expects.
-      console.log(`✅ [2FA Check] No 2FA required for user ${userRecord.id}`);
+      // No 2FA — create the session DIRECTLY (same path as /verify-2fa).
+      //
+      // Previously this called Better Auth's internal /sign-in/email
+      // handler, which:
+      //   * re-runs the password hash check we just performed,
+      //   * runs through Better Auth's own (separate) IP-keyed rate
+      //     limiter — which could be poisoned by a spoofed
+      //     x-forwarded-for header, and
+      //   * silently breaks if Better Auth ever changes pre-conditions
+      //     (e.g. starts demanding email-verified=true).
+      //
+      // Since we have already authenticated the user, just write the
+      // session row ourselves and set the cookie. This is the same
+      // approach already used by /verify-2fa and /verify-email, so the
+      // three success paths now agree.
+      console.log(`✅ [2FA Check] No 2FA required for user ${userRecord.id}, creating session directly`);
 
-      await completeBrowserSignIn(req, res, email, password, remember);
-      console.log('✅ [2FA Check] Better Auth cookies forwarded for non-2FA user');
+      const sessionId = `session_${Date.now()}_${randomBytes(12).toString('base64url')}`;
+      const newSessionToken = `${sessionId}_token_${randomBytes(18).toString('base64url')}`;
+      const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+      await db.insert(betterAuthSession).values({
+        id: sessionId,
+        userId: userRecord.id,
+        token: newSessionToken,
+        expiresAt: sessionExpiresAt,
+        ipAddress: req.ip || req.socket?.remoteAddress || null,
+        userAgent: req.get('User-Agent') || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // CRITICAL: the cookie value MUST be HMAC-signed in the format
+      // Better Auth expects (`${token}.${base64(HMAC-SHA256(secret,token))}`).
+      // Setting the raw token here produces a cookie that Better Auth's
+      // `/api/auth/get-session` (via `ctx.getSignedCookie`) rejects, leaving
+      // the browser logged-in-by-row but logged-out-by-useSession — the
+      // "user logs in but is not redirected to dashboard" regression.
+      setSessionCookie(res, newSessionToken, { rememberMe: remember });
+
+      await db.update(betterAuthUser)
+        .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+        .where(eq(betterAuthUser.id, userRecord.id));
 
       return res.json({
         success: true,
@@ -391,13 +401,18 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
       console.error('❌ [2FA Check] Failed to delete existing sessions:', deleteError);
     }
 
-    // Create new temporary 2FA session
+    // Create new temporary 2FA session, bound to the originating client
+    // identity (SHA-256 over `${ip}|${ua}`). /verify-2fa will require the
+    // same binding to redeem the token, so a leaked token cannot be used
+    // from a different device/network.
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const clientBinding = computeClientBinding(req);
     try {
       await db.insert(temp2faSessions).values({
         sessionToken,
         userId: userRecord.id,
         tenantId: userRecord.tenantId,
+        clientBinding,
         expiresAt
       });
     } catch (insertError) {
@@ -408,10 +423,17 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
       });
     }
 
+    // Carry the temp session token in an HttpOnly, Secure, SameSite=Strict
+    // cookie scoped to /api/auth instead of returning it in the JSON body.
+    // This keeps the token out of JS, response logs, referer headers, and
+    // any telemetry that snapshots response payloads.
+    res.cookie(TEMP_2FA_COOKIE_NAME, sessionToken, tempCookieOptions(10 * 60 * 1000));
+
     return res.json({
       success: true,
       requires2FA: true,
-      tempSessionToken: sessionToken
+      // `tempSessionToken` is intentionally NOT returned in the body anymore.
+      // The client redeems the cookie at /verify-2fa.
     });
 
   } catch (error) {
@@ -428,10 +450,16 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
 // token proves that. We create the session directly here instead of
 // re-authenticating with email/password (which would be a security risk if the
 // temp token were leaked).
-loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
+loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req: any, res) => {
   try {
-    const { token, tempSessionToken, rememberMe } = req.body;
+    const { token, rememberMe } = req.body;
     const remember = rememberMe === true;
+
+    // Read the temp session token from the HttpOnly cookie set by
+    // /check-2fa-requirement. Body fallback is intentionally NOT supported:
+    // accepting the token from the body would re-enable the leak vectors
+    // (logs, referer, telemetry, history) this binding is meant to close.
+    const tempSessionToken: string | undefined = req.cookies?.[TEMP_2FA_COOKIE_NAME];
 
     if (!token) {
       return res.status(400).json({
@@ -439,9 +467,11 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
       });
     }
 
-    if (!tempSessionToken) {
-      return res.status(400).json({
-        message: 'Temporary session token is required'
+    if (!tempSessionToken || typeof tempSessionToken !== 'string') {
+      clearTempTwoFactorCookie(res);
+      return res.status(401).json({
+        success: false,
+        message: 'Temporary session token is required. Please log in again.'
       });
     }
 
@@ -451,6 +481,7 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
     });
 
     if (!tempSession) {
+      clearTempTwoFactorCookie(res);
       return res.status(401).json({
         success: false,
         message: 'Invalid or expired temporary session'
@@ -462,10 +493,31 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
       // Clean up expired session
       await db.delete(temp2faSessions)
         .where(eq(temp2faSessions.id, tempSession.id));
+      clearTempTwoFactorCookie(res);
 
       return res.status(401).json({
         success: false,
         message: 'Temporary session expired. Please log in again.'
+      });
+    }
+
+    // Enforce client-identity binding. The temp session row was stamped with
+    // a SHA-256 of `${ip}|${ua}` at /check-2fa-requirement; the redeemer must
+    // present the same values. If the binding doesn't match (token leak,
+    // device change, anonymizer rotation), nuke the row and force a fresh
+    // login flow rather than letting the holder grind TOTP from elsewhere.
+    const currentBinding = computeClientBinding(req);
+    if (!bindingMatches(tempSession.clientBinding, currentBinding)) {
+      console.warn(
+        `🚫 [2FA] Client binding mismatch for tempSession ${tempSession.id} user=${tempSession.userId}. Revoking temp session.`
+      );
+      await db.delete(temp2faSessions)
+        .where(eq(temp2faSessions.id, tempSession.id))
+        .catch(err => console.warn('⚠️ [2FA] Failed to delete bound temp session:', err));
+      clearTempTwoFactorCookie(res);
+      return res.status(401).json({
+        success: false,
+        message: 'Session is no longer valid. Please log in again.'
       });
     }
 
@@ -496,6 +548,26 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
       });
     }
 
+    // Re-check post-credential security state. The credentials check in
+    // /check-2fa-requirement passed up to 10 minutes ago; in the meantime
+    // the account may have been deactivated, or the password may have been
+    // reset (which bumps tokenValidAfter and is meant to invalidate any
+    // in-flight auth state). Reject the verification and clean up the temp
+    // session row in either case so a stale temp token cannot complete login.
+    const tempCreatedAt = tempSession.createdAt ?? new Date(0);
+    const tokenValidAfter = user.tokenValidAfter ?? null;
+    if (!user.isActive || (tokenValidAfter && tokenValidAfter > tempCreatedAt)) {
+      await db.delete(temp2faSessions)
+        .where(eq(temp2faSessions.id, tempSession.id))
+        .catch(err => console.warn('⚠️ [2FA] Failed to delete stale temp session:', err));
+      clearTempTwoFactorCookie(res);
+      console.log(`🚫 [2FA] Rejecting verify-2fa for user ${user.id}: isActive=${user.isActive}, tokenValidAfter=${tokenValidAfter?.toISOString()}, tempCreatedAt=${tempCreatedAt.toISOString()}`);
+      return res.status(401).json({
+        success: false,
+        message: 'Session is no longer valid. Please log in again.'
+      });
+    }
+
     // Step 3: Verify the 2FA token
     const isValidToken = authenticator.verify({
       token,
@@ -503,16 +575,22 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
     });
 
     if (!isValidToken) {
-      // Per-temp-session failure counter. The token lives for 10 minutes and
-      // is scoped to one login attempt, so an attacker rotating IPs past the
-      // twoFactorRateLimiter still can't grind TOTP forever — after the cap
-      // we nuke the temp session and force a fresh login.
-      const attempts = bumpTwoFactorAttempts(tempSessionToken);
+      // Atomically bump the on-row failure counter. UPDATE ... RETURNING
+      // gives us the post-increment value in a single round trip with no
+      // TOCTOU between read and write, so parallel requests sharing the
+      // same temp token cannot smuggle in extra attempts. The counter is
+      // also durable across restarts and shared across workers — unlike
+      // the previous in-process Map which could be evicted or zeroed.
+      const [bumped] = await db.update(temp2faSessions)
+        .set({ attemptCount: sql`${temp2faSessions.attemptCount} + 1` })
+        .where(eq(temp2faSessions.id, tempSession.id))
+        .returning({ attemptCount: temp2faSessions.attemptCount });
+      const attempts = bumped?.attemptCount ?? MAX_2FA_ATTEMPTS_PER_TEMP_SESSION;
       if (attempts >= MAX_2FA_ATTEMPTS_PER_TEMP_SESSION) {
         await db.delete(temp2faSessions)
           .where(eq(temp2faSessions.id, tempSession.id))
           .catch(err => console.warn('⚠️ [2FA] Failed to delete temp session after cap:', err));
-        clearTwoFactorAttempts(tempSessionToken);
+        clearTempTwoFactorCookie(res);
         return res.status(401).json({
           success: false,
           message: 'Too many invalid codes. Please log in again.',
@@ -526,9 +604,9 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
     // Step 4: 2FA verification successful — delete temp session and create a
     // real session directly. Credentials were already verified during
     // check-2fa-requirement so no re-authentication is needed.
-    clearTwoFactorAttempts(tempSessionToken);
     await db.delete(temp2faSessions)
       .where(eq(temp2faSessions.id, tempSession.id));
+    clearTempTwoFactorCookie(res);
 
     // Create session directly (same approach as verify-email). Session row
     // always lasts 7 days server-side — `rememberMe` only controls whether
@@ -549,18 +627,14 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
       updatedAt: new Date()
     });
 
-    // Set the session cookie. Omit `maxAge` when rememberMe is false so the
-    // browser treats it as a session cookie (cleared on browser close).
-    const sessionCookieOpts: Record<string, any> = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-    };
-    if (remember) {
-      sessionCookieOpts.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
-    }
-    res.cookie('better-auth.session_token', newSessionToken, sessionCookieOpts);
+    // CRITICAL: see setSessionCookie() — the cookie value MUST be
+    // HMAC-signed in `${token}.${signature}` form, otherwise Better
+    // Auth's `/api/auth/get-session` refuses it and `useSession()`
+    // reports the user as logged out even though the DB row exists.
+    // Cookie attributes (HttpOnly, SameSite=Lax, Secure, Path=/) match
+    // Better Auth's own defaults; `rememberMe=false` produces a session
+    // cookie (no Max-Age) that drops on browser close.
+    setSessionCookie(res, newSessionToken, { rememberMe: remember });
 
     console.log('✅ [2FA] Session created directly after verification for user:', user.id);
 
@@ -572,15 +646,19 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req, res) => {
       })
       .where(eq(betterAuthUser.id, user.id));
 
+    // Deliberately do NOT echo the user's email / name back in the response
+    // body. The session cookie already authenticates the browser; the
+    // client should fetch profile data through the normal authenticated
+    // endpoints (/api/auth/me etc.) rather than receiving a redundant copy
+    // that lives in network captures / frontend stores. Only return the id
+    // so the client can finalise its post-login UX.
     res.json({
       success: true,
       message: '2FA verification successful',
       verified: true,
       user: {
         id: user.id,
-        email: user.email,
-        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email
-      }
+      },
     });
 
   } catch (error) {
@@ -739,10 +817,13 @@ loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
     });
     const isVerified = verification && verification.expiresAt > new Date();
 
+    // Deliberately do NOT log any prefix / substring of `sessionToken`.
+    // First-N characters still narrow the brute-force search space and let
+    // anyone with log access confirm a token's presence — the user id is
+    // sufficient for debugging.
     console.log(`📊 [2FA Status] Session verification for user ${user.id}:`, {
-      sessionToken: sessionToken.substring(0, 8) + '...',
       verification: verification ? 'found' : 'not found',
-      isVerified
+      isVerified,
     });
 
     const response = {
@@ -760,10 +841,68 @@ loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
   }
 });
 
-// Custom email verification endpoint that creates a session automatically
-loginRoutes.get('/verify-email', verifyEmailRateLimiter, async (req, res) => {
+// Helper: decode + validate the verification JWT without consuming it.
+// Used by both the GET (preview) and POST (consume) handlers so they
+// behave identically up to the side-effect.
+async function decodeVerificationToken(token: string): Promise<
+  | { ok: true; email: string }
+  | { ok: false; status: number; message: string }
+> {
   try {
-    const token = req.query.token as string;
+    const jwtMod = await import('jsonwebtoken');
+    const secret = getAuthSecret();
+    const decoded = jwtMod.default.verify(token, secret, { algorithms: ['HS256'] }) as { email: string; purpose?: string };
+    if (decoded.purpose !== 'email-verification') {
+      return { ok: false, status: 400, message: 'Invalid or expired verification token' };
+    }
+    return { ok: true, email: decoded.email };
+  } catch (err: any) {
+    return { ok: false, status: 400, message: 'Invalid or expired verification token' };
+  }
+}
+
+// GET /verify-email — preview endpoint.
+//
+// This endpoint is intentionally SIDE-EFFECT FREE. Email link-preview /
+// inbox-scanner / corporate URL-rewriter services (Microsoft SafeLinks,
+// Outlook safe-link scanning, Gmail link prefetch, etc.) routinely issue
+// GETs on any URL that appears in an email. If the GET consumed the
+// single-use token, those scanners would either burn the link before the
+// real user clicks it or — worse — receive an auth session of their own.
+//
+// We only validate the token signature/purpose and report whether it
+// looks redeemable, so the client can render a "Click to verify" button
+// that POSTs to /verify-email to actually consume the token.
+loginRoutes.get('/verify-email', verifyEmailRateLimiter, async (req, res) => {
+  const token = req.query.token as string;
+  if (!token) {
+    return res.status(400).json({ message: 'Verification token is required' });
+  }
+  const decoded = await decodeVerificationToken(token);
+  if (!decoded.ok) {
+    return res.status(decoded.status).json({ message: decoded.message });
+  }
+  // Surface only that the token has a valid signature/purpose. We do not
+  // touch the user row or look up emailVerificationToken here — doing so
+  // would let a scanner-issued GET fingerprint account state.
+  return res.json({
+    success: true,
+    tokenValid: true,
+    requiresConfirmation: true,
+    message: 'Click the verify button to confirm your email.',
+  });
+});
+
+// POST /verify-email — actually consume the single-use token.
+//
+// Requires an explicit user action (button click in the UI). Marks the
+// email verified, clears the stored token, and DOES NOT create a session
+// — the user is redirected to log in normally. Auto-creating a session
+// here would mean a forwarded verification email logs the recipient into
+// the original user's account.
+loginRoutes.post('/verify-email', verifyEmailRateLimiter, async (req, res) => {
+  try {
+    const token = (req.body?.token as string) || (req.query.token as string);
 
     if (!token) {
       return res.status(400).json({
@@ -771,22 +910,16 @@ loginRoutes.get('/verify-email', verifyEmailRateLimiter, async (req, res) => {
       });
     }
 
-    console.log('📧 [Verify Email] Starting email verification for token:', token.substring(0, 20) + '...');
+    // Do not log a token prefix — it still narrows the search space if logs leak.
+    console.log('📧 [Verify Email] Starting email verification');
 
-    // Decode JWT token to get email
-    let email: string;
-    try {
-      const jwt = await import('jsonwebtoken');
-      const secret = getAuthSecret();
-      const decoded = jwt.default.verify(token, secret, { algorithms: ['HS256'] }) as { email: string; iat: number; exp: number };
-      email = decoded.email;
-      console.log('✅ [Verify Email] JWT decoded, email:', redactEmail(email));
-    } catch (jwtError: any) {
-      console.error('❌ [Verify Email] JWT verification failed:', jwtError.message);
-      return res.status(400).json({
-        message: 'Invalid or expired verification token'
-      });
+    const decoded = await decodeVerificationToken(token);
+    if (!decoded.ok) {
+      console.error('❌ [Verify Email] JWT decode/validate failed');
+      return res.status(decoded.status).json({ message: decoded.message });
     }
+    const email = decoded.email;
+    console.log('✅ [Verify Email] JWT decoded, email:', redactEmail(email));
 
     // Find user by email
     const user = await db.query.betterAuthUser.findFirst({
@@ -862,71 +995,22 @@ loginRoutes.get('/verify-email', verifyEmailRateLimiter, async (req, res) => {
       }
     }
 
-    // If 2FA is enabled on this account (e.g. user verified their email after
-    // changing it via /change-email-unverified), DO NOT auto-create a session
-    // — that would bypass the 2FA gate. Mark the email verified and require
-    // the user to log in normally so the TOTP challenge runs.
-    if (user.twoFactorEnabled) {
-      console.log('🔐 [Verify Email] User has 2FA enabled — skipping auto session creation');
-      return res.json({
-        message: 'Email verified successfully. Please log in to continue.',
-        success: true,
-        requires2FA: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          emailVerified: true,
-        },
-      });
-    }
-
-    // Create a Better Auth session for the user automatically
-    console.log('🔐 [Verify Email] Creating session for user:', user.id);
-
-    // Generate a unique session ID and token
-    const sessionId = `session_${Date.now()}_${randomBytes(12).toString('base64url')}`;
-    const sessionToken = `${sessionId}_token_${randomBytes(18).toString('base64url')}`;
-    const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-    // Create session in database
-    const [newSession] = await db.insert(betterAuthSession)
-      .values({
-        id: sessionId,
-        userId: user.id,
-        token: sessionToken,
-        expiresAt: sessionExpiresAt,
-        ipAddress: req.ip || req.connection.remoteAddress || null,
-        userAgent: req.get('User-Agent') || null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      .returning();
-
-    console.log('✅ [Verify Email] Session created:', newSession.id);
-
-    // Set the session cookie
-    res.cookie('better-auth.session_token', sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: '/'
-    });
-
-    console.log('✅ [Verify Email] Session cookie set');
-
-    // Return success response with user info
-    // Note: Session token is set via httpOnly cookie only - not exposed in response body
-    res.json({
-      message: 'Email verified successfully',
+    // No automatic session creation here — regardless of whether the user
+    // has 2FA enabled. We only mark the email verified; the user must log
+    // in normally afterwards. This eliminates two attack/abuse paths:
+    //   1. An email-scanner / link-preview GET (now a POST anyway) granting
+    //      itself a 7-day session.
+    //   2. A forwarded verification email logging the recipient into the
+    //      original user's account.
+    return res.json({
+      message: 'Email verified successfully. Please log in to continue.',
       success: true,
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        emailVerified: true
-      }
+        emailVerified: true,
+      },
     });
 
   } catch (error) {
@@ -940,17 +1024,19 @@ loginRoutes.get('/verify-email', verifyEmailRateLimiter, async (req, res) => {
 // Change email for unverified users endpoint
 // Allows authenticated users whose email is NOT yet verified to change their email
 // and receive a new verification email at the updated address.
-const changeEmailRateLimit = new Map<string, { nextAllowedAt: number }>();
+//
+// The per-user 2-minute cooldown is enforced via the shared sharedCooldown
+// helper, which is Redis-backed when REDIS_URL is set so the limit is
+// effective across workers / pods (previously a per-process Map could be
+// defeated by load-balancing across N workers giving N× attempts).
+const CHANGE_EMAIL_COOLDOWN_MS = 2 * 60 * 1000;
+const CHANGE_EMAIL_BUCKET = 'change-email';
 
-// Clean up expired change-email rate limit entries every 10 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of changeEmailRateLimit) {
-    if (now >= value.nextAllowedAt) {
-      changeEmailRateLimit.delete(key);
-    }
-  }
-}, 10 * 60 * 1000);
+// Periodically prune the in-memory cooldown map (only relevant when Redis
+// is unavailable). Leader-elected so it doesn't duplicate across workers.
+runScheduledJob('shared-cooldown-prune', 10 * 60 * 1000, async () => {
+  pruneMemoryCooldowns();
+});
 
 loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any, res) => {
   try {
@@ -977,14 +1063,13 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
       return res.status(400).json({ message: 'Please enter a valid email address' });
     }
 
-    // Rate limiting – 2-minute cooldown per user
-    const now = Date.now();
-    const rl = changeEmailRateLimit.get(userId);
-    if (rl && now < rl.nextAllowedAt) {
-      const retrySeconds = Math.ceil((rl.nextAllowedAt - now) / 1000);
+    // Rate limiting – 2-minute cooldown per user, backed by Redis when
+    // available so the cooldown holds across workers.
+    const cdCheck = await checkCooldown(CHANGE_EMAIL_BUCKET, userId);
+    if (!cdCheck.allowed) {
       return res.status(429).json({
-        message: `Please wait ${retrySeconds} seconds before changing your email again`,
-        retryAfter: retrySeconds,
+        message: `Please wait ${cdCheck.retryAfterSec} seconds before changing your email again`,
+        retryAfter: cdCheck.retryAfterSec,
       });
     }
 
@@ -1041,11 +1126,39 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
 
     console.log(`📧 [Change Email] Changing email for user ${userId}: ${redactEmail(user.email)} → ${redactEmail(normalizedEmail)}`);
 
-    // Update the user's email
+    // Generate the new verification JWT FIRST so it can be persisted in the
+    // same UPDATE that flips the email — /verify-email enforces single-use
+    // by comparing the presented JWT against user.emailVerificationToken, so
+    // the row must end up holding the token we are about to email out. A
+    // stale token left over from the previous email would otherwise:
+    //   (a) reject the freshly-emailed link (functional break), and
+    //   (b) remain replayable against the new email record if the JWT
+    //       lookup happens to resolve to this user later.
+    const secret = getAuthSecret();
+    const verificationToken = jwt.sign(
+      {
+        email: normalizedEmail,
+        // See /resend-verification — explicit purpose claim so this JWT can
+        // only be redeemed by /verify-email, never cross-used against
+        // another endpoint signing with the same secret.
+        purpose: 'email-verification',
+        iat: Math.floor(Date.now() / 1000),
+      },
+      secret,
+      { expiresIn: '24h' },
+    );
+    const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const verificationSentAt = new Date();
+
+    // Atomically: change the email, clear the verified flag, and rotate the
+    // single-use verification token + expiry + last-sent timestamp.
     await db.update(betterAuthUser)
       .set({
         email: normalizedEmail,
         emailVerified: false,
+        emailVerificationToken: verificationToken,
+        emailVerificationExpires: verificationExpiresAt,
+        lastVerificationEmailSent: verificationSentAt,
         updatedAt: new Date(),
       })
       .where(eq(betterAuthUser.id, userId));
@@ -1068,14 +1181,6 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
       await db.delete(betterAuthSession)
         .where(eq(betterAuthSession.userId, userId));
     }
-
-    // Generate new verification token
-    const secret = getAuthSecret();
-    const verificationToken = jwt.sign(
-      { email: normalizedEmail, iat: Math.floor(Date.now() / 1000) },
-      secret,
-      { expiresIn: '24h' },
-    );
 
     // Dispatch verification email
     let emailSent = false;
@@ -1103,8 +1208,10 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
       // Don't fail the overall operation – the email was changed successfully
     }
 
-    // Set rate limit
-    changeEmailRateLimit.set(userId, { nextAllowedAt: now + 2 * 60 * 1000 });
+    // Arm the next cooldown window. We arm AFTER the heavy work so a
+    // failure path (e.g. DB error) doesn't lock the user out of a retry,
+    // matching the original semantics.
+    await armCooldown(CHANGE_EMAIL_BUCKET, userId, CHANGE_EMAIL_COOLDOWN_MS);
 
     console.log(`✅ [Change Email] Email changed successfully for user ${userId}`);
 
@@ -1126,98 +1233,119 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
 });
 
 // Forgot password - send reset link
-loginRoutes.post('/forgot-password', passwordResetRateLimiter, async (req, res) => {
+//
+// Timing-equalised: every code path (no user / inactive user / valid user)
+// returns the same JSON after the same minimum elapsed time. Token mint,
+// DB writes, and email dispatch happen AFTER the response is queued so
+// network latency to SES/Trigger cannot leak account existence. Mirrors
+// /resend-verification's pattern.
+loginRoutes.post('/forgot-password', forgotPasswordRateLimiter, async (req, res) => {
+  const MINIMUM_RESPONSE_MS = 250;
+  const startTime = Date.now();
+  const equalizeTiming = async () => {
+    const elapsed = Date.now() - startTime;
+    if (elapsed < MINIMUM_RESPONSE_MS) {
+      await sleepMs(MINIMUM_RESPONSE_MS - elapsed);
+    }
+  };
+
+  // Always return success to prevent email enumeration
+  const successResponse = {
+    success: true,
+    message: 'If an account with that email exists, a password reset link has been sent.',
+  };
+
   try {
     const { email } = req.body;
 
     if (!email || typeof email !== 'string') {
+      await equalizeTiming();
       return res.status(400).json({ message: 'Email address is required' });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Always return success to prevent email enumeration
-    const successResponse = {
-      success: true,
-      message: 'If an account with that email exists, a password reset link has been sent.',
-    };
-
-    // Find user
+    // Look up user. This DB hit happens on EVERY path so it doesn't add a
+    // distinguishing latency on its own.
     const user = await db.query.betterAuthUser.findFirst({
       where: eq(betterAuthUser.email, normalizedEmail),
     });
 
-    if (!user) {
+    // Decide whether to actually issue a reset, but DO NOT do the
+    // token-mint/DB-write/email-dispatch work inline — that would create a
+    // measurable latency delta between the "real user" path and the
+    // no-user / inactive-user path.
+    const shouldIssueReset = !!user && user.isActive;
+
+    // Kick off the heavy work in the background. We await `equalizeTiming`
+    // BEFORE responding so all paths take roughly the same wall-clock time
+    // from the client's perspective.
+    if (shouldIssueReset && user) {
+      void (async () => {
+        try {
+          const secret = getAuthSecret();
+          const resetToken = jwt.sign(
+            {
+              sub: user.id,
+              email: user.email,
+              purpose: 'password-reset',
+              iat: Math.floor(Date.now() / 1000),
+            },
+            secret,
+            { expiresIn: '1h' }
+          );
+
+          const tokenId = randomBytes(16).toString('base64url');
+          const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+          await db.delete(betterAuthVerification)
+            .where(eq(betterAuthVerification.identifier, `password-reset:${user.id}`));
+
+          await db.insert(betterAuthVerification).values({
+            id: tokenId,
+            identifier: `password-reset:${user.id}`,
+            value: resetToken,
+            expiresAt,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          const triggerResult = await triggerTransactionalEmail({
+            type: 'password-reset',
+            recipientEmail: user.email,
+            recipientName: user.firstName || user.name?.split(' ')[0],
+            resetToken,
+            baseUrl: process.env.BASE_URL || 'http://localhost:5002',
+            appName: process.env.APP_NAME || 'Zendwise',
+          });
+          if (triggerResult.success) {
+            console.log('✅ [Forgot Password] Reset email dispatched, runId:', triggerResult.runId);
+          } else {
+            console.error('❌ [Forgot Password] Failed to dispatch reset email:', triggerResult.error);
+          }
+        } catch (bgErr) {
+          console.error('❌ [Forgot Password] Background work failed:', bgErr);
+        }
+      })();
+    } else if (!user) {
       console.log('⚠️ [Forgot Password] No user found for:', redactEmail(normalizedEmail));
-      return res.json(successResponse);
-    }
-
-    if (!user.isActive) {
+    } else {
       console.log('⚠️ [Forgot Password] Inactive user:', redactEmail(normalizedEmail));
-      return res.json(successResponse);
     }
 
-    // Generate a secure reset token (JWT with 1-hour expiry)
-    const secret = getAuthSecret();
-    const resetToken = jwt.sign(
-      {
-        sub: user.id,
-        email: user.email,
-        purpose: 'password-reset',
-        iat: Math.floor(Date.now() / 1000),
-      },
-      secret,
-      { expiresIn: '1h' }
-    );
-
-    // Store the token in betterAuthVerification table for single-use enforcement
-    const tokenId = randomBytes(16).toString('base64url');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    // Delete any existing password-reset tokens for this user
-    await db.delete(betterAuthVerification)
-      .where(eq(betterAuthVerification.identifier, `password-reset:${user.id}`));
-
-    // Insert new token
-    await db.insert(betterAuthVerification).values({
-      id: tokenId,
-      identifier: `password-reset:${user.id}`,
-      value: resetToken,
-      expiresAt,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    console.log('✅ [Forgot Password] Reset token stored for user:', user.id);
-
-    // Send password reset email
-    try {
-      const triggerResult = await triggerTransactionalEmail({
-        type: 'password-reset',
-        recipientEmail: user.email,
-        recipientName: user.firstName || user.name?.split(' ')[0],
-        resetToken,
-        baseUrl: process.env.BASE_URL || 'http://localhost:5002',
-        appName: process.env.APP_NAME || 'Zendwise',
-      });
-      if (triggerResult.success) {
-        console.log('✅ [Forgot Password] Reset email dispatched, runId:', triggerResult.runId);
-      } else {
-        console.error('❌ [Forgot Password] Failed to dispatch reset email:', triggerResult.error);
-      }
-    } catch (emailError) {
-      console.error('❌ [Forgot Password] Failed to dispatch reset email:', emailError);
-    }
-
+    await equalizeTiming();
     return res.json(successResponse);
   } catch (error) {
     console.error('❌ [Forgot Password] Error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    // Even on error, equalise timing and return the same success shape so
+    // the error path can't be used as an enumeration oracle either.
+    await equalizeTiming();
+    return res.json(successResponse);
   }
 });
 
 // Reset password - verify token and set new password
-loginRoutes.post('/reset-password', passwordResetRateLimiter, async (req, res) => {
+loginRoutes.post('/reset-password', resetPasswordRateLimiter, async (req, res) => {
   try {
     const { token, password } = req.body;
 
@@ -1299,6 +1427,14 @@ loginRoutes.post('/reset-password', passwordResetRateLimiter, async (req, res) =
     // Invalidate all existing sessions for this user
     await db.delete(betterAuthSession)
       .where(eq(betterAuthSession.userId, user.id));
+
+    // Also revoke any in-flight temp 2FA sessions — otherwise an attacker who
+    // passed /check-2fa-requirement with the old password (or who triggered
+    // this reset themselves) could still complete login via /verify-2fa
+    // within the 10-minute temp session window.
+    await db.delete(temp2faSessions)
+      .where(eq(temp2faSessions.userId, user.id))
+      .catch(err => console.warn('⚠️ [Reset Password] Failed to delete temp 2FA sessions:', err));
 
     // Update tokenValidAfter to invalidate any cached tokens
     await db.update(betterAuthUser)

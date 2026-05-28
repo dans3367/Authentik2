@@ -1,0 +1,538 @@
+/* ============================================
+   Puck Editor Dark Mode Overrides
+   ============================================
+
+   Extracted from index.css. This file is imported ONLY by the routes
+   that mount the Puck visual editor (newsletter/advertise creators)
+   so the ~50 KB of editor-specific dark overrides do not ship with
+   the global stylesheet for every page.
+
+   All selectors are scoped to `.Puck` / `[class*="Puck"]` /
+   `#puck-portal-root`, so this file has no effect outside the editor.
+   ============================================ */
+
+/* Override Puck's own CSS custom properties in dark mode.
+   Puck can load lazily, so these selectors outrank puck.css even when it arrives later. */
+html.dark,
+html.dark .Puck,
+html.dark #puck-portal-root {
+  --puck-color-black: hsl(0, 0%, 95%);
+  --puck-color-white: var(--card);
+  --puck-color-grey-12: var(--card);
+  --puck-color-grey-11: var(--card);
+  --puck-color-grey-10: hsl(215, 20%, 18%);
+  --puck-color-grey-09: hsl(215, 20%, 22%);
+  --puck-color-grey-08: hsl(0, 0%, 50%);
+  --puck-color-grey-07: hsl(0, 0%, 58%);
+  --puck-color-grey-06: hsl(0, 0%, 65%);
+  --puck-color-grey-05: hsl(0, 0%, 50%);
+  --puck-color-grey-04: hsl(0, 0%, 70%);
+  --puck-color-grey-03: hsl(0, 0%, 78%);
+  --puck-color-grey-02: hsl(0, 0%, 85%);
+  --puck-color-grey-01: hsl(0, 0%, 92%);
+}
+
+/* Puck v0 module class names. These stay high-specificity so they win even
+   when puck.css is loaded lazily after the app stylesheet. */
+html.dark .Puck,
+html.dark .Puck [class*="PuckLayout-inner"],
+html.dark .Puck [class*="PuckLayout-nav"],
+html.dark .Puck [class*="PuckPluginTab"],
+html.dark .Puck [class*="PuckPluginTab-body"],
+html.dark .Puck [class*="PuckHeader"],
+html.dark .Puck [class*="MenuBar"],
+html.dark .Puck [class*="Sidebar--left"],
+html.dark .Puck [class*="Sidebar--right"],
+html.dark .Puck [class*="SidebarSection"],
+html.dark .Puck [class*="SidebarSection-title"],
+html.dark .Puck [class*="SidebarSection-content"],
+html.dark .Puck [class*="FieldsPlugin"],
+html.dark .Puck [class*="PuckFields"],
+html.dark .Puck [class*="BlocksPlugin"],
+html.dark .Puck [class*="OutlinePlugin"] {
+  background: var(--input) !important;
+  background-color: var(--input) !important;
+  color: hsl(0, 0%, 90%) !important;
+  border-color: var(--border) !important;
+}
+
+html.dark .Puck [class*="PuckLayout-inner"],
+html.dark .Puck [class*="PuckCanvas_"] {
+  background: var(--input) !important;
+  background-color: var(--input) !important;
+}
+
+html.dark .Puck [class*="PuckHeader-inner"],
+html.dark .Puck [class*="MenuBar"],
+html.dark .Puck [class*="FieldsPlugin-header"],
+html.dark .Puck [class*="SidebarSection-title"],
+html.dark .Puck [class*="PuckFields-field"],
+html.dark .Puck [class*="InputWrapper"],
+html.dark .Puck [class*="Input-radioGroupItems"],
+html.dark .Puck [class*="Input-radio"] {
+  border-color: var(--border) !important;
+}
+
+html.dark .Puck [class*="PuckHeader-title"],
+html.dark .Puck [class*="PuckHeader-path"],
+html.dark .Puck [class*="PuckHeader-toggle"],
+html.dark .Puck [class*="PuckHeader-menuButton"],
+html.dark .Puck [class*="SidebarSection-heading"],
+html.dark .Puck [class*="Input-label"],
+html.dark .Puck [class*="LayerTree"],
+html.dark .Puck [class*="Layer-clickable"],
+html.dark .Puck [class*="ComponentList-title"],
+html.dark .Puck [class*="NavItem-link"] {
+  color: hsl(0, 0%, 85%) !important;
+}
+
+html.dark .Puck [class*="Input-input"],
+html.dark .Puck input:not([type="color"]),
+html.dark .Puck textarea,
+html.dark .Puck select,
+html.dark .Puck [class*="Input-radioInner"],
+html.dark .Puck [class*="AutoField"],
+html.dark .Puck [class*="ObjectField"],
+html.dark .Puck [class*="ArrayField"] {
+  background: var(--card) !important;
+  background-color: var(--card) !important;
+  color: hsl(0, 0%, 90%) !important;
+  border-color: var(--border) !important;
+}
+
+html.dark .Puck [class*="Input-input"]::placeholder,
+html.dark .Puck input::placeholder,
+html.dark .Puck textarea::placeholder {
+  color: hsl(215, 10%, 55%) !important;
+}
+
+html.dark .Puck [class*="PuckHeader"] button,
+html.dark .Puck [class*="MenuBar"] button,
+html.dark .Puck [class*="IconButton"] {
+  background: var(--card) !important;
+  background-color: var(--card) !important;
+  color: hsl(0, 0%, 85%) !important;
+  border-color: var(--border) !important;
+}
+
+html.dark .Puck [class*="PuckHeader"] button:hover,
+html.dark .Puck [class*="MenuBar"] button:hover,
+html.dark .Puck [class*="IconButton"]:hover,
+html.dark .Puck [class*="ComponentList-title"]:hover,
+html.dark .Puck [class*="NavItem"]:not([class*="NavItem--active"]) > [class*="NavItem-link"]:hover,
+html.dark .Puck [class*="Layer"]:not([class*="Layer--isSelected"]) > [class*="Layer-inner"]:hover {
+  background: hsl(215, 20%, 20%) !important;
+  background-color: hsl(215, 20%, 20%) !important;
+  color: hsl(0, 0%, 92%) !important;
+}
+
+html.dark .Puck [class*="NavItem--active"] > [class*="NavItem-link"],
+html.dark .Puck [class*="Layer--isSelected"],
+html.dark .Puck [class*="Layer--isSelected"] > [class*="Layer-inner"],
+html.dark .Puck [class*="Input-radioInput"]:checked ~ [class*="Input-radioInner"] {
+  background: hsl(220, 35%, 20%) !important;
+  background-color: hsl(220, 35%, 20%) !important;
+  color: #93c5fd !important;
+  border-color: #3b82f6 !important;
+}
+
+html.dark .Puck [class*="PuckHeader"] button[style*="background: #2563eb"],
+html.dark .Puck [class*="PuckHeader"] button[style*="background: rgb(37, 99, 235)"] {
+  background: #2563eb !important;
+  background-color: #2563eb !important;
+  color: #fff !important;
+  border-color: #2563eb !important;
+}
+
+html.dark .Puck [class*="PuckHeader"] button[style*="background: #7c3aed"],
+html.dark .Puck [class*="PuckHeader"] button[style*="background: rgb(124, 58, 237)"] {
+  background: #7c3aed !important;
+  background-color: #7c3aed !important;
+  color: #fff !important;
+  border-color: #7c3aed !important;
+}
+
+html.dark .Puck [class*="PuckHeader"] button[style*="background: #059669"],
+html.dark .Puck [class*="PuckHeader"] button[style*="background: rgb(5, 150, 105)"] {
+  background: #059669 !important;
+  background-color: #059669 !important;
+  color: #fff !important;
+  border-color: #059669 !important;
+}
+
+html.dark .Puck [class*="PuckHeader"] button[style*="background: #4b5563"],
+html.dark .Puck [class*="PuckHeader"] button[style*="background: rgb(75, 85, 99)"] {
+  background: #4b5563 !important;
+  background-color: #4b5563 !important;
+  color: #fff !important;
+  border-color: #4b5563 !important;
+}
+
+html.dark .Puck [class*="PuckCanvas-root"] {
+  outline-color: hsl(215, 20%, 25%) !important;
+}
+
+html.dark .Puck [class*="PuckFields-loadingOverlay"],
+html.dark .Puck [class*="SidebarSection-loadingOverlay"] {
+  background: hsla(215, 25%, 12%, 0.88) !important;
+}
+
+/* Puck shell: header, sidebar, panels */
+.dark [class*="Puck-header"] {
+  background: hsl(215, 25%, 10%) !important;
+  border-color: hsl(215, 20%, 22%) !important;
+  color: hsl(0, 0%, 90%) !important;
+}
+
+.dark [class*="Puck-leftSideBar"],
+.dark [class*="Puck-rightSideBar"],
+.dark [class*="SidebarSection"],
+.dark [class*="ComponentList"],
+.dark [class*="Fields-"],
+.dark [class*="FieldLabel"] {
+  background: var(--input) !important;
+  color: hsl(0, 0%, 90%) !important;
+  border-color: var(--border) !important;
+}
+
+.dark [class*="SidebarSection-title"] {
+  color: hsl(0, 0%, 80%) !important;
+}
+
+.dark [class*="SidebarSection-content"] {
+  background: var(--input) !important;
+}
+
+/* Puck field inputs in sidebar */
+.dark [class*="Input-input"],
+.dark [class*="Input-input"] input,
+.dark [class*="Input-input"] textarea,
+.dark [class*="Input-input"] select {
+  background: var(--card) !important;
+  color: hsl(0, 0%, 90%) !important;
+  border-color: var(--border) !important;
+}
+
+.dark [class*="Input-label"],
+.dark [class*="FieldLabel-label"] {
+  color: hsl(0, 0%, 75%) !important;
+}
+
+/* Puck action bar & item overlays */
+.dark [class*="ActionBar"] {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+.dark [class*="ActionBar"] button,
+.dark [class*="ActionBar"] svg {
+  color: hsl(0, 0%, 85%) !important;
+}
+
+/* Puck canvas area */
+.dark [class*="Puck-frame"],
+.dark [class*="Puck-canvas"] {
+  background: var(--input) !important;
+}
+
+/* Puck draggable component list items */
+.dark [class*="ComponentList-item"] {
+  background: var(--card) !important;
+  color: hsl(0, 0%, 85%) !important;
+  border-color: var(--border) !important;
+}
+
+.dark [class*="ComponentList-item"]:hover {
+  background: var(--bg-3) !important;
+}
+
+.dark [class*="ComponentList-item"] svg {
+  color: hsl(0, 0%, 70%) !important;
+}
+
+/* Puck layer tree */
+.dark [class*="LayerTree"],
+.dark [class*="LayerTree-item"] {
+  background: var(--input) !important;
+  color: hsl(0, 0%, 85%) !important;
+}
+
+.dark [class*="LayerTree-item"]:hover {
+  background: hsl(215, 20%, 18%) !important;
+}
+
+/* Puck dropdown menus and popovers */
+.dark [class*="Puck"] [data-radix-popper-content-wrapper],
+.dark [class*="Puck"] [role="listbox"],
+.dark [class*="Puck"] [role="menu"] {
+  background: hsl(215, 25%, 14%) !important;
+  border-color: hsl(215, 20%, 22%) !important;
+  color: hsl(0, 0%, 90%) !important;
+}
+
+/* RichText panel editor (inline styles injected in RichText block) */
+.dark .puck-panel-editor-wrap {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+.dark .puck-panel-toolbar {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+.dark .puck-panel-toolbar button {
+  color: hsl(0, 0%, 75%) !important;
+}
+
+.dark .puck-panel-toolbar button:hover {
+  background: var(--bg-3) !important;
+}
+
+.dark .puck-panel-toolbar button.active {
+  background: #6366f1 !important;
+  color: #fff !important;
+}
+
+.dark .puck-panel-toolbar .sep {
+  background: var(--border) !important;
+}
+
+.dark .puck-panel-content .tiptap {
+  color: hsl(0, 0%, 90%) !important;
+}
+
+.dark .puck-panel-content .tiptap hr {
+  border-color: hsl(215, 20%, 25%) !important;
+}
+
+.dark .puck-panel-content .tiptap blockquote {
+  border-color: hsl(215, 20%, 30%) !important;
+  color: hsl(0, 0%, 65%) !important;
+}
+
+/* RichText canvas editor dark mode */
+.dark .puck-richtext-editor hr {
+  border-color: hsl(215, 20%, 30%) !important;
+}
+
+.dark .puck-richtext-editor blockquote {
+  border-color: hsl(215, 20%, 35%) !important;
+  color: hsl(0, 0%, 65%) !important;
+}
+
+/* Image popover */
+.dark .puck-img-popover {
+  background: hsl(215, 20%, 16%) !important;
+  border-color: hsl(215, 20%, 25%) !important;
+}
+
+.dark .puck-img-popover label {
+  color: hsl(0, 0%, 75%) !important;
+}
+
+.dark .puck-img-popover input[type="text"] {
+  background: hsl(215, 20%, 12%) !important;
+  color: hsl(0, 0%, 90%) !important;
+  border-color: hsl(215, 20%, 25%) !important;
+}
+
+.dark .puck-img-popover .puck-img-actions button {
+  background: hsl(215, 20%, 20%) !important;
+  color: hsl(0, 0%, 85%) !important;
+}
+
+.dark .puck-img-popover .puck-img-actions button:hover {
+  background: hsl(215, 20%, 25%) !important;
+}
+
+.dark .puck-img-popover .puck-img-actions button.primary {
+  background: #6366f1 !important;
+  color: #fff !important;
+}
+
+/* Handlebar pills */
+.dark .handlebar-pill {
+  background: linear-gradient(135deg, hsl(215, 30%, 20%) 0%, hsl(230, 25%, 22%) 100%) !important;
+  border-color: hsl(220, 40%, 35%) !important;
+}
+
+.dark .handlebar-pill:hover {
+  background: linear-gradient(135deg, hsl(215, 30%, 25%) 0%, hsl(230, 25%, 28%) 100%) !important;
+  border-color: hsl(220, 40%, 45%) !important;
+}
+
+.dark .handlebar-pill-braces {
+  color: #a5b4fc !important;
+}
+
+.dark .handlebar-pill-label {
+  color: #93c5fd !important;
+}
+
+/* CSS Module blocks: Card, Hero, ProductGrid, Header */
+.dark .Card--card {
+  background: hsl(215, 20%, 16%) !important;
+  color: hsl(0, 0%, 90%) !important;
+}
+
+.dark .Header {
+  background: hsl(215, 25%, 10%) !important;
+  border-color: hsl(215, 20%, 22%) !important;
+  color: hsl(0, 0%, 90%) !important;
+}
+
+.dark .ProductGrid-item {
+  background: hsl(215, 20%, 16%) !important;
+}
+
+.dark .ProductGrid-image-wrapper {
+  background: hsl(215, 20%, 14%) !important;
+}
+
+.dark .ProductGrid-title {
+  color: hsl(0, 0%, 92%) !important;
+}
+
+.dark .ProductGrid-description {
+  color: hsl(0, 0%, 60%) !important;
+}
+
+.dark .ProductGrid-price {
+  color: hsl(0, 0%, 92%) !important;
+}
+
+.dark .Hero {
+  background-image: linear-gradient(
+    rgba(15, 23, 42, 0),
+    hsl(215, 25%, 10%) 100%
+  ) !important;
+}
+
+.dark .Hero-imageOverlay {
+  background-image: linear-gradient(
+    -90deg,
+    hsla(215, 25%, 10%, 0.85) 0%,
+    hsla(215, 25%, 10%, 0.85) 80%
+  ) !important;
+}
+
+.dark .Hero-subtitle {
+  color: hsl(0, 0%, 65%) !important;
+}
+
+.dark .Card-description {
+  color: hsl(0, 0%, 60%) !important;
+}
+
+/* Puck header toolbar buttons (viewport, zoom, etc.) */
+.dark [class*="Puck-header"] button {
+  background: var(--card) !important;
+  color: hsl(0, 0%, 85%) !important;
+  border-color: var(--border) !important;
+}
+
+.dark [class*="Puck-header"] button:hover {
+  background: var(--bg-3) !important;
+}
+
+/* Keep explicitly colored buttons (Send Preview, Ready, etc.) */
+.dark [class*="Puck-header"] button[style*="background: #2563eb"],
+.dark [class*="Puck-header"] button[style*="background: rgb(37, 99, 235)"] {
+  background: #2563eb !important;
+  color: #fff !important;
+  border-color: #2563eb !important;
+}
+
+.dark [class*="Puck-header"] button[style*="background: #7c3aed"],
+.dark [class*="Puck-header"] button[style*="background: rgb(124, 58, 237)"] {
+  background: #7c3aed !important;
+  color: #fff !important;
+  border-color: #7c3aed !important;
+}
+
+.dark [class*="Puck-header"] button[style*="background: #4b5563"],
+.dark [class*="Puck-header"] button[style*="background: rgb(75, 85, 99)"] {
+  background: #4b5563 !important;
+  color: #fff !important;
+  border-color: #4b5563 !important;
+}
+
+/* Active viewport buttons should keep their blue */
+.dark [class*="Puck-header"] button[style*="background: #2563eb"] {
+  background: #2563eb !important;
+  color: #fff !important;
+}
+
+/* Puck header text elements */
+.dark [class*="Puck-header"] span {
+  color: hsl(0, 0%, 85%) !important;
+}
+
+/* Puck drawer / modal overlays */
+.dark [class*="Drawer"],
+.dark [class*="Modal"] {
+  background: var(--card) !important;
+  color: hsl(0, 0%, 90%) !important;
+  border-color: var(--border) !important;
+}
+
+/* Puck empty state / drop zones */
+.dark [class*="DropZone--isAreaSelected"],
+.dark [class*="DropZone-content"] {
+  border-color: hsl(215, 20%, 25%) !important;
+}
+
+.dark [class*="DropZone--isEmpty"] {
+  background: hsl(215, 20%, 10%) !important;
+  color: hsl(0, 0%, 50%) !important;
+}
+
+.newsletter-create-title-input::placeholder,
+.newsletter-create-subject-input::placeholder {
+  color: #94a3b8;
+}
+
+.dark .newsletter-create-title-input::placeholder,
+.dark .newsletter-create-subject-input::placeholder {
+  color: #64748b;
+}
+
+/* Soft pastel contact tag — uses --tag (hex) for hue, color-mix to desaturate */
+.contact-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  line-height: 1.4;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  font-weight: 500;
+  background: color-mix(in oklch, var(--tag, #6b7280) 16%, white);
+  color: color-mix(in oklch, var(--tag, #6b7280) 70%, black);
+  white-space: nowrap;
+}
+
+.dark .contact-tag {
+  background: color-mix(in oklch, var(--tag, #6b7280) 28%, black);
+  color: color-mix(in oklch, var(--tag, #6b7280) 35%, white);
+}
+
+.contact-tag-muted {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  line-height: 1.4;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  font-weight: 500;
+  background: hsl(215, 16%, 94%);
+  color: hsl(215, 10%, 45%);
+  white-space: nowrap;
+}
+
+.dark .contact-tag-muted {
+  background: hsl(215, 20%, 18%);
+  color: hsl(215, 10%, 70%);
+}

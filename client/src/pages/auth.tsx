@@ -52,8 +52,10 @@ export default function AuthPage() {
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [rememberMe, setRememberMe] = useState(false);
+  // The temp 2FA session token is now carried server-side in an HttpOnly
+  // cookie set by /check-2fa-requirement; we only track `rememberMe` here so
+  // it can be forwarded to /verify-2fa.
   const [twoFactorData, setTwoFactorData] = useState<{
-    tempSessionToken: string;
     rememberMe: boolean;
   } | null>(null);
   const [is2FAVerifying, setIs2FAVerifying] = useState(false);
@@ -96,7 +98,6 @@ export default function AuthPage() {
 
       if (check2FAResult.requires2FA) {
         setTwoFactorData({
-          tempSessionToken: check2FAResult.tempSessionToken,
           rememberMe,
         });
         setCurrentView("twoFactor");
@@ -224,7 +225,6 @@ export default function AuthPage() {
         credentials: "include",
         body: JSON.stringify({
           token: data.token,
-          tempSessionToken: twoFactorData.tempSessionToken,
           rememberMe: twoFactorData.rememberMe,
         }),
       });

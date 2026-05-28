@@ -16,11 +16,19 @@ export default function VerifyEmailPage() {
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useReduxAuth();
   const dispatch = useAppDispatch();
-  const [isVerifying, setIsVerifying] = useState(true);
+  // Verification is a two-step UX now to avoid email-scanner / link-preview
+  // services consuming the single-use token before the real user clicks:
+  //   1. On mount we do a GET /api/auth/verify-email which only validates
+  //      the token signature (no side effects).
+  //   2. The user clicks "Verify my email" which POSTs to the same path to
+  //      actually consume the token.
+  const [tokenStatus, setTokenStatus] = useState<'checking' | 'valid' | 'invalid'>('checking');
+  const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [error, setError] = useState("");
   const [isResending, setIsResending] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState(5); // 5 second countdown
+  const [token, setToken] = useState<string | null>(null);
 
   // Force light theme on email verification page regardless of user preference
   useEffect(() => {
@@ -38,52 +46,63 @@ export default function VerifyEmailPage() {
     };
   }, []);
 
+  // Step 1: on mount, GET the token — server validates signature only
+  // and never consumes / never sets a session cookie.
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get("token");
+    const t = urlParams.get("token");
 
-    if (!token) {
+    if (!t) {
       setError("Invalid verification link. Please check your email and try again.");
-      setIsVerifying(false);
+      setTokenStatus('invalid');
       return;
     }
+    setToken(t);
 
-    console.log("🔍 [VerifyEmail] Starting verification with token:", token);
-
-    // Verify the email token
-    fetch(`/api/auth/verify-email?token=${token}`)
+    fetch(`/api/auth/verify-email?token=${encodeURIComponent(t)}`)
       .then(async (response) => {
-        const data = await response.json();
-        
-        console.log("🔍 [VerifyEmail] Verification response:", {
-          status: response.status,
-          ok: response.ok,
-          data
-        });
-        
-        if (response.ok) {
-          setIsVerified(true);
-          
-          console.log("🔍 [VerifyEmail] Verification response data:", data);
-          
-          toast({
-            title: "Email Verified!",
-            description: "Your account has been successfully verified. Please log in to continue.",
-          });
-          
-          console.log("🔍 [VerifyEmail] Email verified successfully. User should now login.");
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data?.tokenValid) {
+          setTokenStatus('valid');
         } else {
-          setError(data.message || "Failed to verify email");
+          setError(data?.message || "Verification link is invalid or has expired.");
+          setTokenStatus('invalid');
         }
       })
-      .catch((error) => {
-        console.error("🔍 [VerifyEmail] Verification error:", error);
-        setError("An error occurred while verifying your email. Please try again.");
-      })
-      .finally(() => {
-        setIsVerifying(false);
+      .catch(() => {
+        setError("An error occurred while checking your verification link. Please try again.");
+        setTokenStatus('invalid');
       });
-  }, [toast, queryClient, setLocation, dispatch]);
+  }, []);
+
+  // Step 2: explicit user-driven POST to actually consume the token.
+  const handleConfirmVerification = useCallback(async () => {
+    if (!token || isVerifying) return;
+    setIsVerifying(true);
+    try {
+      const response = await fetch("/api/auth/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        setIsVerified(true);
+        toast({
+          title: "Email Verified!",
+          description: "Your account has been successfully verified. Please log in to continue.",
+        });
+      } else {
+        setError(data?.message || "Failed to verify email");
+        setTokenStatus('invalid');
+      }
+    } catch (err) {
+      setError("An error occurred while verifying your email. Please try again.");
+      setTokenStatus('invalid');
+    } finally {
+      setIsVerifying(false);
+    }
+  }, [token, isVerifying, toast]);
 
   // If user is already verified and authenticated, redirect to dashboard
   useEffect(() => {
@@ -160,16 +179,51 @@ export default function VerifyEmailPage() {
     }
   };
 
-  if (isVerifying) {
+  if (tokenStatus === 'checking') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Verifying Your Email</h2>
+            <h2 className="text-xl font-semibold mb-2">Checking Verification Link</h2>
             <p className="text-gray-600 dark:text-gray-400 text-center">
-              Please wait while we verify your email address...
+              Please wait...
             </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Token is valid but not yet consumed — show explicit verify button so
+  // the single-use token is only burned by a real user click.
+  if (tokenStatus === 'valid' && !isVerified) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <Mail className="h-16 w-16 text-blue-600" />
+            </div>
+            <CardTitle className="text-2xl">Verify your email</CardTitle>
+            <CardDescription>
+              Click the button below to confirm your email address.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center space-y-3">
+            <Button onClick={handleConfirmVerification} disabled={isVerifying} className="w-full">
+              {isVerifying ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                <>Verify my email</>
+              )}
+            </Button>
+            <Button onClick={() => setLocation("/auth")} variant="ghost" className="w-full">
+              Back to Login
+            </Button>
           </CardContent>
         </Card>
       </div>

@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { betterAuthSession } from '@shared/schema';
 import { lt, sql } from 'drizzle-orm';
+import { runScheduledJob } from '../utils/scheduledJobs';
 
 const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -36,20 +37,15 @@ export function startSessionCleanupWorker(): void {
     return;
   }
 
-  console.log('🧹 [SessionCleanup] Starting worker (runs every 24 hours)');
+  console.log('🧹 [SessionCleanup] Starting worker (runs every 24 hours, leader-elected)');
 
-  // Run an initial cleanup after a short delay to let the server finish starting
-  setTimeout(() => {
-    cleanupStaleSessions();
-  }, 10_000);
+  // Leader-elected via runScheduledJob so only one worker per deployment
+  // runs the DELETE per interval. See server/utils/scheduledJobs.ts.
+  cleanupTimer = runScheduledJob('session-cleanup', TWENTY_FOUR_HOURS, async () => {
+    await cleanupStaleSessions();
+  });
 
-  // Schedule recurring cleanup every 24 hours
-  cleanupTimer = setInterval(() => {
-    cleanupStaleSessions();
-  }, TWENTY_FOUR_HOURS);
-
-  // Allow the process to exit even if the timer is still running
-  if (cleanupTimer.unref) {
+  if (cleanupTimer && cleanupTimer.unref) {
     cleanupTimer.unref();
   }
 }

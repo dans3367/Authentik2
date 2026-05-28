@@ -361,6 +361,16 @@ export const temp2faSessions = pgTable("temp_2fa_sessions", {
   userId: text("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   verified: boolean("verified").default(false), // Whether 2FA code has been verified
+  // SHA-256 hex of `${ip}|${userAgent}` captured when the temp session was
+  // created. /verify-2fa must present a matching binding or the temp session
+  // is rejected, so a leaked token cannot be redeemed from a different
+  // device/network.
+  clientBinding: text("client_binding"),
+  // Per-temp-session TOTP failure counter. Lives on the row (not in process
+  // memory) so a) it survives restarts, b) it's shared across workers, and
+  // c) it cannot be evicted by inflating an in-memory map with bogus
+  // tokens. Incremented atomically by /verify-2fa via UPDATE ... RETURNING.
+  attemptCount: integer("attempt_count").notNull().default(0),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
