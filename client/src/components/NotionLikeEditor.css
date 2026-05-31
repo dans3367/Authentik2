@@ -65,11 +65,11 @@
 
 /* Paragraphs */
 .notion-editor-content p {
-  margin: 0;
+  margin: 0 !important;
 }
 
 .notion-editor-content p+p {
-  margin-top: 0.75em;
+  margin-top: 0.5em !important;
 }
 
 /* Lists */
@@ -365,6 +365,7 @@
   border-radius: 8px;
   overflow: hidden;
   line-height: 0;
+  cursor: grab;
   transition: box-shadow 0.15s;
 }
 
@@ -381,7 +382,13 @@
 
 .notion-resizable-image.resizing {
   box-shadow: 0 0 0 2px #8b5cf6;
+  cursor: col-resize;
   user-select: none;
+}
+
+.notion-resizable-image.dragging {
+  cursor: grabbing;
+  opacity: 0.75;
 }
 
 /* Resize handles */
@@ -1011,6 +1018,33 @@
   color: #111827;
 }
 
+.notion-image-browser-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.notion-image-browser-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.notion-image-browser-remove:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
 .notion-image-browser-custom,
 .notion-image-browser-search {
   display: flex;
@@ -1230,6 +1264,17 @@
 .dark .notion-image-browser-close:hover {
   background: #374151;
   color: #ffffff;
+}
+
+.dark .notion-image-browser-remove {
+  border-color: #7f1d1d;
+  background: rgba(127, 29, 29, 0.25);
+  color: #fca5a5;
+}
+
+.dark .notion-image-browser-remove:hover {
+  background: rgba(127, 29, 29, 0.4);
+  border-color: #991b1b;
 }
 
 .dark .notion-image-browser-url-row input,

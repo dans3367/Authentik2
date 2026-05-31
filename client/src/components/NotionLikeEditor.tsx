@@ -80,8 +80,88 @@ import {
     Paintbrush,
 } from "lucide-react";
 import { improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText, generateNewsletter } from "@/lib/aiApi";
+import { aiHtmlToInlineHtml, hasTopLevelAiBlocks, mergeAiBlocksWithSurroundingText, normalizeAiHtml } from "@/lib/aiHtmlNormalization";
 import { apiRequest } from "@/lib/queryClient";
 import "./NotionLikeEditor.css";
+
+// ── AI HTML Normalization ───────────────────────────────────────────────────────
+
+function findTextblockDepth($pos: any): number | null {
+    for (let depth = $pos.depth; depth > 0; depth -= 1) {
+        if ($pos.node(depth).isTextblock) return depth;
+    }
+    return null;
+}
+
+function getWholeTextblockRange(editor: any, from: number, to: number) {
+    const { doc } = editor.state;
+    const $from = doc.resolve(from);
+    const $to = doc.resolve(to);
+    const fromDepth = findTextblockDepth($from);
+    const toDepth = findTextblockDepth($to);
+
+    if (fromDepth === null || toDepth === null) {
+        const textBeforeSelection = doc.textBetween(0, from, "\n", "\n");
+        const textAfterSelection = doc.textBetween(to, doc.content.size, "\n", "\n");
+        return textBeforeSelection.trim() || textAfterSelection.trim()
+            ? null
+            : { from, to };
+    }
+
+    const textBeforeSelection = doc.textBetween($from.start(fromDepth), from, "\n", "\n");
+    const textAfterSelection = doc.textBetween(to, $to.end(toDepth), "\n", "\n");
+
+    if (textBeforeSelection.trim() || textAfterSelection.trim()) return null;
+
+    return {
+        from: $from.before(fromDepth),
+        to: $to.after(toDepth),
+    };
+}
+
+function getTextblockRangeWithSurroundingText(editor: any, from: number, to: number) {
+    const { doc } = editor.state;
+    const $from = doc.resolve(from);
+    const $to = doc.resolve(to);
+    const fromDepth = findTextblockDepth($from);
+    const toDepth = findTextblockDepth($to);
+
+    if (fromDepth === null || toDepth === null) return null;
+
+    return {
+        from: $from.before(fromDepth),
+        to: $to.after(toDepth),
+        beforeText: doc.textBetween($from.start(fromDepth), from, " ", " "),
+        afterText: doc.textBetween(to, $to.end(toDepth), " ", " "),
+    };
+}
+
+function prepareAiReplacement(editor: any, range: { from: number; to: number }, replacement: string, allowBlockReplace: boolean) {
+    const html = normalizeAiHtml(replacement);
+    if (!html) return null;
+
+    if (!hasTopLevelAiBlocks(html)) {
+        return { range, content: html };
+    }
+
+    const wholeTextblockRange = allowBlockReplace ? getWholeTextblockRange(editor, range.from, range.to) : null;
+    if (wholeTextblockRange) {
+        return { range: wholeTextblockRange, content: html };
+    }
+
+    const textblockRange = allowBlockReplace ? getTextblockRangeWithSurroundingText(editor, range.from, range.to) : null;
+    if (textblockRange) {
+        return {
+            range: { from: textblockRange.from, to: textblockRange.to },
+            content: mergeAiBlocksWithSurroundingText(html, textblockRange.beforeText, textblockRange.afterText),
+        };
+    }
+
+    return {
+        range,
+        content: aiHtmlToInlineHtml(html),
+    };
+}
 
 // ── Template Variables ──────────────────────────────────────────────────────────
 
@@ -550,6 +630,8 @@ function ImageBrowserModal({
     onPick,
     onApplyUrl,
     onClose,
+    canRemove,
+    onRemove,
     t,
 }: {
     open: boolean;
@@ -564,6 +646,8 @@ function ImageBrowserModal({
     onPick: (result: ImageSearchResult) => void;
     onApplyUrl: () => void;
     onClose: () => void;
+    canRemove: boolean;
+    onRemove: () => void;
     t: (key: string, fallback?: string) => string;
 }) {
     if (!open || typeof document === "undefined") return null;
@@ -579,9 +663,21 @@ function ImageBrowserModal({
                         <h3>{t("notionEditor.imageBrowser.title", "Choose image")}</h3>
                         <p>{t("notionEditor.imageBrowser.subtitle", "Search photos or paste an image URL.")}</p>
                     </div>
-                    <button type="button" className="notion-image-browser-close" onClick={onClose} aria-label={t("notionEditor.imageBrowser.close", "Close")}>
-                        <X className="w-4 h-4" />
-                    </button>
+                    <div className="notion-image-browser-header-actions">
+                        {canRemove && (
+                            <button
+                                type="button"
+                                className="notion-image-browser-remove"
+                                onClick={onRemove}
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                <span>{t("notionEditor.imageBrowser.remove", "Remove image")}</span>
+                            </button>
+                        )}
+                        <button type="button" className="notion-image-browser-close" onClick={onClose} aria-label={t("notionEditor.imageBrowser.close", "Close")}>
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="notion-image-browser-custom">
@@ -668,6 +764,7 @@ function ImageBrowserModal({
 
 const TEXT_COLORS = [
     { label: "Default", value: "" },
+    { label: "White", value: "#ffffff" },
     { label: "Gray", value: "#6b7280" },
     { label: "Brown", value: "#92400e" },
     { label: "Orange", value: "#ea580c" },
@@ -735,59 +832,107 @@ function FloatingToolbar({
         return { from, to, selectedText };
     };
 
-    const replaceSelection = (range: { from: number; to: number }, replacement: string) => {
-        editor.chain().focus().insertContentAt({ from: range.from, to: range.to }, replacement).run();
+    // Split the selection into the text runs that sit between image nodes. Each run is
+    // rewritten in place while the images are left untouched, so they keep their exact
+    // position instead of being deleted or pushed to the end of the rewritten text.
+    const getSelectionSegments = (from: number, to: number) => {
+        const imageRanges: Array<[number, number]> = [];
+        editor.state.doc.nodesBetween(from, to, (node: any, pos: number) => {
+            if (node.type.name === "image") {
+                imageRanges.push([pos, pos + node.nodeSize]);
+                return false;
+            }
+            return true;
+        });
+
+        const ranges: Array<[number, number]> = [];
+        let cursor = from;
+        for (const [rawFrom, rawTo] of imageRanges) {
+            const imgFrom = Math.max(rawFrom, from);
+            const imgTo = Math.min(rawTo, to);
+            if (imgFrom > cursor) ranges.push([cursor, imgFrom]);
+            cursor = Math.max(cursor, imgTo);
+        }
+        if (cursor < to) ranges.push([cursor, to]);
+
+        return ranges
+            .map(([a, b]) => ({ from: a, to: b, text: editor.state.doc.textBetween(a, b, " ") }))
+            .filter((seg) => seg.text.trim().length > 0);
+    };
+
+    const runAiOnText = async (action: string, text: string, targetLanguage?: string): Promise<string | undefined> => {
+        let result: any;
+        switch (action) {
+            case 'improve':
+                result = await improveText({ text });
+                return result?.success ? result.improvedText : undefined;
+            case 'casual':
+                result = await makeMoreCasualText({ text });
+                return result?.success ? result.casualText : undefined;
+            case 'formal':
+                result = await makeMoreFormalText({ text });
+                return result?.success ? result.formalText : undefined;
+            case 'emojify':
+                result = await emojifyText({ text });
+                return result?.success ? result.emojifiedText : undefined;
+            case 'expand':
+                result = await expandText({ text });
+                return result?.success ? result.expandedText : undefined;
+            case 'shorten':
+                result = await shortenText({ text });
+                return result?.success ? result.shortenedText : undefined;
+            case 'translate':
+                if (!targetLanguage) return undefined;
+                result = await translateText({ text, targetLanguage });
+                return result?.success ? result.translatedText : undefined;
+            default:
+                return undefined;
+        }
     };
 
     const handleAiAction = async (action: string, targetLanguage?: string) => {
         const { from, to, selectedText } = getSelectionInfo();
         if (!selectedText.trim()) return;
 
+        // Break the selection into text runs around any images. Each run is rewritten
+        // independently and the images are left in place, so they keep their position.
+        const segments = getSelectionSegments(from, to);
+        if (segments.length === 0) return;
+
         setAiProcessing(action);
         setAiMenuOpen(false);
         setTranslateSubOpen(false);
 
         try {
-            let result: any;
-            let replacement: string | undefined;
+            const rewrites = await Promise.all(
+                segments.map(async (seg) => ({
+                    seg,
+                    replacement: await runAiOnText(action, seg.text, targetLanguage),
+                }))
+            );
 
-            switch (action) {
-                case 'improve':
-                    result = await improveText({ text: selectedText });
-                    replacement = result.improvedText;
-                    break;
-                case 'casual':
-                    result = await makeMoreCasualText({ text: selectedText });
-                    replacement = result.casualText;
-                    break;
-                case 'formal':
-                    result = await makeMoreFormalText({ text: selectedText });
-                    replacement = result.formalText;
-                    break;
-                case 'emojify':
-                    result = await emojifyText({ text: selectedText });
-                    replacement = result.emojifiedText;
-                    break;
-                case 'expand':
-                    result = await expandText({ text: selectedText });
-                    replacement = result.expandedText;
-                    break;
-                case 'shorten':
-                    result = await shortenText({ text: selectedText });
-                    replacement = result.shortenedText;
-                    break;
-                case 'translate':
-                    if (!targetLanguage) return;
-                    result = await translateText({ text: selectedText, targetLanguage });
-                    replacement = result.translatedText;
-                    break;
+            // Apply replacements back-to-front so the earlier (lower) segment positions stay
+            // valid as we edit — the untouched images between segments never shift.
+            const allowBlockReplace = segments.length === 1;
+            const applicable = rewrites
+                .filter((r) => r.replacement)
+                .map((r) => ({
+                    ...r,
+                    insertion: prepareAiReplacement(editor, r.seg, r.replacement as string, allowBlockReplace),
+                }))
+                .filter((r) => r.insertion)
+                .sort((a, b) => b.seg.from - a.seg.from);
+
+            if (applicable.length === 0) {
+                console.error(`AI ${action} failed: no result`);
+                return;
             }
 
-            if (result?.success && replacement) {
-                replaceSelection({ from, to }, replacement);
-            } else {
-                console.error(`AI ${action} failed:`, result?.error);
+            const chain = editor.chain().focus();
+            for (const { insertion } of applicable) {
+                chain.insertContentAt(insertion!.range, insertion!.content);
             }
+            chain.run();
         } catch (error: any) {
             console.error(`AI ${action} error:`, error);
         } finally {
@@ -2752,8 +2897,9 @@ export default function NotionLikeEditor({
 
     const openImageBrowser = useCallback((target: { pos: number | null; attrs: Record<string, any> } | null = null) => {
         const attrs = target?.attrs || {};
-        const seed = (attrs.alt || attrs.title || "").trim();
-        const nextQuery = seed || "product photo";
+        // Seed the query from an existing image's alt/title when re-picking one, but start
+        // blank for a fresh /image insert (no target) instead of defaulting to "product photo".
+        const nextQuery = (attrs.alt || attrs.title || "").trim();
 
         setImageTarget(target);
         setImageSearchQuery(nextQuery);
@@ -2761,7 +2907,7 @@ export default function NotionLikeEditor({
         setImageResults([]);
         setImageSearchError("");
         setImageBrowserOpen(true);
-        void runImageSearch(nextQuery);
+        if (nextQuery) void runImageSearch(nextQuery);
     }, [runImageSearch]);
 
     const slashCommands = getSlashCommands(t);
@@ -2770,6 +2916,7 @@ export default function NotionLikeEditor({
             cmd.title.toLowerCase().includes(slashQuery.toLowerCase()) ||
             cmd.description.toLowerCase().includes(slashQuery.toLowerCase())
     );
+    const normalizedInitialContent = normalizeAiHtml(content);
 
     const editor = useEditor({
         extensions: [
@@ -2804,7 +2951,7 @@ export default function NotionLikeEditor({
             StyledTableCell,
             StyledTableHeader,
         ],
-        content,
+        content: normalizedInitialContent,
         onUpdate: ({ editor }) => {
             onChange(editor.getHTML());
         },
@@ -2936,6 +3083,17 @@ export default function NotionLikeEditor({
     const applyCustomImageUrl = useCallback(() => {
         applyImage(imageCustomUrl, imageTarget?.attrs?.alt || "");
     }, [applyImage, imageCustomUrl, imageTarget]);
+
+    const removeTargetImage = useCallback(() => {
+        if (!editor) return;
+        const pos = imageTarget?.pos;
+        if (pos === null || pos === undefined) return;
+        const node = editor.state.doc.nodeAt(pos);
+        if (node?.type.name !== "image") return;
+        editor.chain().focus().deleteRange({ from: pos, to: pos + node.nodeSize }).run();
+        onChange(editor.getHTML());
+        closeImageBrowser();
+    }, [closeImageBrowser, editor, imageTarget, onChange]);
 
     const pickSearchImage = useCallback((result: ImageSearchResult) => {
         const attribution = result.attribution?.name ? `Photo by ${result.attribution.name}` : result.alt;
@@ -3070,7 +3228,7 @@ export default function NotionLikeEditor({
         try {
             const result = await generateNewsletter({ prompt: aiGeneratePrompt.trim() });
             if (result.success && result.html) {
-                editor.commands.setContent(result.html);
+                editor.commands.setContent(normalizeAiHtml(result.html));
                 onChange(editor.getHTML());
             } else {
                 console.error("Failed to generate newsletter:", result.error);
@@ -3204,7 +3362,9 @@ export default function NotionLikeEditor({
                 onPick={pickSearchImage}
                 onApplyUrl={applyCustomImageUrl}
                 onClose={closeImageBrowser}
-                t={t}
+                canRemove={imageTarget?.pos !== null && imageTarget?.pos !== undefined}
+                onRemove={removeTargetImage}
+                t={(key, fallback) => fallback === undefined ? t(key) : t(key, fallback)}
             />
 
             {/* Editor */}

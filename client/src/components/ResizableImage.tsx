@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 function ResizableImageView({ node, updateAttributes, selected }: any) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [resizing, setResizing] = useState(false);
+    const [dragging, setDragging] = useState(false);
     const [resizeDir, setResizeDir] = useState<"left" | "right" | null>(null);
     const startX = useRef(0);
     const startWidth = useRef(0);
@@ -56,10 +57,20 @@ function ResizableImageView({ node, updateAttributes, selected }: any) {
     const textAlign = node.attrs.textAlign || "center";
 
     return (
-        <NodeViewWrapper className="notion-resizable-image-wrapper" style={{ textAlign }}>
+        <NodeViewWrapper
+            className="notion-resizable-image-wrapper"
+            data-drag-handle=""
+            draggable
+            onDragStartCapture={() => setDragging(true)}
+            onDragEndCapture={() => setDragging(false)}
+            onDropCapture={() => setDragging(false)}
+            style={{ textAlign }}
+        >
             <div
                 ref={containerRef}
-                className={`notion-resizable-image ${selected ? "selected" : ""} ${resizing ? "resizing" : ""}`}
+                data-drag-handle=""
+                draggable
+                className={`notion-resizable-image ${selected ? "selected" : ""} ${resizing ? "resizing" : ""} ${dragging ? "dragging" : ""}`}
                 style={{ width: width ? `${width}px` : "auto", maxWidth: "100%", display: "inline-block" }}
             >
                 {/* Left resize handle */}
@@ -98,6 +109,8 @@ export const ResizableImage = Node.create({
     group: "block",
 
     atom: true,
+
+    draggable: true,
 
     addAttributes() {
         return {

@@ -468,3 +468,43 @@ export async function transformText(
     };
   }
 }
+
+interface GenerateTitleSubjectParams {
+  content: string;
+}
+
+interface GenerateTitleSubjectResponse {
+  success: boolean;
+  title?: string;
+  subject?: string;
+  error?: string;
+}
+
+export async function generateTitleAndSubject(
+  params: GenerateTitleSubjectParams
+): Promise<GenerateTitleSubjectResponse> {
+  try {
+    const response = await fetch("/api/ai/generate-title-subject", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to generate title and subject");
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Error generating title and subject:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to generate title and subject",
+    };
+  }
+}

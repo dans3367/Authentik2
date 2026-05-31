@@ -6,7 +6,7 @@ const LazyNotionEditor = lazy(() => import("@/components/NotionLikeEditor"));
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { initialData } from "@/config/puck/initial-data";
 import { rootFieldErrors } from "@/config/puck/root-field-errors";
-import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X, Rocket, Eye } from "lucide-react";
+import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X, Rocket, Eye, Sparkles } from "lucide-react";
 import { SendPreviewDialog } from "@/components/SendPreviewDialog";
 import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
 import { extractPuckEmailHtml } from "@/utils/puck-to-email-html";
@@ -14,6 +14,8 @@ import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
 import { useLocation, useParams } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { generateTitleAndSubject } from "@/lib/aiApi";
+import { normalizeAiHtml } from "@/lib/aiHtmlNormalization";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
@@ -255,6 +257,8 @@ export default function NewsletterCreatePage() {
 
   // State for notion editor HTML content
   const [notionHtmlContent, setNotionHtmlContent] = useState<string>("");
+  // Whether the AI is generating the title + subject from the editor content
+  const [generatingMeta, setGeneratingMeta] = useState(false);
   // dataRef is updated directly in handleDataChange and handlePublish
 
   // Load existing newsletter when editing
@@ -280,7 +284,7 @@ export default function NewsletterCreatePage() {
           // Detect which editor created this newsletter and always reopen with that editor
           if (parsed.notionHtml) {
             setDetectedEditorType('notion');
-            setNotionHtmlContent(stripNotionPhotoCredits(parsed.notionHtml));
+            setNotionHtmlContent(normalizeAiHtml(stripNotionPhotoCredits(parsed.notionHtml)));
           } else {
             setDetectedEditorType('classic');
             // Ensure root props include title/subject from DB for the Puck fields
@@ -370,16 +374,63 @@ export default function NewsletterCreatePage() {
 
   const getHtmlContent = useCallback(() => {
     if (editorType === 'notion') {
-      return notionHtmlContent;
+      return normalizeAiHtml(notionHtmlContent);
     }
     return extractPuckEmailHtml();
   }, [editorType, notionHtmlContent]);
 
+  // Generate BOTH the newsletter title and the subject line from the main editor content
+  // in one click. The subject prompt is optimized to read like editorial newsletter content
+  // (not marketing) so it avoids the spam / Promotions folder.
+  const handleGenerateMeta = useCallback(async () => {
+    if (generatingMeta) return;
+
+    const html = getHtmlContent();
+    const plainText = (html || "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (plainText.length < 20) {
+      toast({
+        title: t("newsletter.create.aiMeta.notEnoughTitle", "Not enough content"),
+        description: t("newsletter.create.aiMeta.notEnoughDesc", "Add some content to the editor before generating with AI."),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGeneratingMeta(true);
+    try {
+      const res = await generateTitleAndSubject({ content: html });
+      if (res.success && (res.title || res.subject)) {
+        if (res.title) {
+          setTitle(res.title);
+          setTitleError(false);
+        }
+        if (res.subject) {
+          setSubject(res.subject);
+        }
+        setHasUnsavedChanges(true);
+      } else {
+        toast({
+          title: t("newsletter.create.aiMeta.failedTitle", "Generation failed"),
+          description: res.error || t("newsletter.create.aiMeta.failedDesc", "Could not generate. Please try again."),
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setGeneratingMeta(false);
+    }
+  }, [generatingMeta, getHtmlContent, toast, t]);
+
   // Save newsletter to database (create or update)
   // Returns true on success, false on validation failure. Throws on API error.
   const saveToDatabase = useCallback(async (status: 'draft' | 'ready_to_send' | 'scheduled' = 'draft', { silent = false }: { silent?: boolean } = {}) => {
-    const htmlContent = editorType === 'notion' ? notionHtmlContent : extractPuckEmailHtml();
-    const puckDataJson = editorType === 'notion' ? JSON.stringify({ notionHtml: notionHtmlContent }) : JSON.stringify(dataRef.current);
+    const normalizedNotionHtml = editorType === 'notion' ? normalizeAiHtml(notionHtmlContent) : "";
+    const htmlContent = editorType === 'notion' ? normalizedNotionHtml : extractPuckEmailHtml();
+    const puckDataJson = editorType === 'notion' ? JSON.stringify({ notionHtml: normalizedNotionHtml }) : JSON.stringify(dataRef.current);
     const currentTitle = titleRef.current.trim();
     if (!currentTitle) {
       if (!silent) {
@@ -853,26 +904,52 @@ export default function NewsletterCreatePage() {
                             boxShadow: editorSurface.cardShadow,
                             fontFamily,
                           }}>
-                            <input
-                              className="newsletter-create-title-input"
-                              type="text"
-                              value={title}
-                              onChange={(e) => { setTitle(e.target.value); setHasUnsavedChanges(true); if (titleError && e.target.value.trim()) setTitleError(false); }}
-                              placeholder="Newsletter Name *"
-                              style={{
-                                width: '100%',
-                                border: 'none',
-                                outline: 'none',
-                                fontSize: '22px',
-                                fontWeight: 700,
-                                color: editorSurface.text,
-                                background: 'transparent',
-                                padding: 0,
-                                margin: '0 0 4px 0',
-                                fontFamily,
-                                lineHeight: 1.3,
-                              }}
-                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <input
+                                className="newsletter-create-title-input"
+                                type="text"
+                                value={title}
+                                onChange={(e) => { setTitle(e.target.value); setHasUnsavedChanges(true); if (titleError && e.target.value.trim()) setTitleError(false); }}
+                                placeholder="Newsletter Name *"
+                                style={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                  border: 'none',
+                                  outline: 'none',
+                                  fontSize: '22px',
+                                  fontWeight: 700,
+                                  color: editorSurface.text,
+                                  background: 'transparent',
+                                  padding: 0,
+                                  margin: '0 0 4px 0',
+                                  fontFamily,
+                                  lineHeight: 1.3,
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={handleGenerateMeta}
+                                disabled={generatingMeta}
+                                title={t("newsletter.create.aiMeta.button", "Generate title & subject with AI")}
+                                aria-label={t("newsletter.create.aiMeta.button", "Generate title & subject with AI")}
+                                style={{
+                                  flexShrink: 0,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '30px',
+                                  height: '30px',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  background: 'transparent',
+                                  color: editorSurface.textMuted,
+                                  cursor: generatingMeta ? 'default' : 'pointer',
+                                  opacity: generatingMeta ? 0.6 : 1,
+                                }}
+                              >
+                                {generatingMeta ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                              </button>
+                            </div>
                             <input
                               className="newsletter-create-subject-input"
                               type="text"
@@ -1009,7 +1086,7 @@ export default function NewsletterCreatePage() {
                                   key={puckKeyRef.current}
                                   content={notionHtmlContent}
                                   onChange={(html) => {
-                                    setNotionHtmlContent(html);
+                                    setNotionHtmlContent(normalizeAiHtml(html));
                                     setHasUnsavedChanges(true);
                                   }}
                                   placeholder={undefined}

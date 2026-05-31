@@ -113,7 +113,7 @@ router.post("/improve-text", authenticateToken, requireTenant, async (req, res) 
       return;
     }
 
-    const promptText = `Improve the following promotional message from a business to a customer. Make it more engaging, clear, and professional while maintaining its original meaning and tone. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this copy is from a business. Keep the improved version concise and natural. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
+    const promptText = `Improve the following promotional message from a business to a customer. Make it more engaging, clear, and professional while maintaining its original meaning and tone. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this copy is from a business. Keep the improved version concise and natural. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Separate paragraphs ONLY with <p>...</p> tags — never use <br> tags and never output empty paragraphs or extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
 
 ${text}`;
 
@@ -152,7 +152,7 @@ router.post("/emojify-text", authenticateToken, requireTenant, async (req, res) 
       return;
     }
 
-    const promptText = `Add tasteful, celebratory emojis to the following promotional message from a business to a customer. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this copy is from a business. Keep the original wording otherwise intact—only add or swap in emojis where they naturally enhance the sentiment. Avoid overusing emojis and do not include explanations. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
+    const promptText = `Add tasteful, celebratory emojis to the following promotional message from a business to a customer. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this copy is from a business. Keep the original wording otherwise intact—only add or swap in emojis where they naturally enhance the sentiment. Avoid overusing emojis and do not include explanations. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Separate paragraphs ONLY with <p>...</p> tags — never use <br> tags and never output empty paragraphs or extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
 
 ${text}`;
 
@@ -191,7 +191,7 @@ router.post("/expand-text", authenticateToken, requireTenant, async (req, res) =
       return;
     }
 
-    const promptText = `Expand the following promotional message from a business to a customer to be slightly longer (around 30-40% more words) while keeping the original tone, message, and professionalism. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this copy is from a business. Do not add a salutation or signature. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
+    const promptText = `Expand the following promotional message from a business to a customer to be slightly longer (around 30-40% more words) while keeping the original tone, message, and professionalism. Change any first-person singular pronouns (I, me, my) to first-person plural (we, us, our) to reflect that this copy is from a business. Do not add a salutation or signature. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Separate paragraphs ONLY with <p>...</p> tags — never use <br> tags and never output empty paragraphs or extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
 
 ${text}`;
 
@@ -237,7 +237,7 @@ RULES:
 2. Change "I/me/my" to "we/us/our"
 3. Keep the warm, friendly tone
 4. Do NOT add greetings, signatures, or company references like "At [Company Name]"
-5. Format as HTML with <p> tags (one per paragraph, group related sentences)
+5. Format as HTML with <p> tags (one per paragraph, group related sentences). Never use <br> tags and never output empty paragraphs or extra line breaks between paragraphs
 6. Return ONLY the shortened HTML—no explanations and no markdown code fences
 
 TEXT TO SHORTEN:
@@ -278,7 +278,7 @@ router.post("/more-casual-text", authenticateToken, requireTenant, async (req, r
       return;
     }
 
-    const promptText = `Rewrite the following promotional message from a business to a customer in a slightly more casual, conversational tone while keeping it professional and warm. Maintain the original intent and replace any first-person singular pronouns (I, me, my) with first-person plural (we, us, our). Do not add a salutation or signature and keep the length similar. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
+    const promptText = `Rewrite the following promotional message from a business to a customer in a slightly more casual, conversational tone while keeping it professional and warm. Maintain the original intent and replace any first-person singular pronouns (I, me, my) with first-person plural (we, us, our). Do not add a salutation or signature and keep the length similar. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Separate paragraphs ONLY with <p>...</p> tags — never use <br> tags and never output empty paragraphs or extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
 
 ${text}`;
 
@@ -317,7 +317,7 @@ router.post("/more-formal-text", authenticateToken, requireTenant, async (req, r
       return;
     }
 
-    const promptText = `Rewrite the following promotional message from a business to a customer in a more formal, polished tone while keeping it warm and sincere. Maintain the original meaning and replace any first-person singular pronouns (I, me, my) with first-person plural (we, us, our). Do not add a salutation or signature and keep the length similar. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Do not add extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
+    const promptText = `Rewrite the following promotional message from a business to a customer in a more formal, polished tone while keeping it warm and sincere. Maintain the original meaning and replace any first-person singular pronouns (I, me, my) with first-person plural (we, us, our). Do not add a salutation or signature and keep the length similar. Do not use phrases like "At [Company Name]" or similar company references. Format the output as HTML, using one <p> tag per logical paragraph (group related sentences together). Do not put each sentence in its own <p> tag. Separate paragraphs ONLY with <p>...</p> tags — never use <br> tags and never output empty paragraphs or extra line breaks between paragraphs. Return only the raw HTML content without markdown code fences or backticks.
 
 ${text}`;
 
@@ -477,7 +477,7 @@ RULES:
 3. Structure the newsletter with:
    - A compelling headline using <h1>
    - Section headings using <h2> or <h3>
-   - Body paragraphs using <p> tags
+   - Body paragraphs using <p> tags (separate paragraphs ONLY with <p>...</p> — never use <br> tags or empty paragraphs)
    - Bullet lists using <ul><li> where appropriate
    - Bold key phrases using <strong> where it enhances readability
 4. Keep the tone warm, professional, and engaging
@@ -541,7 +541,7 @@ RULES:
 2. Output valid HTML with proper formatting:
    - Use <h2> for the main newsletter title/headline
    - Use <h3> for section headings
-   - Use <p> for body paragraphs
+   - Use <p> for body paragraphs (separate paragraphs ONLY with <p>...</p> — never use <br> tags or empty paragraphs)
    - Use <ul><li> or <ol><li> for lists and key points
    - Use <strong> to bold important words, names, dates, and key phrases
    - Use <em> for emphasis where appropriate
@@ -569,6 +569,81 @@ RULES:
     res.status(500).json({
       success: false,
       error: error.message || "Failed to generate newsletter text",
+    });
+  }
+});
+
+// POST /api/ai/generate-title-subject
+// Generate BOTH a newsletter title and an email subject line from the main editor body
+// content in a single request. The two prompts run in parallel, so latency is roughly
+// that of a single generation rather than the sum.
+router.post("/generate-title-subject", authenticateToken, requireTenant, async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    if (!content || typeof content !== "string" || !content.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Content is required",
+      });
+    }
+
+    if (!ensureApiKey(res)) {
+      return;
+    }
+
+    const titlePrompt = `You are helping run a company email newsletter. Based on the newsletter body content below (which may contain HTML markup), come up with a short, descriptive internal name for this newsletter (max ~60 characters) that the team will recognize in their dashboard. It should summarize the main topic of the content.
+
+Return ONLY the name text — no surrounding quotes, no markdown, and no other text.
+
+NEWSLETTER BODY:
+${content}`;
+
+    // The subject line must read like editorial newsletter content, NOT marketing, so that
+    // mailbox providers deliver it to the Primary inbox instead of flagging it as spam or
+    // filing it under Promotions.
+    const subjectPrompt = `You are writing the email subject line for a company NEWSLETTER — an editorial, informational update from the business to people who subscribed. It is NOT a promotional or sales email. Based on the newsletter body content below (which may contain HTML markup), write ONE subject line.
+
+REQUIREMENTS:
+- Max ~60 characters.
+- Read like a genuine editorial/personal newsletter update that describes what is actually inside — informative and only lightly curiosity-driven.
+- It must NOT look like an advertisement or marketing blast, so that it lands in the Primary inbox and is not tagged as spam or filed under the Promotions tab.
+- Strictly AVOID spam/promotion triggers: no ALL-CAPS words, no exclamation marks, no emojis, no urgency or clickbait, and do not use these or similar words: free, sale, buy, "order now", discount, "% off", deal, offer, "limited time", "act now", hurry, "click here", winner, guarantee, "$", or price figures.
+- Use plain, natural sentence case.
+
+Return ONLY the subject line text — no surrounding quotes, no markdown, and no other text.
+
+NEWSLETTER BODY:
+${content}`;
+
+    // Run both generations in parallel so the round-trip is ~one call, not two.
+    const [titleResult, subjectResult] = await Promise.all([
+      generateText({ model: AI_MODEL, prompt: titlePrompt }),
+      generateText({ model: AI_MODEL, prompt: subjectPrompt }),
+    ]);
+
+    // Single-line outputs — strip stray surrounding quotes/whitespace the model may add.
+    const clean = (s: string) => s.trim().replace(/^["'“”\s]+|["'“”\s]+$/g, "").trim();
+    const title = clean(titleResult.text);
+    const subject = clean(subjectResult.text);
+
+    if (!title && !subject) {
+      return res.status(502).json({
+        success: false,
+        error: "Could not generate a title and subject from the content",
+      });
+    }
+
+    res.json({
+      success: true,
+      title,
+      subject,
+    });
+  } catch (error: any) {
+    console.error("Error generating newsletter title/subject:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to generate title and subject",
     });
   }
 });
