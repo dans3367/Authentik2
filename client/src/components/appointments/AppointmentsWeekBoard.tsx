@@ -1,11 +1,39 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { format, isToday, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, subDays, isSameDay, isSameMonth } from "date-fns";
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  eachDayOfInterval,
+  endOfDay,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isSameDay,
+  isSameMonth,
+  isToday,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  subMonths,
+  subWeeks,
+} from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CalendarDays, Search, Filter, TrendingUp, ArrowRight, Download, FileText } from "lucide-react";
+import {
+  CalendarDays,
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Filter,
+  TrendingUp,
+  ArrowRight,
+  Download,
+  FileText,
+  List as ListIcon,
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -55,6 +83,7 @@ function getInitials(name: string) {
 
 type SidebarFilterKey = "upcoming" | "today" | "confirmed" | "notConfirmed" | "reminders" | "remindersNotSent";
 type ListTabKey = "all" | "selected";
+type BoardViewMode = "list" | "calendar" | "week";
 
 const STATUS_DOT: Record<string, string> = {
   scheduled: "bg-rose-500",
@@ -74,6 +103,17 @@ const STATUS_PILL: Record<string, string> = {
   in_progress: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
 };
 
+const STATUS_CALENDAR_CHIP: Record<string, string> = {
+  scheduled: "border-l-rose-500 bg-rose-50/80 text-rose-950 hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-100 dark:hover:bg-rose-950/50",
+  confirmed: "border-l-emerald-500 bg-emerald-50/80 text-emerald-950 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-100 dark:hover:bg-emerald-950/50",
+  cancelled: "border-l-slate-400 bg-slate-100/80 text-slate-600 hover:bg-slate-200 dark:bg-slate-800/70 dark:text-slate-300 dark:hover:bg-slate-800",
+  completed: "border-l-emerald-500 bg-emerald-50/80 text-emerald-950 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-100 dark:hover:bg-emerald-950/50",
+  no_show: "border-l-amber-500 bg-amber-50/80 text-amber-950 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/50",
+  in_progress: "border-l-emerald-500 bg-emerald-50/80 text-emerald-950 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-100 dark:hover:bg-emerald-950/50",
+};
+
+const dayKey = (date: Date) => format(date, "yyyy-MM-dd");
+
 interface AppointmentsWeekBoardProps {
   appointments: AppointmentWithCustomer[];
   onViewAppointment: (appointment: AppointmentWithCustomer) => void;
@@ -92,12 +132,15 @@ export function AppointmentsWeekBoard({
   const { t } = useTranslation();
   const [selectedFilter, setSelectedFilter] = useState<SidebarFilterKey>("upcoming");
   const [listTab, setListTab] = useState<ListTabKey>("selected");
+  const [viewMode, setViewMode] = useState<BoardViewMode>("list");
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(8);
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
 
   const now = useMemo(() => new Date(), [appointments]);
   const [selectedMonth, setSelectedMonth] = useState<string>(() => format(new Date(), "yyyy-MM"));
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(() => new Date());
+  const [selectedWeekDate, setSelectedWeekDate] = useState<Date>(() => new Date());
 
   const providerOptions = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>();
@@ -134,6 +177,7 @@ export function AppointmentsWeekBoard({
   const monthOptions = useMemo(() => {
     const keys = new Set<string>();
     keys.add(format(now, "yyyy-MM"));
+    keys.add(selectedMonth);
     for (const a of appointments) {
       const d = new Date(a.appointmentDate);
       if (!isNaN(d.getTime())) keys.add(format(d, "yyyy-MM"));
@@ -145,7 +189,7 @@ export function AppointmentsWeekBoard({
         const date = new Date(year, month - 1, 1);
         return { value: key, label: format(date, "MMMM yyyy"), date };
       });
-  }, [appointments, now]);
+  }, [appointments, now, selectedMonth]);
 
   const selectedMonthDate = useMemo(() => {
     const match = monthOptions.find(m => m.value === selectedMonth);
@@ -169,9 +213,17 @@ export function AppointmentsWeekBoard({
     }
   };
 
+  const shiftSelectedMonth = (monthDelta: number) => {
+    handleMonthChange(format(addMonths(selectedMonthDate, monthDelta), "yyyy-MM"));
+  };
+
   useEffect(() => {
     if (!isCurrentMonth && listTab !== "all") setListTab("all");
   }, [isCurrentMonth, listTab]);
+
+  useEffect(() => {
+    setSelectedCalendarDate(isCurrentMonth ? now : selectedMonthDate);
+  }, [isCurrentMonth, now, selectedMonthDate]);
 
   const totalThisMonth = useMemo(() => {
     const s = startOfMonth(now);
@@ -238,20 +290,6 @@ export function AppointmentsWeekBoard({
     [monthAppointments]
   );
 
-  const last7Days = useMemo(() => {
-    const days: { label: string; date: Date; count: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = subDays(now, i);
-      const count = scopedAppointments.filter(a => isSameDay(new Date(a.appointmentDate), d)).length;
-      days.push({ label: format(d, "EEE"), date: d, count });
-    }
-    return days;
-  }, [scopedAppointments, now]);
-
-  const avgLast7 = last7Days.length > 0
-    ? last7Days.reduce((sum, d) => sum + d.count, 0) / last7Days.length
-    : 0;
-
   const filterItems: { key: SidebarFilterKey; label: string; count: number; dotClass: string }[] = [
     { key: "upcoming", label: t('reminders.board.stats.upcoming'), count: upcomingCount, dotClass: "bg-rose-500" },
     { key: "today", label: t('reminders.board.stats.today'), count: todayCount, dotClass: "bg-slate-400" },
@@ -295,158 +333,194 @@ export function AppointmentsWeekBoard({
   }, [monthAppointments, effectiveListTab, selectedFilter, search, now]);
 
   const visible = filtered.slice(0, pageSize);
+  const calendarDays = useMemo(() => {
+    const calendarStart = startOfWeek(startOfMonth(selectedMonthDate), { weekStartsOn: 0 });
+    const calendarEnd = endOfWeek(endOfMonth(selectedMonthDate), { weekStartsOn: 0 });
+    return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  }, [selectedMonthDate]);
+
+  const weekdayLabels = useMemo(() => {
+    const weekStart = startOfWeek(new Date(2024, 0, 7), { weekStartsOn: 0 });
+    return Array.from({ length: 7 }, (_, index) => format(addDays(weekStart, index), "EEE"));
+  }, []);
+
+  const weekStart = useMemo(() => startOfWeek(selectedWeekDate, { weekStartsOn: 0 }), [selectedWeekDate]);
+  const weekEnd = useMemo(() => endOfWeek(selectedWeekDate, { weekStartsOn: 0 }), [selectedWeekDate]);
+  const weekDays = useMemo(() => eachDayOfInterval({ start: weekStart, end: weekEnd }), [weekStart, weekEnd]);
+
+  const weekRangeLabel = useMemo(() => {
+    if (isSameMonth(weekStart, weekEnd)) {
+      return `${format(weekStart, "MMM d")} – ${format(weekEnd, "d, yyyy")}`;
+    }
+    if (weekStart.getFullYear() === weekEnd.getFullYear()) {
+      return `${format(weekStart, "MMM d")} – ${format(weekEnd, "MMM d, yyyy")}`;
+    }
+    return `${format(weekStart, "MMM d, yyyy")} – ${format(weekEnd, "MMM d, yyyy")}`;
+  }, [weekStart, weekEnd]);
+
+  const weekFiltered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const rangeStart = startOfDay(weekStart);
+    const rangeEnd = endOfDay(weekEnd);
+    return scopedAppointments.filter(a => {
+      const d = new Date(a.appointmentDate);
+      if (d < rangeStart || d > rangeEnd) return false;
+      if (effectiveListTab === "selected") {
+        if (selectedFilter === "upcoming" && d < startOfDay(now)) return false;
+        if (selectedFilter === "today" && !isToday(d)) return false;
+        if (selectedFilter === "confirmed" && a.status !== "confirmed") return false;
+        if (selectedFilter === "notConfirmed" && a.status === "confirmed") return false;
+        if (selectedFilter === "reminders" && !a.reminderSent) return false;
+        if (selectedFilter === "remindersNotSent" && a.reminderSent) return false;
+      }
+      if (!q) return true;
+      return (
+        getCustomerNameForSort(a.customer).toLowerCase().includes(q) ||
+        (a.customer?.email || "").toLowerCase().includes(q) ||
+        (a.title || "").toLowerCase().includes(q) ||
+        (a.serviceType || "").toLowerCase().includes(q)
+      );
+    });
+  }, [scopedAppointments, weekStart, weekEnd, effectiveListTab, selectedFilter, search, now]);
+
+  const weekAppointmentsByDay = useMemo(() => {
+    const map = new Map<string, AppointmentWithCustomer[]>();
+    for (const appointment of weekFiltered) {
+      const key = dayKey(new Date(appointment.appointmentDate));
+      const dayAppointments = map.get(key) ?? [];
+      dayAppointments.push(appointment);
+      map.set(key, dayAppointments);
+    }
+    for (const dayAppointments of map.values()) {
+      dayAppointments.sort(
+        (a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime()
+      );
+    }
+    return map;
+  }, [weekFiltered]);
+
+  const calendarAppointmentsByDay = useMemo(() => {
+    const map = new Map<string, AppointmentWithCustomer[]>();
+    for (const appointment of filtered) {
+      const key = dayKey(new Date(appointment.appointmentDate));
+      const dayAppointments = map.get(key) ?? [];
+      dayAppointments.push(appointment);
+      map.set(key, dayAppointments);
+    }
+    return map;
+  }, [filtered]);
+
+  const selectedDayAppointments = useMemo(() => {
+    const appointmentsForDay = calendarAppointmentsByDay.get(dayKey(selectedCalendarDate)) ?? [];
+    return [...appointmentsForDay].sort(
+      (a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime()
+    );
+  }, [calendarAppointmentsByDay, selectedCalendarDate]);
+
+  const formatAppointmentCount = (count: number) =>
+    t(
+      count === 1
+        ? 'reminders.board.calendar.appointmentSingular'
+        : 'reminders.board.calendar.appointmentPlural',
+      { count }
+    );
+
+  const handleCalendarDayKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, day: Date) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setSelectedCalendarDate(day);
+    }
+  };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-      {/* LEFT: Stats sidebar */}
-      <Card className="shadow-sm">
-        <CardContent className="p-6 flex flex-col gap-6">
-          <div>
-            <p className="text-[11px] font-semibold tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
-              {t('reminders.board.totalAppointments')}
-            </p>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">
-                {isCurrentMonth ? totalThisMonth : monthAppointments.length}
-              </span>
-              <span className="text-sm text-slate-500 dark:text-slate-400">
-                {isCurrentMonth
-                  ? t('reminders.board.thisMonth')
-                  : t('reminders.board.inMonth', { month: format(selectedMonthDate, 'MMMM') })}
-              </span>
-            </div>
-            {isCurrentMonth && pctDelta !== null && (
-              <div className="mt-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-medium">
-                <TrendingUp className="h-3 w-3" />
-                {pctDelta >= 0 ? `+${pctDelta}` : pctDelta}% {t('reminders.board.vsLastMonth')}
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-1 -mx-2">
-            {filterItems.map(item => {
-              const active = item.key === selectedFilter;
-              const disabled = !isCurrentMonth;
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => {
-                    setSelectedFilter(item.key);
-                    setListTab("selected");
-                  }}
-                  disabled={disabled}
-                  className={`group flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    disabled
-                      ? "text-slate-400 dark:text-slate-600 cursor-default"
-                      : active
-                      ? "bg-rose-50 dark:bg-rose-950/30 text-slate-900 dark:text-slate-100"
-                      : "hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        disabled ? "bg-slate-300 dark:bg-slate-700" : item.dotClass
-                      }`}
-                    />
-                    {item.label}
-                  </span>
-                  <span
-                    className={`text-sm font-medium tabular-nums ${
-                      disabled
-                        ? "text-slate-400 dark:text-slate-600"
-                        : "text-slate-700 dark:text-slate-300"
-                    }`}
-                  >
-                    {isCurrentMonth ? item.count : "—"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="pt-2 border-t border-border">
-            <p className="text-[11px] font-semibold tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400 mb-2">
-              {t('reminders.board.allAppointments')}
-            </p>
-            <Select value={selectedMonth} onValueChange={handleMonthChange}>
-              <SelectTrigger className="w-full h-9 rounded-lg">
-                <SelectValue placeholder={t('reminders.board.selectMonth')} />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map(m => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                    {isSameMonth(m.date, now) ? t('reminders.board.currentSuffix') : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="pt-2 border-t border-border">
-            <div className="flex items-baseline justify-between mb-2">
-              <span
-                className={`text-[11px] font-medium tracking-[0.15em] uppercase ${
-                  isCurrentMonth
-                    ? "text-slate-500 dark:text-slate-400"
-                    : "text-slate-400 dark:text-slate-600"
-                }`}
-              >
-                {t('reminders.board.bookingsLast7Days')}
-              </span>
-              <span
-                className={`text-[11px] tabular-nums ${
-                  isCurrentMonth
-                    ? "text-slate-500 dark:text-slate-400"
-                    : "text-slate-400 dark:text-slate-600"
-                }`}
-              >
-                {t('reminders.board.avg')} {isCurrentMonth ? avgLast7.toFixed(1) : "—"}
-              </span>
-            </div>
-            {isCurrentMonth ? (
-              <>
-                <MiniLineChart data={last7Days.map(d => d.count)} />
-                <div className="mt-1 flex justify-between text-[10px] text-slate-400 dark:text-slate-500">
-                  {last7Days.map((d, i) => (
-                    <span key={i}>{d.label}</span>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="h-[56px] flex items-center justify-center rounded-md border border-dashed border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 dark:text-slate-600">
-                  {t('reminders.board.currentMonthOnly')}
-                </span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* RIGHT: Main table */}
-      <Card className="shadow-sm">
+    <Card className="shadow-sm">
         <CardContent className="p-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 border-b border-border">
             <div className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+              {viewMode === "week" ? (
+                <CalendarRange className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+              ) : viewMode === "calendar" ? (
+                <CalendarDays className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+              ) : (
+                <ListIcon className="h-5 w-5 text-slate-700 dark:text-slate-300" />
+              )}
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {t('reminders.board.appointmentsList')}
+                {viewMode === "week"
+                  ? t('reminders.board.week.title')
+                  : viewMode === "calendar"
+                  ? t('reminders.board.calendar.title')
+                  : t('reminders.board.appointmentsList')}
               </h2>
               <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-900 dark:bg-slate-100 px-1.5 text-[11px] font-medium text-white dark:text-slate-900 tabular-nums">
-                {monthAppointments.length}
+                {viewMode === "week"
+                  ? weekFiltered.length
+                  : viewMode === "calendar"
+                  ? filtered.length
+                  : monthAppointments.length}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={selectedMonth} onValueChange={handleMonthChange}>
+                <SelectTrigger className="h-9 w-[150px] rounded-lg">
+                  <SelectValue placeholder={t('reminders.board.selectMonth')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(m => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                      {isSameMonth(m.date, now) ? t('reminders.board.currentSuffix') : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="inline-flex h-9 items-center rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-1">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("list")}
+                  aria-pressed={viewMode === "list"}
+                  className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors ${
+                    viewMode === "list"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                  }`}
+                >
+                  <ListIcon className="h-3.5 w-3.5" />
+                  {t('reminders.board.viewModes.list')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("week")}
+                  aria-pressed={viewMode === "week"}
+                  className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors ${
+                    viewMode === "week"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                  }`}
+                >
+                  <CalendarRange className="h-3.5 w-3.5" />
+                  {t('reminders.board.viewModes.week')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("calendar")}
+                  aria-pressed={viewMode === "calendar"}
+                  className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors ${
+                    viewMode === "calendar"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                  }`}
+                >
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  {t('reminders.board.viewModes.calendar')}
+                </button>
+              </div>
+              <div className="relative min-w-[220px] flex-1 sm:flex-none">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder={t('reminders.board.searchPlaceholder')}
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="pl-9 h-9 w-56 rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                  className="pl-9 h-9 w-full sm:w-56 rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
                 />
               </div>
               <Popover>
@@ -519,6 +593,76 @@ export function AppointmentsWeekBoard({
             </div>
           </div>
 
+          {/* Slim stats top bar — total + status filters (replaces the left sidebar) */}
+          <div className="flex items-center gap-4 overflow-x-auto px-5 py-3 border-b border-border bg-slate-50/60 dark:bg-slate-900/30">
+            <div className="flex-none">
+              <p className="text-[11px] font-semibold tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
+                {t('reminders.board.totalAppointments')}
+              </p>
+              <div className="mt-0.5 flex items-baseline gap-2">
+                <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">
+                  {isCurrentMonth ? totalThisMonth : monthAppointments.length}
+                </span>
+                <span className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+                  {isCurrentMonth
+                    ? t('reminders.board.thisMonth')
+                    : t('reminders.board.inMonth', { month: format(selectedMonthDate, 'MMMM') })}
+                </span>
+                {isCurrentMonth && pctDelta !== null && (
+                  <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                    <TrendingUp className="h-3 w-3" />
+                    {pctDelta >= 0 ? `+${pctDelta}` : pctDelta}%
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="h-10 w-px flex-none bg-border" />
+
+            <div className="flex items-center gap-2">
+              {filterItems.map(item => {
+                const active = item.key === selectedFilter;
+                const disabled = !isCurrentMonth;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedFilter(item.key);
+                      setListTab("selected");
+                    }}
+                    disabled={disabled}
+                    className={`inline-flex items-center gap-2 whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                      disabled
+                        ? "border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-600 cursor-default"
+                        : active
+                        ? "border-rose-200 bg-rose-50 text-slate-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-slate-100"
+                        : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        disabled ? "bg-slate-300 dark:bg-slate-700" : item.dotClass
+                      }`}
+                    />
+                    {item.label}
+                    <span
+                      className={`text-sm font-semibold tabular-nums ${
+                        disabled
+                          ? "text-slate-400 dark:text-slate-600"
+                          : active
+                          ? "text-slate-900 dark:text-slate-100"
+                          : "text-slate-500 dark:text-slate-400"
+                      }`}
+                    >
+                      {isCurrentMonth ? item.count : "—"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="flex items-center gap-1 px-5 py-3 border-b border-border overflow-x-auto">
             <TabPill active={effectiveListTab === "all"} onClick={() => setListTab("all")} count={monthAppointments.length}>
               {t('reminders.board.tabs.all')}
@@ -533,7 +677,322 @@ export function AppointmentsWeekBoard({
             </TabPill>
           </div>
 
-          {filtered.length === 0 ? (
+          {viewMode === "week" ? (
+            <>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-border">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {weekRangeLabel}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {formatAppointmentCount(weekFiltered.length)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 rounded-lg p-0"
+                    onClick={() => setSelectedWeekDate(d => subWeeks(d, 1))}
+                    aria-label={t('reminders.board.week.previousWeek')}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-lg px-3 text-xs"
+                    onClick={() => setSelectedWeekDate(new Date())}
+                  >
+                    {t('reminders.board.week.currentWeek')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 rounded-lg p-0"
+                    onClick={() => setSelectedWeekDate(d => addWeeks(d, 1))}
+                    aria-label={t('reminders.board.week.nextWeek')}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <div className="grid grid-cols-7 min-w-[840px]">
+                  {weekDays.map(day => {
+                    const key = dayKey(day);
+                    const dayAppointments = weekAppointmentsByDay.get(key) ?? [];
+                    const today = isToday(day);
+                    return (
+                      <div
+                        key={key}
+                        className="flex min-h-[460px] flex-col border-r border-border last:border-r-0"
+                      >
+                        <div
+                          className={`border-b border-border px-3 py-2 text-center ${
+                            today
+                              ? "bg-rose-50/70 dark:bg-rose-950/20"
+                              : "bg-slate-50/70 dark:bg-slate-900/40"
+                          }`}
+                        >
+                          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            {format(day, "EEE")}
+                          </div>
+                          <div
+                            className={`mt-0.5 inline-flex h-7 min-w-[28px] items-center justify-center rounded-full px-1.5 text-sm font-semibold tabular-nums ${
+                              today
+                                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                                : "text-slate-900 dark:text-slate-100"
+                            }`}
+                          >
+                            {format(day, "d")}
+                          </div>
+                        </div>
+                        <div className="flex-1 space-y-2 p-2">
+                          {dayAppointments.length === 0 ? (
+                            <div className="pt-6 text-center text-[11px] text-slate-300 dark:text-slate-600">
+                              —
+                            </div>
+                          ) : (
+                            dayAppointments.map(appointment => {
+                              const appointmentDate = new Date(appointment.appointmentDate);
+                              const chipClass =
+                                STATUS_CALENDAR_CHIP[appointment.status] ||
+                                "border-l-slate-400 bg-slate-100/80 text-slate-700 hover:bg-slate-200 dark:bg-slate-800/70 dark:text-slate-300 dark:hover:bg-slate-800";
+                              const name = getCustomerName(appointment.customer);
+                              return (
+                                <button
+                                  key={appointment.id}
+                                  type="button"
+                                  onClick={() => onViewAppointment(appointment)}
+                                  className={`block w-full rounded-md border-l-2 px-2 py-1.5 text-left transition-colors ${chipClass}`}
+                                >
+                                  <div className="text-[11px] font-semibold tabular-nums">
+                                    {format(appointmentDate, "h:mm a")}
+                                  </div>
+                                  <div className="mt-0.5 truncate text-xs font-medium">
+                                    {appointment.serviceType || appointment.title}
+                                  </div>
+                                  <div className="truncate text-[11px] opacity-70">
+                                    {name}
+                                  </div>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : viewMode === "calendar" ? (
+            <>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-border">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {format(selectedMonthDate, "MMMM yyyy")}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {formatAppointmentCount(filtered.length)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 rounded-lg p-0"
+                    onClick={() => shiftSelectedMonth(-1)}
+                    aria-label={t('reminders.board.calendar.previousMonth')}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-lg px-3 text-xs"
+                    onClick={() => handleMonthChange(format(now, "yyyy-MM"))}
+                  >
+                    {t('reminders.board.calendar.currentMonth')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 rounded-lg p-0"
+                    onClick={() => shiftSelectedMonth(1)}
+                    aria-label={t('reminders.board.calendar.nextMonth')}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col">
+                <div className="overflow-x-auto">
+                  <div className="min-w-[720px]">
+                    <div className="grid grid-cols-7 border-b border-border bg-slate-50/80 dark:bg-slate-900/40">
+                      {weekdayLabels.map(label => (
+                        <div
+                          key={label}
+                          className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                        >
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7">
+                      {calendarDays.map(day => {
+                        const key = dayKey(day);
+                        const dayAppointments = calendarAppointmentsByDay.get(key) ?? [];
+                        const outsideMonth = !isSameMonth(day, selectedMonthDate);
+                        const selected = isSameDay(day, selectedCalendarDate);
+                        const today = isToday(day);
+
+                        return (
+                          <div
+                            key={key}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setSelectedCalendarDate(day)}
+                            onKeyDown={(event) => handleCalendarDayKeyDown(event, day)}
+                            className={`min-h-[128px] border-r border-b border-slate-100 dark:border-slate-800 p-2 text-left outline-none transition-colors ${
+                              outsideMonth
+                                ? "bg-slate-50/60 dark:bg-slate-950/30 text-slate-400 dark:text-slate-600"
+                                : "bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-900/60"
+                            } ${
+                              selected
+                                ? "ring-2 ring-inset ring-slate-900 dark:ring-slate-100"
+                                : "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span
+                                className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold tabular-nums ${
+                                  today
+                                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                                    : selected
+                                    ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                                    : ""
+                                }`}
+                              >
+                                {format(day, "d")}
+                              </span>
+                              {dayAppointments.length > 0 && (
+                                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 tabular-nums">
+                                  {dayAppointments.length}
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-2 space-y-1 overflow-hidden">
+                              {dayAppointments.slice(0, 3).map(appointment => {
+                                const appointmentDate = new Date(appointment.appointmentDate);
+                                const chipClass =
+                                  STATUS_CALENDAR_CHIP[appointment.status] ||
+                                  "border-l-slate-400 bg-slate-100/80 text-slate-700 hover:bg-slate-200 dark:bg-slate-800/70 dark:text-slate-300 dark:hover:bg-slate-800";
+
+                                return (
+                                  <button
+                                    key={appointment.id}
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setSelectedCalendarDate(day);
+                                      onViewAppointment(appointment);
+                                    }}
+                                    className={`flex w-full items-center gap-1 rounded-md border-l-2 px-2 py-1 text-left text-[11px] leading-4 transition-colors ${chipClass}`}
+                                    aria-label={`${format(appointmentDate, "h:mm a")} ${appointment.title}`}
+                                  >
+                                    <span className="shrink-0 font-semibold tabular-nums">
+                                      {format(appointmentDate, "h:mm a")}
+                                    </span>
+                                    <span className="min-w-0 truncate">
+                                      {appointment.serviceType || appointment.title}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                              {dayAppointments.length > 3 && (
+                                <div className="px-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                  {t('reminders.board.calendar.more', { count: dayAppointments.length - 3 })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <aside className="border-t border-border">
+                  <div className="p-5 border-b border-border">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
+                      {t('reminders.board.calendar.selectedDay')}
+                    </p>
+                    <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                      {format(selectedCalendarDate, "EEEE, MMM d")}
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      {formatAppointmentCount(selectedDayAppointments.length)}
+                    </p>
+                  </div>
+                  <div className="max-h-[520px] overflow-y-auto p-4">
+                    {selectedDayAppointments.length === 0 ? (
+                      <div className="flex min-h-40 items-center justify-center rounded-lg border border-dashed border-slate-200 dark:border-slate-800 px-4 text-center">
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          {t('reminders.board.calendar.noAppointments')}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                        {selectedDayAppointments.map(appointment => {
+                          const appointmentDate = new Date(appointment.appointmentDate);
+                          const dotClass = STATUS_DOT[appointment.status] || "bg-slate-400";
+                          const name = getCustomerName(appointment.customer);
+
+                          return (
+                            <button
+                              key={appointment.id}
+                              type="button"
+                              onClick={() => onViewAppointment(appointment)}
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-900"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
+                                  {format(appointmentDate, "h:mm a")}
+                                </span>
+                                <span className={`h-2 w-2 rounded-full ${dotClass}`} />
+                              </div>
+                              <p className="mt-1 truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+                                {appointment.serviceType || appointment.title}
+                              </p>
+                              <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                                {name}
+                              </p>
+                              <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                <span>{appointment.duration}m</span>
+                                <span className="truncate">
+                                  {appointment.provider?.name || appointment.provider?.email || t('reminders.board.unassigned')}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </aside>
+              </div>
+            </>
+          ) : filtered.length === 0 ? (
             <div className="px-5 py-16 text-center">
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 {t('reminders.board.noMatch')}
@@ -652,16 +1111,34 @@ export function AppointmentsWeekBoard({
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-t border-border text-sm">
             <div className="text-slate-500 dark:text-slate-400">
-              {t('reminders.board.showing')} <span className="font-medium text-slate-700 dark:text-slate-300">{visible.length}</span>{" "}
-              {t('reminders.board.of')} <span className="font-medium text-slate-700 dark:text-slate-300">{filtered.length}</span>
-              {filtered.length > pageSize && (
-                <button
-                  type="button"
-                  onClick={() => setPageSize(p => p + 8)}
-                  className="ml-3 text-slate-900 dark:text-slate-100 hover:underline"
-                >
-                  {t('reminders.board.showMore')}
-                </button>
+              {viewMode === "week" ? (
+                <>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {formatAppointmentCount(weekFiltered.length)}
+                  </span>{" "}
+                  · {weekRangeLabel}
+                </>
+              ) : viewMode === "calendar" ? (
+                <>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {formatAppointmentCount(filtered.length)}
+                  </span>{" "}
+                  · {format(selectedMonthDate, "MMMM yyyy")}
+                </>
+              ) : (
+                <>
+                  {t('reminders.board.showing')} <span className="font-medium text-slate-700 dark:text-slate-300">{visible.length}</span>{" "}
+                  {t('reminders.board.of')} <span className="font-medium text-slate-700 dark:text-slate-300">{filtered.length}</span>
+                  {filtered.length > pageSize && (
+                    <button
+                      type="button"
+                      onClick={() => setPageSize(p => p + 8)}
+                      className="ml-3 text-slate-900 dark:text-slate-100 hover:underline"
+                    >
+                      {t('reminders.board.showMore')}
+                    </button>
+                  )}
+                </>
               )}
             </div>
             <div className="flex items-center gap-4">
@@ -699,7 +1176,6 @@ export function AppointmentsWeekBoard({
           </div>
         </CardContent>
       </Card>
-    </div>
   );
 }
 
@@ -742,42 +1218,6 @@ function TabPill({
         {disabled ? "—" : count}
       </span>
     </button>
-  );
-}
-
-function MiniLineChart({ data }: { data: number[] }) {
-  const width = 232;
-  const height = 56;
-  const max = Math.max(1, ...data);
-  const stepX = data.length > 1 ? width / (data.length - 1) : 0;
-  const points = data.map((v, i) => {
-    const x = i * stepX;
-    const y = height - (v / max) * (height - 8) - 4;
-    return [x, y] as [number, number];
-  });
-  const linePath = points
-    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`)
-    .join(" ");
-  const areaPath = `${linePath} L${width},${height} L0,${height} Z`;
-
-  return (
-    <svg width="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
-      <defs>
-        <linearGradient id="miniChartFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgb(190 24 93)" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="rgb(190 24 93)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill="url(#miniChartFill)" />
-      <path
-        d={linePath}
-        fill="none"
-        stroke="rgb(190 24 93)"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 

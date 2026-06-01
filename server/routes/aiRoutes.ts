@@ -20,6 +20,14 @@ function ensureApiKey(res: any) {
   return true;
 }
 
+function cleanGeneratedHtml(value: string) {
+  return value
+    .trim()
+    .replace(/^```(?:html)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
 // POST /api/ai/generate-birthday-message
 // Generate an occasion-specific greeting message using AI
 router.post("/generate-birthday-message", authenticateToken, requireTenant, async (req, res) => {
@@ -386,6 +394,84 @@ ${text}`;
   }
 });
 
+// POST /api/ai/transform-newsletter
+// Rewrite the entire Notion newsletter body while preserving editor-safe HTML.
+router.post("/transform-newsletter", authenticateToken, requireTenant, async (req, res) => {
+  try {
+    const { html, action, instruction } = req.body;
+
+    if (!html || typeof html !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Newsletter HTML is required",
+      });
+    }
+
+    if (!action || typeof action !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Action is required",
+      });
+    }
+
+    if (!ensureApiKey(res)) {
+      return;
+    }
+
+    const actionInstructions: Record<string, string> = {
+      regenerate: "Regenerate the newsletter into a fresh, polished version while preserving the core topic, facts, offers, dates, links, calls to action, and overall structure.",
+      improve: "Improve clarity, flow, engagement, and readability while preserving the original tone and meaning.",
+      formal: "Rewrite the newsletter in a more formal, polished, professional tone while keeping it warm and sincere.",
+      casual: "Rewrite the newsletter in a more casual, friendly, conversational tone while keeping it professional and clear.",
+      shorten: "Make the newsletter more concise by removing repetition and unnecessary wording while preserving all important details.",
+      expand: "Expand the newsletter with useful detail and smoother transitions while preserving the original intent and keeping the result focused.",
+      custom: `Rewrite the newsletter according to this direction: ${typeof instruction === "string" ? instruction.trim() : ""}`,
+    };
+
+    const transformInstruction = actionInstructions[action];
+    if (!transformInstruction || (action === "custom" && !String(instruction || "").trim())) {
+      return res.status(400).json({
+        success: false,
+        error: "A valid rewrite direction is required",
+      });
+    }
+
+    const promptText = `You are a professional email newsletter editor. Rewrite the complete newsletter body below.
+
+TRANSFORMATION:
+${transformInstruction}
+
+RULES:
+1. Return only raw HTML. Do not use markdown code fences, backticks, explanations, or comments.
+2. Keep the result as body content only. Do not include <html>, <head>, <body>, scripts, stylesheets, or wrapper container tags.
+3. Use editor-safe semantic HTML: <h1>, <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <blockquote>, <hr>, <a>, and existing image markup.
+4. Preserve every <img> tag exactly as provided, including src, alt, title, width, style, classes, and surrounding image wrapper markup when present. Do not add new image tags and do not remove existing image tags.
+5. Preserve all links, URLs, template variables such as {{first_name}}, product names, event names, prices, dates, coupon codes, and factual claims.
+6. Use one <p> tag per logical paragraph. Never use <br> tags for paragraph spacing and never output empty paragraphs.
+7. Do not add greetings like "Dear subscriber", signatures, unsubscribe text, or email footer/legal boilerplate unless they already appear in the source.
+8. Keep first-person business copy in first-person plural: we, us, our.
+
+NEWSLETTER HTML:
+${html}`;
+
+    const { text } = await generateText({
+      model: AI_MODEL,
+      prompt: promptText,
+    });
+
+    res.json({
+      success: true,
+      html: cleanGeneratedHtml(text),
+    });
+  } catch (error: any) {
+    console.error("Error transforming newsletter:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to transform newsletter",
+    });
+  }
+});
+
 // POST /api/ai/translate
 // Translate selected text to various languages
 router.post("/translate", authenticateToken, requireTenant, async (req, res) => {
@@ -644,6 +730,121 @@ ${content}`;
     res.status(500).json({
       success: false,
       error: error.message || "Failed to generate title and subject",
+    });
+  }
+});
+
+// POST /api/ai/transform-title-subject
+// Regenerate or rewrite the newsletter dashboard title and inbox subject line.
+router.post("/transform-title-subject", authenticateToken, requireTenant, async (req, res) => {
+  try {
+    const { content, title, subject, action, instruction } = req.body;
+    const currentTitle = typeof title === "string" ? title.trim() : "";
+    const currentSubject = typeof subject === "string" ? subject.trim() : "";
+    const bodyContent = typeof content === "string" ? content.trim() : "";
+
+    if (!bodyContent && !currentTitle && !currentSubject) {
+      return res.status(400).json({
+        success: false,
+        error: "Content, title, or subject is required",
+      });
+    }
+
+    if (!action || typeof action !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Action is required",
+      });
+    }
+
+    if (!ensureApiKey(res)) {
+      return;
+    }
+
+    const actionInstructions: Record<string, string> = {
+      regenerate: "Create a fresh title and subject from the newsletter body. Do not merely copy the existing values.",
+      formal: "Rewrite the existing title and subject to be more formal, polished, and professional while keeping the same meaning.",
+      casual: "Rewrite the existing title and subject to be less formal, more conversational, and still clear.",
+      shorten: "Make the existing title and subject shorter and more direct while preserving the main idea.",
+      custom: `Rewrite the title and subject according to this direction: ${typeof instruction === "string" ? instruction.trim() : ""}`,
+    };
+
+    const transformInstruction = actionInstructions[action];
+    if (!transformInstruction || (action === "custom" && !String(instruction || "").trim())) {
+      return res.status(400).json({
+        success: false,
+        error: "A valid title/subject direction is required",
+      });
+    }
+
+    const clean = (s: string) => s.trim().replace(/^["'“”\s]+|["'“”\s]+$/g, "").trim();
+
+    const sharedContext = `CURRENT TITLE:
+${currentTitle || "(none)"}
+
+CURRENT SUBJECT:
+${currentSubject || "(none)"}
+
+NEWSLETTER BODY:
+${bodyContent || "(not provided)"}`;
+
+    const titlePrompt = `You are helping run a company email newsletter.
+
+TASK:
+${transformInstruction}
+
+Write the internal newsletter name/title only.
+
+REQUIREMENTS:
+- Max ~60 characters.
+- Summarize the main topic clearly for a dashboard.
+- Use sentence case unless a proper noun requires capitalization.
+- Return ONLY the title text. No quotes, markdown, labels, or explanation.
+
+${sharedContext}`;
+
+    const subjectPrompt = `You are writing the inbox subject line for a company NEWSLETTER. This is editorial/informational, not a sales blast.
+
+TASK:
+${transformInstruction}
+
+Write the email subject line only.
+
+REQUIREMENTS:
+- Max ~60 characters.
+- Read like a genuine newsletter update that describes what is inside.
+- Avoid spam/promotion triggers: no ALL-CAPS, no exclamation marks, no emojis, no urgency, no clickbait.
+- Avoid these or similar words unless already essential to the source: free, sale, buy, order now, discount, % off, deal, offer, limited time, act now, hurry, click here, winner, guarantee.
+- Use plain, natural sentence case.
+- Return ONLY the subject line text. No quotes, markdown, labels, or explanation.
+
+${sharedContext}`;
+
+    const [titleResult, subjectResult] = await Promise.all([
+      generateText({ model: AI_MODEL, prompt: titlePrompt }),
+      generateText({ model: AI_MODEL, prompt: subjectPrompt }),
+    ]);
+
+    const nextTitle = clean(titleResult.text);
+    const nextSubject = clean(subjectResult.text);
+
+    if (!nextTitle && !nextSubject) {
+      return res.status(502).json({
+        success: false,
+        error: "Could not update the title and subject",
+      });
+    }
+
+    res.json({
+      success: true,
+      title: nextTitle,
+      subject: nextSubject,
+    });
+  } catch (error: any) {
+    console.error("Error transforming newsletter title/subject:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to update title and subject",
     });
   }
 });

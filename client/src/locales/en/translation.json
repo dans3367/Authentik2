@@ -602,6 +602,11 @@
       "avg": "avg",
       "currentMonthOnly": "Current month only",
       "appointmentsList": "Appointments list",
+      "viewModes": {
+        "list": "List",
+        "week": "Week",
+        "calendar": "Calendar"
+      },
       "searchPlaceholder": "Search contacts or types...",
       "filters": "Filters",
       "provider": "Provider",
@@ -632,7 +637,24 @@
       "showMore": "Show more",
       "exportCsv": "Export CSV",
       "manageTemplates": "Manage templates",
-      "viewFullCalendar": "View full calendar"
+      "viewFullCalendar": "View full calendar",
+      "week": {
+        "title": "Week view",
+        "previousWeek": "Previous week",
+        "nextWeek": "Next week",
+        "currentWeek": "Current week"
+      },
+      "calendar": {
+        "title": "Appointment calendar",
+        "appointmentSingular": "{{count}} appointment",
+        "appointmentPlural": "{{count}} appointments",
+        "previousMonth": "Previous month",
+        "nextMonth": "Next month",
+        "currentMonth": "Current month",
+        "selectedDay": "Selected day",
+        "noAppointments": "No appointments scheduled for this day.",
+        "more": "+{{count}} more"
+      }
     }
   },
   "birthdays": {

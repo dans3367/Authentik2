@@ -483,6 +483,218 @@
   margin-top: 0;
 }
 
+/* ─── Full Newsletter AI Menu ───────────────────────────────────────────── */
+
+.notion-newsletter-ai-shell {
+  position: sticky;
+  top: 10px;
+  z-index: 45;
+  width: fit-content;
+  margin: 10px 24px -2px auto;
+}
+
+.notion-editor-embedded .notion-newsletter-ai-shell {
+  position: relative;
+  top: auto;
+  margin: -8px 0 10px auto;
+}
+
+.notion-newsletter-ai-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  backdrop-filter: blur(10px);
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.notion-newsletter-ai-trigger:hover,
+.notion-newsletter-ai-shell.open .notion-newsletter-ai-trigger,
+.notion-newsletter-ai-trigger.processing {
+  background: #ffffff;
+  border-color: #e5e7eb;
+  color: #4f46e5;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.notion-newsletter-ai-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(420px, calc(100vw - 32px));
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.02);
+  animation: notion-ai-popover-in 0.12s ease-out;
+}
+
+@keyframes notion-ai-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.notion-newsletter-ai-popover-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px 8px;
+  color: #4f46e5;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notion-newsletter-ai-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.notion-newsletter-ai-btn,
+.notion-newsletter-ai-direction button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #374151;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.notion-newsletter-ai-btn:hover:not(:disabled),
+.notion-newsletter-ai-direction button:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.notion-newsletter-ai-btn:disabled,
+.notion-newsletter-ai-direction button:disabled,
+.notion-newsletter-ai-direction input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.notion-newsletter-ai-direction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.notion-newsletter-ai-direction input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 13px;
+  outline: none;
+}
+
+.notion-newsletter-ai-direction input:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.notion-newsletter-ai-direction button {
+  justify-content: center;
+  border-color: #e5e7eb;
+  background: #ffffff;
+}
+
+.notion-newsletter-ai-error {
+  margin-top: 8px;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.dark .notion-newsletter-ai-trigger {
+  background: rgba(17, 24, 39, 0.74);
+  color: #9ca3af;
+}
+
+.dark .notion-newsletter-ai-trigger:hover,
+.dark .notion-newsletter-ai-shell.open .notion-newsletter-ai-trigger,
+.dark .notion-newsletter-ai-trigger.processing {
+  background: #1f2937;
+  border-color: #374151;
+  color: #a5b4fc;
+}
+
+.dark .notion-newsletter-ai-popover {
+  background: #111827;
+  border-color: #374151;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+}
+
+.dark .notion-newsletter-ai-popover-header {
+  color: #a5b4fc;
+}
+
+.dark .notion-newsletter-ai-btn,
+.dark .notion-newsletter-ai-direction button {
+  color: #e5e7eb;
+}
+
+.dark .notion-newsletter-ai-btn:hover:not(:disabled),
+.dark .notion-newsletter-ai-direction button:hover:not(:disabled) {
+  background: #1f2937;
+  color: #ffffff;
+}
+
+.dark .notion-newsletter-ai-direction {
+  border-top-color: #1f2937;
+}
+
+.dark .notion-newsletter-ai-direction input,
+.dark .notion-newsletter-ai-direction button {
+  background: #111827;
+  border-color: #374151;
+  color: #f9fafb;
+}
+
+.dark .notion-newsletter-ai-direction input::placeholder {
+  color: #6b7280;
+}
+
+.dark .notion-newsletter-ai-error {
+  color: #fca5a5;
+}
+
 /* ─── Placeholder ─────────────────────────────────────────────────────────── */
 
 .notion-editor-content .is-editor-empty:first-child::before {

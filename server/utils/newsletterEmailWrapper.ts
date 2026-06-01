@@ -329,7 +329,7 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
 
   // Logo section (non-banner mode)
   const logoSection = design.logoUrl && isValidHttpUrl(design.logoUrl)
-    ? `<img src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="display: block; max-height: ${logoHeight}; width: auto; margin: 0 ${logoMR} 20px ${logoML}; object-fit: contain;" />`
+    ? `<img class="email-hero-logo" src="${escapeHtml(design.logoUrl)}" alt="${safeCompanyName}" style="display: block; max-height: ${logoHeight}; width: auto; margin: 0 ${logoMR} 20px ${logoML}; object-fit: contain;" />`
     : (safeCompanyName && showName)
       ? `<div style="height: 48px; width: 48px; background-color: rgba(255,255,255,0.2); border-radius: 50%; margin: 0 ${logoMR} 16px ${logoML}; line-height: 48px; font-size: 20px; font-weight: bold; color: #ffffff; text-align: center;">${escapeHtml((design.displayCompanyName || 'C').charAt(0))}</div>`
       : '';
@@ -363,6 +363,25 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
     <![endif]-->
     <style type="text/css">
       img { max-width: 100% !important; height: auto !important; }
+      @media screen and (max-width: 480px) {
+        .email-hero-header { padding: 24px 18px !important; }
+        .email-hero-header-banner { padding: 12px 18px !important; }
+        .email-hero-logo { max-height: 72px !important; margin-bottom: 12px !important; }
+        .email-hero-title { font-size: 20px !important; line-height: 1.2 !important; letter-spacing: 0 !important; }
+        .email-hero-copy { font-size: 14px !important; line-height: 1.4 !important; max-width: 280px !important; }
+        .email-content h1 { font-size: 22px !important; line-height: 1.25 !important; }
+        .email-content h2 { font-size: 20px !important; line-height: 1.3 !important; }
+        .email-content h3 { font-size: 18px !important; line-height: 1.35 !important; }
+      }
+      @media screen and (max-width: 360px) {
+        .email-hero-header { padding: 20px 16px !important; }
+        .email-hero-header-banner { padding: 10px 16px !important; }
+        .email-hero-title { font-size: 18px !important; }
+        .email-hero-copy { font-size: 13px !important; }
+        .email-content h1 { font-size: 20px !important; }
+        .email-content h2 { font-size: 18px !important; }
+        .email-content h3 { font-size: 17px !important; }
+      }
     </style>
   </head>
   <body style="font-family: ${fontFamily}; margin: 0; padding: 0; background-color: ${bodyBgColor}; -webkit-font-smoothing: antialiased;">
@@ -373,22 +392,22 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
       ${useBanner ? `
       <img src="${escapeHtml(design.bannerUrl!)}" alt="${safeCompanyName}" style="display: block; width: 100%; height: auto; border: 0; outline: none;" />
       ${(safeCompanyName && showName) || safeHeaderText ? `
-      <div style="padding: 16px 24px; text-align: center; background-color: ${primaryColor}; color: #ffffff;">
-        ${safeCompanyName && showName ? `<h1 style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">${safeCompanyName}</h1>` : ''}
-        ${safeHeaderText ? `<p style="margin: 0 auto; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">${safeHeaderText}</p>` : ''}
+      <div class="email-hero-header-banner" style="padding: 16px 24px; text-align: center; background-color: ${primaryColor}; color: #ffffff;">
+        ${safeCompanyName && showName ? `<h1 class="email-hero-title" style="margin: 0 0 4px 0; font-size: 24px; font-weight: bold; letter-spacing: 0; color: #ffffff; line-height: 1.2;">${safeCompanyName}</h1>` : ''}
+        ${safeHeaderText ? `<p class="email-hero-copy" style="margin: 0 auto; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">${safeHeaderText}</p>` : ''}
       </div>
       ` : ''}
       ` : `
-      <div style="padding: 40px 24px; text-align: ${logoAlign}; background-color: ${primaryColor}; color: #ffffff;">
+      <div class="email-hero-header" style="padding: 40px 24px; text-align: ${logoAlign}; background-color: ${primaryColor}; color: #ffffff;">
         ${logoSection}
-        ${safeCompanyName && showName ? `<h1 style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: -0.025em; color: #ffffff;">${safeCompanyName}</h1>` : ''}
-        ${safeHeaderText ? `<p style="margin: 0 ${logoMR} 0 ${logoML}; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">${safeHeaderText}</p>` : ''}
+        ${safeCompanyName && showName ? `<h1 class="email-hero-title" style="margin: 0 0 10px 0; font-size: 24px; font-weight: bold; letter-spacing: 0; color: #ffffff; line-height: 1.2;">${safeCompanyName}</h1>` : ''}
+        ${safeHeaderText ? `<p class="email-hero-copy" style="margin: 0 ${logoMR} 0 ${logoML}; font-size: 16px; opacity: 0.95; max-width: 400px; line-height: 1.5; color: #ffffff;">${safeHeaderText}</p>` : ''}
       </div>
       `}
 
       <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;">
         <tr>
-          <td style="padding: 20px 24px 32px 24px; font-size: 16px; line-height: 1.625; color: #334155; border: none; background-color: ${contentBgColor};">
+          <td class="email-content" style="padding: 20px 24px 32px 24px; font-size: 16px; line-height: 1.625; color: #334155; border: none; background-color: ${contentBgColor};">
             ${bodyContent}
           </td>
         </tr>

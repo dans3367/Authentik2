@@ -469,6 +469,59 @@ export async function transformText(
   }
 }
 
+export type NewsletterTransformAction =
+  | "regenerate"
+  | "improve"
+  | "formal"
+  | "casual"
+  | "shorten"
+  | "expand"
+  | "custom";
+
+interface TransformNewsletterParams {
+  html: string;
+  action: NewsletterTransformAction;
+  instruction?: string;
+}
+
+interface TransformNewsletterResponse {
+  success: boolean;
+  html?: string;
+  error?: string;
+}
+
+/**
+ * Rewrite the complete Notion newsletter body while preserving valid editor HTML.
+ */
+export async function transformNewsletter(
+  params: TransformNewsletterParams
+): Promise<TransformNewsletterResponse> {
+  try {
+    const response = await fetch("/api/ai/transform-newsletter", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to transform newsletter");
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Error transforming newsletter:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to transform newsletter",
+    };
+  }
+}
+
 interface GenerateTitleSubjectParams {
   content: string;
 }
@@ -505,6 +558,57 @@ export async function generateTitleAndSubject(
     return {
       success: false,
       error: error.message || "Failed to generate title and subject",
+    };
+  }
+}
+
+export type NewsletterMetaTransformAction =
+  | "regenerate"
+  | "formal"
+  | "casual"
+  | "shorten"
+  | "custom";
+
+interface TransformTitleSubjectParams {
+  content: string;
+  title?: string;
+  subject?: string;
+  action: NewsletterMetaTransformAction;
+  instruction?: string;
+}
+
+interface TransformTitleSubjectResponse {
+  success: boolean;
+  title?: string;
+  subject?: string;
+  error?: string;
+}
+
+export async function transformTitleAndSubject(
+  params: TransformTitleSubjectParams
+): Promise<TransformTitleSubjectResponse> {
+  try {
+    const response = await fetch("/api/ai/transform-title-subject", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to update title and subject");
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Error updating title and subject:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to update title and subject",
     };
   }
 }

@@ -6,18 +6,21 @@ const LazyNotionEditor = lazy(() => import("@/components/NotionLikeEditor"));
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { initialData } from "@/config/puck/initial-data";
 import { rootFieldErrors } from "@/config/puck/root-field-errors";
-import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X, Rocket, Eye, Sparkles } from "lucide-react";
+import { Monitor, Smartphone, ZoomIn, ZoomOut, Mail, Save, ArrowLeft, Loader2, X, Rocket, Eye, Sparkles, ChevronDown, RefreshCw, Type, ArrowLeftToLine, Check } from "lucide-react";
 import { SendPreviewDialog } from "@/components/SendPreviewDialog";
 import { SendNewsletterWizardModal } from "@/components/SendNewsletterWizardModal";
 import { extractPuckEmailHtml } from "@/utils/puck-to-email-html";
 import { wrapInEmailPreview } from "@/utils/email-preview-wrapper";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLocation, useParams } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { generateTitleAndSubject } from "@/lib/aiApi";
+import { transformTitleAndSubject, type NewsletterMetaTransformAction } from "@/lib/aiApi";
 import { normalizeAiHtml } from "@/lib/aiHtmlNormalization";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTheme } from "@/contexts/ThemeContext";
+import phoneMockup from "@assets/phone_14.svg";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -141,6 +144,347 @@ function SaveDraftButton({
   );
 }
 
+function TitleSubjectAiMenu({
+  processingAction,
+  onTransform,
+  t,
+  surface,
+}: {
+  processingAction: NewsletterMetaTransformAction | null;
+  onTransform: (action: NewsletterMetaTransformAction, instruction?: string) => void;
+  t: (key: string, fallback: string) => string;
+  surface: {
+    controlBg: string;
+    controlBorder: string;
+    chromeHover: string;
+    text: string;
+    textSoft: string;
+    textMuted: string;
+    cardBg: string;
+    border: string;
+  };
+}) {
+  const [open, setOpen] = useState(false);
+  const [direction, setDirection] = useState("");
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isProcessing = Boolean(processingAction);
+  const canApplyDirection = direction.trim().length >= 3 && !isProcessing;
+  const actions: Array<{ action: NewsletterMetaTransformAction; label: string; icon: React.ReactNode }> = [
+    { action: "regenerate", label: t("newsletter.create.aiMeta.regenerate", "Regenerate"), icon: <RefreshCw size={14} /> },
+    { action: "formal", label: t("newsletter.create.aiMeta.formal", "More formal"), icon: <Type size={14} /> },
+    { action: "casual", label: t("newsletter.create.aiMeta.casual", "Less formal"), icon: <Sparkles size={14} /> },
+    { action: "shorten", label: t("newsletter.create.aiMeta.shorten", "Shorter"), icon: <ArrowLeftToLine size={14} /> },
+  ];
+
+  useEffect(() => {
+    if (isProcessing) setOpen(true);
+  }, [isProcessing]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={menuRef} style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={() => {
+          if (!isProcessing) setOpen((value) => !value);
+        }}
+        disabled={isProcessing}
+        title={t("newsletter.create.aiMeta.button", "Generate title & subject with AI")}
+        aria-label={t("newsletter.create.aiMeta.button", "Generate title & subject with AI")}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '5px',
+          height: '30px',
+          padding: '0 9px',
+          border: `1px solid ${open ? surface.controlBorder : 'transparent'}`,
+          borderRadius: '999px',
+          background: open ? surface.controlBg : 'transparent',
+          color: open ? surface.text : surface.textMuted,
+          cursor: isProcessing ? 'default' : 'pointer',
+          opacity: isProcessing ? 0.7 : 1,
+          fontSize: '12px',
+          fontWeight: 600,
+          lineHeight: 1,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {isProcessing ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+        <span>{t("newsletter.create.aiMeta.ai", "AI")}</span>
+        <ChevronDown size={12} />
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 8px)',
+            right: 0,
+            width: '300px',
+            maxWidth: 'calc(100vw - 32px)',
+            padding: '8px',
+            border: `1px solid ${surface.border}`,
+            borderRadius: '10px',
+            background: surface.cardBg,
+            boxShadow: '0 18px 48px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.02)',
+            zIndex: 60,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 8px 8px', color: surface.text, fontSize: '12px', fontWeight: 700 }}>
+            <Sparkles size={14} />
+            <span>{t("newsletter.create.aiMeta.menuTitle", "Title & subject")}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '4px' }}>
+            {actions.map((item) => (
+              <button
+                key={item.action}
+                type="button"
+                disabled={isProcessing}
+                onClick={() => onTransform(item.action)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '7px',
+                  height: '34px',
+                  padding: '0 9px',
+                  border: '1px solid transparent',
+                  borderRadius: '7px',
+                  background: 'transparent',
+                  color: surface.textSoft,
+                  cursor: isProcessing ? 'default' : 'pointer',
+                  opacity: isProcessing ? 0.55 : 1,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  textAlign: 'left',
+                }}
+                onMouseEnter={(event) => { if (!isProcessing) event.currentTarget.style.background = surface.chromeHover; }}
+                onMouseLeave={(event) => { event.currentTarget.style.background = 'transparent'; }}
+              >
+                {processingAction === item.action ? <Loader2 size={14} className="animate-spin" /> : item.icon}
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const nextDirection = direction.trim();
+              if (!nextDirection || isProcessing) return;
+              onTransform("custom", nextDirection);
+              setDirection("");
+            }}
+            style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '6px', marginTop: '8px', paddingTop: '8px', borderTop: `1px solid ${surface.border}` }}
+          >
+            <input
+              value={direction}
+              onChange={(event) => setDirection(event.target.value)}
+              disabled={isProcessing}
+              placeholder={t("newsletter.create.aiMeta.directionPlaceholder", "Tell AI how to rewrite...")}
+              style={{
+                width: '100%',
+                minWidth: 0,
+                height: '34px',
+                padding: '0 10px',
+                border: `1px solid ${surface.controlBorder}`,
+                borderRadius: '7px',
+                background: surface.controlBg,
+                color: surface.text,
+                fontSize: '13px',
+                outline: 'none',
+              }}
+            />
+            <button
+              type="submit"
+              disabled={!canApplyDirection}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                height: '34px',
+                padding: '0 9px',
+                border: `1px solid ${surface.controlBorder}`,
+                borderRadius: '7px',
+                background: surface.controlBg,
+                color: surface.text,
+                cursor: canApplyDirection ? 'pointer' : 'default',
+                opacity: canApplyDirection ? 1 : 0.5,
+                fontSize: '12px',
+                fontWeight: 600,
+              }}
+            >
+              {processingAction === "custom" ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              {t("newsletter.create.aiMeta.apply", "Apply")}
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NewsletterEmailClientPreviewDialog({
+  open,
+  onOpenChange,
+  previewMode,
+  onPreviewModeChange,
+  previewHtml,
+  title,
+  subject,
+  senderName,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  previewMode: "desktop" | "mobile";
+  onPreviewModeChange: (mode: "desktop" | "mobile") => void;
+  previewHtml: string;
+  title: string;
+  subject: string;
+  senderName: string;
+}) {
+  const previewIframeRef = useRef<HTMLIFrameElement>(null);
+  const displayTitle = title.trim() || "Newsletter";
+  const displaySubject = subject.trim() || displayTitle || "Newsletter Preview";
+  const displaySender = senderName.trim() || "Your Business";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[95vw] sm:max-w-[900px] max-h-[95vh] flex flex-col p-0">
+        <DialogHeader className="px-4 pt-4 pb-2 sm:px-6 sm:pt-6 flex-shrink-0">
+          <DialogTitle className="text-lg sm:text-xl">Email Client Preview</DialogTitle>
+          <DialogDescription className="text-sm">
+            This is how your newsletter will appear in an email client.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center justify-center gap-1 px-4 sm:px-6 pb-2 flex-shrink-0">
+          <Button
+            variant={previewMode === "desktop" ? "default" : "outline"}
+            size="sm"
+            onClick={() => onPreviewModeChange("desktop")}
+            className="text-xs"
+          >
+            <Monitor className="w-3.5 h-3.5 mr-1" />
+            Desktop
+          </Button>
+          <Button
+            variant={previewMode === "mobile" ? "default" : "outline"}
+            size="sm"
+            onClick={() => onPreviewModeChange("mobile")}
+            className="text-xs"
+          >
+            <Smartphone className="w-3.5 h-3.5 mr-1" />
+            Mobile
+          </Button>
+        </div>
+        <div className="px-4 pb-4 sm:px-6 sm:pb-6 flex justify-center overflow-auto flex-1 min-h-0">
+          {previewMode === "mobile" ? (
+            <div
+              className="relative mx-auto w-full max-w-[340px] transition-all duration-300"
+              style={{ aspectRatio: "436 / 878" }}
+            >
+              <img
+                src={phoneMockup}
+                alt=""
+                aria-hidden="true"
+                draggable={false}
+                className="absolute inset-0 w-full h-full pointer-events-none select-none z-20"
+              />
+              <div
+                className="absolute overflow-y-auto overflow-x-hidden bg-white text-slate-900 z-10 select-none scrollbar-hide"
+                style={{
+                  top: "4.04%",
+                  left: "6.84%",
+                  right: "6.46%",
+                  bottom: "2.71%",
+                  borderRadius: "12.7% / 5.86%",
+                  scrollbarWidth: "none",
+                  msOverflowStyle: "none",
+                  WebkitOverflowScrolling: "touch",
+                } as React.CSSProperties}
+              >
+                <div className="h-10 shrink-0 bg-gray-50" />
+                <div className="bg-white px-3 py-2 border-b text-xs text-gray-600 space-y-0.5">
+                  <div><span className="font-medium text-gray-500">From:</span> {displaySender}</div>
+                  <div><span className="font-medium text-gray-500">To:</span> Subscriber</div>
+                  <div><span className="font-medium text-gray-500">Subject:</span> {displaySubject}</div>
+                </div>
+                <iframe
+                  ref={previewIframeRef}
+                  srcDoc={previewHtml}
+                  title="Newsletter mobile email preview"
+                  className="w-full border-0"
+                  style={{
+                    minHeight: "600px",
+                    pointerEvents: "none",
+                  }}
+                  sandbox="allow-same-origin"
+                  onLoad={() => {
+                    const iframe = previewIframeRef.current;
+                    if (iframe?.contentDocument?.body) {
+                      const height = iframe.contentDocument.body.scrollHeight;
+                      iframe.style.height = `${Math.max(height + 20, 600)}px`;
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div
+              className="border rounded-lg shadow-inner bg-gray-100 transition-all duration-300 dark:bg-gray-800 dark:border-gray-700"
+              style={{ width: "100%", maxWidth: "800px" }}
+            >
+              <div className="bg-gray-200 px-3 py-2 flex items-center gap-2 text-xs text-gray-500 border-b dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600">
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+                </div>
+                <div className="flex-1 text-center truncate">
+                  Newsletter - {displayTitle}
+                </div>
+              </div>
+              <div className="bg-white px-3 py-2 border-b text-xs text-gray-600 space-y-0.5 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600">
+                <div><span className="font-medium text-gray-500">From:</span> {displaySender}</div>
+                <div><span className="font-medium text-gray-500">To:</span> Subscriber</div>
+                <div><span className="font-medium text-gray-500">Subject:</span> {displaySubject}</div>
+              </div>
+              <iframe
+                ref={previewIframeRef}
+                srcDoc={previewHtml}
+                title="Newsletter email preview"
+                className="w-full border-0"
+                style={{
+                  minHeight: "700px",
+                  pointerEvents: "none",
+                }}
+                sandbox="allow-same-origin"
+                onLoad={() => {
+                  const iframe = previewIframeRef.current;
+                  if (iframe?.contentDocument?.body) {
+                    const height = iframe.contentDocument.body.scrollHeight;
+                    iframe.style.height = `${Math.max(height + 20, 700)}px`;
+                  }
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /**
  * Preview wrapper that reads root colors via usePuck selector.
  * Only re-renders when colors change — isolates color updates from the blocks panel.
@@ -162,6 +506,9 @@ export default function NewsletterCreatePage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [previewViewport, setPreviewViewport] = useState<"mobile" | "desktop">("desktop");
+  const [emailClientPreviewOpen, setEmailClientPreviewOpen] = useState(false);
+  const [emailClientPreviewMode, setEmailClientPreviewMode] = useState<"mobile" | "desktop">("desktop");
+  const [emailClientPreviewHtml, setEmailClientPreviewHtml] = useState("");
   const [, setLocation] = useLocation();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
@@ -257,8 +604,9 @@ export default function NewsletterCreatePage() {
 
   // State for notion editor HTML content
   const [notionHtmlContent, setNotionHtmlContent] = useState<string>("");
-  // Whether the AI is generating the title + subject from the editor content
-  const [generatingMeta, setGeneratingMeta] = useState(false);
+  // Whether the AI is rewriting the title + subject from the editor content
+  const [metaAiAction, setMetaAiAction] = useState<NewsletterMetaTransformAction | null>(null);
+  const generatingMeta = Boolean(metaAiAction);
   // dataRef is updated directly in handleDataChange and handlePublish
 
   // Load existing newsletter when editing
@@ -360,7 +708,7 @@ export default function NewsletterCreatePage() {
     fontFamily: string;
     headerText?: string;
     footerText?: string;
-    socialLinks?: { facebook?: string; twitter?: string; instagram?: string; linkedin?: string };
+    socialLinks?: { facebook?: string; twitter?: string; instagram?: string; linkedin?: string } | string;
   }>({
     queryKey: ["/api/master-email-design"],
     queryFn: async () => {
@@ -379,10 +727,58 @@ export default function NewsletterCreatePage() {
     return extractPuckEmailHtml();
   }, [editorType, notionHtmlContent]);
 
-  // Generate BOTH the newsletter title and the subject line from the main editor content
-  // in one click. The subject prompt is optimized to read like editorial newsletter content
-  // (not marketing) so it avoids the spam / Promotions folder.
-  const handleGenerateMeta = useCallback(async () => {
+  const parsedSocialLinks = useMemo(() => {
+    const raw = emailDesign?.socialLinks;
+    if (!raw) return undefined;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return undefined;
+      }
+    }
+    return raw;
+  }, [emailDesign?.socialLinks]);
+
+  const buildEmailClientPreviewHtml = useCallback(() => {
+    const bodyHtml = getHtmlContent();
+    const currentRootProps = dataRef.current?.root?.props;
+
+    return wrapInEmailPreview(bodyHtml, {
+      companyName: emailDesign?.companyName || '',
+      headerMode: emailDesign?.headerMode,
+      primaryColor: emailDesign?.primaryColor,
+      logoUrl: emailDesign?.logoUrl,
+      logoSize: emailDesign?.logoSize,
+      logoAlignment: emailDesign?.logoAlignment,
+      bannerUrl: emailDesign?.bannerUrl,
+      showCompanyName: emailDesign?.showCompanyName,
+      headerText: emailDesign?.headerText,
+      footerText: emailDesign?.footerText,
+      fontFamily: emailDesign?.fontFamily,
+      socialLinks: parsedSocialLinks,
+      contentBackgroundColor: currentRootProps?.backgroundColor,
+      bodyBackgroundColor: currentRootProps?.bodyBackgroundColor,
+      footerTextColor: currentRootProps?.footerTextColor,
+    });
+  }, [emailDesign, getHtmlContent, parsedSocialLinks]);
+
+  const openEmailClientPreview = useCallback(() => {
+    setEmailClientPreviewHtml(buildEmailClientPreviewHtml());
+    setEmailClientPreviewMode("desktop");
+    setEmailClientPreviewOpen(true);
+  }, [buildEmailClientPreviewHtml]);
+
+  useEffect(() => {
+    if (emailClientPreviewOpen) {
+      setEmailClientPreviewHtml(buildEmailClientPreviewHtml());
+    }
+  }, [buildEmailClientPreviewHtml, emailClientPreviewOpen]);
+
+  // Rewrite BOTH the newsletter title and the subject line from the main editor content
+  // and the current field values. The subject prompt stays optimized to read like editorial
+  // newsletter content (not marketing) so it avoids spam / Promotions-folder cues.
+  const handleTransformMeta = useCallback(async (action: NewsletterMetaTransformAction = "regenerate", instruction?: string) => {
     if (generatingMeta) return;
 
     const html = getHtmlContent();
@@ -392,7 +788,7 @@ export default function NewsletterCreatePage() {
       .replace(/\s+/g, " ")
       .trim();
 
-    if (plainText.length < 20) {
+    if (plainText.length < 20 && !title.trim() && !subject.trim()) {
       toast({
         title: t("newsletter.create.aiMeta.notEnoughTitle", "Not enough content"),
         description: t("newsletter.create.aiMeta.notEnoughDesc", "Add some content to the editor before generating with AI."),
@@ -401,9 +797,25 @@ export default function NewsletterCreatePage() {
       return;
     }
 
-    setGeneratingMeta(true);
+    const nextInstruction = instruction?.trim();
+    if (action === "custom" && !nextInstruction) {
+      toast({
+        title: t("newsletter.create.aiMeta.directionRequiredTitle", "Add a direction"),
+        description: t("newsletter.create.aiMeta.directionRequiredDesc", "Tell AI how to rewrite the title and subject first."),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setMetaAiAction(action);
     try {
-      const res = await generateTitleAndSubject({ content: html });
+      const res = await transformTitleAndSubject({
+        content: html,
+        title,
+        subject,
+        action,
+        instruction: nextInstruction,
+      });
       if (res.success && (res.title || res.subject)) {
         if (res.title) {
           setTitle(res.title);
@@ -421,9 +833,9 @@ export default function NewsletterCreatePage() {
         });
       }
     } finally {
-      setGeneratingMeta(false);
+      setMetaAiAction(null);
     }
-  }, [generatingMeta, getHtmlContent, toast, t]);
+  }, [generatingMeta, getHtmlContent, subject, title, toast, t]);
 
   // Save newsletter to database (create or update)
   // Returns true on success, false on validation failure. Throws on API error.
@@ -802,6 +1214,26 @@ export default function NewsletterCreatePage() {
                       {isSaving ? t("newsletter.create.saving", "Saving...") : justSaved ? t("newsletter.create.saved", "Saved") : hasUnsavedChanges ? t("newsletter.create.unsavedChanges", "Unsaved changes") : ""}
                     </span>
                     <button
+                      onClick={openEmailClientPreview}
+                      style={{
+                        padding: '6px 12px',
+                        background: editorSurface.controlBg,
+                        color: editorSurface.textSoft,
+                        border: `1px solid ${editorSurface.controlBorder}`,
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <Eye size={14} />
+                      {t("newsletter.create.preview", "Preview")}
+                    </button>
+                    <button
                       onClick={() => setPreviewOpen(true)}
                       style={{
                         padding: '6px 12px',
@@ -893,7 +1325,7 @@ export default function NewsletterCreatePage() {
                           padding: '24px 20px',
                           minHeight: '100%',
                         }}>
-                          {/* Newsletter name & subject — separate from the email card */}
+                          {/* Newsletter subject & internal title — separate from the email card */}
                           <div style={{
                             width: '100%',
                             maxWidth: '620px',
@@ -916,39 +1348,22 @@ export default function NewsletterCreatePage() {
                                   minWidth: 0,
                                   border: 'none',
                                   outline: 'none',
-                                  fontSize: '22px',
-                                  fontWeight: 700,
-                                  color: editorSurface.text,
+                                  fontSize: '13px',
+                                  fontWeight: 500,
+                                  color: editorSurface.textMuted,
                                   background: 'transparent',
                                   padding: 0,
-                                  margin: '0 0 4px 0',
+                                  margin: 0,
                                   fontFamily,
-                                  lineHeight: 1.3,
+                                  lineHeight: 1.35,
                                 }}
                               />
-                              <button
-                                type="button"
-                                onClick={handleGenerateMeta}
-                                disabled={generatingMeta}
-                                title={t("newsletter.create.aiMeta.button", "Generate title & subject with AI")}
-                                aria-label={t("newsletter.create.aiMeta.button", "Generate title & subject with AI")}
-                                style={{
-                                  flexShrink: 0,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: '30px',
-                                  height: '30px',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  background: 'transparent',
-                                  color: editorSurface.textMuted,
-                                  cursor: generatingMeta ? 'default' : 'pointer',
-                                  opacity: generatingMeta ? 0.6 : 1,
-                                }}
-                              >
-                                {generatingMeta ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                              </button>
+                              <TitleSubjectAiMenu
+                                processingAction={metaAiAction}
+                                onTransform={handleTransformMeta}
+                                t={t}
+                                surface={editorSurface}
+                              />
                             </div>
                             <input
                               className="newsletter-create-subject-input"
@@ -960,14 +1375,14 @@ export default function NewsletterCreatePage() {
                                 width: '100%',
                                 border: 'none',
                                 outline: 'none',
-                                fontSize: '14px',
-                                fontWeight: 400,
-                                color: editorSurface.textSubtle,
+                                fontSize: '26px',
+                                fontWeight: 700,
+                                color: editorSurface.text,
                                 background: 'transparent',
                                 padding: 0,
-                                margin: 0,
+                                margin: '8px 0 0 0',
                                 fontFamily,
-                                lineHeight: 1.4,
+                                lineHeight: 1.18,
                               }}
                             />
                           </div>
@@ -1193,6 +1608,16 @@ export default function NewsletterCreatePage() {
             </Suspense>
           </div>
         </div>
+        <NewsletterEmailClientPreviewDialog
+          open={emailClientPreviewOpen}
+          onOpenChange={setEmailClientPreviewOpen}
+          previewMode={emailClientPreviewMode}
+          onPreviewModeChange={setEmailClientPreviewMode}
+          previewHtml={emailClientPreviewHtml}
+          title={title}
+          subject={subject}
+          senderName={emailDesign?.companyName || ""}
+        />
         <SendPreviewDialog
           open={previewOpen}
           onOpenChange={setPreviewOpen}

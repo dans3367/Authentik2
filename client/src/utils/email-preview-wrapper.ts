@@ -307,7 +307,7 @@ export function wrapInEmailPreview(
   const logoMR = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? '0' : 'auto';
 
   const logoSection = sanitizedLogoUrl
-    ? `<img src="${esc(sanitizedLogoUrl)}" alt="${companyName}" style="display:block;max-height:${logoHeight};width:auto;margin:0 ${logoMR} 20px ${logoML};object-fit:contain;" />`
+    ? `<img class="email-hero-logo" src="${esc(sanitizedLogoUrl)}" alt="${companyName}" style="display:block;max-height:${logoHeight};width:auto;margin:0 ${logoMR} 20px ${logoML};object-fit:contain;" />`
     : (companyName && showName)
       ? `<div style="height:48px;width:48px;background-color:rgba(255,255,255,0.2);border-radius:50%;margin:0 ${logoMR} 16px ${logoML};line-height:48px;font-size:20px;font-weight:bold;color:#ffffff;text-align:center;">${esc(d.companyName.charAt(0))}</div>`
       : '';
@@ -349,43 +349,64 @@ export function wrapInEmailPreview(
     th p, th div, th ul, th ol, th h1, th h2, th h3, th h4, th h5, th h6 {
       margin: 0;
     }
+    @media screen and (max-width: 480px) {
+      .email-hero-header { padding: 24px 18px !important; }
+      .email-hero-header-banner { padding: 12px 18px !important; }
+      .email-hero-logo { max-height: 72px !important; margin-bottom: 12px !important; }
+      .email-hero-title { font-size: 20px !important; line-height: 1.2 !important; letter-spacing: 0 !important; }
+      .email-hero-copy { font-size: 14px !important; line-height: 1.4 !important; max-width: 280px !important; }
+      .email-content h1 { font-size: 22px !important; line-height: 1.25 !important; }
+      .email-content h2 { font-size: 20px !important; line-height: 1.3 !important; }
+      .email-content h3 { font-size: 18px !important; line-height: 1.35 !important; }
+    }
+    @media screen and (max-width: 360px) {
+      .email-hero-header { padding: 20px 16px !important; }
+      .email-hero-header-banner { padding: 10px 16px !important; }
+      .email-hero-title { font-size: 18px !important; }
+      .email-hero-copy { font-size: 13px !important; }
+      .email-content h1 { font-size: 20px !important; }
+      .email-content h2 { font-size: 18px !important; }
+      .email-content h3 { font-size: 17px !important; }
+    }
   </style>
 </head>
 <body style="font-family:${fontFamily};margin:0;padding:0;background-color:${bodyBgColor};-webkit-font-smoothing:antialiased;min-height:100%;">
-  <div style="background-color:${bodyBgColor};display:flex;flex-direction:column;min-height:100%;">
+  <div style="background-color:${bodyBgColor};min-height:100%;padding:0;">
+    <div style="max-width:600px;margin:0 auto;background-color:${contentBgColor};overflow:hidden;">
 
     <!-- Hero Header -->
     ${useBanner ? `
     <img src="${esc(sanitizedBannerUrl)}" alt="${companyName}" style="display:block;width:100%;height:auto;border:0;outline:none;" />
     ${(companyName && showName) || headerText ? `
-    <div style="padding:16px 24px;text-align:center;background-color:${primaryColor};color:#ffffff;">
-      ${companyName && showName ? `<h1 style="margin:0 0 4px 0;font-size:24px;font-weight:bold;letter-spacing:-0.025em;color:#ffffff;">${companyName}</h1>` : ''}
-      ${headerText ? `<p style="margin:0 auto;font-size:16px;opacity:0.95;max-width:400px;line-height:1.5;color:#ffffff;">${headerText}</p>` : ''}
+    <div class="email-hero-header-banner" style="padding:16px 24px;text-align:center;background-color:${primaryColor};color:#ffffff;">
+      ${companyName && showName ? `<h1 class="email-hero-title" style="margin:0 0 4px 0;font-size:24px;font-weight:bold;letter-spacing:0;color:#ffffff;line-height:1.2;">${companyName}</h1>` : ''}
+      ${headerText ? `<p class="email-hero-copy" style="margin:0 auto;font-size:16px;opacity:0.95;max-width:400px;line-height:1.5;color:#ffffff;">${headerText}</p>` : ''}
     </div>
     ` : ''}
     ` : `
-    <div style="padding:40px 24px;text-align:${logoAlign};background-color:${primaryColor};color:#ffffff;">
-      ${logoSection}sdsdsdddsdsd
-      ${companyName && showName ? `<h1 style="margin:0 0 10px 0;font-size:24px;font-weight:bold;letter-spacing:-0.025em;color:#ffffff;">${companyName}</h1>` : ''}
-      ${headerText ? `<p style="margin:0 ${logoMR} 0 ${logoML};font-size:16px;opacity:0.95;max-width:400px;line-height:1.5;color:#ffffff;">${headerText}</p>` : ''}
+    <div class="email-hero-header" style="padding:40px 24px;text-align:${logoAlign};background-color:${primaryColor};color:#ffffff;">
+      ${logoSection}
+      ${companyName && showName ? `<h1 class="email-hero-title" style="margin:0 0 10px 0;font-size:24px;font-weight:bold;letter-spacing:0;color:#ffffff;line-height:1.2;">${companyName}</h1>` : ''}
+      ${headerText ? `<p class="email-hero-copy" style="margin:0 ${logoMR} 0 ${logoML};font-size:16px;opacity:0.95;max-width:400px;line-height:1.5;color:#ffffff;">${headerText}</p>` : ''}
     </div>
     `}
 
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;flex:1;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">
       <tr>
-        <td style="padding:20px 24px 32px 24px;font-size:16px;line-height:1.625;color:#334155;border:none;background-color:${contentBgColor};vertical-align:top;">
+        <td class="email-content" style="padding:20px 24px 32px 24px;font-size:16px;line-height:1.625;color:#334155;border:none;background-color:${contentBgColor};vertical-align:top;">
           ${safeBodyContent}
         </td>
       </tr>
     </table>
 
     <!-- Footer -->
-    <div style="background-color:${contentBgColor};padding:32px;text-align:center;border-top:1px solid #e2e8f0;color:${footerTextColor};margin-top:auto;">
+    <div style="background-color:${contentBgColor};padding:32px;text-align:center;border-top:1px solid #e2e8f0;color:${footerTextColor};">
       ${socialLinksHtml}
       ${footerText ? `<p style="margin:0 0 16px 0;font-size:12px;line-height:1.5;color:${footerTextColor};">${footerText}</p>` : ''}
       ${companyName && showName ? `<div style="font-size:12px;line-height:1.5;color:${footerTextColor};opacity:0.7;"><p style="margin:0;">Sent via ${companyName}</p></div>` : ''}
     </div>
 
+    </div>
   </div>
 </body>
 </html>`;

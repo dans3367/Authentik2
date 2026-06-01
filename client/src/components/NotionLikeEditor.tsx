@@ -79,7 +79,7 @@ import {
     Eraser,
     Paintbrush,
 } from "lucide-react";
-import { improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText, generateNewsletter } from "@/lib/aiApi";
+import { improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText, generateNewsletter, transformNewsletter, type NewsletterTransformAction } from "@/lib/aiApi";
 import { aiHtmlToInlineHtml, hasTopLevelAiBlocks, mergeAiBlocksWithSurroundingText, normalizeAiHtml } from "@/lib/aiHtmlNormalization";
 import { apiRequest } from "@/lib/queryClient";
 import "./NotionLikeEditor.css";
@@ -1326,6 +1326,157 @@ function FloatingToolbar({
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+// ── Full Newsletter AI Menu Bar ────────────────────────────────────────────────
+
+function NewsletterAiMenuBar({
+    processingAction,
+    direction,
+    error,
+    onDirectionChange,
+    onTransform,
+    t,
+}: {
+    processingAction: NewsletterTransformAction | null;
+    direction: string;
+    error: string;
+    onDirectionChange: (value: string) => void;
+    onTransform: (action: NewsletterTransformAction, instruction?: string) => void;
+    t: (key: string, fallback?: string) => string;
+}) {
+    const [open, setOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const quickActions: Array<{
+        action: NewsletterTransformAction;
+        label: string;
+        title: string;
+        icon: React.ReactNode;
+    }> = [
+        {
+            action: "regenerate",
+            label: t("notionEditor.newsletterAi.regenerate", "Regenerate"),
+            title: t("notionEditor.newsletterAi.regenerateTitle", "Regenerate the entire newsletter"),
+            icon: <RefreshCw className="w-4 h-4" />,
+        },
+        {
+            action: "improve",
+            label: t("notionEditor.newsletterAi.improve", "Improve"),
+            title: t("notionEditor.newsletterAi.improveTitle", "Improve clarity and flow"),
+            icon: <Wand2 className="w-4 h-4" />,
+        },
+        {
+            action: "formal",
+            label: t("notionEditor.newsletterAi.formal", "Formal"),
+            title: t("notionEditor.newsletterAi.formalTitle", "Make the newsletter more formal"),
+            icon: <Type className="w-4 h-4" />,
+        },
+        {
+            action: "casual",
+            label: t("notionEditor.newsletterAi.casual", "Casual"),
+            title: t("notionEditor.newsletterAi.casualTitle", "Make the newsletter more casual"),
+            icon: <Sparkles className="w-4 h-4" />,
+        },
+        {
+            action: "shorten",
+            label: t("notionEditor.newsletterAi.shorten", "Shorten"),
+            title: t("notionEditor.newsletterAi.shortenTitle", "Make the newsletter more concise"),
+            icon: <ArrowLeftToLine className="w-4 h-4" />,
+        },
+        {
+            action: "expand",
+            label: t("notionEditor.newsletterAi.expand", "Expand"),
+            title: t("notionEditor.newsletterAi.expandTitle", "Add more detail to the newsletter"),
+            icon: <ArrowRightFromLine className="w-4 h-4" />,
+        },
+    ];
+    const isProcessing = Boolean(processingAction);
+    const canApplyDirection = direction.trim().length >= 3 && !isProcessing;
+
+    useEffect(() => {
+        if (isProcessing || error) {
+            setOpen(true);
+        }
+    }, [error, isProcessing]);
+
+    useEffect(() => {
+        if (!open) return;
+
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [open]);
+
+    return (
+        <div ref={menuRef} className={`notion-newsletter-ai-shell ${open ? "open" : ""}`}>
+            <button
+                type="button"
+                className={`notion-newsletter-ai-trigger ${isProcessing ? "processing" : ""}`}
+                title={t("notionEditor.newsletterAi.title", "Newsletter AI")}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                    if (!isProcessing) setOpen((value) => !value);
+                }}
+            >
+                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                <span>{t("notionEditor.newsletterAi.askAi", "Ask AI")}</span>
+                <ChevronDown className="w-3 h-3" />
+            </button>
+
+            {open && (
+                <div className="notion-newsletter-ai-popover">
+                    <div className="notion-newsletter-ai-popover-header">
+                        <Sparkles className="w-4 h-4" />
+                        <span>{t("notionEditor.newsletterAi.title", "Newsletter AI")}</span>
+                    </div>
+                    <div className="notion-newsletter-ai-actions">
+                        {quickActions.map((item) => (
+                            <button
+                                key={item.action}
+                                type="button"
+                                className="notion-newsletter-ai-btn"
+                                disabled={isProcessing}
+                                title={item.title}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => onTransform(item.action)}
+                            >
+                                {processingAction === item.action ? <Loader2 className="w-4 h-4 animate-spin" /> : item.icon}
+                                <span>{item.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <form
+                        className="notion-newsletter-ai-direction"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            if (canApplyDirection) onTransform("custom", direction);
+                        }}
+                    >
+                        <input
+                            value={direction}
+                            onChange={(event) => onDirectionChange(event.target.value)}
+                            placeholder={t("notionEditor.newsletterAi.directionPlaceholder", "Write a new direction...")}
+                            disabled={isProcessing}
+                        />
+                        <button
+                            type="submit"
+                            disabled={!canApplyDirection}
+                            title={t("notionEditor.newsletterAi.applyDirection", "Apply direction")}
+                        >
+                            {processingAction === "custom" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                            <span>{t("notionEditor.newsletterAi.apply", "Apply")}</span>
+                        </button>
+                    </form>
+                    {error && <div className="notion-newsletter-ai-error">{error}</div>}
+                </div>
+            )}
         </div>
     );
 }
@@ -2875,6 +3026,9 @@ export default function NotionLikeEditor({
     const [imageResults, setImageResults] = useState<ImageSearchResult[]>([]);
     const [imageSearching, setImageSearching] = useState(false);
     const [imageSearchError, setImageSearchError] = useState("");
+    const [newsletterAiAction, setNewsletterAiAction] = useState<NewsletterTransformAction | null>(null);
+    const [newsletterAiDirection, setNewsletterAiDirection] = useState("");
+    const [newsletterAiError, setNewsletterAiError] = useState("");
 
     const runImageSearch = useCallback(async (value: string) => {
         const term = value.trim();
@@ -3044,6 +3198,52 @@ export default function NotionLikeEditor({
             },
         },
     });
+
+    const handleNewsletterAiTransform = useCallback(async (action: NewsletterTransformAction, instruction?: string) => {
+        if (!editor || newsletterAiAction) return;
+
+        const html = normalizeAiHtml(editor.getHTML());
+        const plainText = html
+            .replace(/<[^>]*>/g, " ")
+            .replace(/&nbsp;/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+        if (plainText.length < 20) {
+            setNewsletterAiError(t("notionEditor.newsletterAi.notEnoughContent", "Add more newsletter content before using AI."));
+            return;
+        }
+
+        const nextInstruction = instruction?.trim();
+        if (action === "custom" && !nextInstruction) {
+            setNewsletterAiError(t("notionEditor.newsletterAi.directionRequired", "Enter a direction first."));
+            return;
+        }
+
+        setNewsletterAiAction(action);
+        setNewsletterAiError("");
+        try {
+            const result = await transformNewsletter({
+                html,
+                action,
+                instruction: nextInstruction,
+            });
+
+            if (result.success && result.html) {
+                editor.commands.setContent(normalizeAiHtml(result.html));
+                onChange(editor.getHTML());
+                if (action === "custom") {
+                    setNewsletterAiDirection("");
+                }
+            } else {
+                setNewsletterAiError(result.error || t("notionEditor.newsletterAi.failed", "Could not rewrite the newsletter. Please try again."));
+            }
+        } catch (error: any) {
+            setNewsletterAiError(error?.message || t("notionEditor.newsletterAi.failed", "Could not rewrite the newsletter. Please try again."));
+        } finally {
+            setNewsletterAiAction(null);
+        }
+    }, [editor, newsletterAiAction, onChange, t]);
 
     const closeImageBrowser = useCallback(() => {
         setImageBrowserOpen(false);
@@ -3369,6 +3569,18 @@ export default function NotionLikeEditor({
 
             {/* Editor */}
             <div className="notion-editor-area">
+                <NewsletterAiMenuBar
+                    processingAction={newsletterAiAction}
+                    direction={newsletterAiDirection}
+                    error={newsletterAiError}
+                    onDirectionChange={(value) => {
+                        setNewsletterAiDirection(value);
+                        if (newsletterAiError) setNewsletterAiError("");
+                    }}
+                    onTransform={handleNewsletterAiTransform}
+                    t={(key, fallback) => fallback === undefined ? t(key) : t(key, fallback)}
+                />
+
                 {/* Custom floating toolbar (replaces BubbleMenu) */}
                 <FloatingToolbar
                     editor={editor}
