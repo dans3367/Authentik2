@@ -354,6 +354,47 @@ function NewsletterEmailClientPreviewDialog({
   senderName: string;
 }) {
   const previewIframeRef = useRef<HTMLIFrameElement>(null);
+  const previewResizeObserverRef = useRef<ResizeObserver | null>(null);
+
+  // Size the preview iframe to its content and hide its own scrollbar, so the
+  // email scrolls only via the surrounding device frame. Re-measures as
+  // late-loading images change the document height (otherwise content gets cut).
+  const handlePreviewIframeLoad = useCallback((minHeight: number) => {
+    const iframe = previewIframeRef.current;
+    const doc = iframe?.contentDocument;
+    if (!iframe || !doc?.body) return;
+
+    if (!doc.getElementById("np-hide-scrollbar")) {
+      const style = doc.createElement("style");
+      style.id = "np-hide-scrollbar";
+      style.textContent =
+        "html,body{scrollbar-width:none;-ms-overflow-style:none;}" +
+        "html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;width:0;height:0;}";
+      doc.head?.appendChild(style);
+    }
+
+    const resize = () => {
+      const body = previewIframeRef.current?.contentDocument?.body;
+      if (!body || !previewIframeRef.current) return;
+      const height = Math.max(body.scrollHeight, body.offsetHeight);
+      previewIframeRef.current.style.height = `${Math.max(height, minHeight)}px`;
+    };
+    resize();
+
+    doc.querySelectorAll("img").forEach((img) => {
+      if (!img.complete) img.addEventListener("load", resize, { once: true });
+    });
+
+    previewResizeObserverRef.current?.disconnect();
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(resize);
+      observer.observe(doc.body);
+      previewResizeObserverRef.current = observer;
+    }
+  }, []);
+
+  useEffect(() => () => previewResizeObserverRef.current?.disconnect(), []);
+
   const displayTitle = title.trim() || "Newsletter";
   const displaySubject = subject.trim() || displayTitle || "Newsletter Preview";
   const displaySender = senderName.trim() || "Your Business";
@@ -387,7 +428,7 @@ function NewsletterEmailClientPreviewDialog({
             Mobile
           </Button>
         </div>
-        <div className="px-4 pb-4 sm:px-6 sm:pb-6 flex justify-center overflow-auto flex-1 min-h-0">
+        <div className="px-4 pb-4 sm:px-6 sm:pb-6 flex justify-center items-start overflow-auto flex-1 min-h-0">
           {previewMode === "mobile" ? (
             <div
               className="relative mx-auto w-full max-w-[340px] transition-all duration-300"
@@ -429,13 +470,7 @@ function NewsletterEmailClientPreviewDialog({
                     pointerEvents: "none",
                   }}
                   sandbox="allow-same-origin"
-                  onLoad={() => {
-                    const iframe = previewIframeRef.current;
-                    if (iframe?.contentDocument?.body) {
-                      const height = iframe.contentDocument.body.scrollHeight;
-                      iframe.style.height = `${Math.max(height + 20, 600)}px`;
-                    }
-                  }}
+                  onLoad={() => handlePreviewIframeLoad(600)}
                 />
               </div>
             </div>
@@ -469,13 +504,7 @@ function NewsletterEmailClientPreviewDialog({
                   pointerEvents: "none",
                 }}
                 sandbox="allow-same-origin"
-                onLoad={() => {
-                  const iframe = previewIframeRef.current;
-                  if (iframe?.contentDocument?.body) {
-                    const height = iframe.contentDocument.body.scrollHeight;
-                    iframe.style.height = `${Math.max(height + 20, 700)}px`;
-                  }
-                }}
+                onLoad={() => handlePreviewIframeLoad(700)}
               />
             </div>
           )}
@@ -1316,6 +1345,19 @@ export default function NewsletterCreatePage() {
                       const logoML = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? 'auto' : '0';
                       const logoMR = logoAlign === 'center' ? 'auto' : logoAlign === 'right' ? '0' : 'auto';
 
+                      // The email card mirrors the real sent email, so its surface
+                      // stays light regardless of the app's light/dark theme.
+                      const emailInk = {
+                        surface: '#ffffff',
+                        titleText: '#111827',
+                        metaText: '#6b7280',
+                        bodyText: '#334155',
+                        border: '#e2e8f0',
+                        footerText: '#64748b',
+                        footerSubtle: '#94a3b8',
+                        shadow: '0 0 0 1px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.08)',
+                      };
+
                       return (
                         <div style={{
                           width: '100%',
@@ -1331,9 +1373,9 @@ export default function NewsletterCreatePage() {
                             maxWidth: '620px',
                             marginBottom: '10px',
                             padding: '20px 24px 16px',
-                            background: editorSurface.cardBg,
+                            background: emailInk.surface,
                             borderRadius: '2px',
-                            boxShadow: editorSurface.cardShadow,
+                            boxShadow: emailInk.shadow,
                             fontFamily,
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1350,7 +1392,7 @@ export default function NewsletterCreatePage() {
                                   outline: 'none',
                                   fontSize: '13px',
                                   fontWeight: 500,
-                                  color: editorSurface.textMuted,
+                                  color: emailInk.metaText,
                                   background: 'transparent',
                                   padding: 0,
                                   margin: 0,
@@ -1377,7 +1419,7 @@ export default function NewsletterCreatePage() {
                                 outline: 'none',
                                 fontSize: '26px',
                                 fontWeight: 700,
-                                color: editorSurface.text,
+                                color: emailInk.titleText,
                                 background: 'transparent',
                                 padding: 0,
                                 margin: '8px 0 0 0',
@@ -1387,11 +1429,11 @@ export default function NewsletterCreatePage() {
                             />
                           </div>
 
-                          <div style={{
+                          <div className="newsletter-email-canvas" style={{
                             width: '100%',
                             maxWidth: '620px',
-                            boxShadow: editorSurface.cardShadow,
-                            background: editorSurface.cardBg,
+                            boxShadow: emailInk.shadow,
+                            background: emailInk.surface,
                             margin: '0 auto',
                             fontFamily,
                             borderRadius: '2px',
@@ -1495,7 +1537,7 @@ export default function NewsletterCreatePage() {
                             )}
 
                             {/* Body content zone — editor lives here */}
-                            <div className="notion-editor-embedded" style={{ padding: '20px 24px 32px 24px', fontSize: '16px', lineHeight: '1.625', color: editorSurface.textSoft }}>
+                            <div className="notion-editor-embedded" style={{ padding: '20px 24px 32px 24px', fontSize: '16px', lineHeight: '1.625', color: emailInk.bodyText }}>
                               {dataReady ? (
                                 <LazyNotionEditor
                                   key={puckKeyRef.current}
@@ -1516,11 +1558,11 @@ export default function NewsletterCreatePage() {
 
                             {/* Branded email footer */}
                             <div style={{
-                              backgroundColor: editorSurface.cardBgAlt,
+                              backgroundColor: emailInk.surface,
                               padding: '32px',
                               textAlign: 'center',
-                              borderTop: `1px solid ${editorSurface.border}`,
-                              color: editorSurface.textMuted,
+                              borderTop: `1px solid ${emailInk.border}`,
+                              color: emailInk.footerText,
                             }}>
                               {socialLinks && (socialLinks.facebook || socialLinks.twitter || socialLinks.instagram || socialLinks.linkedin) && (
                                 <div style={{ marginBottom: '24px' }}>
@@ -1530,19 +1572,19 @@ export default function NewsletterCreatePage() {
                                     socialLinks.instagram && 'Instagram',
                                     socialLinks.linkedin && 'LinkedIn',
                                   ].filter(Boolean).map((name, i, arr) => (
-                                    <span key={name} style={{ color: editorSurface.textMuted, fontSize: '13px', fontWeight: 500 }}>
+                                    <span key={name} style={{ color: emailInk.footerText, fontSize: '13px', fontWeight: 500 }}>
                                       {name}{i < arr.length - 1 ? ' | ' : ''}
                                     </span>
                                   ))}
                                 </div>
                               )}
                               {footerText && (
-                                <p style={{ margin: '0 0 16px 0', fontSize: '12px', lineHeight: '1.5', color: editorSurface.textMuted }}>
+                                <p style={{ margin: '0 0 16px 0', fontSize: '12px', lineHeight: '1.5', color: emailInk.footerText }}>
                                   {footerText}
                                 </p>
                               )}
                               {companyName && showName && (
-                                <div style={{ fontSize: '12px', lineHeight: '1.5', color: editorSurface.textSubtle }}>
+                                <div style={{ fontSize: '12px', lineHeight: '1.5', color: emailInk.footerSubtle }}>
                                   <p style={{ margin: 0 }}>Sent via {companyName}</p>
                                 </div>
                               )}

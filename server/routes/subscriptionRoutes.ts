@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import { db } from '../db';
-import { sql, eq, or } from 'drizzle-orm';
+import { sql, eq, or, and } from 'drizzle-orm';
 import { betterAuthUser, subscriptionPlans, forms, formResponses, companies, subscriptions, subscriptionPlanRelations, tenants, shopLimitEvents, shops } from '@shared/schema';
 import { authenticateToken, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import { storage } from '../storage';
@@ -346,7 +346,7 @@ subscriptionRoutes.get("/my-subscription", authenticateToken, requireTenant, req
 });
 
 // Create Stripe checkout session
-subscriptionRoutes.post("/create-checkout-session", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
+subscriptionRoutes.post("/create-checkout-session", authenticateToken, requireTenant, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     const { planId, successUrl, cancelUrl } = req.body;
 
@@ -440,7 +440,7 @@ subscriptionRoutes.post("/create-checkout-session", authenticateToken, requirePe
 });
 
 // Create billing portal session
-subscriptionRoutes.post("/create-portal-session", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
+subscriptionRoutes.post("/create-portal-session", authenticateToken, requireTenant, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     const { returnUrl } = req.body;
 
@@ -481,7 +481,7 @@ subscriptionRoutes.post("/create-portal-session", authenticateToken, requirePerm
 });
 
 // Cancel subscription
-subscriptionRoutes.post("/cancel", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
+subscriptionRoutes.post("/cancel", authenticateToken, requireTenant, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     const { cancelAtPeriodEnd = true } = req.body;
 
@@ -515,12 +515,15 @@ subscriptionRoutes.post("/cancel", authenticateToken, requirePermission('billing
     );
 
     // Update subscription in database
-    await db.update(db.subscriptions)
+    await db.update(subscriptions)
       .set({
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
         updatedAt: new Date(),
       })
-      .where(sql`${db.subscriptions.id} = ${company.subscription.id}`);
+      .where(and(
+        eq(subscriptions.id, company.subscription.id),
+        eq(subscriptions.tenantId, req.user.tenantId)
+      ));
 
     res.json({
       message: cancelAtPeriodEnd ? 'Subscription will be cancelled at the end of the current period' : 'Subscription cancelled immediately',
@@ -533,7 +536,7 @@ subscriptionRoutes.post("/cancel", authenticateToken, requirePermission('billing
 });
 
 // Reactivate subscription
-subscriptionRoutes.post("/reactivate", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
+subscriptionRoutes.post("/reactivate", authenticateToken, requireTenant, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({ message: 'Stripe is not configured' });
@@ -565,12 +568,15 @@ subscriptionRoutes.post("/reactivate", authenticateToken, requirePermission('bil
     );
 
     // Update subscription in database
-    await db.update(db.subscriptions)
+    await db.update(subscriptions)
       .set({
         cancelAtPeriodEnd: false,
         updatedAt: new Date(),
       })
-      .where(sql`${db.subscriptions.id} = ${company.subscription.id}`);
+      .where(and(
+        eq(subscriptions.id, company.subscription.id),
+        eq(subscriptions.tenantId, req.user.tenantId)
+      ));
 
     res.json({
       message: 'Subscription reactivated successfully',
@@ -583,7 +589,7 @@ subscriptionRoutes.post("/reactivate", authenticateToken, requirePermission('bil
 });
 
 // Pre-flight check for downgrade impact
-subscriptionRoutes.post("/check-downgrade", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
+subscriptionRoutes.post("/check-downgrade", authenticateToken, requireTenant, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     if (!req.user || !req.user.tenantId) {
       return res.status(401).json({ message: 'Authentication required' });
@@ -673,7 +679,7 @@ subscriptionRoutes.post("/check-downgrade", authenticateToken, requirePermission
 });
 
 // Upgrade or downgrade subscription plan (Owner only)
-subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requirePermission('billing.manage_subscription'), async (req: any, res) => {
+subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requireTenant, requirePermission('billing.manage_subscription'), async (req: any, res) => {
   try {
     if (!req.user || !req.user.tenantId) {
       return res.status(401).json({ message: 'Authentication required' });
@@ -790,7 +796,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requirePermi
         if (existingSubscription) {
           await db.update(subscriptions)
             .set({ stripeCustomerId })
-            .where(eq(subscriptions.id, existingSubscription.id));
+            .where(and(eq(subscriptions.id, existingSubscription.id), eq(subscriptions.tenantId, tenantId)));
         }
       }
 
@@ -916,7 +922,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requirePermi
           downgradeScheduledAt: null,
           updatedAt: new Date(),
         })
-        .where(eq(subscriptions.id, existingSubscription.id));
+        .where(and(eq(subscriptions.id, existingSubscription.id), eq(subscriptions.tenantId, tenantId)));
 
       // Log audit event
       try {
@@ -1000,7 +1006,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requirePermi
         downgradeScheduledAt: null,
         updatedAt: new Date(),
       })
-      .where(eq(subscriptions.id, existingSubscription.id));
+      .where(and(eq(subscriptions.id, existingSubscription.id), eq(subscriptions.tenantId, tenantId)));
 
     // For downgrade to Free: cancel the Stripe subscription at period end
     if (isDowngradeToFree && stripe && existingSubscription.stripeSubscriptionId && !existingSubscription.stripeSubscriptionId.startsWith('manual_')) {
@@ -1015,7 +1021,7 @@ subscriptionRoutes.post("/upgrade-subscription", authenticateToken, requirePermi
             canceledAt: new Date(),
             updatedAt: new Date(),
           })
-          .where(eq(subscriptions.id, existingSubscription.id));
+          .where(and(eq(subscriptions.id, existingSubscription.id), eq(subscriptions.tenantId, tenantId)));
       } catch (stripeError) {
         console.error('Failed to cancel Stripe subscription for Free downgrade:', stripeError);
         // Non-blocking: the plan change still goes through
@@ -1368,7 +1374,7 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
       if (existingSub) {
         await db.update(subscriptions)
           .set({ ...subValues, updatedAt: now })
-          .where(eq(subscriptions.id, existingSub.id));
+          .where(and(eq(subscriptions.id, existingSub.id), eq(subscriptions.tenantId, tenantId)));
       } else {
         await db.insert(subscriptions).values(subValues);
       }
@@ -1414,7 +1420,7 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
       if (existingSub) {
         await db.update(subscriptions)
           .set({ ...subValues, updatedAt: now })
-          .where(eq(subscriptions.id, existingSub.id));
+          .where(and(eq(subscriptions.id, existingSub.id), eq(subscriptions.tenantId, tenantId)));
       } else {
         await db.insert(subscriptions).values(subValues);
       }
@@ -1433,7 +1439,7 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
         if (newPlan) {
           const isUpgrade = parseFloat(newPlan.price) > parseFloat(oldPlan?.price || '0');
           const ownerUser = await db.query.betterAuthUser.findFirst({
-            where: eq(betterAuthUser.id, req.user.id),
+            where: and(eq(betterAuthUser.id, req.user.id), eq(betterAuthUser.tenantId, tenantId)),
           });
 
           const { sendPlanChangeNotificationTask } = await import('../../src/trigger/planChangeNotification');
@@ -1467,7 +1473,9 @@ subscriptionRoutes.post("/confirm-checkout", authenticateToken, async (req: any,
         const { triggerNewSignupNotification } = await import('../lib/trigger');
 
         const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, planId) });
-        const ownerUser = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, userId) });
+        const ownerUser = await db.query.betterAuthUser.findFirst({
+          where: and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)),
+        });
         const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
 
         if (plan && ownerUser && tenant) {
@@ -1639,7 +1647,7 @@ async function handleCheckoutSessionCompleted(session: any) {
       if (existingSub) {
         await db.update(subscriptions)
           .set({ ...subValues, updatedAt: new Date() })
-          .where(eq(subscriptions.id, existingSub.id));
+          .where(and(eq(subscriptions.id, existingSub.id), eq(subscriptions.tenantId, tenantId)));
       } else {
         await db.insert(subscriptions).values(subValues);
       }
@@ -1652,7 +1660,9 @@ async function handleCheckoutSessionCompleted(session: any) {
           const { triggerNewSignupNotification } = await import('../lib/trigger');
 
           const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, planId) });
-          const ownerUser = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, userId) });
+          const ownerUser = await db.query.betterAuthUser.findFirst({
+            where: and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)),
+          });
           const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
 
           if (plan && ownerUser && tenant) {
@@ -1732,7 +1742,7 @@ async function handleCheckoutSessionCompleted(session: any) {
       if (existingSub) {
         await db.update(subscriptions)
           .set({ ...subValues, updatedAt: new Date() })
-          .where(eq(subscriptions.id, existingSub.id));
+          .where(and(eq(subscriptions.id, existingSub.id), eq(subscriptions.tenantId, tenantId)));
       } else {
         await db.insert(subscriptions).values(subValues);
       }
@@ -1746,7 +1756,9 @@ async function handleCheckoutSessionCompleted(session: any) {
           const { triggerNewSignupNotification } = await import('../lib/trigger');
 
           const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, planId) });
-          const ownerUser = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, userId) });
+          const ownerUser = await db.query.betterAuthUser.findFirst({
+            where: and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)),
+          });
           const tenant = await db.query.tenants.findFirst({ where: eq(tenants.id, tenantId) });
 
           if (plan && ownerUser && tenant) {
@@ -1781,7 +1793,7 @@ async function handleCheckoutSessionCompleted(session: any) {
 
           if (newPlan && userId) {
             const ownerUser = await db.query.betterAuthUser.findFirst({
-              where: eq(betterAuthUser.id, userId),
+              where: and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)),
             });
 
             if (ownerUser?.email) {
@@ -1889,7 +1901,7 @@ async function handleSubscriptionUpdated(stripeSubscription: any) {
 
     await db.update(subscriptions)
       .set(updateData)
-      .where(eq(subscriptions.id, dbSubscription.id));
+      .where(and(eq(subscriptions.id, dbSubscription.id), eq(subscriptions.tenantId, dbSubscription.tenantId)));
 
     console.log('Subscription updated:', stripeSubscription.id, updateData.planId ? `(new plan: ${updateData.planId})` : '');
 
@@ -1897,7 +1909,9 @@ async function handleSubscriptionUpdated(stripeSubscription: any) {
     if (previousStatus !== stripeSubscription.status || updateData.cancelAtPeriodEnd !== dbSubscription.cancelAtPeriodEnd) {
       try {
         const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, updateData.planId || dbSubscription.planId) });
-        const owner = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, dbSubscription.userId) });
+        const owner = await db.query.betterAuthUser.findFirst({
+          where: and(eq(betterAuthUser.id, dbSubscription.userId), eq(betterAuthUser.tenantId, dbSubscription.tenantId)),
+        });
         if (owner?.email && plan) {
           const { sendSubscriptionEventNotificationTask } = await import('../../src/trigger/subscriptionEventNotification');
           await sendSubscriptionEventNotificationTask.trigger({
@@ -1940,14 +1954,16 @@ async function handleSubscriptionDeleted(stripeSubscription: any) {
         status: 'cancelled',
         updatedAt: new Date(),
       })
-      .where(eq(subscriptions.id, dbSubscription.id));
+      .where(and(eq(subscriptions.id, dbSubscription.id), eq(subscriptions.tenantId, dbSubscription.tenantId)));
 
     console.log('Subscription cancelled:', stripeSubscription.id);
 
     // Send cancellation notification
     try {
       const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, dbSubscription.planId) });
-      const owner = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, dbSubscription.userId) });
+      const owner = await db.query.betterAuthUser.findFirst({
+        where: and(eq(betterAuthUser.id, dbSubscription.userId), eq(betterAuthUser.tenantId, dbSubscription.tenantId)),
+      });
       if (owner?.email && plan) {
         const { sendSubscriptionEventNotificationTask } = await import('../../src/trigger/subscriptionEventNotification');
         await sendSubscriptionEventNotificationTask.trigger({
@@ -1992,14 +2008,16 @@ async function handlePaymentSucceeded(invoice: any) {
         status: 'active',
         updatedAt: new Date(),
       })
-      .where(eq(subscriptions.id, dbSubscription.id));
+      .where(and(eq(subscriptions.id, dbSubscription.id), eq(subscriptions.tenantId, dbSubscription.tenantId)));
 
     console.log('Payment succeeded for subscription:', stripeSub.id);
 
     // Send payment success notification
     try {
       const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, dbSubscription.planId) });
-      const owner = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, dbSubscription.userId) });
+      const owner = await db.query.betterAuthUser.findFirst({
+        where: and(eq(betterAuthUser.id, dbSubscription.userId), eq(betterAuthUser.tenantId, dbSubscription.tenantId)),
+      });
       if (owner?.email && plan) {
         const { sendSubscriptionEventNotificationTask } = await import('../../src/trigger/subscriptionEventNotification');
         await sendSubscriptionEventNotificationTask.trigger({
@@ -2046,14 +2064,16 @@ async function handlePaymentFailed(invoice: any) {
         status: 'past_due',
         updatedAt: new Date(),
       })
-      .where(eq(subscriptions.id, dbSubscription.id));
+      .where(and(eq(subscriptions.id, dbSubscription.id), eq(subscriptions.tenantId, dbSubscription.tenantId)));
 
     console.log('Payment failed for subscription:', stripeSub.id);
 
     // Send payment failed notification
     try {
       const plan = await db.query.subscriptionPlans.findFirst({ where: eq(subscriptionPlans.id, dbSubscription.planId) });
-      const owner = await db.query.betterAuthUser.findFirst({ where: eq(betterAuthUser.id, dbSubscription.userId) });
+      const owner = await db.query.betterAuthUser.findFirst({
+        where: and(eq(betterAuthUser.id, dbSubscription.userId), eq(betterAuthUser.tenantId, dbSubscription.tenantId)),
+      });
       if (owner?.email && plan) {
         const { sendSubscriptionEventNotificationTask } = await import('../../src/trigger/subscriptionEventNotification');
         await sendSubscriptionEventNotificationTask.trigger({

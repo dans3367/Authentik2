@@ -562,7 +562,7 @@ formsRoutes.get("/:id/responses", authenticateToken, requireTenant, requirePermi
     }
 
     const responses = await db.query.formResponses.findMany({
-      where: sql`${formResponses.formId} = ${id}`,
+      where: sql`${formResponses.formId} = ${id} AND ${formResponses.tenantId} = ${req.user.tenantId}`,
       orderBy: sql`${formResponses.submittedAt} DESC`,
       limit,
       offset,
@@ -570,7 +570,7 @@ formsRoutes.get("/:id/responses", authenticateToken, requireTenant, requirePermi
 
     const totalCount = await db.select({
       count: sql<number>`count(*)`,
-    }).from(formResponses).where(sql`${formResponses.formId} = ${id}`);
+    }).from(formResponses).where(sql`${formResponses.formId} = ${id} AND ${formResponses.tenantId} = ${req.user.tenantId}`);
 
     res.json({
       responses,
@@ -717,7 +717,7 @@ formsRoutes.post("/public/google-signin", googleSignInLimiter, async (req: any, 
       // Contact already exists — update last activity
       await db.update(emailContacts)
         .set({ lastActivity: new Date(), updatedAt: new Date() })
-        .where(sql`${emailContacts.id} = ${existingContact.id}`);
+        .where(sql`${emailContacts.id} = ${existingContact.id} AND ${emailContacts.tenantId} = ${form.tenantId}`);
 
       return res.status(200).json({
         success: true,
@@ -771,7 +771,7 @@ formsRoutes.post("/public/google-signin", googleSignInLimiter, async (req: any, 
           responseCount: sql`${forms.responseCount} + 1`,
           updatedAt: new Date(),
         })
-        .where(sql`${forms.id} = ${formId}`);
+        .where(sql`${forms.id} = ${formId} AND ${forms.tenantId} = ${form.tenantId}`);
 
       return contact;
     });
@@ -975,7 +975,7 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
         responseCount: sql`${forms.responseCount} + 1`,
         updatedAt: new Date()
       })
-      .where(sql`${forms.id} = ${id}`);
+      .where(sql`${forms.id} = ${id} AND ${forms.tenantId} = ${form.tenantId}`);
 
     // Extract email from submission data for template/promotion emails
     const submittedData = typeof data === 'object' ? data : {};
@@ -1010,7 +1010,7 @@ formsRoutes.post("/public/:id/submit", publicSubmitLimiter, validateUuidParam, a
           // Contact already exists — update last activity
           await db.update(emailContacts)
             .set({ lastActivity: new Date(), updatedAt: new Date() })
-            .where(sql`${emailContacts.id} = ${existingContact.id}`);
+            .where(sql`${emailContacts.id} = ${existingContact.id} AND ${emailContacts.tenantId} = ${form.tenantId}`);
         } else {
           // Create new email contact — default to 'Preferred Customer' for email-only signups
           const contactFirstName = submittedFirstName || 'Preferred';

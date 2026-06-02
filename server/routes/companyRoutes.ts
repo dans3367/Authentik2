@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { betterAuthUser, tenants, shops, stores, companies, forms, formResponses } from '@shared/schema';
-import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requireRole } from '../middleware/auth-middleware';
 import { createCompanySchema, updateCompanySchema, completeOnboardingSchema } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
 import { invalidateUserSecurity } from '../utils/userSecurityCache';
@@ -10,7 +10,7 @@ import { invalidateUserSecurity } from '../utils/userSecurityCache';
 export const companyRoutes = Router();
 
 // Get company information
-companyRoutes.get("/", authenticateToken, async (req: any, res) => {
+companyRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     console.log(`🏢 [GET /api/company] Fetching company for user ${req.user.email}, tenantId: ${req.user.tenantId}`);
 
@@ -39,7 +39,7 @@ companyRoutes.get("/", authenticateToken, async (req: any, res) => {
 });
 
 // Create company (for owners)
-companyRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
+companyRoutes.post("/", authenticateToken, requireTenant, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
   try {
     const validatedData = createCompanySchema.parse(req.body);
     const { name, description, website, address, companyType, companyEmail, phone } = validatedData;
@@ -82,7 +82,7 @@ companyRoutes.post("/", authenticateToken, requireRole(["Owner", "Administrator"
 });
 
 // Update company information
-companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
+companyRoutes.patch("/", authenticateToken, requireTenant, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
   try {
     const validatedData = updateCompanySchema.parse(req.body);
     const { name, description, website, address, companyType, companyEmail, phone, isActive } = validatedData;
@@ -157,7 +157,7 @@ companyRoutes.patch("/", authenticateToken, requireRole(["Owner", "Administrator
 });
 
 // Get company statistics
-companyRoutes.get("/stats", authenticateToken, async (req: any, res) => {
+companyRoutes.get("/stats", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const [
       userStats,
@@ -203,7 +203,7 @@ companyRoutes.get("/stats", authenticateToken, async (req: any, res) => {
 });
 
 // Get company users
-companyRoutes.get("/users", authenticateToken, requireRole(["Owner", "Administrator", "Manager"]), async (req: any, res) => {
+companyRoutes.get("/users", authenticateToken, requireTenant, requireRole(["Owner", "Administrator", "Manager"]), async (req: any, res) => {
   try {
     const { page = 1, limit = 50, role, search } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
@@ -261,7 +261,7 @@ companyRoutes.get("/users", authenticateToken, requireRole(["Owner", "Administra
 });
 
 // Update user role within company
-companyRoutes.patch("/users/:userId/role", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
+companyRoutes.patch("/users/:userId/role", authenticateToken, requireTenant, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { role } = req.body;
@@ -316,7 +316,7 @@ companyRoutes.patch("/users/:userId/role", authenticateToken, requireRole(["Owne
 });
 
 // Remove user from company
-companyRoutes.delete("/users/:userId", authenticateToken, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
+companyRoutes.delete("/users/:userId", authenticateToken, requireTenant, requireRole(["Owner", "Administrator"]), async (req: any, res) => {
   try {
     const { userId } = req.params;
 
@@ -358,7 +358,7 @@ companyRoutes.delete("/users/:userId", authenticateToken, requireRole(["Owner", 
 });
 
 // Complete onboarding wizard
-companyRoutes.post("/complete-onboarding", authenticateToken, async (req: any, res) => {
+companyRoutes.post("/complete-onboarding", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     console.log('📝 [Onboarding] Request body:', req.body);
     console.log('👤 [Onboarding] User:', { id: req.user?.id, tenantId: req.user?.tenantId });

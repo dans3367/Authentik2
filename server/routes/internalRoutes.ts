@@ -312,6 +312,19 @@ router.post(
         });
       }
 
+      const existingSend = await db.query.emailSends.findFirst({
+        where: eq(emailSends.id, emailTrackingId),
+        columns: { id: true, tenantId: true },
+      });
+
+      if (!existingSend) {
+        console.warn(`⚠️ [Internal API] No email_sends record found for tracking ID ${emailTrackingId}`);
+        return res.status(404).json({
+          success: false,
+          error: 'Email send record not found',
+        });
+      }
+
       console.log(`📧 [Internal API] Updating email_sends record for tracking ID ${emailTrackingId} with status ${validatedStatus}${providerMessageId ? ` and provider ID ${providerMessageId}` : ''}`);
 
       // Find and update the email_sends record by the email tracking ID
@@ -336,7 +349,10 @@ router.post(
 
       const result = await db.update(emailSends)
         .set(updatePayload)
-        .where(eq(emailSends.id, emailTrackingId))
+        .where(and(
+          eq(emailSends.id, emailTrackingId),
+          eq(emailSends.tenantId, existingSend.tenantId)
+        ))
         .returning();
 
       if (result.length === 0) {
@@ -356,7 +372,10 @@ router.post(
               lastActivity: now,
               updatedAt: now,
             })
-            .where(eq(emailContacts.id, result[0].contactId));
+            .where(and(
+              eq(emailContacts.id, result[0].contactId),
+              eq(emailContacts.tenantId, result[0].tenantId)
+            ));
           console.log(`✅ [Internal API] Incremented emailsSent for contact ${result[0].contactId}`);
         } catch (metricsUpdateError) {
           console.warn(`⚠️ [Internal API] Failed to update contact emailsSent:`, metricsUpdateError);

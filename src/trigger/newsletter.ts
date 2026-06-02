@@ -376,6 +376,7 @@ export type NewsletterRecipient = z.infer<typeof recipientSchema>;
  */
 async function updateNewsletterStatusInternal(
   newsletterId: string,
+  tenantId: string,
   status: string,
   stats: { sentCount: number; failedCount: number; totalCount: number }
 ): Promise<void> {
@@ -404,7 +405,7 @@ async function updateNewsletterStatusInternal(
     urls.push(remoteUrl, localUrl);
   }
 
-  const body = { status, ...stats };
+  const body = { tenantId, status, ...stats };
 
   for (const baseUrl of urls) {
     try {
@@ -821,7 +822,7 @@ export const sendNewsletterTask = task({
       }
 
       try {
-        await updateNewsletterStatusInternal(data.newsletterId, "sent", {
+        await updateNewsletterStatusInternal(data.newsletterId, data.tenantId, "sent", {
           sentCount: 0,
           failedCount: 0,
           totalCount: 0,
@@ -1136,7 +1137,7 @@ export const sendNewsletterTask = task({
     // all emails are re-sent. The status update is best-effort; the emails
     // have already been delivered at this point.
     try {
-      await updateNewsletterStatusInternal(data.newsletterId, "sent", {
+      await updateNewsletterStatusInternal(data.newsletterId, data.tenantId, "sent", {
         sentCount: totalSent,
         failedCount: totalFailed,
         totalCount: validRecipients.length,

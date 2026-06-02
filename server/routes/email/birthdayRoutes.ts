@@ -563,7 +563,7 @@ birthdayRoutes.put("/e-card-settings", authenticateToken, requireTenant, async (
           senderName: senderName || '',
           updatedAt: new Date(),
         })
-        .where(sql`${eCardSettings.id} = ${existingSettings.id}`)
+        .where(sql`${eCardSettings.id} = ${existingSettings.id} AND ${eCardSettings.tenantId} = ${req.user.tenantId}`)
         .returning();
     } else {
       // Create new settings if they don't exist
@@ -667,7 +667,7 @@ birthdayRoutes.post("/birthday-invitation/:contactId", authenticateToken, requir
       return res.status(500).json({ message: 'Server configuration error' });
     }
     const profileUpdateToken = jwt.sign(
-      { contactId, action: 'update_birthday' },
+      { contactId, tenantId: req.user.tenantId, action: 'update_birthday' },
       jwtSecret,
       { expiresIn: '30d' }
     );
@@ -772,7 +772,11 @@ birthdayRoutes.post("/update-profile", async (req: any, res) => {
       return res.status(401).json({ message: 'Invalid token action' });
     }
 
-    const { contactId } = decoded;
+    const { contactId, tenantId } = decoded;
+
+    if (!tenantId) {
+      return res.status(401).json({ message: 'Invalid token tenant context' });
+    }
 
     if (!birthday) {
       return res.status(400).json({ message: 'Birthday is required' });
@@ -791,7 +795,7 @@ birthdayRoutes.post("/update-profile", async (req: any, res) => {
         birthdayEmailEnabled: true, // Enable birthday emails by default when they add their birthday
         updatedAt: new Date()
       })
-      .where(sql`${emailContacts.id} = ${contactId}`)
+      .where(sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${tenantId}`)
       .returning();
 
     if (updatedContact.length === 0) {
@@ -839,11 +843,15 @@ birthdayRoutes.get("/profile-form", async (req: any, res) => {
       return res.status(401).json({ message: 'Invalid token action' });
     }
 
-    const { contactId } = decoded;
+    const { contactId, tenantId } = decoded;
+
+    if (!tenantId) {
+      return res.status(401).json({ message: 'Invalid token tenant context' });
+    }
 
     // Get contact information
     const contact = await db.query.emailContacts.findFirst({
-      where: sql`${emailContacts.id} = ${contactId}`,
+      where: sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${tenantId}`,
       columns: {
         id: true,
         email: true,

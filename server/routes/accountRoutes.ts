@@ -26,7 +26,7 @@ import {
   appointments,
   campaigns,
 } from '@shared/schema';
-import { authenticateToken, requirePermission } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requirePermission } from '../middleware/auth-middleware';
 import {
   requestTenantDeletion,
   cancelTenantDeletion,
@@ -37,7 +37,7 @@ export const accountRoutes = Router();
 
 // ─── Status ──────────────────────────────────────────────────────────────────
 
-accountRoutes.get('/deletion-status', authenticateToken, async (req: any, res) => {
+accountRoutes.get('/deletion-status', authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
@@ -57,6 +57,7 @@ accountRoutes.get('/deletion-status', authenticateToken, async (req: any, res) =
 accountRoutes.get(
   '/export',
   authenticateToken,
+  requireTenant,
   requirePermission('billing.delete_account'),
   async (req: any, res) => {
     try {
@@ -131,6 +132,7 @@ accountRoutes.get(
 accountRoutes.post(
   '/delete',
   authenticateToken,
+  requireTenant,
   requirePermission('billing.delete_account'),
   async (req: any, res) => {
     try {
@@ -200,6 +202,7 @@ accountRoutes.post(
 accountRoutes.post(
   '/cancel-deletion',
   authenticateToken,
+  requireTenant,
   requirePermission('billing.delete_account'),
   async (req: any, res) => {
     try {

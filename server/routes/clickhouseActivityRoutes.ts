@@ -7,12 +7,12 @@
  */
 
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { getClickHouseClient, CLICKHOUSE_TABLE } from '../utils/clickhouseClient';
 import { isAdmin } from '../utils/routeHelpers';
 import { db } from '../db';
 import { betterAuthUser } from '@shared/schema';
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 export const clickhouseActivityRoutes = Router();
 
@@ -37,7 +37,7 @@ function validatePaginationParams(limit?: string | string[], offset?: string | s
 /**
  * Looks up user details from the DB for a set of user IDs.
  */
-async function fetchUserMap(userIds: string[]): Promise<Map<string, { firstName: string | null; lastName: string | null; email: string; avatarUrl: string | null }>> {
+async function fetchUserMap(userIds: string[], tenantId: string): Promise<Map<string, { firstName: string | null; lastName: string | null; email: string; avatarUrl: string | null }>> {
     const map = new Map();
     if (userIds.length === 0) return map;
     try {
@@ -50,7 +50,10 @@ async function fetchUserMap(userIds: string[]): Promise<Map<string, { firstName:
                 avatarUrl: betterAuthUser.avatarUrl,
             })
             .from(betterAuthUser)
-            .where(inArray(betterAuthUser.id, userIds));
+            .where(and(
+                inArray(betterAuthUser.id, userIds),
+                eq(betterAuthUser.tenantId, tenantId)
+            ));
         for (const u of users) {
             map.set(u.id, u);
         }
@@ -122,7 +125,7 @@ function safeJsonParse(value: string): any {
  */
 async function buildPaginationResponse(rows: any[], pagination: { limit: number; offset: number }, total: number, req: any) {
     const userIds = [...new Set(rows.map((r: any) => r.user_id).filter(Boolean))] as string[];
-    const userMap = await fetchUserMap(userIds);
+    const userMap = await fetchUserMap(userIds, req.user.tenantId);
 
     return {
         logs: transformRows(rows, req, userMap),
@@ -222,7 +225,7 @@ async function queryClickHouseLogs(opts: {
  * GET /api/axiom-activity-logs
  * Fetch activity logs from ClickHouse with optional filtering.
  */
-clickhouseActivityRoutes.get("/", authenticateToken, async (req: any, res) => {
+clickhouseActivityRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
     try {
         const client = getClickHouseClient();
         if (!client) {
@@ -260,7 +263,7 @@ clickhouseActivityRoutes.get("/", authenticateToken, async (req: any, res) => {
  * GET /api/axiom-activity-logs/entity/:entityType/:entityId
  * Shorthand endpoint for fetching activities for a specific entity.
  */
-clickhouseActivityRoutes.get("/entity/:entityType/:entityId", authenticateToken, async (req: any, res) => {
+clickhouseActivityRoutes.get("/entity/:entityType/:entityId", authenticateToken, requireTenant, async (req: any, res) => {
     try {
         const client = getClickHouseClient();
         if (!client) {
@@ -298,7 +301,7 @@ clickhouseActivityRoutes.get("/entity/:entityType/:entityId", authenticateToken,
  * GET /api/axiom-activity-logs/stats
  * Aggregated activity stats from ClickHouse.
  */
-clickhouseActivityRoutes.get("/stats", authenticateToken, async (req: any, res) => {
+clickhouseActivityRoutes.get("/stats", authenticateToken, requireTenant, async (req: any, res) => {
     try {
         const client = getClickHouseClient();
         if (!client) {
@@ -354,7 +357,7 @@ clickhouseActivityRoutes.get("/stats", authenticateToken, async (req: any, res) 
  * GET /api/axiom-activity-logs/search
  * Full-text search across activity logs in ClickHouse.
  */
-clickhouseActivityRoutes.get("/search", authenticateToken, async (req: any, res) => {
+clickhouseActivityRoutes.get("/search", authenticateToken, requireTenant, async (req: any, res) => {
     try {
         const client = getClickHouseClient();
         if (!client) {

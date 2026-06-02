@@ -1110,7 +1110,10 @@ newsletterRoutes.post("/", authenticateToken, requireTenant, requirePermission('
     // Get the correct user ID from the betterAuthUser table based on email
     // since authentication uses betterAuthUser and newsletters now reference betterAuthUser table
     const userRecord = await db.query.betterAuthUser.findFirst({
-      where: sql`${betterAuthUser.email} = ${req.user.email}`,
+      where: and(
+        eq(betterAuthUser.id, req.user.id),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ),
     });
 
     if (!userRecord) {
@@ -1177,7 +1180,10 @@ newsletterRoutes.post("/:id/clone", authenticateToken, requireTenant, requirePer
     }
 
     const userRecord = await db.query.betterAuthUser.findFirst({
-      where: sql`${betterAuthUser.email} = ${req.user.email}`,
+      where: and(
+        eq(betterAuthUser.id, req.user.id),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ),
     });
 
     if (!userRecord) {
@@ -1245,7 +1251,7 @@ newsletterRoutes.post("/:id/archive", authenticateToken, requireTenant, requireP
 
     const [updated] = await db.update(newsletters)
       .set({ archivedAt: new Date(), updatedAt: new Date() })
-      .where(sql`${newsletters.id} = ${id}`)
+      .where(sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     // Log activity
@@ -1290,7 +1296,7 @@ newsletterRoutes.post("/:id/unarchive", authenticateToken, requireTenant, requir
 
     const [updated] = await db.update(newsletters)
       .set({ archivedAt: null, updatedAt: new Date() })
-      .where(sql`${newsletters.id} = ${id}`)
+      .where(sql`${newsletters.id} = ${id} AND ${newsletters.tenantId} = ${req.user.tenantId}`)
       .returning();
 
     // Log activity
@@ -1702,8 +1708,21 @@ newsletterRoutes.put("/:id/status", authenticateInternalService, async (req: any
 
     const { id } = req.params;
     const { status, metadata } = req.body;
+    let { tenantId } = req.body;
 
     console.log(`[Newsletter] Updating newsletter ${id} status to: ${status}`);
+
+    if (!tenantId) {
+      const existingNewsletter = await db.query.newsletters.findFirst({
+        where: eq(newsletters.id, id),
+        columns: { tenantId: true },
+      });
+      tenantId = existingNewsletter?.tenantId;
+    }
+
+    if (!tenantId) {
+      return res.status(404).json({ message: 'Newsletter not found' });
+    }
 
     // Update newsletter status in database
     const updatedNewsletter = await db.update(newsletters)
@@ -1717,7 +1736,7 @@ newsletterRoutes.put("/:id/status", authenticateInternalService, async (req: any
           sentAt: new Date(metadata.completedAt)
         })
       })
-      .where(eq(newsletters.id, id))
+      .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)))
       .returning();
 
     if (updatedNewsletter.length === 0) {
@@ -2046,7 +2065,10 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
         status: 'sending',
         updatedAt: new Date(),
       })
-      .where(eq(newsletters.id, id));
+      .where(and(
+        eq(newsletters.id, id),
+        eq(newsletters.tenantId, req.user.tenantId)
+      ));
 
     // Log activity: newsletter send initiated
     await logActivity({
@@ -2109,7 +2131,10 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
             status: 'draft',
             updatedAt: new Date(),
           })
-          .where(eq(newsletters.id, id));
+          .where(and(
+            eq(newsletters.id, id),
+            eq(newsletters.tenantId, req.user.tenantId)
+          ));
 
         return res.status(400).json({
           message: 'No recipients found for newsletter. Please check your segmentation settings or add email contacts.'
@@ -2119,7 +2144,10 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
       if (allowedRecipients.length === 0) {
         await db.update(newsletters)
           .set({ status: 'draft', updatedAt: new Date() })
-          .where(eq(newsletters.id, id));
+          .where(and(
+            eq(newsletters.id, id),
+            eq(newsletters.tenantId, req.user.tenantId)
+          ));
         return res.status(400).json({ message: 'All recipients are suppressed (bounces or tenant-level complaints). No emails will be sent.' });
       }
 
@@ -2287,7 +2315,10 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
             recipientCount: allowedRecipients.length,
             updatedAt: new Date(),
           })
-          .where(eq(newsletters.id, id));
+          .where(and(
+            eq(newsletters.id, id),
+            eq(newsletters.tenantId, req.user.tenantId)
+          ));
 
         // Sync to Convex for real-time kanban updates (fire-and-forget)
         syncNewsletterToConvex({ ...newsletter, status: 'sending', recipientCount: allowedRecipients.length, updatedAt: new Date() });
@@ -2469,7 +2500,10 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
 
         await db.update(newsletters)
           .set(sendUpdate)
-          .where(eq(newsletters.id, id));
+          .where(and(
+            eq(newsletters.id, id),
+            eq(newsletters.tenantId, req.user.tenantId)
+          ));
 
         res.json({
           message: 'Newsletter sent successfully (direct mode)',
@@ -2493,7 +2527,10 @@ newsletterRoutes.post("/:id/send", authenticateToken, requireTenant, requirePerm
           sentAt: null,
           updatedAt: new Date(),
         })
-        .where(eq(newsletters.id, id));
+        .where(and(
+          eq(newsletters.id, id),
+          eq(newsletters.tenantId, req.user.tenantId)
+        ));
 
       // Log activity: send failure
       await logActivity({
@@ -2727,7 +2764,10 @@ newsletterRoutes.post("/:id/schedule", authenticateToken, requireTenant, require
         recipientCount: allowedRecipients.length,
         updatedAt: new Date(),
       })
-      .where(eq(newsletters.id, id));
+      .where(and(
+        eq(newsletters.id, id),
+        eq(newsletters.tenantId, req.user.tenantId)
+      ));
 
     // Sync to Convex for real-time kanban updates (fire-and-forget)
     syncNewsletterToConvex({ ...newsletter, status: 'scheduled', scheduledAt: scheduledDate, recipientCount: allowedRecipients.length, updatedAt: new Date() });
@@ -2802,7 +2842,10 @@ newsletterRoutes.post("/:id/cancel-schedule", authenticateToken, requireTenant, 
         triggerRunId: null,
         updatedAt: new Date(),
       })
-      .where(eq(newsletters.id, id));
+      .where(and(
+        eq(newsletters.id, id),
+        eq(newsletters.tenantId, req.user.tenantId)
+      ));
 
     // Log activity
     await logActivity({
@@ -2875,7 +2918,10 @@ newsletterRoutes.put('/internal/:id/complete-analytics', authenticateInternalSer
           completedAt: completedAt ? new Date(completedAt) : new Date(),
           updatedAt: new Date(),
         })
-        .where(eq(newsletterTaskStatus.id, analyticsTask.id));
+        .where(and(
+          eq(newsletterTaskStatus.id, analyticsTask.id),
+          eq(newsletterTaskStatus.tenantId, tenantId)
+        ));
     }
 
     console.log(`[Newsletter Internal] Analytics collection marked as completed for newsletter ${id}`);
@@ -2890,9 +2936,13 @@ newsletterRoutes.put('/internal/:id/complete-analytics', authenticateInternalSer
 newsletterRoutes.put('/internal/:id/status', authenticateInternalService, async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { status, sentCount, failedCount, totalCount } = req.body;
+    const { tenantId, status, sentCount, failedCount, totalCount } = req.body;
 
     console.log(`[Newsletter Internal] Updating newsletter ${id} status to: ${status}`, { sentCount, failedCount, totalCount });
+
+    if (!tenantId) {
+      return res.status(400).json({ error: 'tenantId is required' });
+    }
 
     const updateData: any = {
       status,
@@ -2906,7 +2956,10 @@ newsletterRoutes.put('/internal/:id/status', authenticateInternalService, async 
     // When marking as 'sent', also publish for web viewing (if publishToBlog is enabled)
     if (status === 'sent') {
       const newsletter = await db.query.newsletters.findFirst({
-        where: eq(newsletters.id, id),
+        where: and(
+          eq(newsletters.id, id),
+          eq(newsletters.tenantId, tenantId)
+        ),
         columns: { id: true, title: true, tenantId: true, webSlug: true, publishToBlog: true },
       });
       if (newsletter && !newsletter.webSlug && newsletter.publishToBlog !== false) {
@@ -2921,11 +2974,17 @@ newsletterRoutes.put('/internal/:id/status', authenticateInternalService, async 
 
     await db.update(newsletters)
       .set(updateData)
-      .where(eq(newsletters.id, id));
+      .where(and(
+        eq(newsletters.id, id),
+        eq(newsletters.tenantId, tenantId)
+      ));
 
     // Sync to Convex for real-time kanban updates (fire-and-forget)
     const updatedForConvex = await db.query.newsletters.findFirst({
-      where: eq(newsletters.id, id),
+      where: and(
+        eq(newsletters.id, id),
+        eq(newsletters.tenantId, tenantId)
+      ),
       with: { user: { columns: { id: true, firstName: true, lastName: true } } },
     });
     if (updatedForConvex) {
@@ -3147,7 +3206,7 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
         reviewerApprovalCode: approvalCodeHash,
         updatedAt: new Date(),
       })
-      .where(eq(newsletters.id, id))
+      .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)))
       .returning();
 
     // Log activity
@@ -3170,7 +3229,10 @@ newsletterRoutes.post("/:id/submit-for-review", authenticateToken, requireTenant
     try {
       // Fetch reviewer details
       const reviewer = await db.query.betterAuthUser.findFirst({
-        where: eq(betterAuthUser.id, settings.reviewerId),
+        where: and(
+          eq(betterAuthUser.id, settings.reviewerId),
+          eq(betterAuthUser.tenantId, tenantId)
+        ),
         columns: { id: true, email: true, firstName: true, lastName: true, name: true },
       });
 
@@ -3245,7 +3307,7 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
         // Max attempts exceeded — invalidate the code and force re-submission
         await db.update(newsletters)
           .set({ reviewerApprovalCode: null, status: 'draft', reviewStatus: 'pending', updatedAt: new Date() })
-          .where(eq(newsletters.id, id));
+          .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)));
         clearApprovalCodeRateLimit(req.user.id, id);
         return res.status(403).json({
           message: 'Too many failed approval code attempts. The approval code has been invalidated. The newsletter must be re-submitted for review.',
@@ -3292,7 +3354,7 @@ newsletterRoutes.post("/:id/approve", authenticateToken, requireTenant, async (r
         reviewerApprovalCode: null, // Clear the code after use
         updatedAt: new Date(),
       })
-      .where(eq(newsletters.id, id))
+      .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)))
       .returning();
 
     // Log activity
@@ -3357,7 +3419,7 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
         // Max attempts exceeded — invalidate the code and force re-submission
         await db.update(newsletters)
           .set({ reviewerApprovalCode: null, status: 'draft', reviewStatus: 'pending', updatedAt: new Date() })
-          .where(eq(newsletters.id, id));
+          .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)));
         clearApprovalCodeRateLimit(req.user.id, id);
         return res.status(403).json({
           message: 'Too many failed approval code attempts. The approval code has been invalidated. The newsletter must be re-submitted for review.',
@@ -3405,7 +3467,7 @@ newsletterRoutes.post("/:id/approve-and-send", authenticateToken, requireTenant,
         reviewerApprovalCode: null, // Clear the code after use
         updatedAt: new Date(),
       })
-      .where(eq(newsletters.id, id))
+      .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)))
       .returning();
 
     // Log activity
@@ -3507,7 +3569,7 @@ newsletterRoutes.post("/:id/reject", authenticateToken, requireTenant, async (re
         reviewerApprovalCode: null, // Invalidate the code on rejection
         updatedAt: new Date(),
       })
-      .where(eq(newsletters.id, id))
+      .where(and(eq(newsletters.id, id), eq(newsletters.tenantId, tenantId)))
       .returning();
 
     // Log activity
@@ -3625,7 +3687,7 @@ async function finalizeStuckNewsletters(): Promise<number> {
         let shouldPublishToBlog = true;
         try {
           const fullNl = await db.query.newsletters.findFirst({
-            where: eq(newsletters.id, nl.id),
+            where: and(eq(newsletters.id, nl.id), eq(newsletters.tenantId, nl.tenantId)),
             columns: { publishToBlog: true },
           });
           if (fullNl && fullNl.publishToBlog === false) {
@@ -3649,7 +3711,10 @@ async function finalizeStuckNewsletters(): Promise<number> {
 
         await db.update(newsletters)
           .set(finalizeUpdate)
-          .where(eq(newsletters.id, nl.id));
+          .where(and(
+            eq(newsletters.id, nl.id),
+            eq(newsletters.tenantId, nl.tenantId)
+          ));
 
         console.log(`✅ [Newsletter Safety Net] Finalized newsletter "${nl.title}" (${nl.id}) → sent`);
       } catch (err) {

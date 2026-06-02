@@ -8,7 +8,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { activityLogs, betterAuthUser } from '@shared/schema';
-import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { activityLogQuerySchema } from '@shared/schema';
 import { isAdmin } from '../utils/routeHelpers';
 
@@ -137,7 +137,7 @@ function buildPaginationResponse(logs: any[], pagination: { limit: number; offse
  * Fetch activity logs with optional filtering by entity type, entity ID, activity type
  * Supports pagination via limit and offset query params
  */
-activityRoutes.get("/", authenticateToken, async (req: any, res) => {
+activityRoutes.get("/", authenticateToken, requireTenant, async (req: any, res) => {
     try {
         const { entityType, entityId, activityType, limit, offset } = req.query;
         
@@ -167,7 +167,7 @@ activityRoutes.get("/", authenticateToken, async (req: any, res) => {
         // Fetch logs with user details
         const logs = await db.select(getActivityLogSelectFields(req))
             .from(activityLogs)
-            .leftJoin(betterAuthUser, sql`${activityLogs.userId} = ${betterAuthUser.id}`)
+            .leftJoin(betterAuthUser, sql`${activityLogs.userId} = ${betterAuthUser.id} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`)
             .where(whereClause)
             .orderBy(sql`${activityLogs.createdAt} DESC`)
             .limit(paginationParams.limit)
@@ -191,7 +191,7 @@ activityRoutes.get("/", authenticateToken, async (req: any, res) => {
  * GET /api/activity-logs/entity/:entityType/:entityId
  * Shorthand endpoint for fetching activities for a specific entity
  */
-activityRoutes.get("/entity/:entityType/:entityId", authenticateToken, async (req: any, res) => {
+activityRoutes.get("/entity/:entityType/:entityId", authenticateToken, requireTenant, async (req: any, res) => {
     try {
         const { entityType, entityId } = req.params;
         const { limit, offset } = req.query;
@@ -206,7 +206,7 @@ activityRoutes.get("/entity/:entityType/:entityId", authenticateToken, async (re
 
         const logs = await db.select(getActivityLogSelectFields(req))
             .from(activityLogs)
-            .leftJoin(betterAuthUser, sql`${activityLogs.userId} = ${betterAuthUser.id}`)
+            .leftJoin(betterAuthUser, sql`${activityLogs.userId} = ${betterAuthUser.id} AND ${betterAuthUser.tenantId} = ${req.user.tenantId}`)
             .where(sql`${activityLogs.tenantId} = ${req.user.tenantId} 
                  AND ${activityLogs.entityType} = ${entityType} 
                  AND ${activityLogs.entityId} = ${entityId}`)

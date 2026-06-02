@@ -653,7 +653,10 @@
         "currentMonth": "Current month",
         "selectedDay": "Selected day",
         "noAppointments": "No appointments scheduled for this day.",
-        "more": "+{{count}} more"
+        "more": "+{{count}} more",
+        "addEvent": "Add appointment",
+        "previousDay": "Previous day",
+        "nextDay": "Next day"
       }
     }
   },

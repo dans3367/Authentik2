@@ -2,13 +2,13 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql, and, eq } from 'drizzle-orm';
 import { betterAuthUser, tenants, companies, forms, refreshTokens, temp2faSessions, betterAuthSession } from '@shared/schema';
-import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requireRole } from '../middleware/auth-middleware';
 import { invalidateUserSecurity } from '../utils/userSecurityCache';
 
 export const adminRoutes = Router();
 
 // Get session statistics
-adminRoutes.get("/sessions/stats", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.get("/sessions/stats", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     const stats = await db.select({
       totalSessions: sql<number>`count(*)`,
@@ -25,7 +25,7 @@ adminRoutes.get("/sessions/stats", authenticateToken, requireRole('Administrator
 
 
 // Get all sessions (admin view)
-adminRoutes.get("/sessions", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.get("/sessions", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     const { page = 1, limit = 50, userId, deviceId, ipAddress } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
@@ -84,7 +84,7 @@ adminRoutes.get("/sessions", authenticateToken, requireRole('Administrator'), as
 
 
 // Delete specific session (admin)
-adminRoutes.delete("/sessions", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.delete("/sessions", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     const { sessionId } = req.body;
 
@@ -109,7 +109,7 @@ adminRoutes.delete("/sessions", authenticateToken, requireRole('Administrator'),
 });
 
 // Get user statistics
-adminRoutes.get("/users/stats", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.get("/users/stats", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     const userStats = await db.select({
       totalUsers: sql<number>`count(*)`,
@@ -140,7 +140,7 @@ adminRoutes.get("/users/stats", authenticateToken, requireRole('Administrator'),
 });
 
 // Get user limits
-adminRoutes.get("/users/limits", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.get("/users/limits", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     // Get current user count for this tenant
     const userCount = await db.select({
@@ -166,7 +166,7 @@ adminRoutes.get("/users/limits", authenticateToken, requireRole('Administrator')
 });
 
 // Get user management data
-adminRoutes.get("/users", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.get("/users", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     const { page = 1, limit = 50, role, emailVerified, search } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
@@ -237,7 +237,7 @@ adminRoutes.get("/users", authenticateToken, requireRole('Administrator'), async
 });
 
 // Update user (full update)
-adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.put("/users/:userId", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { firstName, lastName, email, role, isActive } = req.body;
@@ -312,7 +312,7 @@ adminRoutes.put("/users/:userId", authenticateToken, requireRole('Administrator'
 });
 
 // Update user status (active/inactive)
-adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.patch("/users/:userId/status", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { isActive } = req.body;
@@ -372,7 +372,10 @@ adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Admin
         .where(eq(betterAuthSession.userId, userId))
         .catch(err => console.warn('⚠️ [Admin Status] Failed to revoke sessions:', err));
       await db.delete(temp2faSessions)
-        .where(eq(temp2faSessions.userId, userId))
+        .where(and(
+          eq(temp2faSessions.userId, userId),
+          eq(temp2faSessions.tenantId, req.user.tenantId)
+        ))
         .catch(err => console.warn('⚠️ [Admin Status] Failed to revoke temp 2FA sessions:', err));
     }
 
@@ -395,7 +398,7 @@ adminRoutes.patch("/users/:userId/status", authenticateToken, requireRole('Admin
 });
 
 // Update user role
-adminRoutes.patch("/users/:userId/role", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.patch("/users/:userId/role", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { role } = req.body;
@@ -456,7 +459,7 @@ adminRoutes.patch("/users/:userId/role", authenticateToken, requireRole('Adminis
 });
 
 // Delete user (admin)
-adminRoutes.delete("/users/:userId", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.delete("/users/:userId", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     const { userId } = req.params;
 
@@ -499,7 +502,7 @@ adminRoutes.delete("/users/:userId", authenticateToken, requireRole('Administrat
 });
 
 // Get system statistics
-adminRoutes.get("/stats", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.get("/stats", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -551,7 +554,7 @@ adminRoutes.get("/stats", authenticateToken, requireRole('Administrator'), async
 });
 
 // Get activity logs (if you have an activity log table)
-adminRoutes.get("/activity", authenticateToken, requireRole('Administrator'), async (req: any, res) => {
+adminRoutes.get("/activity", authenticateToken, requireTenant, requireRole('Administrator'), async (req: any, res) => {
   try {
     const { page = 1, limit = 50, userId, action, startDate, endDate } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
@@ -618,4 +621,3 @@ adminRoutes.get("/activity", authenticateToken, requireRole('Administrator'), as
     res.status(500).json({ message: 'Failed to get activity logs' });
   }
 });
-

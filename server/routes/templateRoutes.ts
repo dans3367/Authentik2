@@ -226,7 +226,10 @@ templateRoutes.post("/", authenticateToken, requireTenant, async (req: any, res)
 
     // Fetch the complete template with user details
     const completeTemplate = await db.query.templates.findFirst({
-      where: eq(templates.id, newTemplate.id),
+      where: and(
+        eq(templates.id, newTemplate.id),
+        eq(templates.tenantId, req.user.tenantId)
+      ),
       with: {
         user: {
           columns: {
@@ -302,7 +305,10 @@ templateRoutes.patch("/:id", authenticateToken, requireTenant, async (req: any, 
 
     // Fetch the complete updated template with user details
     const completeTemplate = await db.query.templates.findFirst({
-      where: eq(templates.id, updatedTemplate.id),
+      where: and(
+        eq(templates.id, updatedTemplate.id),
+        eq(templates.tenantId, req.user.tenantId)
+      ),
       with: {
         user: {
           columns: {
@@ -435,7 +441,10 @@ templateRoutes.post("/:id/duplicate", authenticateToken, requireTenant, async (r
 
     // Fetch the complete template with user details
     const completeTemplate = await db.query.templates.findFirst({
-      where: eq(templates.id, duplicatedTemplate.id),
+      where: and(
+        eq(templates.id, duplicatedTemplate.id),
+        eq(templates.tenantId, req.user.tenantId)
+      ),
       with: {
         user: {
           columns: {

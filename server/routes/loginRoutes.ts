@@ -4,7 +4,7 @@ import { betterAuthUser, betterAuthSession, betterAuthAccount, betterAuthVerific
 import { eq, and, sql, lt, not } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 import { z } from 'zod';
-import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { getAuthSecret } from '../auth';
 // bcrypt removed — Better Auth uses scrypt via hashPassword
 import jwt from 'jsonwebtoken';
@@ -178,7 +178,7 @@ loginRoutes.post('/resend-verification', resendVerificationRateLimiter, async (r
           lastVerificationEmailSent: new Date(),
           updatedAt: new Date()
         })
-        .where(eq(betterAuthUser.id, user.id));
+        .where(and(eq(betterAuthUser.id, user.id), eq(betterAuthUser.tenantId, user.tenantId)));
 
       // Dispatch verification email via Trigger.dev + SES
       // Failures are logged internally but never surfaced to the client to
@@ -379,7 +379,7 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
 
       await db.update(betterAuthUser)
         .set({ lastLoginAt: new Date(), updatedAt: new Date() })
-        .where(eq(betterAuthUser.id, userRecord.id));
+        .where(and(eq(betterAuthUser.id, userRecord.id), eq(betterAuthUser.tenantId, userRecord.tenantId)));
 
       return res.json({
         success: true,
@@ -396,7 +396,7 @@ loginRoutes.post('/check-2fa-requirement', loginRateLimiter, async (req, res) =>
     // Delete any existing temp 2FA session for this user
     try {
       await db.delete(temp2faSessions)
-        .where(eq(temp2faSessions.userId, userRecord.id));
+        .where(and(eq(temp2faSessions.userId, userRecord.id), eq(temp2faSessions.tenantId, userRecord.tenantId)));
     } catch (deleteError) {
       console.error('❌ [2FA Check] Failed to delete existing sessions:', deleteError);
     }
@@ -492,7 +492,7 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req: any, res) => {
     if (new Date() > tempSession.expiresAt) {
       // Clean up expired session
       await db.delete(temp2faSessions)
-        .where(eq(temp2faSessions.id, tempSession.id));
+        .where(and(eq(temp2faSessions.id, tempSession.id), eq(temp2faSessions.tenantId, tempSession.tenantId)));
       clearTempTwoFactorCookie(res);
 
       return res.status(401).json({
@@ -512,7 +512,7 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req: any, res) => {
         `🚫 [2FA] Client binding mismatch for tempSession ${tempSession.id} user=${tempSession.userId}. Revoking temp session.`
       );
       await db.delete(temp2faSessions)
-        .where(eq(temp2faSessions.id, tempSession.id))
+        .where(and(eq(temp2faSessions.id, tempSession.id), eq(temp2faSessions.tenantId, tempSession.tenantId)))
         .catch(err => console.warn('⚠️ [2FA] Failed to delete bound temp session:', err));
       clearTempTwoFactorCookie(res);
       return res.status(401).json({
@@ -525,7 +525,7 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req: any, res) => {
     let user;
     try {
       user = await db.query.betterAuthUser.findFirst({
-        where: eq(betterAuthUser.id, tempSession.userId)
+        where: and(eq(betterAuthUser.id, tempSession.userId), eq(betterAuthUser.tenantId, tempSession.tenantId))
       });
 
       if (!user) {
@@ -558,7 +558,7 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req: any, res) => {
     const tokenValidAfter = user.tokenValidAfter ?? null;
     if (!user.isActive || (tokenValidAfter && tokenValidAfter > tempCreatedAt)) {
       await db.delete(temp2faSessions)
-        .where(eq(temp2faSessions.id, tempSession.id))
+        .where(and(eq(temp2faSessions.id, tempSession.id), eq(temp2faSessions.tenantId, tempSession.tenantId)))
         .catch(err => console.warn('⚠️ [2FA] Failed to delete stale temp session:', err));
       clearTempTwoFactorCookie(res);
       console.log(`🚫 [2FA] Rejecting verify-2fa for user ${user.id}: isActive=${user.isActive}, tokenValidAfter=${tokenValidAfter?.toISOString()}, tempCreatedAt=${tempCreatedAt.toISOString()}`);
@@ -583,12 +583,12 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req: any, res) => {
       // the previous in-process Map which could be evicted or zeroed.
       const [bumped] = await db.update(temp2faSessions)
         .set({ attemptCount: sql`${temp2faSessions.attemptCount} + 1` })
-        .where(eq(temp2faSessions.id, tempSession.id))
+        .where(and(eq(temp2faSessions.id, tempSession.id), eq(temp2faSessions.tenantId, tempSession.tenantId)))
         .returning({ attemptCount: temp2faSessions.attemptCount });
       const attempts = bumped?.attemptCount ?? MAX_2FA_ATTEMPTS_PER_TEMP_SESSION;
       if (attempts >= MAX_2FA_ATTEMPTS_PER_TEMP_SESSION) {
         await db.delete(temp2faSessions)
-          .where(eq(temp2faSessions.id, tempSession.id))
+          .where(and(eq(temp2faSessions.id, tempSession.id), eq(temp2faSessions.tenantId, tempSession.tenantId)))
           .catch(err => console.warn('⚠️ [2FA] Failed to delete temp session after cap:', err));
         clearTempTwoFactorCookie(res);
         return res.status(401).json({
@@ -605,7 +605,7 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req: any, res) => {
     // real session directly. Credentials were already verified during
     // check-2fa-requirement so no re-authentication is needed.
     await db.delete(temp2faSessions)
-      .where(eq(temp2faSessions.id, tempSession.id));
+      .where(and(eq(temp2faSessions.id, tempSession.id), eq(temp2faSessions.tenantId, tempSession.tenantId)));
     clearTempTwoFactorCookie(res);
 
     // Create session directly (same approach as verify-email). Session row
@@ -644,7 +644,7 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req: any, res) => {
         lastLoginAt: new Date(),
         updatedAt: new Date()
       })
-      .where(eq(betterAuthUser.id, user.id));
+      .where(and(eq(betterAuthUser.id, user.id), eq(betterAuthUser.tenantId, user.tenantId)));
 
     // Deliberately do NOT echo the user's email / name back in the response
     // body. The session cookie already authenticates the browser; the
@@ -672,7 +672,7 @@ loginRoutes.post('/verify-2fa', twoFactorRateLimiter, async (req: any, res) => {
 // there is no row keyed by the Better-Auth session cookie. This endpoint
 // (re)creates that row so protected UI gates (TwoFactorGuard / use2FA) can
 // consult it via /2fa-status.
-loginRoutes.post('/verify-session-2fa', twoFactorRateLimiter, authenticateToken, async (req: any, res) => {
+loginRoutes.post('/verify-session-2fa', twoFactorRateLimiter, authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { token } = req.body;
 
@@ -693,7 +693,7 @@ loginRoutes.post('/verify-session-2fa', twoFactorRateLimiter, authenticateToken,
     }
 
     const user = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, userId)
+      where: and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId))
     }).catch(err => {
       console.error('Error getting user for session 2FA verification:', err);
       return null;
@@ -727,7 +727,10 @@ loginRoutes.post('/verify-session-2fa', twoFactorRateLimiter, authenticateToken,
     const verifiedExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
     try {
       await db.delete(temp2faSessions)
-        .where(eq(temp2faSessions.sessionToken, sessionToken));
+        .where(and(
+          eq(temp2faSessions.sessionToken, sessionToken),
+          eq(temp2faSessions.tenantId, tenantId)
+        ));
 
       await db.insert(temp2faSessions).values({
         sessionToken,
@@ -743,7 +746,7 @@ loginRoutes.post('/verify-session-2fa', twoFactorRateLimiter, authenticateToken,
 
     await db.update(betterAuthUser)
       .set({ lastLoginAt: new Date(), updatedAt: new Date() })
-      .where(eq(betterAuthUser.id, user.id));
+      .where(and(eq(betterAuthUser.id, user.id), eq(betterAuthUser.tenantId, tenantId)));
 
     res.json({
       success: true,
@@ -758,7 +761,7 @@ loginRoutes.post('/verify-session-2fa', twoFactorRateLimiter, authenticateToken,
 });
 
 // Get current 2FA verification status
-loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
+loginRoutes.get('/2fa-status', authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const tenantId = req.user.tenantId;
@@ -767,7 +770,7 @@ loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
     let user;
     try {
       user = await db.query.betterAuthUser.findFirst({
-        where: eq(betterAuthUser.id, userId)
+        where: and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId))
       });
 
       if (!user) {
@@ -812,6 +815,7 @@ loginRoutes.get('/2fa-status', authenticateToken, async (req: any, res) => {
     const verification = await db.query.temp2faSessions.findFirst({
       where: and(
         eq(temp2faSessions.sessionToken, sessionToken),
+        eq(temp2faSessions.tenantId, tenantId),
         eq(temp2faSessions.verified, true)
       )
     });
@@ -955,7 +959,7 @@ loginRoutes.post('/verify-email', verifyEmailRateLimiter, async (req, res) => {
           emailVerificationExpires: null,
           updatedAt: new Date()
         })
-        .where(eq(betterAuthUser.id, user.id));
+        .where(and(eq(betterAuthUser.id, user.id), eq(betterAuthUser.tenantId, user.tenantId)));
       return res.json({
         message: 'Email already verified',
         success: true,
@@ -970,7 +974,7 @@ loginRoutes.post('/verify-email', verifyEmailRateLimiter, async (req, res) => {
           emailVerificationExpires: null,
           updatedAt: new Date()
         })
-        .where(eq(betterAuthUser.id, user.id));
+        .where(and(eq(betterAuthUser.id, user.id), eq(betterAuthUser.tenantId, user.tenantId)));
 
       console.log('✅ [Verify Email] Email verified for user:', user.id);
 
@@ -1038,10 +1042,11 @@ runScheduledJob('shared-cooldown-prune', 10 * 60 * 1000, async () => {
   pruneMemoryCooldowns();
 });
 
-loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any, res) => {
+loginRoutes.post('/change-email-unverified', authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const userId = req.user?.id;
-    if (!userId) {
+    const tenantId = req.user?.tenantId;
+    if (!userId || !tenantId) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
@@ -1075,7 +1080,7 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
 
     // Fetch current user
     const user = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, userId),
+      where: and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)),
     });
 
     if (!user) {
@@ -1161,7 +1166,7 @@ loginRoutes.post('/change-email-unverified', authenticateToken, async (req: any,
         lastVerificationEmailSent: verificationSentAt,
         updatedAt: new Date(),
       })
-      .where(eq(betterAuthUser.id, userId));
+      .where(and(eq(betterAuthUser.id, userId), eq(betterAuthUser.tenantId, tenantId)));
 
     // Invalidate all existing sessions for this user (except current) to prevent
     // stale sessions from being used with the old email
@@ -1433,7 +1438,7 @@ loginRoutes.post('/reset-password', resetPasswordRateLimiter, async (req, res) =
     // this reset themselves) could still complete login via /verify-2fa
     // within the 10-minute temp session window.
     await db.delete(temp2faSessions)
-      .where(eq(temp2faSessions.userId, user.id))
+      .where(and(eq(temp2faSessions.userId, user.id), eq(temp2faSessions.tenantId, user.tenantId)))
       .catch(err => console.warn('⚠️ [Reset Password] Failed to delete temp 2FA sessions:', err));
 
     // Update tokenValidAfter to invalidate any cached tokens
@@ -1442,7 +1447,7 @@ loginRoutes.post('/reset-password', resetPasswordRateLimiter, async (req, res) =
         tokenValidAfter: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(betterAuthUser.id, user.id));
+      .where(and(eq(betterAuthUser.id, user.id), eq(betterAuthUser.tenantId, user.tenantId)));
 
     // Invalidate security cache — password was reset and all sessions revoked
     invalidateUserSecurity(user.id, 'password_reset', {

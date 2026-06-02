@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { betterAuthSession, betterAuthUser, updateProfileSchema } from '@shared/schema';
 import { eq, and, not } from 'drizzle-orm';
-import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { avatarUpload, handleUploadError } from '../middleware/upload';
 import { uploadToR2, deleteImageFromR2, R2_CONFIG } from '../config/r2';
 import { optimizeAvatar } from '../lib/imageOptimizer';
@@ -22,7 +22,7 @@ function extractBaseToken(cookieToken: string | undefined): string | undefined {
 }
 
 // Get user's own sessions
-authRoutes.get("/user-sessions", authenticateToken, async (req: any, res) => {
+authRoutes.get("/user-sessions", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     // Get the actual user ID from the authenticated session
     const userId = req.user.id;
@@ -106,7 +106,7 @@ authRoutes.get("/user-sessions", authenticateToken, async (req: any, res) => {
 });
 
 // Delete a specific session
-authRoutes.delete("/user-sessions", authenticateToken, async (req: any, res) => {
+authRoutes.delete("/user-sessions", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { sessionId } = req.body;
     // Get the actual user ID from the authenticated session
@@ -191,7 +191,7 @@ authRoutes.delete("/user-sessions", authenticateToken, async (req: any, res) => 
 });
 
 // Log out all other sessions
-authRoutes.post("/logout-all", authenticateToken, async (req: any, res) => {
+authRoutes.post("/logout-all", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     // Get the actual user ID from the authenticated session
     const userId = req.user.id;
@@ -253,7 +253,7 @@ authRoutes.post("/logout-all", authenticateToken, async (req: any, res) => {
 });
 
 // Update user profile (language, theme, menu preferences)
-authRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
+authRoutes.patch("/profile", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const updateData = req.body;
@@ -296,7 +296,7 @@ authRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
 });
 
 // Upload avatar
-authRoutes.post("/avatar", authenticateToken, (req: any, res) => {
+authRoutes.post("/avatar", authenticateToken, requireTenant, (req: any, res) => {
   avatarUpload(req, res, async (err) => {
     if (err) {
       const errorMessage = handleUploadError(err);
@@ -305,6 +305,7 @@ authRoutes.post("/avatar", authenticateToken, (req: any, res) => {
 
     try {
       const userId = req.user.id;
+      const tenantId = req.user.tenantId;
       const file = req.file;
 
       if (!file) {
@@ -321,7 +322,10 @@ authRoutes.post("/avatar", authenticateToken, (req: any, res) => {
 
       // Get current user to check for existing avatar
       const currentUser = await db.query.betterAuthUser.findFirst({
-        where: eq(betterAuthUser.id, userId)
+        where: and(
+          eq(betterAuthUser.id, userId),
+          eq(betterAuthUser.tenantId, tenantId)
+        )
       });
 
       // Optimize image using sharp before upload
@@ -350,7 +354,10 @@ authRoutes.post("/avatar", authenticateToken, (req: any, res) => {
           avatarUrl,
           updatedAt: new Date(),
         })
-        .where(eq(betterAuthUser.id, userId))
+        .where(and(
+          eq(betterAuthUser.id, userId),
+          eq(betterAuthUser.tenantId, tenantId)
+        ))
         .returning();
 
       if (updatedUser.length === 0) {
@@ -381,13 +388,17 @@ authRoutes.post("/avatar", authenticateToken, (req: any, res) => {
 });
 
 // Delete avatar
-authRoutes.delete("/avatar", authenticateToken, async (req: any, res) => {
+authRoutes.delete("/avatar", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const userId = req.user.id;
+    const tenantId = req.user.tenantId;
 
     // Get current user to check for existing avatar
     const currentUser = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, userId)
+      where: and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, tenantId)
+      )
     });
 
     if (!currentUser) {
@@ -407,7 +418,10 @@ authRoutes.delete("/avatar", authenticateToken, async (req: any, res) => {
         avatarUrl: null,
         updatedAt: new Date(),
       })
-      .where(eq(betterAuthUser.id, userId))
+      .where(and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, tenantId)
+      ))
       .returning();
 
     console.log('✅ [Avatar] Successfully deleted avatar for user:', userId);

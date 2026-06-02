@@ -4,7 +4,7 @@ import { enhancedEmailService } from '../emailService';
 import { db } from '../db';
 import { and, eq, sql } from 'drizzle-orm';
 import { unsubscribeTokens, emailContacts, emailActivity } from '@shared/schema';
-import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requireRole } from '../middleware/auth-middleware';
 
 export const emailRoutes = Router();
 
@@ -17,7 +17,7 @@ const unsubscribeLimiter = rateLimit({
 });
 
 // Email system status endpoint
-emailRoutes.get('/status', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+emailRoutes.get('/status', authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const status = enhancedEmailService.getStatus();
     const healthCheck = await enhancedEmailService.healthCheck();
@@ -71,7 +71,10 @@ emailRoutes.post('/unsubscribe', async (req, res) => {
     if (!tokenRow.usedAt) {
       await db.update(unsubscribeTokens)
         .set({ usedAt: new Date() as any })
-        .where(eq(unsubscribeTokens.id, tokenRow.id));
+        .where(and(
+          eq(unsubscribeTokens.id, tokenRow.id),
+          eq(unsubscribeTokens.tenantId, tokenRow.tenantId)
+        ));
     }
 
     await db.insert(emailActivity).values({
@@ -198,7 +201,7 @@ emailRoutes.post('/unsubscribe/preferences', unsubscribeLimiter, async (req, res
 
 
 // Send custom email endpoint (for testing)
-emailRoutes.post('/send', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+emailRoutes.post('/send', authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const {
       to,
@@ -277,7 +280,7 @@ emailRoutes.get('/health', async (req, res) => {
 });
 
 // Provider configuration endpoints (for admin use)
-emailRoutes.get('/providers', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+emailRoutes.get('/providers', authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const status = enhancedEmailService.getStatus();
 

@@ -248,7 +248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Birthday test endpoint - sends a test birthday card via Trigger.dev + Resend
   // Business logic extracted to server/services/birthdayTestService.ts for testability
-  app.post("/api/birthday-test", authenticateToken, async (req: any, res) => {
+  app.post("/api/birthday-test", authenticateToken, requireTenant, async (req: any, res) => {
     try {
       const { sendBirthdayTestEmail } = await import('./services/birthdayTestService');
 
@@ -292,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate external service token endpoint
-  app.post("/api/external-token", authenticateToken, jwtTokenRateLimiter, async (req: any, res) => {
+  app.post("/api/external-token", authenticateToken, requireTenant, jwtTokenRateLimiter, async (req: any, res) => {
     try {
       // Use consistent auth secret (same as loginRoutes.ts)
       const jwtSecret = getAuthSecret();

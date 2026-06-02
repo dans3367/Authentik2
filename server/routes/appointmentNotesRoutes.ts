@@ -122,7 +122,10 @@ router.post('/', async (req: Request, res: Response) => {
       })
       .from(appointmentNotes)
       .leftJoin(betterAuthUser, eq(appointmentNotes.userId, betterAuthUser.id))
-      .where(eq(appointmentNotes.id, newNote[0].id))
+      .where(and(
+        eq(appointmentNotes.id, newNote[0].id),
+        eq(appointmentNotes.tenantId, tenantId)
+      ))
       .limit(1);
 
     res.status(201).json({ 
@@ -193,7 +196,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
       })
       .from(appointmentNotes)
       .leftJoin(betterAuthUser, eq(appointmentNotes.userId, betterAuthUser.id))
-      .where(eq(appointmentNotes.id, updatedNote[0].id))
+      .where(and(
+        eq(appointmentNotes.id, updatedNote[0].id),
+        eq(appointmentNotes.tenantId, tenantId)
+      ))
       .limit(1);
 
     res.json({ 

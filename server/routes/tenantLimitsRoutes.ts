@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requireRole } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requireRole } from '../middleware/auth-middleware';
 import { storage } from '../storage';
 import { createTenantLimitsSchema, updateTenantLimitsSchema } from '@shared/schema';
 import { sanitizeString } from '../utils/sanitization';
@@ -7,7 +7,7 @@ import { sanitizeString } from '../utils/sanitization';
 export const tenantLimitsRoutes = Router();
 
 // Get tenant limits for a specific tenant
-tenantLimitsRoutes.get('/:tenantId', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+tenantLimitsRoutes.get('/:tenantId', authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { tenantId } = req.params;
     
@@ -34,7 +34,7 @@ tenantLimitsRoutes.get('/:tenantId', authenticateToken, requireRole(['Owner', 'A
 });
 
 // Create or update tenant limits
-tenantLimitsRoutes.post('/:tenantId', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+tenantLimitsRoutes.post('/:tenantId', authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { tenantId } = req.params;
     
@@ -76,7 +76,7 @@ tenantLimitsRoutes.post('/:tenantId', authenticateToken, requireRole(['Owner', '
 });
 
 // Update tenant limits
-tenantLimitsRoutes.put('/:tenantId', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+tenantLimitsRoutes.put('/:tenantId', authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { tenantId } = req.params;
     
@@ -114,7 +114,7 @@ tenantLimitsRoutes.put('/:tenantId', authenticateToken, requireRole(['Owner', 'A
 });
 
 // Delete tenant limits (revert to subscription plan limits)
-tenantLimitsRoutes.delete('/:tenantId', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+tenantLimitsRoutes.delete('/:tenantId', authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { tenantId } = req.params;
     
@@ -140,7 +140,7 @@ tenantLimitsRoutes.delete('/:tenantId', authenticateToken, requireRole(['Owner',
 });
 
 // Get shop limit events for analytics
-tenantLimitsRoutes.get('/:tenantId/events', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+tenantLimitsRoutes.get('/:tenantId/events', authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { tenantId } = req.params;
     const { eventType, fromDate, toDate, limit = 50 } = req.query;
@@ -177,7 +177,7 @@ tenantLimitsRoutes.get('/:tenantId/events', authenticateToken, requireRole(['Own
 });
 
 // Get current shop usage and limits summary
-tenantLimitsRoutes.get('/:tenantId/summary', authenticateToken, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
+tenantLimitsRoutes.get('/:tenantId/summary', authenticateToken, requireTenant, requireRole(['Owner', 'Administrator']), async (req: any, res) => {
   try {
     const { tenantId } = req.params;
     

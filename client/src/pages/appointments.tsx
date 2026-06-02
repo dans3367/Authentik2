@@ -531,6 +531,15 @@ export default function RemindersPage() {
     setViewAppointmentPanelOpen(true);
   };
 
+  // Open the create dialog pre-seeded to a calendar day (default 9:00 AM).
+  const handleAddAppointmentForDate = (date: Date) => {
+    const seed = new Date(date);
+    seed.setHours(9, 0, 0, 0);
+    setNewAppointmentDefaults({ appointmentDate: seed });
+    setNewAppointmentSeedCustomer(undefined);
+    setNewAppointmentModalOpen(true);
+  };
+
   const handleEditAppointment = (appointment: AppointmentWithCustomer) => {
     setEditingAppointment(appointment);
     setEditAppointmentModalOpen(true);
@@ -983,41 +992,34 @@ export default function RemindersPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-7xl p-6 space-y-8">
-        {/* Page Header */}
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                {t('reminders.pageTitle')}
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400">{t('reminders.pageSubtitle')}</p>
-            </div>
-            <Button
-              onClick={() => {
-                setNewAppointmentDefaults(undefined);
-                setNewAppointmentSeedCustomer(undefined);
-                setNewAppointmentModalOpen(true);
-              }}
-            >
-              <CalendarPlus className="h-4 w-4 mr-2" />
-              {t('reminders.appointments.newAppointment')}
-            </Button>
-          </div>
-        </div>
-
+      <div className="mx-auto max-w-7xl p-6">
         <div className="flex flex-col gap-6">
           {/* Next Up Section */}
           <NextUpAppointments
             appointments={allAppointments}
             onViewDetails={handleViewAppointment}
             onConfirm={(id) => confirmAppointmentMutation.mutateAsync(id)}
+            pageTitle={t('reminders.pageTitle')}
+            pageSubtitle={t('reminders.pageSubtitle')}
+            pageAction={
+              <Button
+                onClick={() => {
+                  setNewAppointmentDefaults(undefined);
+                  setNewAppointmentSeedCustomer(undefined);
+                  setNewAppointmentModalOpen(true);
+                }}
+              >
+                <CalendarPlus className="h-4 w-4 mr-2" />
+                {t('reminders.appointments.newAppointment')}
+              </Button>
+            }
           />
 
           {/* Week board: stats sidebar + upcoming-this-week table */}
           <AppointmentsWeekBoard
             appointments={allAppointments}
             onViewAppointment={handleViewAppointment}
+            onAddAppointment={handleAddAppointmentForDate}
           />
 
         </div>

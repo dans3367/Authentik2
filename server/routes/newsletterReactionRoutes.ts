@@ -157,6 +157,7 @@ async function recordReaction(params: RecordReactionParams): Promise<{ success: 
         // Check if this user already reacted (upsert: update their reaction)
         const existingReaction = await db.query.newsletterReactions.findFirst({
             where: and(
+                eq(newsletterReactions.tenantId, tenantId),
                 eq(newsletterReactions.newsletterId, newsletterId),
                 eq(newsletterReactions.recipientEmail, recipientEmail),
             ),
@@ -672,4 +673,3 @@ function buildReactionPage(
 </body>
 </html>`;
 }
-

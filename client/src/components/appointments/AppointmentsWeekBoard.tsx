@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   addDays,
@@ -28,6 +28,7 @@ import {
   ChevronRight,
   Search,
   Filter,
+  Plus,
   TrendingUp,
   ArrowRight,
   Download,
@@ -117,6 +118,7 @@ const dayKey = (date: Date) => format(date, "yyyy-MM-dd");
 interface AppointmentsWeekBoardProps {
   appointments: AppointmentWithCustomer[];
   onViewAppointment: (appointment: AppointmentWithCustomer) => void;
+  onAddAppointment?: (date: Date) => void;
   onExportCsv?: () => void;
   onManageTemplates?: () => void;
   onViewCalendar?: () => void;
@@ -125,6 +127,7 @@ interface AppointmentsWeekBoardProps {
 export function AppointmentsWeekBoard({
   appointments,
   onViewAppointment,
+  onAddAppointment,
   onExportCsv,
   onManageTemplates,
   onViewCalendar,
@@ -221,7 +224,15 @@ export function AppointmentsWeekBoard({
     if (!isCurrentMonth && listTab !== "all") setListTab("all");
   }, [isCurrentMonth, listTab]);
 
+  // When the displayed month changes, reset the selected day to a sensible
+  // default — unless the change was driven by the day stepper crossing a month
+  // boundary, in which case the stepped day is kept (guard below).
+  const skipDayResetRef = useRef(false);
   useEffect(() => {
+    if (skipDayResetRef.current) {
+      skipDayResetRef.current = false;
+      return;
+    }
     setSelectedCalendarDate(isCurrentMonth ? now : selectedMonthDate);
   }, [isCurrentMonth, now, selectedMonthDate]);
 
@@ -430,6 +441,16 @@ export function AppointmentsWeekBoard({
       event.preventDefault();
       setSelectedCalendarDate(day);
     }
+  };
+
+  // Select a day, following it into another month when the stepper crosses a
+  // month boundary so the grid and appointment data stay in sync.
+  const goToDay = (date: Date) => {
+    if (!isSameMonth(date, selectedMonthDate)) {
+      skipDayResetRef.current = true;
+      handleMonthChange(format(date, "yyyy-MM"));
+    }
+    setSelectedCalendarDate(date);
   };
 
   return (
@@ -730,10 +751,10 @@ export function AppointmentsWeekBoard({
                     return (
                       <div
                         key={key}
-                        className="flex min-h-[460px] flex-col border-r border-border last:border-r-0"
+                        className="group flex min-h-[460px] flex-col border-r border-border last:border-r-0"
                       >
                         <div
-                          className={`border-b border-border px-3 py-2 text-center ${
+                          className={`relative border-b border-border px-3 py-2 text-center ${
                             today
                               ? "bg-rose-50/70 dark:bg-rose-950/20"
                               : "bg-slate-50/70 dark:bg-slate-900/40"
@@ -751,12 +772,34 @@ export function AppointmentsWeekBoard({
                           >
                             {format(day, "d")}
                           </div>
+                          {onAddAppointment && (
+                            <button
+                              type="button"
+                              onClick={() => onAddAppointment(day)}
+                              aria-label={t('reminders.board.calendar.addEvent')}
+                              title={t('reminders.board.calendar.addEvent')}
+                              className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 hover:text-slate-900 dark:hover:text-slate-100"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                         <div className="flex-1 space-y-2 p-2">
                           {dayAppointments.length === 0 ? (
-                            <div className="pt-6 text-center text-[11px] text-slate-300 dark:text-slate-600">
-                              —
-                            </div>
+                            onAddAppointment ? (
+                              <button
+                                type="button"
+                                onClick={() => onAddAppointment(day)}
+                                className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-slate-200 dark:border-slate-800 py-2 text-[11px] text-slate-400 dark:text-slate-500 transition hover:border-slate-300 hover:text-slate-600 dark:hover:border-slate-700 dark:hover:text-slate-300"
+                              >
+                                <Plus className="h-3 w-3" />
+                                {t('reminders.board.calendar.addEvent')}
+                              </button>
+                            ) : (
+                              <div className="pt-6 text-center text-[11px] text-slate-300 dark:text-slate-600">
+                                —
+                              </div>
+                            )
                           ) : (
                             dayAppointments.map(appointment => {
                               const appointmentDate = new Date(appointment.appointmentDate);
@@ -863,7 +906,7 @@ export function AppointmentsWeekBoard({
                             tabIndex={0}
                             onClick={() => setSelectedCalendarDate(day)}
                             onKeyDown={(event) => handleCalendarDayKeyDown(event, day)}
-                            className={`min-h-[128px] border-r border-b border-slate-100 dark:border-slate-800 p-2 text-left outline-none transition-colors ${
+                            className={`group min-h-[128px] border-r border-b border-slate-100 dark:border-slate-800 p-2 text-left outline-none transition-colors ${
                               outsideMonth
                                 ? "bg-slate-50/60 dark:bg-slate-950/30 text-slate-400 dark:text-slate-600"
                                 : "bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-900/60"
@@ -885,11 +928,28 @@ export function AppointmentsWeekBoard({
                               >
                                 {format(day, "d")}
                               </span>
-                              {dayAppointments.length > 0 && (
-                                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 tabular-nums">
-                                  {dayAppointments.length}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-1">
+                                {dayAppointments.length > 0 && (
+                                  <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 tabular-nums">
+                                    {dayAppointments.length}
+                                  </span>
+                                )}
+                                {onAddAppointment && (
+                                  <button
+                                    type="button"
+                                    onClick={event => {
+                                      event.stopPropagation();
+                                      setSelectedCalendarDate(day);
+                                      onAddAppointment(day);
+                                    }}
+                                    aria-label={t('reminders.board.calendar.addEvent')}
+                                    title={t('reminders.board.calendar.addEvent')}
+                                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 hover:text-slate-900 dark:hover:text-slate-100"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <div className="mt-2 space-y-1 overflow-hidden">
                               {dayAppointments.slice(0, 3).map(appointment => {
@@ -933,16 +993,54 @@ export function AppointmentsWeekBoard({
                 </div>
 
                 <aside className="border-t border-border">
-                  <div className="p-5 border-b border-border">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
-                      {t('reminders.board.calendar.selectedDay')}
-                    </p>
-                    <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
-                      {format(selectedCalendarDate, "EEEE, MMM d")}
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {formatAppointmentCount(selectedDayAppointments.length)}
-                    </p>
+                  <div className="flex items-start justify-between gap-3 p-5 border-b border-border">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
+                        {t('reminders.board.calendar.selectedDay')}
+                      </p>
+                      <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                        {format(selectedCalendarDate, "EEEE, MMM d")}
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {formatAppointmentCount(selectedDayAppointments.length)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 rounded-lg p-0"
+                          onClick={() => goToDay(addDays(selectedCalendarDate, -1))}
+                          aria-label={t('reminders.board.calendar.previousDay')}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 rounded-lg p-0"
+                          onClick={() => goToDay(addDays(selectedCalendarDate, 1))}
+                          aria-label={t('reminders.board.calendar.nextDay')}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {onAddAppointment && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 shrink-0 gap-1.5 rounded-lg"
+                          onClick={() => onAddAppointment(selectedCalendarDate)}
+                        >
+                          <Plus className="h-4 w-4" />
+                          {t('reminders.board.calendar.addEvent')}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   <div className="max-h-[520px] overflow-y-auto p-4">
                     {selectedDayAppointments.length === 0 ? (

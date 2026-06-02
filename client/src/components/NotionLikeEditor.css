@@ -1785,6 +1785,63 @@
   color: #6b7280;
 }
 
+/* ─── Embedded email canvas: always light ─────────────────────────────────────
+   The newsletter editor renders the actual email, which is always on its own
+   light background. Re-assert the light-mode content colors inside the embedded
+   canvas so dark mode never bleeds into the email body. */
+.dark .notion-editor-content.notion-editor-embedded {
+  color: #374151;
+}
+
+.dark .notion-editor-content.notion-editor-embedded h1 {
+  color: #111827;
+}
+
+.dark .notion-editor-content.notion-editor-embedded h2 {
+  color: #1f2937;
+}
+
+.dark .notion-editor-content.notion-editor-embedded h3 {
+  color: #374151;
+}
+
+.dark .notion-editor-content.notion-editor-embedded code {
+  background: #f3f4f6;
+  color: #dc2626;
+}
+
+.dark .notion-editor-content.notion-editor-embedded blockquote {
+  border-left-color: #e5e7eb;
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+.dark .notion-editor-content.notion-editor-embedded hr {
+  border-top-color: #e5e7eb;
+}
+
+.dark .notion-editor-content.notion-editor-embedded s {
+  color: #9ca3af;
+}
+
+.dark .notion-editor-content.notion-editor-embedded .tableWrapper {
+  border-color: #e5e7eb;
+}
+
+.dark .notion-editor-content.notion-editor-embedded table td,
+.dark .notion-editor-content.notion-editor-embedded table th {
+  border-color: #e5e7eb;
+}
+
+.dark .notion-editor-content.notion-editor-embedded table th {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.dark .notion-editor-content.notion-editor-embedded table .selectedCell {
+  background-color: rgba(99, 102, 241, 0.08);
+}
+
 .dark .notion-slash-menu {
   background: #1f2937;
   border-color: #374151;

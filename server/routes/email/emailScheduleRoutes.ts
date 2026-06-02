@@ -1009,7 +1009,10 @@ emailScheduleRoutes.post("/email-contacts/:id/send-email", authenticateToken, re
       lastActivity: new Date(),
       updatedAt: new Date()
     })
-    .where(eq(emailContacts.id, contact.id));
+    .where(and(
+      eq(emailContacts.id, contact.id),
+      eq(emailContacts.tenantId, tenantId)
+    ));
 
   console.log(`✅ [SendEmail] Email queued successfully for ${contact.email}, subject: "${subject}", runId: ${result?.runId}`);
 

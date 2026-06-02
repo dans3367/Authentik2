@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { db } from '../db';
 import { betterAuthUser } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
@@ -39,9 +39,12 @@ function clearPending2FASecret(userId: string) {
 }
 
 // Helper function to get user from betterAuthUser table
-export async function getUser(userId: string) {
+export async function getUser(userId: string, tenantId: string) {
   const user = await db.query.betterAuthUser.findFirst({
-    where: eq(betterAuthUser.id, userId)
+    where: and(
+      eq(betterAuthUser.id, userId),
+      eq(betterAuthUser.tenantId, tenantId)
+    )
   });
 
   if (!user) {
@@ -52,7 +55,7 @@ export async function getUser(userId: string) {
 }
 
 // Setup 2FA - Generate secret and QR code
-twoFactorRoutes.post('/setup', authenticateToken, async (req: any, res) => {
+twoFactorRoutes.post('/setup', authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const tenantId = req.user.tenantId;
@@ -60,7 +63,7 @@ twoFactorRoutes.post('/setup', authenticateToken, async (req: any, res) => {
     // Get or create user using helper function
     let user;
     try {
-      user = await getUser(userId);
+      user = await getUser(userId, tenantId);
     } catch (error) {
       console.error('Error getting or creating user:', error);
       return res.status(404).json({ message: 'User not found' });
@@ -92,7 +95,7 @@ twoFactorRoutes.post('/setup', authenticateToken, async (req: any, res) => {
 });
 
 // Enable 2FA - Verify token and enable
-twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
+twoFactorRoutes.post('/enable', authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const tenantId = req.user.tenantId;
@@ -111,7 +114,7 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
     // Get or create user using helper function
     let user;
     try {
-      user = await getUser(userId);
+      user = await getUser(userId, tenantId);
     } catch (error) {
       console.error('Error getting or creating user:', error);
       return res.status(404).json({ message: 'User not found' });
@@ -139,7 +142,10 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
         twoFactorSecret: secret,
         updatedAt: new Date(),
       })
-      .where(eq(betterAuthUser.id, user.id)); // Use the actual user ID from the fetched record, not the auth token
+      .where(and(
+        eq(betterAuthUser.id, user.id),
+        eq(betterAuthUser.tenantId, tenantId)
+      )); // Use the actual user ID from the fetched record, not the auth token
 
     console.log(`📊 [2FA Enable] Update result:`, updateResult);
     console.log(`✅ [2FA Enable] Rows affected: ${updateResult.rowCount || 0}`);
@@ -151,7 +157,10 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
 
     // Verify the update worked by fetching the user again
     const updatedUser = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, user.id)
+      where: and(
+        eq(betterAuthUser.id, user.id),
+        eq(betterAuthUser.tenantId, tenantId)
+      )
     });
 
     console.log(`🔍 [2FA Enable] Verification - Updated user 2FA status: ${updatedUser?.twoFactorEnabled}, has secret: ${!!updatedUser?.twoFactorSecret}`);
@@ -173,7 +182,7 @@ twoFactorRoutes.post('/enable', authenticateToken, async (req: any, res) => {
 });
 
 // Disable 2FA - Require current token for verification
-twoFactorRoutes.post('/disable', authenticateToken, async (req: any, res) => {
+twoFactorRoutes.post('/disable', authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const tenantId = req.user.tenantId;
@@ -186,7 +195,7 @@ twoFactorRoutes.post('/disable', authenticateToken, async (req: any, res) => {
     // Get or create user using helper function
     let user;
     try {
-      user = await getUser(userId);
+      user = await getUser(userId, tenantId);
     } catch (error) {
       console.error('Error getting or creating user:', error);
       return res.status(404).json({ message: 'User not found' });
@@ -233,7 +242,7 @@ twoFactorRoutes.post('/disable', authenticateToken, async (req: any, res) => {
 });
 
 // Verify 2FA token (for login or other verification)
-twoFactorRoutes.post('/verify', authenticateToken, async (req: any, res) => {
+twoFactorRoutes.post('/verify', authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const tenantId = req.user.tenantId;
@@ -246,7 +255,7 @@ twoFactorRoutes.post('/verify', authenticateToken, async (req: any, res) => {
     // Get or create user using helper function
     let user;
     try {
-      user = await getUser(userId);
+      user = await getUser(userId, tenantId);
     } catch (error) {
       console.error('Error getting or creating user:', error);
       return res.status(404).json({ message: 'User not found' });
@@ -275,7 +284,7 @@ twoFactorRoutes.post('/verify', authenticateToken, async (req: any, res) => {
 });
 
 // Get 2FA status
-twoFactorRoutes.get('/status', authenticateToken, async (req: any, res) => {
+twoFactorRoutes.get('/status', authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const tenantId = req.user.tenantId;
@@ -285,7 +294,7 @@ twoFactorRoutes.get('/status', authenticateToken, async (req: any, res) => {
     // Get or create user using helper function
     let user;
     try {
-      user = await getUser(userId);
+      user = await getUser(userId, tenantId);
       console.log(`✅ [2FA Status] User found/created: ${user.email}, 2FA enabled: ${user.twoFactorEnabled}, has secret: ${!!user.twoFactorSecret}`);
     } catch (error) {
       console.error('❌ [2FA Status] Error getting or creating user:', error);
@@ -303,4 +312,3 @@ twoFactorRoutes.get('/status', authenticateToken, async (req: any, res) => {
     res.status(500).json({ message: 'Failed to get 2FA status' });
   }
 });
-

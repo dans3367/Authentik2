@@ -33,6 +33,9 @@ interface NextUpAppointmentsProps {
   appointments: AppointmentWithCustomer[];
   onViewDetails: (appointment: AppointmentWithCustomer) => void;
   onConfirm?: (appointmentId: string) => Promise<unknown> | void;
+  pageTitle?: ReactNode;
+  pageSubtitle?: ReactNode;
+  pageAction?: ReactNode;
 }
 
 const AVATAR_PALETTE = [
@@ -164,7 +167,14 @@ function CustomerInfoDialog({ customer, trigger }: CustomerInfoDialogProps) {
   );
 }
 
-export function NextUpAppointments({ appointments, onViewDetails, onConfirm }: NextUpAppointmentsProps) {
+export function NextUpAppointments({
+  appointments,
+  onViewDetails,
+  onConfirm,
+  pageTitle,
+  pageSubtitle,
+  pageAction,
+}: NextUpAppointmentsProps) {
   const [now, setNow] = useState(new Date());
   const [hoursRange, setHoursRange] = useState(48);
   const [confirmingIds, setConfirmingIds] = useState<Set<string>>(new Set());
@@ -222,53 +232,88 @@ export function NextUpAppointments({ appointments, onViewDetails, onConfirm }: N
     a => a.status !== 'confirmed' && a.status !== 'in_progress'
   ).length;
 
-  return (
-    <Card className="mb-6 shadow-sm">
-      <CardHeader className="pb-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
-          <div className="flex flex-col gap-2">
-            <span className="text-[11px] font-semibold tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
-              Agenda
-            </span>
-            <Select
-              value={hoursRange.toString()}
-              onValueChange={(val) => setHoursRange(parseInt(val))}
-            >
-              <SelectTrigger
-                aria-label="Time range"
-                className="h-auto w-auto p-0 border-0 bg-transparent shadow-none hover:bg-transparent focus:ring-0 focus:ring-offset-0 text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 gap-2 [&>svg]:h-5 [&>svg]:w-5 [&>svg]:text-slate-400"
-              >
-                <span>Next {hoursRange} hours</span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="12">Next 12 hours</SelectItem>
-                <SelectItem value="24">Next 24 hours</SelectItem>
-                <SelectItem value="36">Next 36 hours</SelectItem>
-                <SelectItem value="48">Next 48 hours</SelectItem>
-                <SelectItem value="64">Next 64 hours</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+  const agendaControl = (
+    <div className="flex flex-col gap-2">
+      <span className="text-[11px] font-semibold tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
+        Agenda
+      </span>
+      <Select
+        value={hoursRange.toString()}
+        onValueChange={(val) => setHoursRange(parseInt(val))}
+      >
+        <SelectTrigger
+          aria-label="Time range"
+          className="h-auto w-auto p-0 border-0 bg-transparent shadow-none hover:bg-transparent focus:ring-0 focus:ring-offset-0 text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 gap-2 [&>svg]:h-5 [&>svg]:w-5 [&>svg]:text-slate-400"
+        >
+          <span>Next {hoursRange} hours</span>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="12">Next 12 hours</SelectItem>
+          <SelectItem value="24">Next 24 hours</SelectItem>
+          <SelectItem value="36">Next 36 hours</SelectItem>
+          <SelectItem value="48">Next 48 hours</SelectItem>
+          <SelectItem value="64">Next 64 hours</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
-          <div className="flex items-start gap-8 pb-1">
-            <div className="flex flex-col items-center">
-              <span className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums leading-none">
-                {nextUp.length}
-              </span>
-              <span className="mt-2 text-[11px] font-medium tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
-                Total
-              </span>
+  const appointmentCounts = (
+    <div className="flex items-start gap-8 pb-1">
+      <div className="flex flex-col items-center">
+        <span className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums leading-none">
+          {nextUp.length}
+        </span>
+        <span className="mt-2 text-[11px] font-medium tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
+          Total
+        </span>
+      </div>
+      <div className="flex flex-col items-center">
+        <span className="text-3xl sm:text-4xl font-semibold tracking-tight text-amber-600 dark:text-amber-500 tabular-nums leading-none">
+          {unconfirmedCount}
+        </span>
+        <span className="mt-2 text-[11px] font-medium tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
+          Unconfirmed
+        </span>
+      </div>
+    </div>
+  );
+
+  const hasPageHeader = Boolean(pageTitle || pageSubtitle || pageAction);
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-6">
+        {hasPageHeader ? (
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center lg:gap-8">
+            <div className="min-w-0 space-y-1">
+              {pageTitle && (
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
+                  {pageTitle}
+                </h1>
+              )}
+              {pageSubtitle && (
+                <p className="text-gray-600 dark:text-gray-400">
+                  {pageSubtitle}
+                </p>
+              )}
             </div>
-            <div className="flex flex-col items-center">
-              <span className="text-3xl sm:text-4xl font-semibold tracking-tight text-amber-600 dark:text-amber-500 tabular-nums leading-none">
-                {unconfirmedCount}
-              </span>
-              <span className="mt-2 text-[11px] font-medium tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
-                Unconfirmed
-              </span>
+
+            <div className="min-w-0 lg:border-l lg:border-slate-200 lg:pl-8 dark:lg:border-slate-800">
+              {agendaControl}
+            </div>
+
+            <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center lg:justify-end">
+              {appointmentCounts}
+              {pageAction && <div className="shrink-0">{pageAction}</div>}
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
+            {agendaControl}
+            {appointmentCounts}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {nextUp.length === 0 ? (

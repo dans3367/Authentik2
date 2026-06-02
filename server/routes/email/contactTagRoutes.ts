@@ -28,7 +28,10 @@ contactTagRoutes.get("/contact-tags", authenticateToken, requireTenant, requireP
       let shopName: string | null = null;
       if (tag.shopId) {
         const shop = await db.query.shops.findFirst({
-          where: eq(shops.id, tag.shopId),
+          where: and(
+            eq(shops.id, tag.shopId),
+            eq(shops.tenantId, req.user.tenantId)
+          ),
           columns: { name: true },
         });
         shopName = shop?.name ?? null;

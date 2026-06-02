@@ -343,7 +343,10 @@ router.post('/', requirePermission('appointments.manage_reminders'), async (req:
           await db
             .update(appointmentReminders)
             .set({ status: 'failed', errorMessage: `Failed to ${isSendNow ? 'send' : 'schedule'} via Trigger.dev: ${result.error}`, updatedAt: new Date() })
-            .where(eq(appointmentReminders.id, newReminder[0].id));
+            .where(and(
+              eq(appointmentReminders.id, newReminder[0].id),
+              eq(appointmentReminders.tenantId, tenantId)
+            ));
         } else {
           // Store the Trigger.dev run ID for potential cancellation later (using inngestEventId field for backwards compatibility)
           await db
@@ -352,7 +355,10 @@ router.post('/', requirePermission('appointments.manage_reminders'), async (req:
               inngestEventId: result.runId || null,
               updatedAt: new Date()
             })
-            .where(eq(appointmentReminders.id, newReminder[0].id));
+            .where(and(
+              eq(appointmentReminders.id, newReminder[0].id),
+              eq(appointmentReminders.tenantId, tenantId)
+            ));
 
           if (isSendNow) {
             console.log(`📧 Immediate reminder triggered for appointment ${appointment.id} to ${appointment.customer.email}, runId: ${result.runId}`);
@@ -369,7 +375,10 @@ router.post('/', requirePermission('appointments.manage_reminders'), async (req:
             status: 'failed',
             errorMessage: triggerError instanceof Error ? triggerError.message : 'Unknown error'
           })
-          .where(eq(appointmentReminders.id, newReminder[0].id));
+          .where(and(
+            eq(appointmentReminders.id, newReminder[0].id),
+            eq(appointmentReminders.tenantId, tenantId)
+          ));
       }
     }
 
@@ -555,7 +564,10 @@ router.post('/send', requirePermission('appointments.manage_reminders'), async (
             reminderSentAt: new Date(),
             updatedAt: new Date(),
           })
-          .where(eq(appointments.id, appointment.id));
+          .where(and(
+            eq(appointments.id, appointment.id),
+            eq(appointments.tenantId, tenantId)
+          ));
 
         remindersCreated.push(newReminder[0]);
 
@@ -614,7 +626,10 @@ router.post('/send', requirePermission('appointments.manage_reminders'), async (
               await db
                 .update(appointmentReminders)
                 .set({ status: 'failed', errorMessage: `Trigger.dev bulk send failed: ${bulkResult.error}`, updatedAt: new Date() })
-                .where(eq(appointmentReminders.id, reminder.id));
+                .where(and(
+                  eq(appointmentReminders.id, reminder.id),
+                  eq(appointmentReminders.tenantId, tenantId)
+                ));
             }
           }
         } catch (triggerError) {
@@ -623,7 +638,10 @@ router.post('/send', requirePermission('appointments.manage_reminders'), async (
             await db
               .update(appointmentReminders)
               .set({ status: 'failed', errorMessage: triggerError instanceof Error ? triggerError.message : 'Unknown error', updatedAt: new Date() })
-              .where(eq(appointmentReminders.id, reminder.id));
+              .where(and(
+                eq(appointmentReminders.id, reminder.id),
+                eq(appointmentReminders.tenantId, tenantId)
+              ));
           }
         }
       }
@@ -727,7 +745,10 @@ router.put('/:id/reschedule', requirePermission('appointments.manage_reminders')
       })
       .from(appointments)
       .leftJoin(emailContacts, eq(appointments.customerId, emailContacts.id))
-      .where(eq(appointments.id, reminder.appointmentId))
+      .where(and(
+        eq(appointments.id, reminder.appointmentId),
+        eq(appointments.tenantId, tenantId)
+      ))
       .limit(1);
 
     if (appointmentWithCustomer.length === 0) {
@@ -798,7 +819,10 @@ router.put('/:id/reschedule', requirePermission('appointments.manage_reminders')
         inngestEventId: newRunId,
         updatedAt: new Date(),
       })
-      .where(eq(appointmentReminders.id, id))
+      .where(and(
+        eq(appointmentReminders.id, id),
+        eq(appointmentReminders.tenantId, tenantId)
+      ))
       .returning();
 
     console.log(`🔄 [Reschedule] Reminder ${id} rescheduled from ${reminder.scheduledFor} to ${newScheduledTime.toISOString()}`);
@@ -871,7 +895,10 @@ router.put('/:id/status', requirePermission('appointments.manage_reminders'), as
         sentAt: status === 'sent' ? new Date() : reminder.sentAt,
         updatedAt: new Date(),
       })
-      .where(eq(appointmentReminders.id, id))
+      .where(and(
+        eq(appointmentReminders.id, id),
+        eq(appointmentReminders.tenantId, tenantId)
+      ))
       .returning();
 
     res.json({

@@ -628,7 +628,10 @@ contactRoutes.get("/email-contacts/:id", authenticateToken, requireTenant, requi
     let shopName: string | null = null;
     if (contact.shopId) {
       const shop = await db.query.shops.findFirst({
-        where: eq(shops.id, contact.shopId),
+        where: and(
+          eq(shops.id, contact.shopId),
+          eq(shops.tenantId, req.user.tenantId)
+        ),
         columns: { name: true },
       });
       shopName = shop?.name ?? null;
@@ -1343,7 +1346,10 @@ async function autoSendBirthdayCard(contact: any, tenantId: string) {
     try {
       await db.update(emailContacts)
         .set({ emailsSent: sql`${emailContacts.emailsSent} + 1`, lastActivity: new Date(), updatedAt: new Date() })
-        .where(eq(emailContacts.id, contact.id));
+        .where(and(
+          eq(emailContacts.id, contact.id),
+          eq(emailContacts.tenantId, tenantId)
+        ));
     } catch (err) {
       console.error(`[AutoBirthday] Failed to update contact metrics:`, err);
     }
@@ -2466,7 +2472,10 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
                 status: 'failed',
                 updatedAt: new Date(),
               })
-              .where(inArray(emailSends.id, emailSendIds));
+              .where(and(
+                inArray(emailSends.id, emailSendIds),
+                eq(emailSends.tenantId, tenantId)
+              ));
           } catch (statusError) {
             console.error(`⚠️ [SendEmail] Failed to mark email_sends rows as failed:`, statusError);
           }
@@ -2493,7 +2502,10 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
               sentAt,
               updatedAt: new Date(),
             })
-            .where(inArray(emailSends.id, emailSendIds));
+            .where(and(
+              inArray(emailSends.id, emailSendIds),
+              eq(emailSends.tenantId, tenantId)
+            ));
           console.log(`📧 [SendEmail] Marked ${emailSendIds.length} email_sends row(s) as sent`);
         } catch (statusError) {
           console.error(`❌ [SendEmail] Email accepted by provider but failed to finalize usage status:`, statusError);
@@ -2636,11 +2648,14 @@ contactRoutes.post("/email-contacts/:id/send-email", authenticateToken, requireT
 	    for (const recipientContact of allContactRecipients) {
 	      await db.update(emailContacts)
 	        .set({
-	          emailsSent: sql`COALESCE(${emailContacts.emailsSent}, 0) + 1`,
-	          lastActivity: new Date(),
+          emailsSent: sql`COALESCE(${emailContacts.emailsSent}, 0) + 1`,
+          lastActivity: new Date(),
           updatedAt: new Date()
         })
-        .where(eq(emailContacts.id, recipientContact.id));
+        .where(and(
+          eq(emailContacts.id, recipientContact.id),
+          eq(emailContacts.tenantId, tenantId)
+        ));
     }
 
     console.log(`✅ [SendEmail] Email sent successfully for ${successfulSends.length} recipient(s), subject: "${subject}"`);

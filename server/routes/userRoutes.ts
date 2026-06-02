@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken, requirePermission, requirePlanFeature, getEffectivePermissions, getAssignableRoles, ROLE_HIERARCHY } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant, requirePermission, requirePlanFeature, getEffectivePermissions, getAssignableRoles, ROLE_HIERARCHY } from '../middleware/auth-middleware';
 import { validatePasswordStrength } from '../middleware/security-enhanced';
 import { storage } from '../storage';
 import { db } from '../db';
@@ -10,10 +10,13 @@ import { invalidateUserSecurity } from '../utils/userSecurityCache';
 export const userRoutes = Router();
 
 // Get current user's dashboard layout
-userRoutes.get("/dashboard-layout", authenticateToken, async (req: any, res) => {
+userRoutes.get("/dashboard-layout", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const user = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, req.user.id),
+      where: and(
+        eq(betterAuthUser.id, req.user.id),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ),
       columns: { dashboardLayout: true },
     });
     res.json({ layout: user?.dashboardLayout ?? null });
@@ -24,7 +27,7 @@ userRoutes.get("/dashboard-layout", authenticateToken, async (req: any, res) => 
 });
 
 // Update current user's dashboard layout (self-service)
-userRoutes.patch("/dashboard-layout", authenticateToken, async (req: any, res) => {
+userRoutes.patch("/dashboard-layout", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { cardOrder, cardSizes, cardVisibility } = req.body ?? {};
     const layout: {
@@ -70,7 +73,10 @@ userRoutes.patch("/dashboard-layout", authenticateToken, async (req: any, res) =
 
     // Merge with existing layout so a partial update (e.g. only sizes) does not wipe the other field
     const existing = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, req.user.id),
+      where: and(
+        eq(betterAuthUser.id, req.user.id),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ),
       columns: { dashboardLayout: true },
     });
     const merged = {
@@ -80,7 +86,10 @@ userRoutes.patch("/dashboard-layout", authenticateToken, async (req: any, res) =
 
     await db.update(betterAuthUser)
       .set({ dashboardLayout: merged, updatedAt: new Date() })
-      .where(eq(betterAuthUser.id, req.user.id));
+      .where(and(
+        eq(betterAuthUser.id, req.user.id),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ));
 
     res.json({ layout: merged });
   } catch (error) {
@@ -90,10 +99,13 @@ userRoutes.patch("/dashboard-layout", authenticateToken, async (req: any, res) =
 });
 
 // Get current user's remembered shop selection (null = "All Shops")
-userRoutes.get("/shop-preference", authenticateToken, async (req: any, res) => {
+userRoutes.get("/shop-preference", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const user = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, req.user.id),
+      where: and(
+        eq(betterAuthUser.id, req.user.id),
+        eq(betterAuthUser.tenantId, req.user.tenantId)
+      ),
       columns: { lastSelectedShopId: true },
     });
     res.json({ shopId: user?.lastSelectedShopId ?? null });
@@ -105,7 +117,7 @@ userRoutes.get("/shop-preference", authenticateToken, async (req: any, res) => {
 
 // Update current user's remembered shop selection.
 // Body: { shopId: string | null }. Non-null values must belong to the caller's tenant.
-userRoutes.patch("/shop-preference", authenticateToken, async (req: any, res) => {
+userRoutes.patch("/shop-preference", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { shopId } = req.body ?? {};
@@ -127,7 +139,10 @@ userRoutes.patch("/shop-preference", authenticateToken, async (req: any, res) =>
 
     await db.update(betterAuthUser)
       .set({ lastSelectedShopId: shopId ?? null, updatedAt: new Date() })
-      .where(eq(betterAuthUser.id, req.user.id));
+      .where(and(
+        eq(betterAuthUser.id, req.user.id),
+        eq(betterAuthUser.tenantId, tenantId)
+      ));
 
     res.json({ shopId: shopId ?? null });
   } catch (error) {
@@ -137,7 +152,7 @@ userRoutes.patch("/shop-preference", authenticateToken, async (req: any, res) =>
 });
 
 // Update current user's profile (self-service)
-userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
+userRoutes.patch("/profile", authenticateToken, requireTenant, async (req: any, res) => {
   console.log('📝 [Profile] Update request received:', {
     userId: req.user.id,
     body: req.body
@@ -241,7 +256,10 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
 
     // Fetch updated user to return
     const updatedUser = await db.query.betterAuthUser.findFirst({
-      where: eq(betterAuthUser.id, userId),
+      where: and(
+        eq(betterAuthUser.id, userId),
+        eq(betterAuthUser.tenantId, tenantId)
+      ),
     });
 
     console.log('✅ [Profile] Updated user from DB:', {
@@ -273,7 +291,7 @@ userRoutes.patch("/profile", authenticateToken, async (req: any, res) => {
 // authenticated member of the tenant — no users-management plan/permission gate.
 // Returns ALL tenant users (Owner, Administrator, Manager, Employee — active and inactive)
 // so any team member can be assigned as the provider for an appointment.
-userRoutes.get("/assignable", authenticateToken, async (req: any, res) => {
+userRoutes.get("/assignable", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
     const rows = await db
@@ -312,7 +330,7 @@ userRoutes.get("/assignable", authenticateToken, async (req: any, res) => {
 });
 
 // Get users for tenant
-userRoutes.get("/", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.view'), async (req: any, res) => {
+userRoutes.get("/", authenticateToken, requireTenant, requirePlanFeature('allowUsersManagement'), requirePermission('users.view'), async (req: any, res) => {
   try {
     const { search, role, status, showInactive } = req.query;
 
@@ -335,7 +353,7 @@ userRoutes.get("/", authenticateToken, requirePlanFeature('allowUsersManagement'
 });
 
 // Create new user
-userRoutes.post("/", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.create'), async (req: any, res) => {
+userRoutes.post("/", authenticateToken, requireTenant, requirePlanFeature('allowUsersManagement'), requirePermission('users.create'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -396,7 +414,7 @@ userRoutes.post("/", authenticateToken, requirePlanFeature('allowUsersManagement
 });
 
 // Get user statistics
-userRoutes.get("/stats", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.view'), async (req: any, res) => {
+userRoutes.get("/stats", authenticateToken, requireTenant, requirePlanFeature('allowUsersManagement'), requirePermission('users.view'), async (req: any, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -434,7 +452,7 @@ userRoutes.get("/stats", authenticateToken, requirePlanFeature('allowUsersManage
 });
 
 // Get user limits and plan information
-userRoutes.get("/limits", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.view'), async (req: any, res) => {
+userRoutes.get("/limits", authenticateToken, requireTenant, requirePlanFeature('allowUsersManagement'), requirePermission('users.view'), async (req: any, res) => {
   try {
     const limits = await storage.checkUserLimits(req.user.tenantId);
     res.json(limits);
@@ -445,7 +463,7 @@ userRoutes.get("/limits", authenticateToken, requirePlanFeature('allowUsersManag
 });
 
 // Update user (full update)
-userRoutes.put("/:userId", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.edit'), async (req: any, res) => {
+userRoutes.put("/:userId", authenticateToken, requireTenant, requirePlanFeature('allowUsersManagement'), requirePermission('users.edit'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { firstName, lastName, email, role, isActive } = req.body;
@@ -560,7 +578,7 @@ userRoutes.put("/:userId", authenticateToken, requirePlanFeature('allowUsersMana
 });
 
 // Update user status (active/inactive)
-userRoutes.patch("/:userId/status", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.toggle_status'), async (req: any, res) => {
+userRoutes.patch("/:userId/status", authenticateToken, requireTenant, requirePlanFeature('allowUsersManagement'), requirePermission('users.toggle_status'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { isActive } = req.body;
@@ -632,7 +650,10 @@ userRoutes.patch("/:userId/status", authenticateToken, requirePlanFeature('allow
         .where(eq(betterAuthSession.userId, userId))
         .catch(err => console.warn('⚠️ [User Status] Failed to revoke sessions:', err));
       await db.delete(temp2faSessions)
-        .where(eq(temp2faSessions.userId, userId))
+        .where(and(
+          eq(temp2faSessions.userId, userId),
+          eq(temp2faSessions.tenantId, req.user.tenantId)
+        ))
         .catch(err => console.warn('⚠️ [User Status] Failed to revoke temp 2FA sessions:', err));
     }
 
@@ -655,7 +676,7 @@ userRoutes.patch("/:userId/status", authenticateToken, requirePlanFeature('allow
 });
 
 // Delete user
-userRoutes.delete("/:userId", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.delete'), async (req: any, res) => {
+userRoutes.delete("/:userId", authenticateToken, requireTenant, requirePlanFeature('allowUsersManagement'), requirePermission('users.delete'), async (req: any, res) => {
   try {
     const { userId } = req.params;
 
@@ -706,7 +727,7 @@ userRoutes.delete("/:userId", authenticateToken, requirePlanFeature('allowUsersM
 
 // Set password for a user (Manager+)
 // Owner accounts can only have their password set by the same owner
-userRoutes.post("/:userId/set-password", authenticateToken, requirePlanFeature('allowUsersManagement'), requirePermission('users.edit'), async (req: any, res) => {
+userRoutes.post("/:userId/set-password", authenticateToken, requireTenant, requirePlanFeature('allowUsersManagement'), requirePermission('users.edit'), async (req: any, res) => {
   try {
     const { userId } = req.params;
     const { password, confirmPassword } = req.body;
@@ -770,7 +791,10 @@ userRoutes.post("/:userId/set-password", authenticateToken, requirePlanFeature('
       // Also revoke in-flight temp 2FA sessions so a stale post-credential
       // temp token cannot complete login after the password has been changed.
       await db.delete(temp2faSessions)
-        .where(eq(temp2faSessions.userId, userId))
+        .where(and(
+          eq(temp2faSessions.userId, userId),
+          eq(temp2faSessions.tenantId, tenantId)
+        ))
         .catch(err => console.warn('⚠️ [Set Password] Failed to revoke temp 2FA sessions:', err));
     }
 

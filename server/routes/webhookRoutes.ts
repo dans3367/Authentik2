@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { emailSends, bouncedEmails, emailContacts, emailEvents, emailActivity } from '@shared/schema';
-import { authenticateToken } from '../middleware/auth-middleware';
+import { authenticateToken, requireTenant } from '../middleware/auth-middleware';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { getConvexClient, api } from '../utils/convexClient';
 
@@ -20,7 +20,7 @@ webhookRoutes.get("/resend", async (req, res) => {
 });
 
 // Test webhook endpoint for testing email events
-webhookRoutes.post("/test/webhook-event", authenticateToken, async (req: any, res) => {
+webhookRoutes.post("/test/webhook-event", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { email_id, eventType, metadata } = req.body;
 
@@ -42,16 +42,16 @@ webhookRoutes.post("/test/webhook-event", authenticateToken, async (req: any, re
     let handlerResult = null;
     switch (eventType) {
       case 'sent':
-        handlerResult = await handleEmailSent(testWebhookData);
+        handlerResult = await handleEmailSent(testWebhookData, req.user.tenantId);
         break;
       case 'delivered':
-        handlerResult = await handleEmailDelivered(testWebhookData);
+        handlerResult = await handleEmailDelivered(testWebhookData, req.user.tenantId);
         break;
       case 'opened':
-        handlerResult = await handleEmailOpened(testWebhookData);
+        handlerResult = await handleEmailOpened(testWebhookData, req.user.tenantId);
         break;
       case 'clicked':
-        handlerResult = await handleEmailClicked(testWebhookData);
+        handlerResult = await handleEmailClicked(testWebhookData, req.user.tenantId);
         break;
       default:
         return res.status(400).json({ message: 'Invalid eventType. Supported: sent, delivered, opened, clicked' });
@@ -72,7 +72,7 @@ webhookRoutes.post("/test/webhook-event", authenticateToken, async (req: any, re
 });
 
 // Test webhook open endpoint (keeping for backward compatibility)
-webhookRoutes.post("/test/webhook-open", authenticateToken, async (req: any, res) => {
+webhookRoutes.post("/test/webhook-open", authenticateToken, requireTenant, async (req: any, res) => {
   try {
     const { email, newsletterId, timestamp } = req.body;
 
@@ -598,7 +598,7 @@ webhookRoutes.post("/ses", async (req, res) => {
 });
 
 // Helper functions for webhook event handling
-async function handleEmailSent(data: any) {
+async function handleEmailSent(data: any, tenantId?: string) {
   try {
     const nlTags = extractNewsletterTags(data);
     console.log('Email sent event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
@@ -613,7 +613,7 @@ async function handleEmailSent(data: any) {
     console.log(`Processing sent event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
-    const emailSend = await findEmailSendByProviderId(providerMessageId);
+    const emailSend = await findEmailSendByProviderId(providerMessageId, tenantId);
     if (!emailSend) {
       console.log(`Email send record not found for provider_message_id: ${providerMessageId}`);
       return;
@@ -626,14 +626,14 @@ async function handleEmailSent(data: any) {
         sentAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(sql`${emailSends.id} = ${emailSend.id}`);
+      .where(sql`${emailSends.id} = ${emailSend.id} AND ${emailSends.tenantId} = ${emailSend.tenantId}`);
 
     // Create email_events record
     await createEmailEvent(emailSend.id, data, 'sent');
 
     // Update contact metrics if contact is linked
     if (emailSend.contactId) {
-      await updateContactMetrics(emailSend.contactId, 'sent');
+      await updateContactMetrics(emailSend.contactId, 'sent', emailSend.tenantId);
     }
 
 
@@ -644,7 +644,7 @@ async function handleEmailSent(data: any) {
   }
 }
 
-async function handleEmailDelivered(data: any) {
+async function handleEmailDelivered(data: any, tenantId?: string) {
   try {
     const nlTags = extractNewsletterTags(data);
     console.log('Email delivered event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
@@ -659,7 +659,7 @@ async function handleEmailDelivered(data: any) {
     console.log(`Processing delivered event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
-    const emailSend = await findEmailSendByProviderId(providerMessageId);
+    const emailSend = await findEmailSendByProviderId(providerMessageId, tenantId);
     if (!emailSend) {
       console.log(`Email send record not found for provider_message_id: ${providerMessageId}`);
       return;
@@ -672,14 +672,14 @@ async function handleEmailDelivered(data: any) {
         deliveredAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(sql`${emailSends.id} = ${emailSend.id}`);
+      .where(sql`${emailSends.id} = ${emailSend.id} AND ${emailSends.tenantId} = ${emailSend.tenantId}`);
 
     // Create email_events record
     await createEmailEvent(emailSend.id, data, 'delivered');
 
     // Update contact metrics if contact is linked
     if (emailSend.contactId) {
-      await updateContactMetrics(emailSend.contactId, 'delivered');
+      await updateContactMetrics(emailSend.contactId, 'delivered', emailSend.tenantId);
     }
 
 
@@ -690,7 +690,7 @@ async function handleEmailDelivered(data: any) {
   }
 }
 
-async function handleEmailBounced(data: any) {
+async function handleEmailBounced(data: any, tenantId?: string) {
   try {
     const nlTags = extractNewsletterTags(data);
     console.log('Email bounced event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
@@ -703,7 +703,7 @@ async function handleEmailBounced(data: any) {
 
     // Update email_sends if we have provider_message_id
     if (providerMessageId) {
-      const emailSend = await findEmailSendByProviderId(providerMessageId);
+      const emailSend = await findEmailSendByProviderId(providerMessageId, tenantId);
       if (emailSend) {
         await db.update(emailSends)
           .set({
@@ -711,7 +711,7 @@ async function handleEmailBounced(data: any) {
             errorMessage: description,
             updatedAt: new Date(),
           })
-          .where(sql`${emailSends.id} = ${emailSend.id}`);
+          .where(sql`${emailSends.id} = ${emailSend.id} AND ${emailSends.tenantId} = ${emailSend.tenantId}`);
 
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'bounced');
@@ -744,7 +744,7 @@ async function handleEmailBounced(data: any) {
   }
 }
 
-async function handleEmailComplained(data: any) {
+async function handleEmailComplained(data: any, tenantId?: string) {
   try {
     const nlTags = extractNewsletterTags(data);
     console.log('Email complained event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
@@ -760,7 +760,7 @@ async function handleEmailComplained(data: any) {
 
     // Update email_sends if we have provider_message_id
     if (providerMessageId) {
-      const emailSend = await findEmailSendByProviderId(providerMessageId);
+      const emailSend = await findEmailSendByProviderId(providerMessageId, tenantId);
       if (emailSend) {
         sourceTenantId = emailSend.tenantId || null;
 
@@ -798,7 +798,7 @@ async function handleEmailComplained(data: any) {
   }
 }
 
-async function handleEmailSuppressed(data: any) {
+async function handleEmailSuppressed(data: any, tenantId?: string) {
   try {
     const nlTags = extractNewsletterTags(data);
     console.log('Email suppressed event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
@@ -820,7 +820,7 @@ async function handleEmailSuppressed(data: any) {
 
     // Update email_sends if we have provider_message_id
     if (providerMessageId) {
-      const emailSend = await findEmailSendByProviderId(providerMessageId);
+      const emailSend = await findEmailSendByProviderId(providerMessageId, tenantId);
       if (emailSend) {
         sourceTenantId = emailSend.tenantId || null;
 
@@ -830,7 +830,7 @@ async function handleEmailSuppressed(data: any) {
             errorMessage: description,
             updatedAt: new Date(),
           })
-          .where(sql`${emailSends.id} = ${emailSend.id}`);
+          .where(sql`${emailSends.id} = ${emailSend.id} AND ${emailSends.tenantId} = ${emailSend.tenantId}`);
 
         // Create email_events record
         await createEmailEvent(emailSend.id, data, 'suppressed');
@@ -874,14 +874,18 @@ async function handleEmailSuppressed(data: any) {
 
       // Update contact status to 'suppressed' for all tenants that have this contact
       try {
-        await db.update(emailContacts)
-          .set({
-            status: 'suppressed',
-            lastActivity: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(sql`LOWER(${emailContacts.email}) = ${emailLower} AND ${emailContacts.status} != 'suppressed'`);
-        console.log(`Updated contact status to suppressed for: ${emailLower}`);
+        if (sourceTenantId) {
+          await db.update(emailContacts)
+            .set({
+              status: 'suppressed',
+              lastActivity: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(sql`LOWER(${emailContacts.email}) = ${emailLower} AND ${emailContacts.tenantId} = ${sourceTenantId} AND ${emailContacts.status} != 'suppressed'`);
+          console.log(`Updated contact status to suppressed for: ${emailLower}`);
+        } else {
+          console.log(`Skipped contact status update for suppressed email without source tenant: ${emailLower}`);
+        }
       } catch (contactErr) {
         console.error('Error updating contact status for suppressed email:', contactErr);
       }
@@ -891,7 +895,7 @@ async function handleEmailSuppressed(data: any) {
   }
 }
 
-async function handleEmailOpened(data: any) {
+async function handleEmailOpened(data: any, tenantId?: string) {
   try {
     const nlTags = extractNewsletterTags(data);
     console.log('Email opened event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
@@ -906,7 +910,7 @@ async function handleEmailOpened(data: any) {
     console.log(`Processing opened event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
-    const emailSend = await findEmailSendByProviderId(providerMessageId);
+    const emailSend = await findEmailSendByProviderId(providerMessageId, tenantId);
     if (!emailSend) {
       console.log(`Email send record not found for provider_message_id: ${providerMessageId}`);
       return;
@@ -919,7 +923,7 @@ async function handleEmailOpened(data: any) {
     if (emailSend.contactId && providerEmailId) {
       const existingOpens = await db.select({ count: sql<number>`cast(count(*) as int)` })
         .from(emailActivity)
-        .where(sql`${emailActivity.contactId} = ${emailSend.contactId} AND ${emailActivity.activityType} IN ('opened', 'clicked') AND ${emailActivity.activityData}::text LIKE ${'%' + providerEmailId + '%'}`);
+        .where(sql`${emailActivity.contactId} = ${emailSend.contactId} AND ${emailActivity.tenantId} = ${emailSend.tenantId} AND ${emailActivity.activityType} IN ('opened', 'clicked') AND ${emailActivity.activityData}::text LIKE ${'%' + providerEmailId + '%'}`);
       isFirstOpen = (existingOpens[0]?.count ?? 0) === 0;
     } else if (emailSend.contactId) {
       // Fallback: check emailEvents if no provider email ID available
@@ -935,12 +939,12 @@ async function handleEmailOpened(data: any) {
     // Update contact metrics if contact is linked - only increment open count on first open
     if (emailSend.contactId) {
       if (isFirstOpen) {
-        await updateContactMetrics(emailSend.contactId, 'opened');
+        await updateContactMetrics(emailSend.contactId, 'opened', emailSend.tenantId);
       } else {
         // Still update lastActivity for subsequent opens, but don't increment counter
         await db.update(emailContacts)
           .set({ lastActivity: new Date(), updatedAt: new Date() })
-          .where(sql`${emailContacts.id} = ${emailSend.contactId}`);
+          .where(sql`${emailContacts.id} = ${emailSend.contactId} AND ${emailContacts.tenantId} = ${emailSend.tenantId}`);
       }
     }
 
@@ -950,7 +954,7 @@ async function handleEmailOpened(data: any) {
   }
 }
 
-async function handleEmailClicked(data: any) {
+async function handleEmailClicked(data: any, tenantId?: string) {
   try {
     const nlTags = extractNewsletterTags(data);
     console.log('Email clicked event:', { providerMessageId: data.email_id || data.id, ...(nlTags && { newsletterTags: nlTags }) });
@@ -965,7 +969,7 @@ async function handleEmailClicked(data: any) {
     console.log(`Processing clicked event for provider_message_id: ${providerMessageId}`, nlTags ? `[trackingId=${nlTags.trackingId}]` : '');
 
     // Find the email_sends record
-    const emailSend = await findEmailSendByProviderId(providerMessageId);
+    const emailSend = await findEmailSendByProviderId(providerMessageId, tenantId);
     if (!emailSend) {
       console.log(`Email send record not found for provider_message_id: ${providerMessageId}`);
       return;
@@ -978,7 +982,7 @@ async function handleEmailClicked(data: any) {
     if (emailSend.contactId && providerEmailId) {
       const existingOpens = await db.select({ count: sql<number>`cast(count(*) as int)` })
         .from(emailActivity)
-        .where(sql`${emailActivity.contactId} = ${emailSend.contactId} AND ${emailActivity.activityType} IN ('opened', 'clicked') AND ${emailActivity.activityData}::text LIKE ${'%' + providerEmailId + '%'}`);
+        .where(sql`${emailActivity.contactId} = ${emailSend.contactId} AND ${emailActivity.tenantId} = ${emailSend.tenantId} AND ${emailActivity.activityType} IN ('opened', 'clicked') AND ${emailActivity.activityData}::text LIKE ${'%' + providerEmailId + '%'}`);
       isFirstOpen = (existingOpens[0]?.count ?? 0) === 0;
     } else if (emailSend.contactId) {
       // Fallback: check emailEvents if no provider email ID available
@@ -994,12 +998,12 @@ async function handleEmailClicked(data: any) {
     // Update contact metrics if contact is linked - only increment open count on first interaction
     if (emailSend.contactId) {
       if (isFirstOpen) {
-        await updateContactMetrics(emailSend.contactId, 'clicked');
+        await updateContactMetrics(emailSend.contactId, 'clicked', emailSend.tenantId);
       } else {
         // Still update lastActivity for subsequent clicks, but don't increment open counter
         await db.update(emailContacts)
           .set({ lastActivity: new Date(), updatedAt: new Date() })
-          .where(sql`${emailContacts.id} = ${emailSend.contactId}`);
+          .where(sql`${emailContacts.id} = ${emailSend.contactId} AND ${emailContacts.tenantId} = ${emailSend.tenantId}`);
       }
     }
 
@@ -1068,10 +1072,12 @@ function extractRecipientEmail(data: any): string | null {
 }
 
 // Helper function to find email_sends by provider_message_id
-async function findEmailSendByProviderId(providerMessageId: string) {
+async function findEmailSendByProviderId(providerMessageId: string, tenantId?: string) {
   try {
     const emailSend = await db.query.emailSends.findFirst({
-      where: sql`${emailSends.providerMessageId} = ${providerMessageId}`,
+      where: tenantId
+        ? sql`${emailSends.providerMessageId} = ${providerMessageId} AND ${emailSends.tenantId} = ${tenantId}`
+        : sql`${emailSends.providerMessageId} = ${providerMessageId}`,
     });
 
     return emailSend;
@@ -1082,7 +1088,7 @@ async function findEmailSendByProviderId(providerMessageId: string) {
 }
 
 // Helper function to update contact metrics
-async function updateContactMetrics(contactId: string, activityType: string) {
+async function updateContactMetrics(contactId: string, activityType: string, tenantId: string) {
   try {
     const now = new Date();
 
@@ -1108,7 +1114,7 @@ async function updateContactMetrics(contactId: string, activityType: string) {
 
     await db.update(emailContacts)
       .set(updateData)
-      .where(sql`${emailContacts.id} = ${contactId}`);
+      .where(sql`${emailContacts.id} = ${contactId} AND ${emailContacts.tenantId} = ${tenantId}`);
 
     console.log(`Updated contact ${contactId} metrics for ${activityType}`);
   } catch (error) {
