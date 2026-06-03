@@ -2221,7 +2221,10 @@
 
 /* ─── Table Floating Controls ──────────────────────────────────────────── */
 
-/* Portal root for table controls — rendered at body level via React portal */
+/* Portal root for table controls — rendered inside the scrollable .notion-editor-area.
+   It must NOT establish a containing block or take up space: its absolutely-positioned
+   children are positioned relative to .notion-editor-area so they co-scroll with the
+   table (no JS on scroll). Keep it position:static and zero-impact. */
 .table-floating-controls-portal {
   pointer-events: none;
 }

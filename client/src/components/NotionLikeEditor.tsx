@@ -1994,23 +1994,6 @@ interface RowInfo {
     index: number;
 }
 
-function getScrollableAncestors(element: HTMLElement): Array<HTMLElement | Window> {
-    const ancestors: Array<HTMLElement | Window> = [];
-    let current = element.parentElement;
-
-    while (current && current !== document.body) {
-        const style = window.getComputedStyle(current);
-        const overflow = `${style.overflow} ${style.overflowX} ${style.overflowY}`;
-        if (/(auto|scroll|overlay)/.test(overflow)) {
-            ancestors.push(current);
-        }
-        current = current.parentElement;
-    }
-
-    ancestors.push(window);
-    return ancestors;
-}
-
 function TableFloatingControls({ editor }: { editor: any }) {
     const { t } = useTranslation();
     const [isInTable, setIsInTable] = useState(false);
@@ -2028,6 +2011,11 @@ function TableFloatingControls({ editor }: { editor: any }) {
     const [colSubmenu, setColSubmenu] = useState<'color' | 'align' | null>(null);
     const [rowSubmenu, setRowSubmenu] = useState<'color' | 'align' | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+    // The scrollable, position:relative editor area. Controls are rendered as its
+    // absolutely-positioned children so they co-scroll with the table natively
+    // (no JS on scroll), which keeps them glued to the table without lag.
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+    const areaElRef = useRef<HTMLElement | null>(null);
 
     // ── Drag state ───────────────────────────────────────────────────────────
     const [dragColFrom, setDragColFrom] = useState<number | null>(null);
@@ -2064,8 +2052,10 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 setOpenRowMenu(null);
             }
 
-            // Determine which column the mouse is over based on x position
-            const mouseX = ev.clientX; // viewport coordinate, matches col.left (also viewport)
+            // Determine which column the mouse is over. col.left is in editor-area
+            // content coords, so convert the viewport mouse x into the same space.
+            const ar = areaElRef.current?.getBoundingClientRect();
+            const mouseX = ev.clientX - (ar?.left ?? 0) + (areaElRef.current?.scrollLeft ?? 0);
             const cols = columnsRef.current;
             let target = 0;
             for (let i = 0; i < cols.length; i++) {
@@ -2120,7 +2110,9 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 setOpenRowMenu(null);
             }
 
-            const mouseY = ev.clientY; // viewport coordinate, matches row.top (also viewport)
+            // row.top is in editor-area content coords; convert the viewport mouse y to match.
+            const ar = areaElRef.current?.getBoundingClientRect();
+            const mouseY = ev.clientY - (ar?.top ?? 0) + (areaElRef.current?.scrollTop ?? 0);
             const rws = rowsRef.current;
             let target = 0;
             for (let i = 0; i < rws.length; i++) {
@@ -2263,14 +2255,32 @@ function TableFloatingControls({ editor }: { editor: any }) {
 
             trackTable(table);
 
-            // Use viewport-relative coords (position: fixed) to avoid overflow clipping
+            // The controls are rendered as absolutely-positioned children of the
+            // scrollable, position:relative `.notion-editor-area`, so we express all
+            // coords in that element's content space (viewport coord − area top + its
+            // scroll offset). Absolutely-positioned children co-scroll with the area,
+            // so the controls stay glued to the table with zero JS during scrolling.
+            const area = viewDom.closest('.notion-editor-area') as HTMLElement | null;
+            if (!area) {
+                setIsInTable(false);
+                trackTable(null);
+                return;
+            }
+            areaElRef.current = area;
+            setPortalTarget((prev) => (prev === area ? prev : area));
+            const areaRect = area.getBoundingClientRect();
+            const sTop = area.scrollTop;
+            const sLeft = area.scrollLeft;
+            const toContentTop = (v: number) => v - areaRect.top + sTop;
+            const toContentLeft = (v: number) => v - areaRect.left + sLeft;
+
             const tableRect = table.getBoundingClientRect();
             setTablePos({
-                top: tableRect.top,
-                left: tableRect.left,
+                top: toContentTop(tableRect.top),
+                left: toContentLeft(tableRect.left),
                 width: tableRect.width,
                 height: tableRect.height,
-                bottom: tableRect.bottom,
+                bottom: toContentTop(tableRect.bottom),
             });
 
             // Column positions from the first row
@@ -2279,7 +2289,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 const cells = Array.from(firstRow.children) as HTMLElement[];
                 setColumns(cells.map((cell, i) => {
                     const cellRect = cell.getBoundingClientRect();
-                    return { left: cellRect.left, width: cellRect.width, index: i };
+                    return { left: toContentLeft(cellRect.left), width: cellRect.width, index: i };
                 }));
             }
 
@@ -2287,29 +2297,24 @@ function TableFloatingControls({ editor }: { editor: any }) {
             const allRows = Array.from(table.querySelectorAll('tr')) as HTMLElement[];
             setRows(allRows.map((row, i) => {
                 const rowRect = row.getBoundingClientRect();
-                return { top: rowRect.top, height: rowRect.height, index: i };
+                return { top: toContentTop(rowRect.top), height: rowRect.height, index: i };
             }));
 
             setIsInTable(true);
         };
 
-        // Re-measure on every scrollable parent so fixed-position handles track embedded editors.
-        const scrollAncestors = getScrollableAncestors(viewDom);
+        // No scroll listener needed: the controls are absolute children of the editor
+        // area's content, so the browser scrolls them in lockstep with the table.
+        // We only re-measure when the table's size/position can actually change.
         const onViewportChange = () => { if (editor.isActive('table')) scheduleUpdate(); };
 
         editor.on('selectionUpdate', update);
         editor.on('transaction', update);
-        scrollAncestors.forEach((ancestor) => {
-            ancestor.addEventListener('scroll', onViewportChange, { passive: true });
-        });
         window.addEventListener('resize', onViewportChange);
         scheduleUpdate();
         return () => {
             editor.off('selectionUpdate', update);
             editor.off('transaction', update);
-            scrollAncestors.forEach((ancestor) => {
-                ancestor.removeEventListener('scroll', onViewportChange);
-            });
             window.removeEventListener('resize', onViewportChange);
             trackTable(null);
             resizeObserver?.disconnect();
@@ -2470,7 +2475,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
         setTimeout(() => alignRow(editor, alignment), 10);
     };
 
-    if (!isInTable || columns.length === 0) return null;
+    if (!isInTable || columns.length === 0 || !portalTarget) return null;
 
     const canMerge = !isStructureLocked && editor.can().mergeCells();
     const canSplit = !isStructureLocked && editor.can().splitCell();
@@ -2485,7 +2490,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                         key={col.index}
                         className="flex justify-center"
                         style={{
-                            position: 'fixed',
+                            position: 'absolute',
                             top: tablePos.top - 30,
                             left: col.left,
                             width: col.width,
@@ -2686,7 +2691,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
 
             {/* ── Row drag bars ─ left of each row ────────────────────────── */}
             {rows.map((row) => (
-                <div key={row.index} style={{ position: 'fixed', top: row.top, left: tablePos.left - 32, zIndex: openRowMenu === row.index ? 10002 : 9999 }}>
+                <div key={row.index} style={{ position: 'absolute', top: row.top, left: tablePos.left - 32, zIndex: openRowMenu === row.index ? 10002 : 9999 }}>
                     <button
                         onClick={() => handleRowClick(row.index)}
                         onMouseDown={(e) => {
@@ -2859,7 +2864,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 <div
                     className="table-col-highlight"
                     style={{
-                        position: 'fixed',
+                        position: 'absolute',
                         top: tablePos.top,
                         left: columns[hoveredCol].left,
                         width: columns[hoveredCol].width,
@@ -2874,7 +2879,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 <div
                     className="table-row-highlight"
                     style={{
-                        position: 'fixed',
+                        position: 'absolute',
                         top: rows[hoveredRow].top,
                         left: tablePos.left,
                         width: tablePos.width,
@@ -2889,7 +2894,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 <div
                     className="table-drag-indicator-col"
                     style={{
-                        position: 'fixed',
+                        position: 'absolute',
                         top: tablePos.top - 6,
                         left: dragColTarget <= dragColFrom
                             ? columns[dragColTarget].left - 2
@@ -2905,7 +2910,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 <div
                     className="table-drag-indicator-row"
                     style={{
-                        position: 'fixed',
+                        position: 'absolute',
                         top: dragRowTarget <= dragRowFrom
                             ? rows[dragRowTarget].top - 2
                             : rows[dragRowTarget].top + rows[dragRowTarget].height - 2,
@@ -2922,7 +2927,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                     <button
                         className="table-extend-btn"
                         style={{
-                            position: 'fixed',
+                            position: 'absolute',
                             top: tablePos.top + tablePos.height / 2 - 14,
                             left: tablePos.left + tablePos.width + 6,
                             zIndex: 9999,
@@ -2938,7 +2943,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                     <button
                         className="table-extend-btn"
                         style={{
-                            position: 'fixed',
+                            position: 'absolute',
                             top: tablePos.bottom + 6,
                             left: tablePos.left + tablePos.width / 2 - 14,
                             zIndex: 9999,
@@ -2955,7 +2960,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
             {/* ── Delete table button ─ below the add-row button ──────────── */}
             <div
                 style={{
-                    position: 'fixed',
+                    position: 'absolute',
                     display: 'flex',
                     justifyContent: 'center',
                     top: tablePos.bottom + 36,
@@ -2975,7 +2980,7 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 </button>
             </div>
         </div>,
-        document.body
+        portalTarget
     );
 }
 
