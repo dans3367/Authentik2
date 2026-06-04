@@ -733,6 +733,8 @@
       }
     },
     "nextUp": {
+      "collapse": "Collapse",
+      "expand": "Expand",
       "timeRange": "Time range",
       "next12Hours": "Next 12 hours",
       "next24Hours": "Next 24 hours",

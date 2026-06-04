@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, MessageSquare, Phone, Mail, Home, Check, ArrowRight, Loader2 } from "lucide-react";
+import { MapPin, MessageSquare, Phone, Mail, Home, Check, ArrowRight, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import SendEmailModal from "@/components/SendEmailModal";
 import { addHours, isWithinInterval, format, isToday, isTomorrow, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
@@ -39,6 +39,9 @@ interface NextUpAppointmentsProps {
   pageSubtitle?: ReactNode;
   pageAction?: ReactNode;
 }
+
+// Collapsed (minified) state persists across visits so the section stays the way the user left it.
+const NEXTUP_COLLAPSE_KEY = "appointments-nextup-collapsed";
 
 const AVATAR_PALETTE = [
   "bg-sky-200 text-sky-900",
@@ -184,6 +187,15 @@ export function NextUpAppointments({
   const [hoursRange, setHoursRange] = useState(48);
   const [confirmingIds, setConfirmingIds] = useState<Set<string>>(new Set());
 
+  // Minified view — hides the appointment list body, leaving the header.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem(NEXTUP_COLLAPSE_KEY) === "true"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem(NEXTUP_COLLAPSE_KEY, String(collapsed)); } catch {}
+  }, [collapsed]);
+
   const handleConfirmClick = async (appointmentId: string) => {
     if (!onConfirm || confirmingIds.has(appointmentId)) return;
     setConfirmingIds(prev => {
@@ -276,6 +288,20 @@ export function NextUpAppointments({
     </div>
   );
 
+  const collapseToggle = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-9 w-9 shrink-0 rounded-lg p-0"
+      onClick={() => setCollapsed(c => !c)}
+      aria-label={collapsed ? t('reminders.nextUp.expand') : t('reminders.nextUp.collapse')}
+      title={collapsed ? t('reminders.nextUp.expand') : t('reminders.nextUp.collapse')}
+    >
+      {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+    </Button>
+  );
+
   const hasPageHeader = Boolean(pageTitle || pageSubtitle || pageAction);
 
   return (
@@ -300,6 +326,7 @@ export function NextUpAppointments({
               <div className="flex shrink-0 items-center gap-2">
                 {rangeSelect}
                 {pageAction}
+                {collapseToggle}
               </div>
             </div>
 
@@ -308,10 +335,14 @@ export function NextUpAppointments({
         ) : (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {rangeSelect}
-            {summaryChips}
+            <div className="flex items-center gap-2">
+              {summaryChips}
+              {collapseToggle}
+            </div>
           </div>
         )}
       </CardHeader>
+      {!collapsed && (
       <CardContent>
         {nextUp.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">
@@ -538,6 +569,7 @@ export function NextUpAppointments({
           </div>
         )}
       </CardContent>
+      )}
     </Card>
   );
 }
