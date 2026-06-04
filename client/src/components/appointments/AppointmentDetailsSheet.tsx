@@ -467,10 +467,6 @@ export function AppointmentDetailsSheet({
                       <span className="text-muted-foreground">{t('reminders.details.lastUpdated')}</span>
                       <span className="text-foreground">{appointment.updatedAt ? formatDateTime(new Date(appointment.updatedAt)) : 'N/A'}</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">{t('reminders.details.appointmentId')}</span>
-                      <span className="font-mono text-[10px] text-muted-foreground select-all">{appointment.id}</span>
-                    </div>
                   </div>
                 </div>
               </TabsContent>

@@ -20,3 +20,5 @@ export { AppointmentCard } from './AppointmentCard';
 export { AppointmentStats } from './AppointmentStats';
 
 export { AppointmentsWeekBoard } from './AppointmentsWeekBoard';
+
+export { TabHeaderCard } from './TabHeaderCard';

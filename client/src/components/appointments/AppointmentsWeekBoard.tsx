@@ -12,6 +12,7 @@ import {
   isSameDay,
   isSameMonth,
   isToday,
+  isTomorrow,
   startOfDay,
   startOfMonth,
   startOfWeek,
@@ -27,8 +28,6 @@ import {
   CalendarRange,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
-  ChevronUp,
   Search,
   Filter,
   Plus,
@@ -38,14 +37,6 @@ import {
   FileText,
   List as ListIcon,
 } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -118,9 +109,6 @@ const STATUS_CALENDAR_CHIP: Record<string, string> = {
 
 const dayKey = (date: Date) => format(date, "yyyy-MM-dd");
 
-// Collapsed state persists across visits so the board stays minified if the user left it that way.
-const COLLAPSE_KEY = "appointments-board-collapsed";
-
 interface AppointmentsWeekBoardProps {
   appointments: AppointmentWithCustomer[];
   onViewAppointment: (appointment: AppointmentWithCustomer) => void;
@@ -143,20 +131,11 @@ export function AppointmentsWeekBoard({
   // i18n language to a date-fns locale so the calendar reads in that language.
   const dfLocale = i18n.language?.toLowerCase().startsWith("es") ? es : undefined;
   const [selectedFilter, setSelectedFilter] = useState<SidebarFilterKey>("upcoming");
-  const [listTab, setListTab] = useState<ListTabKey>("selected");
+  const [listTab, setListTab] = useState<ListTabKey>("all");
   const [viewMode, setViewMode] = useState<BoardViewMode>("list");
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(8);
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
-
-  // Minified view — hides the list/calendar/week body, leaving the header + stats bar.
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    try { return window.localStorage.getItem(COLLAPSE_KEY) === "true"; } catch { return false; }
-  });
-  useEffect(() => {
-    try { window.localStorage.setItem(COLLAPSE_KEY, String(collapsed)); } catch {}
-  }, [collapsed]);
 
   const now = useMemo(() => new Date(), [appointments]);
   const [selectedMonth, setSelectedMonth] = useState<string>(() => format(new Date(), "yyyy-MM"));
@@ -363,6 +342,29 @@ export function AppointmentsWeekBoard({
   }, [monthAppointments, effectiveListTab, selectedFilter, search, now]);
 
   const visible = filtered.slice(0, pageSize);
+
+  // Group the visible list by day so the list view reads like the "Next up"
+  // section: a day header followed by an hour-led timeline of that day's rows.
+  const visibleGroups = useMemo(() => {
+    const map: { key: string; date: Date; items: AppointmentWithCustomer[] }[] = [];
+    for (const apt of visible) {
+      const d = new Date(apt.appointmentDate);
+      const last = map[map.length - 1];
+      if (last && isSameDay(last.date, d)) {
+        last.items.push(apt);
+      } else {
+        map.push({ key: dayKey(d), date: d, items: [apt] });
+      }
+    }
+    return map;
+  }, [visible]);
+
+  const listGroupLabel = (date: Date) => {
+    if (isToday(date)) return t('reminders.nextUp.today');
+    if (isTomorrow(date)) return t('reminders.nextUp.tomorrow');
+    return format(date, "EEEE", { locale: dfLocale });
+  };
+
   const calendarDays = useMemo(() => {
     const calendarStart = startOfWeek(startOfMonth(selectedMonthDate), { weekStartsOn: 0 });
     const calendarEnd = endOfWeek(endOfMonth(selectedMonthDate), { weekStartsOn: 0 });
@@ -520,21 +522,6 @@ export function AppointmentsWeekBoard({
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {!collapsed && (
-              <>
-              <Select value={selectedMonth} onValueChange={handleMonthChange}>
-                <SelectTrigger className="h-9 w-[150px] rounded-lg">
-                  <SelectValue placeholder={t('reminders.board.selectMonth')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {monthOptions.map(m => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                      {isSameMonth(m.date, now) ? t('reminders.board.currentSuffix') : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <div className="inline-flex h-9 items-center rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-1">
                 <button
                   type="button"
@@ -652,19 +639,6 @@ export function AppointmentsWeekBoard({
                   </div>
                 </PopoverContent>
               </Popover>
-              </>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 shrink-0 rounded-lg p-0"
-                onClick={() => setCollapsed(c => !c)}
-                aria-label={collapsed ? t('reminders.board.expand') : t('reminders.board.collapse')}
-                title={collapsed ? t('reminders.board.expand') : t('reminders.board.collapse')}
-              >
-                {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-              </Button>
             </div>
           </div>
 
@@ -694,11 +668,31 @@ export function AppointmentsWeekBoard({
 
             <div className="h-10 w-px flex-none bg-border" />
 
+            <Select value={selectedMonth} onValueChange={handleMonthChange} disabled={viewMode === "week"}>
+              <SelectTrigger className="h-9 w-[150px] flex-none rounded-lg">
+                <SelectValue placeholder={t('reminders.board.selectMonth')} />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map(m => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                    {isSameMonth(m.date, now) ? t('reminders.board.currentSuffix') : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select
-              value={selectedFilter}
+              value={effectiveListTab === "all" ? "all" : selectedFilter}
               onValueChange={value => {
-                setSelectedFilter(value as SidebarFilterKey);
-                setListTab("selected");
+                // "All" mirrors the All tab (no status filter); any other value
+                // applies that status filter via the Selected tab.
+                if (value === "all") {
+                  setListTab("all");
+                } else {
+                  setSelectedFilter(value as SidebarFilterKey);
+                  setListTab("selected");
+                }
               }}
               disabled={!isCurrentMonth}
             >
@@ -709,6 +703,15 @@ export function AppointmentsWeekBoard({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">
+                  <span className="flex w-full items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    <span>{t('reminders.board.tabs.all')}</span>
+                    <span className="ml-auto pl-3 text-sm font-semibold tabular-nums text-slate-500 dark:text-slate-400">
+                      {isCurrentMonth ? monthAppointments.length : "—"}
+                    </span>
+                  </span>
+                </SelectItem>
                 {filterItems.map(item => (
                   <SelectItem key={item.key} value={item.key}>
                     <span className="flex w-full items-center gap-2">
@@ -724,8 +727,6 @@ export function AppointmentsWeekBoard({
             </Select>
           </div>
 
-          {!collapsed && (
-          <>
           <div className="flex items-center gap-1 px-5 py-3 border-b border-border overflow-x-auto">
             <TabPill active={effectiveListTab === "all"} onClick={() => setListTab("all")} count={monthAppointments.length}>
               {t('reminders.board.tabs.all')}
@@ -1139,118 +1140,106 @@ export function AppointmentsWeekBoard({
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-slate-200 dark:border-slate-800 hover:bg-transparent">
-                  <TableHead className="px-4 sm:px-6 text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
-                    {t('reminders.board.table.contact')}
-                  </TableHead>
-                  <TableHead className="px-4 sm:px-6 text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
-                    {t('reminders.board.table.when')}
-                  </TableHead>
-                  <TableHead className="hidden md:table-cell px-4 sm:px-6 text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
-                    {t('reminders.board.table.type')}
-                  </TableHead>
-                  <TableHead className="hidden lg:table-cell px-4 sm:px-6 text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
-                    {t('reminders.board.table.provider')}
-                  </TableHead>
-                  <TableHead className="px-4 sm:px-6 text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
-                    {t('reminders.board.table.status')}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visible.map(apt => {
-                  const name = getCustomerName(apt.customer);
-                  const initials = getInitials(name);
-                  const avatarClass = AVATAR_PALETTE[hashString(name) % AVATAR_PALETTE.length];
-                  const aptDate = new Date(apt.appointmentDate);
-                  const dotClass = STATUS_DOT[apt.status] || "bg-slate-400";
-                  const pillClass = STATUS_PILL[apt.status] || "bg-slate-100 text-slate-600";
+            <div className="space-y-8 px-5 py-5">
+              {visibleGroups.map(group => (
+                <div key={group.key}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-baseline gap-2 shrink-0">
+                      <span className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                        {listGroupLabel(group.date)}
+                      </span>
+                      <span className="text-sm text-slate-500 dark:text-slate-400">
+                        {format(group.date, "MMM d", { locale: dfLocale })}
+                      </span>
+                    </div>
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                    <span className="text-xs font-medium tracking-wider text-slate-500 dark:text-slate-400">
+                      {group.items.length}{" "}
+                      {group.items.length === 1
+                        ? t('reminders.nextUp.appointmentCountAbbr')
+                        : t('reminders.nextUp.appointmentCountAbbrPlural')}
+                    </span>
+                  </div>
 
-                  return (
-                    <TableRow
-                      key={apt.id}
-                      onClick={() => onViewAppointment(apt)}
-                      className="cursor-pointer border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors"
-                    >
-                      <TableCell className="px-4 sm:px-6 py-3 sm:py-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold ${avatarClass}`}
-                          >
-                            {initials}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">
-                              {name}
+                  <div className="relative">
+                    <div
+                      className="absolute left-[62px] top-2 bottom-2 border-l border-dashed border-slate-300 dark:border-slate-700"
+                      aria-hidden="true"
+                    />
+                    <ul className="space-y-3">
+                      {group.items.map(apt => {
+                        const name = getCustomerName(apt.customer);
+                        const initials = getInitials(name);
+                        const avatarClass = AVATAR_PALETTE[hashString(name) % AVATAR_PALETTE.length];
+                        const aptDate = new Date(apt.appointmentDate);
+                        const dotClass = STATUS_DOT[apt.status] || "bg-slate-400";
+                        const pillClass = STATUS_PILL[apt.status] || "bg-slate-100 text-slate-600";
+                        const providerName = apt.provider?.name || apt.provider?.email;
+
+                        return (
+                          <li key={apt.id} className="flex items-stretch gap-4">
+                            <div className="w-[56px] shrink-0 flex flex-col items-end pt-4">
+                              <div className="flex items-baseline gap-0.5 text-slate-900 dark:text-slate-100">
+                                <span className="text-xl font-semibold tracking-tight tabular-nums">
+                                  {format(aptDate, "h:mm", { locale: dfLocale })}
+                                </span>
+                                <span className="text-[10px] font-medium uppercase text-slate-500 dark:text-slate-400">
+                                  {format(aptDate, "a", { locale: dfLocale })}
+                                </span>
+                              </div>
+                              <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                +{apt.duration}m
+                              </span>
                             </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                              {apt.customer?.email || name}
+
+                            <div className="relative shrink-0 flex items-center pt-5">
+                              <span
+                                aria-hidden="true"
+                                className={`relative z-10 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-slate-900 ${dotClass}`}
+                              />
                             </div>
-                            {/* On mobile the Type column is hidden, so surface it here */}
-                            <div className="md:hidden text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                              {apt.serviceType || apt.title}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-slate-900 dark:text-slate-100 tabular-nums">
-                            {format(aptDate, "h:mm a", { locale: dfLocale })}
-                          </span>
-                          {isToday(aptDate) && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-[10px] font-medium">
-                              {t('reminders.board.todayBadge')}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          {format(aptDate, "MMM d", { locale: dfLocale })}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell px-4 sm:px-6 py-3 sm:py-4 text-sm text-slate-700 dark:text-slate-300">
-                        {apt.serviceType || apt.title}
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell px-4 sm:px-6 py-3 sm:py-4">
-                        {apt.provider?.name || apt.provider?.email ? (
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div
-                              className={`h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-[10px] font-semibold ${
-                                AVATAR_PALETTE[
-                                  hashString(apt.provider.name || apt.provider.email || "") %
-                                    AVATAR_PALETTE.length
-                                ]
-                              }`}
+
+                            <button
+                              type="button"
+                              onClick={() => onViewAppointment(apt)}
+                              className="flex-1 group flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-left hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm transition-all"
                             >
-                              {getInitials(apt.provider.name || apt.provider.email || "?")}
-                            </div>
-                            <span className="text-sm text-slate-700 dark:text-slate-300 truncate">
-                              {apt.provider.name || apt.provider.email}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-sm italic text-slate-400 dark:text-slate-500">
-                            {t('reminders.board.unassigned')}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="px-4 sm:px-6 py-3 sm:py-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${pillClass}`}
-                        >
-                          <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
-                          {t(`reminders.appointments.${
-                            apt.status === 'no_show' ? 'noShow' : apt.status
-                          }`, { defaultValue: apt.status.replace("_", " ") })}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                              <div className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold ${avatarClass}`}>
+                                {initials}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                  {name}
+                                </div>
+                                <div className="mt-0.5 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 min-w-0">
+                                  <span className="truncate">{apt.serviceType || apt.title}</span>
+                                  {providerName && (
+                                    <>
+                                      <span className="text-slate-300 dark:text-slate-600">·</span>
+                                      <span className="truncate">{providerName}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              <span
+                                className={`hidden sm:inline-flex shrink-0 items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${pillClass}`}
+                              >
+                                <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
+                                {t(`reminders.appointments.${
+                                  apt.status === 'no_show' ? 'noShow' : apt.status
+                                }`, { defaultValue: apt.status.replace("_", " ") })}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-t border-border text-sm">
@@ -1318,8 +1307,6 @@ export function AppointmentsWeekBoard({
               )}
             </div>
           </div>
-          </>
-          )}
         </CardContent>
       </Card>
   );

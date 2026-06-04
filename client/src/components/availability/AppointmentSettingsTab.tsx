@@ -24,11 +24,6 @@ export function AppointmentSettingsTab() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-lg font-semibold">{t("reminders.availability.settings.title")}</h2>
-        <p className="text-sm text-muted-foreground">{t("reminders.availability.settings.subtitle")}</p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">

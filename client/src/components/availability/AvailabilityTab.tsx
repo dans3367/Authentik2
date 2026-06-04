@@ -12,6 +12,7 @@ import { WeeklyHoursEditor } from "./WeeklyHoursEditor";
 import { DateOverridesEditor } from "./DateOverridesEditor";
 import { BookingRulesForm, type BookingRulesValue } from "./BookingRulesForm";
 import { ProviderAvailabilityPicker } from "./ProviderAvailabilityPicker";
+import { TabHeaderCard } from "@/components/appointments/TabHeaderCard";
 
 interface Draft extends BookingRulesValue {
   weeklyHours: DayHours[];
@@ -59,10 +60,28 @@ export function AvailabilityTab() {
 
   const pickerValue = effectiveTarget ?? user?.id ?? "";
 
+  // Header matches the other appointment tabs; the provider picker sits where the
+  // Appointments tab puts its "New appointment" action (right side of the header).
+  const header = (
+    <TabHeaderCard
+      title={t("reminders.availability.tabLabel")}
+      subtitle={t("reminders.availability.pageSubtitle")}
+      action={
+        canManageOthers && providers.length > 0 ? (
+          <ProviderAvailabilityPicker
+            providers={providers}
+            value={pickerValue}
+            onChange={(id) => setTargetUserId(id === user?.id ? undefined : id)}
+          />
+        ) : undefined
+      }
+    />
+  );
+
   if (isLoading || !draft) {
     return (
-      <div className="flex flex-col gap-4">
-        <Skeleton className="h-10 w-64" />
+      <div className="flex flex-col gap-6">
+        {header}
         <Skeleton className="h-64 w-full" />
       </div>
     );
@@ -70,19 +89,7 @@ export function AvailabilityTab() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">{t("reminders.availability.title")}</h2>
-          <p className="text-sm text-muted-foreground">{t("reminders.availability.subtitle")}</p>
-        </div>
-        {canManageOthers && providers.length > 0 && (
-          <ProviderAvailabilityPicker
-            providers={providers}
-            value={pickerValue}
-            onChange={(id) => setTargetUserId(id === user?.id ? undefined : id)}
-          />
-        )}
-      </div>
+      {header}
 
       <Card>
         <CardHeader>

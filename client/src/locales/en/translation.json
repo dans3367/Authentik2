@@ -397,6 +397,7 @@
     },
     "availability": {
       "tabLabel": "Availability",
+      "pageSubtitle": "Set the hours, booking link, and scheduling rules customers use to book with you.",
       "title": "Your Availability",
       "subtitle": "Set the hours you're available for bookings.",
       "viewingFor": "Viewing availability for",
@@ -568,6 +569,7 @@
     },
     "settings": {
       "title": "Reminder Settings",
+      "pageSubtitle": "Configure automatic reminders and default messaging for your appointments.",
       "enableAutomatic": "Enable Automatic Reminders",
       "enableAutomaticDescription": "Automatically send reminders based on appointment timing",
       "defaultSettings": "Default Reminder Settings",
