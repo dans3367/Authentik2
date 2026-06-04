@@ -694,48 +694,34 @@ export function AppointmentsWeekBoard({
 
             <div className="h-10 w-px flex-none bg-border" />
 
-            <div className="flex items-center gap-2">
-              {filterItems.map(item => {
-                const active = item.key === selectedFilter;
-                const disabled = !isCurrentMonth;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => {
-                      setSelectedFilter(item.key);
-                      setListTab("selected");
-                    }}
-                    disabled={disabled}
-                    className={`inline-flex items-center gap-2 whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                      disabled
-                        ? "border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-600 cursor-default"
-                        : active
-                        ? "border-rose-200 bg-rose-50 text-slate-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-slate-100"
-                        : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                    }`}
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        disabled ? "bg-slate-300 dark:bg-slate-700" : item.dotClass
-                      }`}
-                    />
-                    {item.label}
-                    <span
-                      className={`text-sm font-semibold tabular-nums ${
-                        disabled
-                          ? "text-slate-400 dark:text-slate-600"
-                          : active
-                          ? "text-slate-900 dark:text-slate-100"
-                          : "text-slate-500 dark:text-slate-400"
-                      }`}
-                    >
-                      {isCurrentMonth ? item.count : "—"}
+            <Select
+              value={selectedFilter}
+              onValueChange={value => {
+                setSelectedFilter(value as SidebarFilterKey);
+                setListTab("selected");
+              }}
+              disabled={!isCurrentMonth}
+            >
+              <SelectTrigger
+                aria-label={t('reminders.board.filterByStatus')}
+                className="h-9 w-[230px] flex-none rounded-lg"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {filterItems.map(item => (
+                  <SelectItem key={item.key} value={item.key}>
+                    <span className="flex w-full items-center gap-2">
+                      <span className={`h-1.5 w-1.5 rounded-full ${item.dotClass}`} />
+                      <span>{item.label}</span>
+                      <span className="ml-auto pl-3 text-sm font-semibold tabular-nums text-slate-500 dark:text-slate-400">
+                        {isCurrentMonth ? item.count : "—"}
+                      </span>
                     </span>
-                  </button>
-                );
-              })}
-            </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {!collapsed && (

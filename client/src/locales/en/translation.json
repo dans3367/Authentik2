@@ -662,6 +662,7 @@
       "vsLastMonth": "vs. last month",
       "allAppointments": "All Appointments",
       "selectMonth": "Select month",
+      "filterByStatus": "Filter by status",
       "currentSuffix": " (current)",
       "stats": {
         "upcoming": "Upcoming",
