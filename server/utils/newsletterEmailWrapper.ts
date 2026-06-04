@@ -365,7 +365,12 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
     <![endif]-->
     <style type="text/css">
       img { max-width: 100% !important; height: auto !important; }
-      .email-content table:not([role="presentation"]) { max-width: 100% !important; }
+      /* TipTap data tables carry an inline min-width (sum of column widths)
+         that beats max-width/width; neutralize so they can shrink on phones. */
+      .email-content table:not([role="presentation"]) { max-width: 100% !important; min-width: 0 !important; }
+      .email-content table:not([role="presentation"]) col,
+      .email-content table:not([role="presentation"]) td,
+      .email-content table:not([role="presentation"]) th { min-width: 0 !important; }
       .email-content td, .email-content th,
       .email-content p, .email-content li, .email-content a,
       .email-content blockquote {
@@ -382,10 +387,10 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
         .email-content h3 { font-size: 18px !important; line-height: 1.35 !important; }
         /* Collapse authored-width data tables to fit narrow screens
            instead of overflowing — mirrors the editor mobile preview. */
-        .email-content table:not([role="presentation"]) { width: 100% !important; table-layout: fixed !important; }
-        .email-content table:not([role="presentation"]) col { width: auto !important; }
+        .email-content table:not([role="presentation"]) { width: 100% !important; min-width: 0 !important; table-layout: fixed !important; }
+        .email-content table:not([role="presentation"]) col { width: auto !important; min-width: 0 !important; }
         .email-content table:not([role="presentation"]) td,
-        .email-content table:not([role="presentation"]) th { width: auto !important; }
+        .email-content table:not([role="presentation"]) th { width: auto !important; min-width: 0 !important; }
       }
       @media screen and (max-width: 360px) {
         .email-hero-header { padding: 20px 16px !important; }

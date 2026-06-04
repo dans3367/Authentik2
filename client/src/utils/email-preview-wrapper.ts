@@ -353,7 +353,13 @@ export function wrapInEmailPreview(
        preview, but this also protects the desktop frame). Layout
        tables (role="presentation", emitted by the Puck editor) are
        excluded so their column structure is preserved. */
-    .email-content table:not([role="presentation"]) { max-width: 100% !important; }
+    /* TipTap serializes data tables with an inline min-width (sum of column
+       widths, e.g. "min-width: 347px") which beats max-width/width and forces
+       the whole layout wider than a phone. Neutralize it on data tables. */
+    .email-content table:not([role="presentation"]) { max-width: 100% !important; min-width: 0 !important; }
+    .email-content table:not([role="presentation"]) col,
+    .email-content table:not([role="presentation"]) td,
+    .email-content table:not([role="presentation"]) th { min-width: 0 !important; }
     .email-content td, .email-content th,
     .email-content p, .email-content li, .email-content a,
     .email-content blockquote,
@@ -380,10 +386,10 @@ export function wrapInEmailPreview(
       /* Force authored-width data tables to fit the phone: fixed
          layout + neutralized <col> widths collapse them to equal,
          wrapping columns instead of overflowing the frame. */
-      .email-content table:not([role="presentation"]) { width: 100% !important; table-layout: fixed !important; }
-      .email-content table:not([role="presentation"]) col { width: auto !important; }
+      .email-content table:not([role="presentation"]) { width: 100% !important; min-width: 0 !important; table-layout: fixed !important; }
+      .email-content table:not([role="presentation"]) col { width: auto !important; min-width: 0 !important; }
       .email-content table:not([role="presentation"]) td,
-      .email-content table:not([role="presentation"]) th { width: auto !important; }
+      .email-content table:not([role="presentation"]) th { width: auto !important; min-width: 0 !important; }
       .email-content img { max-width: 100% !important; height: auto !important; }
     }
     @media screen and (max-width: 360px) {
