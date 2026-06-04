@@ -36,6 +36,7 @@ import appointmentRoutes from "./routes/appointmentRoutes";
 import appointmentRemindersRoutes from "./routes/appointmentRemindersRoutes";
 import appointmentNotesRoutes from "./routes/appointmentNotesRoutes";
 import appointmentConfirmationRoutes from "./routes/appointmentConfirmationRoutes";
+import availabilityRoutes from "./routes/availabilityRoutes";
 import suppressionManagementRoutes from "./routes/suppressionManagementRoutes";
 import aiRoutes from "./routes/aiRoutes";
 import newsletterAIRoutes from "./routes/newsletterAIRoutes";
@@ -52,6 +53,7 @@ import internalRoutes from "./routes/internalRoutes";
 import { statsRoutes } from "./routes/statsRoutes";
 import { newsletterReactionRoutes } from "./routes/newsletterReactionRoutes";
 import { publicNewsletterRoutes } from "./routes/publicNewsletterRoutes";
+import { publicBookingRoutes } from "./routes/publicBookingRoutes";
 import { publicPromotionRoutes } from "./routes/publicPromotionRoutes";
 import { analyticsRoutes } from "./routes/analyticsRoutes";
 import { translationRoutes } from "./routes/translationRoutes";
@@ -140,6 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Public routes (no authentication required)
   app.use("/api/public/newsletters", publicNewsletterRoutes); // Public newsletter web viewing (blog format)
+  app.use("/api/public/booking", publicBookingRoutes); // Public availability/booking page
   app.use("/api/public/promotions", publicPromotionRoutes); // Public promotion terms page (blog format)
   app.use("/api/newsletter-reactions", newsletterReactionRoutes); // Public reaction endpoint + authenticated stats
   app.use("/api/appointments", appointmentConfirmationRoutes); // Public appointment confirmation/decline
@@ -176,6 +179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/appointments", appointmentRoutes);
   app.use("/api/appointment-reminders", appointmentRemindersRoutes);
   app.use("/api/appointment-notes", appointmentNotesRoutes);
+  app.use("/api/availability", availabilityRoutes);
   app.use("/api/ai", aiRoutes);
   app.use("/api/suppression", suppressionManagementRoutes);
   // Handle Stripe checkout success redirect

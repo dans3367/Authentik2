@@ -395,6 +395,77 @@
       "reminders": "Reminders",
       "settings": "Settings"
     },
+    "availability": {
+      "tabLabel": "Availability",
+      "title": "Your Availability",
+      "subtitle": "Set the hours you're available for bookings.",
+      "viewingFor": "Viewing availability for",
+      "selectProvider": "Select provider",
+      "weeklyHours": "Weekly Hours",
+      "addRange": "Add time range",
+      "copyToAll": "Copy to all days",
+      "unavailable": "Unavailable",
+      "save": "Save Availability",
+      "saving": "Saving...",
+      "bookingLink": "Your booking link",
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied to clipboard",
+      "linkUnavailable": "Save your availability to generate your booking link.",
+      "settings": {
+        "title": "Booking Settings",
+        "subtitle": "Share your booking link with customers.",
+        "linkDescription": "Anyone with this link can view your open times and book an appointment with you.",
+        "openLink": "Open"
+      },
+      "days": {
+        "0": "Sunday",
+        "1": "Monday",
+        "2": "Tuesday",
+        "3": "Wednesday",
+        "4": "Thursday",
+        "5": "Friday",
+        "6": "Saturday"
+      },
+      "overrides": {
+        "title": "Date Overrides",
+        "add": "Add override",
+        "empty": "No date overrides yet.",
+        "dayOff": "Day off",
+        "customHours": "Special hours",
+        "dateLabel": "Date",
+        "typeLabel": "Type",
+        "noteLabel": "Note",
+        "notePlaceholder": "e.g. Holiday, Vacation"
+      },
+      "rules": {
+        "title": "Booking Rules",
+        "timezone": "Timezone",
+        "slotLength": "Slot length (minutes)",
+        "buffer": "Buffer between bookings (minutes)",
+        "minimumNotice": "Minimum notice (hours)",
+        "bookingHorizon": "Booking window (days)",
+        "bookableWindow": "Bookable date range",
+        "bookableWindowHelp": "Optional. Only offer dates within this range. Leave blank to keep using the rolling booking window above.",
+        "bookableFrom": "Start date",
+        "bookableUntil": "End date",
+        "clearWindow": "Clear",
+        "windowEndBeforeStart": "End date must be on or after the start date",
+        "isBookable": "Available for public booking",
+        "isEnabled": "Enable availability"
+      },
+      "errors": {
+        "overlap": "Time ranges overlap",
+        "endBeforeStart": "End time must be after start time",
+        "duplicateDate": "An override already exists for this date"
+      },
+      "toasts": {
+        "saved": "Availability saved",
+        "saveError": "Failed to save availability",
+        "overrideAdded": "Date override saved",
+        "overrideRemoved": "Date override removed",
+        "overrideError": "Failed to save override"
+      }
+    },
     "appointments": {
       "newAppointment": "New Appointment",
       "createAppointment": "Create Appointment",
@@ -583,6 +654,8 @@
       "close": "Close"
     },
     "board": {
+      "collapse": "Collapse",
+      "expand": "Expand",
       "totalAppointments": "Total Appointments",
       "thisMonth": "this month",
       "inMonth": "in {{month}}",

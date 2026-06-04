@@ -2654,6 +2654,137 @@ export const appointmentReminderRelations = relations(appointmentReminders, ({ o
   }),
 }));
 
+// ─── User Availability (provider scheduling) ─────────────────────────────────
+// Per-user availability powering the appointments UI and the future public
+// booking page. Weekly recurring hours are stored as a JSON string (mirrors
+// shops.operatingHours); date-specific exceptions live in
+// user_availability_overrides. One row per user (global, not per-shop).
+export const userAvailability = pgTable("user_availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
+  // JSON string: array of 7 { day:0..6 (0=Sun), enabled, ranges:[{start:"HH:MM", end:"HH:MM"}] }
+  weeklyHours: text("weekly_hours"),
+  timezone: text("timezone").notNull().default('America/Chicago'), // IANA, provider-local
+  // Booking rules (consumed by the future public booking slot generator)
+  slotLengthMinutes: integer("slot_length_minutes").notNull().default(30),
+  bufferMinutes: integer("buffer_minutes").notNull().default(0),
+  minimumNoticeHours: integer("minimum_notice_hours").notNull().default(24),
+  bookingHorizonDays: integer("booking_horizon_days").notNull().default(30),
+  // Optional explicit bookable window (provider-local YYYY-MM-DD). When set, only
+  // dates within [start, end] are offered, intersected with the rolling horizon.
+  // Null = unbounded on that side (fall back to today / rolling horizon).
+  bookableStartDate: text("bookable_start_date"),
+  bookableEndDate: text("bookable_end_date"),
+  isBookable: boolean("is_bookable").notNull().default(true), // include in PUBLIC booking
+  isEnabled: boolean("is_enabled").notNull().default(true),   // availability feature on for this user
+  bookingSlug: text("booking_slug"),                          // public short-link (/book/:slug); null until first save
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userUnique: uniqueIndex("user_availability_user_unique").on(table.userId),
+  tenantIdx: index("user_availability_tenant_idx").on(table.tenantId),
+  // Unique across users; Postgres allows multiple NULLs so unsaved rows don't collide.
+  bookingSlugUnique: uniqueIndex("user_availability_booking_slug_unique").on(table.bookingSlug),
+}));
+
+// Date-specific overrides: a day off / holiday / vacation (type 'off') or
+// special hours that replace the weekly schedule for that date (type 'custom').
+export const userAvailabilityOverrides = pgTable("user_availability_overrides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => betterAuthUser.id, { onDelete: 'cascade' }),
+  date: text("date").notNull(), // 'YYYY-MM-DD', provider-local calendar date
+  type: text("type").notNull().default('off'), // 'off' | 'custom'
+  ranges: text("ranges"), // JSON array of {start,end} when type='custom'; null for 'off'
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userDateUnique: uniqueIndex("user_availability_override_user_date_unique").on(table.userId, table.date),
+  userDateIdx: index("user_availability_override_user_date_idx").on(table.userId, table.date),
+}));
+
+export const userAvailabilityRelations = relations(userAvailability, ({ one }) => ({
+  tenant: one(tenants, { fields: [userAvailability.tenantId], references: [tenants.id] }),
+  user: one(betterAuthUser, { fields: [userAvailability.userId], references: [betterAuthUser.id] }),
+}));
+
+export const userAvailabilityOverrideRelations = relations(userAvailabilityOverrides, ({ one }) => ({
+  tenant: one(tenants, { fields: [userAvailabilityOverrides.tenantId], references: [tenants.id] }),
+  user: one(betterAuthUser, { fields: [userAvailabilityOverrides.userId], references: [betterAuthUser.id] }),
+}));
+
+// User availability schemas
+const availabilityTimeStr = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Time must be HH:MM (24h)");
+const availabilityRangeSchema = z.object({
+  start: availabilityTimeStr,
+  end: availabilityTimeStr,
+}).refine((r) => r.start < r.end, { message: "End time must be after start time", path: ["end"] });
+
+const availabilityDaySchema = z.object({
+  day: z.number().int().min(0).max(6),
+  enabled: z.boolean(),
+  ranges: z.array(availabilityRangeSchema).max(6).superRefine((ranges, ctx) => {
+    // Disallow overlapping ranges within a day (cross-midnight ranges are not supported in v1).
+    const sorted = [...ranges].sort((a, b) => a.start.localeCompare(b.start));
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].start < sorted[i - 1].end) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Time ranges overlap" });
+        break;
+      }
+    }
+  }),
+});
+
+export const weeklyHoursSchema = z.array(availabilityDaySchema).length(7);
+
+const availabilityDateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD");
+
+export const upsertUserAvailabilitySchema = z.object({
+  weeklyHours: weeklyHoursSchema.optional(),
+  timezone: z.string().min(1).optional(),
+  slotLengthMinutes: z.number().int().min(5).max(480).optional(),
+  bufferMinutes: z.number().int().min(0).max(240).optional(),
+  minimumNoticeHours: z.number().int().min(0).max(8760).optional(),
+  bookingHorizonDays: z.number().int().min(1).max(365).optional(),
+  // Empty string from a cleared <input type="date"> normalizes to null (unbounded).
+  bookableStartDate: availabilityDateStr.nullable().optional().or(z.literal("").transform(() => null)),
+  bookableEndDate: availabilityDateStr.nullable().optional().or(z.literal("").transform(() => null)),
+  isBookable: z.boolean().optional(),
+  isEnabled: z.boolean().optional(),
+}).superRefine((d, ctx) => {
+  if (d.bookableStartDate && d.bookableEndDate && d.bookableEndDate < d.bookableStartDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "End date must be on or after the start date",
+      path: ["bookableEndDate"],
+    });
+  }
+});
+
+export const createAvailabilityOverrideSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  type: z.enum(['off', 'custom']).default('off'),
+  ranges: z.array(availabilityRangeSchema).max(6).optional().nullable(),
+  note: z.string().max(200).optional().nullable(),
+}).superRefine((d, ctx) => {
+  if (d.type === 'custom' && (!d.ranges || d.ranges.length === 0)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Custom hours require at least one range", path: ["ranges"] });
+  }
+});
+
+export const updateAvailabilityOverrideSchema = createAvailabilityOverrideSchema;
+
+export type UserAvailability = typeof userAvailability.$inferSelect;
+export type InsertUserAvailability = typeof userAvailability.$inferInsert;
+export type UserAvailabilityOverride = typeof userAvailabilityOverrides.$inferSelect;
+export type InsertUserAvailabilityOverride = typeof userAvailabilityOverrides.$inferInsert;
+export type WeeklyHours = z.infer<typeof weeklyHoursSchema>;
+export type AvailabilityRange = z.infer<typeof availabilityRangeSchema>;
+export type UpsertUserAvailabilityData = z.infer<typeof upsertUserAvailabilitySchema>;
+export type CreateAvailabilityOverrideData = z.infer<typeof createAvailabilityOverrideSchema>;
+
 // Update tenant relations to include appointments and templates
 export const tenantRelationsUpdated = relations(tenants, ({ many }) => ({
   users: many(betterAuthUser),

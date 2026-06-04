@@ -27,6 +27,8 @@ import {
   CalendarRange,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Search,
   Filter,
   Plus,
@@ -116,6 +118,9 @@ const STATUS_CALENDAR_CHIP: Record<string, string> = {
 
 const dayKey = (date: Date) => format(date, "yyyy-MM-dd");
 
+// Collapsed state persists across visits so the board stays minified if the user left it that way.
+const COLLAPSE_KEY = "appointments-board-collapsed";
+
 interface AppointmentsWeekBoardProps {
   appointments: AppointmentWithCustomer[];
   onViewAppointment: (appointment: AppointmentWithCustomer) => void;
@@ -143,6 +148,15 @@ export function AppointmentsWeekBoard({
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(8);
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
+
+  // Minified view — hides the list/calendar/week body, leaving the header + stats bar.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem(COLLAPSE_KEY) === "true"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem(COLLAPSE_KEY, String(collapsed)); } catch {}
+  }, [collapsed]);
 
   const now = useMemo(() => new Date(), [appointments]);
   const [selectedMonth, setSelectedMonth] = useState<string>(() => format(new Date(), "yyyy-MM"));
@@ -506,6 +520,8 @@ export function AppointmentsWeekBoard({
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {!collapsed && (
+              <>
               <Select value={selectedMonth} onValueChange={handleMonthChange}>
                 <SelectTrigger className="h-9 w-[150px] rounded-lg">
                   <SelectValue placeholder={t('reminders.board.selectMonth')} />
@@ -636,6 +652,19 @@ export function AppointmentsWeekBoard({
                   </div>
                 </PopoverContent>
               </Popover>
+              </>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 shrink-0 rounded-lg p-0"
+                onClick={() => setCollapsed(c => !c)}
+                aria-label={collapsed ? t('reminders.board.expand') : t('reminders.board.collapse')}
+                title={collapsed ? t('reminders.board.expand') : t('reminders.board.collapse')}
+              >
+                {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              </Button>
             </div>
           </div>
 
@@ -709,6 +738,8 @@ export function AppointmentsWeekBoard({
             </div>
           </div>
 
+          {!collapsed && (
+          <>
           <div className="flex items-center gap-1 px-5 py-3 border-b border-border overflow-x-auto">
             <TabPill active={effectiveListTab === "all"} onClick={() => setListTab("all")} count={monthAppointments.length}>
               {t('reminders.board.tabs.all')}
@@ -1301,6 +1332,8 @@ export function AppointmentsWeekBoard({
               )}
             </div>
           </div>
+          </>
+          )}
         </CardContent>
       </Card>
   );

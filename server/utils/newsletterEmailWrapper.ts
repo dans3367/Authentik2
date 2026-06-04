@@ -365,6 +365,12 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
     <![endif]-->
     <style type="text/css">
       img { max-width: 100% !important; height: auto !important; }
+      .email-content table:not([role="presentation"]) { max-width: 100% !important; }
+      .email-content td, .email-content th,
+      .email-content p, .email-content li, .email-content a,
+      .email-content blockquote {
+        overflow-wrap: anywhere; word-break: break-word;
+      }
       @media screen and (max-width: 480px) {
         .email-hero-header { padding: 24px 18px !important; }
         .email-hero-header-banner { padding: 12px 18px !important; }
@@ -374,6 +380,12 @@ export function buildNewsletterEmailHtml(design: NewsletterDesign, bodyContent: 
         .email-content h1 { font-size: 22px !important; line-height: 1.25 !important; }
         .email-content h2 { font-size: 20px !important; line-height: 1.3 !important; }
         .email-content h3 { font-size: 18px !important; line-height: 1.35 !important; }
+        /* Collapse authored-width data tables to fit narrow screens
+           instead of overflowing — mirrors the editor mobile preview. */
+        .email-content table:not([role="presentation"]) { width: 100% !important; table-layout: fixed !important; }
+        .email-content table:not([role="presentation"]) col { width: auto !important; }
+        .email-content table:not([role="presentation"]) td,
+        .email-content table:not([role="presentation"]) th { width: auto !important; }
       }
       @media screen and (max-width: 360px) {
         .email-hero-header { padding: 20px 16px !important; }

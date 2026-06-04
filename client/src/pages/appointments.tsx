@@ -62,6 +62,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NextUpAppointments } from "@/components/NextUpAppointments";
+import { AvailabilityTab, AppointmentSettingsTab } from "@/components/availability";
 
 // Import extracted components
 import {
@@ -110,6 +111,7 @@ export default function RemindersPage() {
   const { providers } = useAssignableUsers();
 
   const [appointmentsTab, setAppointmentsTab] = useState<"upcoming" | "past">("upcoming");
+  const [activeTab, setActiveTab] = useState<"appointments" | "availability" | "settings">("appointments");
 
   useSetBreadcrumbs([
     { label: t('navigation.dashboard'), href: "/", icon: LayoutDashboard },
@@ -993,36 +995,51 @@ export default function RemindersPage() {
   return (
     <div className="min-h-screen">
       <div className="mx-auto max-w-7xl p-6">
-        <div className="flex flex-col gap-6">
-          {/* Next Up Section */}
-          <NextUpAppointments
-            appointments={allAppointments}
-            onViewDetails={handleViewAppointment}
-            onConfirm={(id) => confirmAppointmentMutation.mutateAsync(id)}
-            pageTitle={t('reminders.pageTitle')}
-            pageSubtitle={t('reminders.pageSubtitle')}
-            pageAction={
-              <Button
-                onClick={() => {
-                  setNewAppointmentDefaults(undefined);
-                  setNewAppointmentSeedCustomer(undefined);
-                  setNewAppointmentModalOpen(true);
-                }}
-              >
-                <CalendarPlus className="h-4 w-4 mr-2" />
-                {t('reminders.appointments.newAppointment')}
-              </Button>
-            }
-          />
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "appointments" | "availability" | "settings")} className="flex flex-col gap-6">
+          <TabsList className="self-end">
+            <TabsTrigger value="appointments">{t('reminders.tabs.appointments')}</TabsTrigger>
+            <TabsTrigger value="availability">{t('reminders.availability.tabLabel')}</TabsTrigger>
+            <TabsTrigger value="settings">{t('reminders.tabs.settings')}</TabsTrigger>
+          </TabsList>
 
-          {/* Week board: stats sidebar + upcoming-this-week table */}
-          <AppointmentsWeekBoard
-            appointments={allAppointments}
-            onViewAppointment={handleViewAppointment}
-            onAddAppointment={handleAddAppointmentForDate}
-          />
+          <TabsContent value="appointments" className="flex flex-col gap-6 mt-0">
+            {/* Next Up Section */}
+            <NextUpAppointments
+              appointments={allAppointments}
+              onViewDetails={handleViewAppointment}
+              onConfirm={(id) => confirmAppointmentMutation.mutateAsync(id)}
+              pageTitle={t('reminders.pageTitle')}
+              pageSubtitle={t('reminders.pageSubtitle')}
+              pageAction={
+                <Button
+                  onClick={() => {
+                    setNewAppointmentDefaults(undefined);
+                    setNewAppointmentSeedCustomer(undefined);
+                    setNewAppointmentModalOpen(true);
+                  }}
+                >
+                  <CalendarPlus className="h-4 w-4 mr-2" />
+                  {t('reminders.appointments.newAppointment')}
+                </Button>
+              }
+            />
 
-        </div>
+            {/* Week board: stats sidebar + upcoming-this-week table */}
+            <AppointmentsWeekBoard
+              appointments={allAppointments}
+              onViewAppointment={handleViewAppointment}
+              onAddAppointment={handleAddAppointmentForDate}
+            />
+          </TabsContent>
+
+          <TabsContent value="availability" className="mt-0">
+            <AvailabilityTab />
+          </TabsContent>
+
+          <TabsContent value="settings" className="mt-0">
+            <AppointmentSettingsTab />
+          </TabsContent>
+        </Tabs>
 
         {/* ─── Dialogs & Sheets (Extracted Components) ───────────────────── */}
 

@@ -344,8 +344,25 @@ export function wrapInEmailPreview(
   <style>
     /* Reset for email-like rendering inside iframe */
     html, body { margin: 0; padding: 0; height: 100%; }
-    img { max-width: 100%; }
+    img, video { max-width: 100% !important; height: auto; }
     * { box-sizing: border-box; }
+    /* ── Responsive containment ──────────────────────────────────
+       Body content is authored at desktop widths. Keep data tables,
+       media and long unbroken words from overflowing the email
+       column on any viewport (the reported issue is the mobile
+       preview, but this also protects the desktop frame). Layout
+       tables (role="presentation", emitted by the Puck editor) are
+       excluded so their column structure is preserved. */
+    .email-content table:not([role="presentation"]) { max-width: 100% !important; }
+    .email-content td, .email-content th,
+    .email-content p, .email-content li, .email-content a,
+    .email-content blockquote,
+    .email-content h1, .email-content h2, .email-content h3,
+    .email-content h4, .email-content h5, .email-content h6 {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .email-content pre { white-space: pre-wrap; word-break: break-word; }
     /* Match editor table cell spacing */
     td p, td div, td ul, td ol, td h1, td h2, td h3, td h4, td h5, td h6,
     th p, th div, th ul, th ol, th h1, th h2, th h3, th h4, th h5, th h6 {
@@ -360,6 +377,14 @@ export function wrapInEmailPreview(
       .email-content h1 { font-size: 22px !important; line-height: 1.25 !important; }
       .email-content h2 { font-size: 20px !important; line-height: 1.3 !important; }
       .email-content h3 { font-size: 18px !important; line-height: 1.35 !important; }
+      /* Force authored-width data tables to fit the phone: fixed
+         layout + neutralized <col> widths collapse them to equal,
+         wrapping columns instead of overflowing the frame. */
+      .email-content table:not([role="presentation"]) { width: 100% !important; table-layout: fixed !important; }
+      .email-content table:not([role="presentation"]) col { width: auto !important; }
+      .email-content table:not([role="presentation"]) td,
+      .email-content table:not([role="presentation"]) th { width: auto !important; }
+      .email-content img { max-width: 100% !important; height: auto !important; }
     }
     @media screen and (max-width: 360px) {
       .email-hero-header { padding: 20px 16px !important; }

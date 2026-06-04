@@ -89,6 +89,7 @@ const PublicFormPage = lazy(() => import("@/pages/public-form"));
 const PublicNewsletterHub = lazy(() => import("@/pages/public-newsletter"));
 const PublicNewsletterView = lazy(() => import("@/pages/public-newsletter-view"));
 const PublicPromotionTerms = lazy(() => import("@/pages/public-promotion-terms"));
+const PublicBookingPage = lazy(() => import("@/pages/public-booking"));
 
 // Cache helpers + key builders live in @/lib/protectedFlagCache so other
 // pages (subscribe / select-plan / onboarding) that write these flags
@@ -382,6 +383,16 @@ function Router() {
       <Suspense fallback={<PageLoader />}>
         <Switch>
           <Route path="/p/:tenantSlug/:promotionId/terms" component={PublicPromotionTerms} />
+        </Switch>
+      </Suspense>
+    );
+  }
+
+  if (currentLocation.startsWith('/book/')) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Switch>
+          <Route path="/book/:slug" component={PublicBookingPage} />
         </Switch>
       </Suspense>
     );

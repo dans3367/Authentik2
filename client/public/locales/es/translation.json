@@ -197,6 +197,77 @@
       "reminders": "Recordatorios",
       "settings": "Configuración"
     },
+    "availability": {
+      "tabLabel": "Disponibilidad",
+      "title": "Tu disponibilidad",
+      "subtitle": "Define las horas en las que estás disponible para reservas.",
+      "viewingFor": "Viendo la disponibilidad de",
+      "selectProvider": "Seleccionar proveedor",
+      "weeklyHours": "Horario semanal",
+      "addRange": "Añadir franja horaria",
+      "copyToAll": "Copiar a todos los días",
+      "unavailable": "No disponible",
+      "save": "Guardar disponibilidad",
+      "saving": "Guardando...",
+      "bookingLink": "Tu enlace de reserva",
+      "copyLink": "Copiar enlace",
+      "linkCopied": "Enlace copiado al portapapeles",
+      "linkUnavailable": "Guarda tu disponibilidad para generar tu enlace de reserva.",
+      "settings": {
+        "title": "Configuración de reservas",
+        "subtitle": "Comparte tu enlace de reserva con tus clientes.",
+        "linkDescription": "Cualquiera con este enlace puede ver tus horarios disponibles y reservar una cita contigo.",
+        "openLink": "Abrir"
+      },
+      "days": {
+        "0": "Domingo",
+        "1": "Lunes",
+        "2": "Martes",
+        "3": "Miércoles",
+        "4": "Jueves",
+        "5": "Viernes",
+        "6": "Sábado"
+      },
+      "overrides": {
+        "title": "Excepciones por fecha",
+        "add": "Añadir excepción",
+        "empty": "Aún no hay excepciones por fecha.",
+        "dayOff": "Día libre",
+        "customHours": "Horario especial",
+        "dateLabel": "Fecha",
+        "typeLabel": "Tipo",
+        "noteLabel": "Nota",
+        "notePlaceholder": "p. ej. Festivo, Vacaciones"
+      },
+      "rules": {
+        "title": "Reglas de reserva",
+        "timezone": "Zona horaria",
+        "slotLength": "Duración de la cita (minutos)",
+        "buffer": "Margen entre reservas (minutos)",
+        "minimumNotice": "Antelación mínima (horas)",
+        "bookingHorizon": "Ventana de reserva (días)",
+        "bookableWindow": "Rango de fechas reservables",
+        "bookableWindowHelp": "Opcional. Solo se ofrecerán fechas dentro de este rango. Déjalo en blanco para seguir usando la ventana de reserva continua de arriba.",
+        "bookableFrom": "Fecha de inicio",
+        "bookableUntil": "Fecha de fin",
+        "clearWindow": "Borrar",
+        "windowEndBeforeStart": "La fecha de fin debe ser igual o posterior a la de inicio",
+        "isBookable": "Disponible para reservas públicas",
+        "isEnabled": "Activar disponibilidad"
+      },
+      "errors": {
+        "overlap": "Las franjas horarias se solapan",
+        "endBeforeStart": "La hora de fin debe ser posterior a la de inicio",
+        "duplicateDate": "Ya existe una excepción para esta fecha"
+      },
+      "toasts": {
+        "saved": "Disponibilidad guardada",
+        "saveError": "No se pudo guardar la disponibilidad",
+        "overrideAdded": "Excepción guardada",
+        "overrideRemoved": "Excepción eliminada",
+        "overrideError": "No se pudo guardar la excepción"
+      }
+    },
     "appointments": {
       "newAppointment": "Nueva Cita",
       "createAppointment": "Crear Cita",
@@ -388,6 +459,8 @@
       "close": "Cerrar"
     },
     "board": {
+      "collapse": "Contraer",
+      "expand": "Expandir",
       "totalAppointments": "Total de Citas",
       "thisMonth": "este mes",
       "inMonth": "en {{month}}",
