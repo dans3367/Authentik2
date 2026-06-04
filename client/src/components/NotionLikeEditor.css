@@ -144,12 +144,12 @@
 
 /* ─── Table ───────────────────────────────────────────────────────────────── */
 
-/* tableWrapper is the outer div created by tiptap's TableView NodeView */
+/* tableWrapper is the outer div created by tiptap's TableView NodeView.
+   Square corners (no border-radius) to match the preview/email output; the
+   visible frame is drawn by the cells so a per-cell border-color recolors it. */
 .notion-editor-content .tableWrapper {
   overflow: hidden;
   margin: 1em 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
 }
 
 .notion-editor-content table {
@@ -161,7 +161,6 @@
 
 .notion-editor-content table td,
 .notion-editor-content table th {
-  border: 1px solid #e5e7eb;
   padding: 8px 12px;
   position: relative;
   vertical-align: top;
@@ -171,25 +170,20 @@
   line-height: 1.5;
 }
 
-/* Remove outer borders so the wrapper's border-radius works cleanly */
-.notion-editor-content table tr:first-child td,
-.notion-editor-content table tr:first-child th {
-  border-top: none;
+/* No border by default. Cells with no chosen color get a faint DASHED guide so
+   the grid stays editable — this guide is editor-only and never exported, which
+   matches the transparent (borderless) default in the preview/email wrappers. */
+.notion-editor-content table td:not([style*="border-color"]),
+.notion-editor-content table th:not([style*="border-color"]) {
+  border: 1px dashed #e5e7eb;
 }
 
-.notion-editor-content table tr:last-child td,
-.notion-editor-content table tr:last-child th {
-  border-bottom: none;
-}
-
-.notion-editor-content table td:first-child,
-.notion-editor-content table th:first-child {
-  border-left: none;
-}
-
-.notion-editor-content table td:last-child,
-.notion-editor-content table th:last-child {
-  border-right: none;
+/* A cell with a chosen border-color renders it solid (color comes from the
+   inline style; width/style come from here). */
+.notion-editor-content table td[style*="border-color"],
+.notion-editor-content table th[style*="border-color"] {
+  border-width: 1px;
+  border-style: solid;
 }
 
 .notion-editor-content table th {
@@ -286,13 +280,10 @@
   margin: 0 4px;
 }
 
-/* Dark mode table */
-.dark .notion-editor-content .tableWrapper {
-  border-color: #374151;
-}
-
-.dark .notion-editor-content table td,
-.dark .notion-editor-content table th {
+/* Dark mode table — only the default (uncolored) cells use the dark guide color;
+   a per-cell inline border-color from the picker still wins for the rest. */
+.dark .notion-editor-content table td:not([style*="border-color"]),
+.dark .notion-editor-content table th:not([style*="border-color"]) {
   border-color: #374151;
 }
 
@@ -2419,6 +2410,31 @@
   flex-shrink: 0;
 }
 
+/* "Default / none" swatch: clear background with a red diagonal slash. */
+.table-color-swatch-none {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  background-image: linear-gradient(
+    to top right,
+    transparent calc(50% - 1px),
+    #ef4444 calc(50% - 1px),
+    #ef4444 calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+
+.dark .table-color-swatch-none {
+  background: #1f2937;
+  border-color: #4b5563;
+  background-image: linear-gradient(
+    to top right,
+    transparent calc(50% - 1px),
+    #ef4444 calc(50% - 1px),
+    #ef4444 calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+
 /* ─── Drag states ─────────────────────────────────────────────────────── */
 
 .table-col-drag-bar-dragging {
@@ -2531,6 +2547,62 @@
   border-color: #f87171;
   color: #dc2626;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
+}
+
+/* Border color button + popover below the table */
+.table-border-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.table-border-btn:hover {
+  background: #f9fafb;
+  border-color: #6366f1;
+  color: #111827;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
+}
+
+.table-border-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 140px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+  animation: table-col-dropdown-in 0.12s ease-out;
+}
+
+.dark .table-border-btn {
+  background: #1f2937;
+  border-color: #374151;
+  color: #d1d5db;
+}
+
+.dark .table-border-btn:hover {
+  background: #374151;
+  border-color: #6366f1;
+  color: #f3f4f6;
+}
+
+.dark .table-border-popover {
+  background: #1f2937;
+  border-color: #374151;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 /* Make sure table wrapper has enough top margin for the drag bars */

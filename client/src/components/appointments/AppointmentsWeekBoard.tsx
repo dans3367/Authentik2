@@ -18,6 +18,7 @@ import {
   subMonths,
   subWeeks,
 } from "date-fns";
+import { es } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,7 +133,10 @@ export function AppointmentsWeekBoard({
   onManageTemplates,
   onViewCalendar,
 }: AppointmentsWeekBoardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // date-fns formats weekday/month names in English by default; map the active
+  // i18n language to a date-fns locale so the calendar reads in that language.
+  const dfLocale = i18n.language?.toLowerCase().startsWith("es") ? es : undefined;
   const [selectedFilter, setSelectedFilter] = useState<SidebarFilterKey>("upcoming");
   const [listTab, setListTab] = useState<ListTabKey>("selected");
   const [viewMode, setViewMode] = useState<BoardViewMode>("list");
@@ -190,9 +194,9 @@ export function AppointmentsWeekBoard({
       .map(key => {
         const [year, month] = key.split("-").map(Number);
         const date = new Date(year, month - 1, 1);
-        return { value: key, label: format(date, "MMMM yyyy"), date };
+        return { value: key, label: format(date, "MMMM yyyy", { locale: dfLocale }), date };
       });
-  }, [appointments, now, selectedMonth]);
+  }, [appointments, now, selectedMonth, dfLocale]);
 
   const selectedMonthDate = useMemo(() => {
     const match = monthOptions.find(m => m.value === selectedMonth);
@@ -228,6 +232,7 @@ export function AppointmentsWeekBoard({
   // default — unless the change was driven by the day stepper crossing a month
   // boundary, in which case the stepped day is kept (guard below).
   const skipDayResetRef = useRef(false);
+  const selectedDaySectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (skipDayResetRef.current) {
       skipDayResetRef.current = false;
@@ -352,8 +357,10 @@ export function AppointmentsWeekBoard({
 
   const weekdayLabels = useMemo(() => {
     const weekStart = startOfWeek(new Date(2024, 0, 7), { weekStartsOn: 0 });
-    return Array.from({ length: 7 }, (_, index) => format(addDays(weekStart, index), "EEE"));
-  }, []);
+    return Array.from({ length: 7 }, (_, index) =>
+      format(addDays(weekStart, index), "EEE", { locale: dfLocale })
+    );
+  }, [dfLocale]);
 
   const weekStart = useMemo(() => startOfWeek(selectedWeekDate, { weekStartsOn: 0 }), [selectedWeekDate]);
   const weekEnd = useMemo(() => endOfWeek(selectedWeekDate, { weekStartsOn: 0 }), [selectedWeekDate]);
@@ -361,13 +368,13 @@ export function AppointmentsWeekBoard({
 
   const weekRangeLabel = useMemo(() => {
     if (isSameMonth(weekStart, weekEnd)) {
-      return `${format(weekStart, "MMM d")} – ${format(weekEnd, "d, yyyy")}`;
+      return `${format(weekStart, "MMM d", { locale: dfLocale })} – ${format(weekEnd, "d, yyyy", { locale: dfLocale })}`;
     }
     if (weekStart.getFullYear() === weekEnd.getFullYear()) {
-      return `${format(weekStart, "MMM d")} – ${format(weekEnd, "MMM d, yyyy")}`;
+      return `${format(weekStart, "MMM d", { locale: dfLocale })} – ${format(weekEnd, "MMM d, yyyy", { locale: dfLocale })}`;
     }
-    return `${format(weekStart, "MMM d, yyyy")} – ${format(weekEnd, "MMM d, yyyy")}`;
-  }, [weekStart, weekEnd]);
+    return `${format(weekStart, "MMM d, yyyy", { locale: dfLocale })} – ${format(weekEnd, "MMM d, yyyy", { locale: dfLocale })}`;
+  }, [weekStart, weekEnd, dfLocale]);
 
   const weekFiltered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -436,10 +443,28 @@ export function AppointmentsWeekBoard({
       { count }
     );
 
+  // Select a calendar day and, when it has appointments, bring the Selected-day
+  // panel (stacked below the grid) into view so the list is visible without the
+  // user manually scrolling down.
+  const selectCalendarDay = (day: Date) => {
+    setSelectedCalendarDate(day);
+    const hasAppointments = (calendarAppointmentsByDay.get(dayKey(day))?.length ?? 0) > 0;
+    if (!hasAppointments) return;
+    requestAnimationFrame(() => {
+      const el = selectedDaySectionRef.current;
+      if (!el) return;
+      // Only pull it up when it's sitting low/below the fold, so we don't yank
+      // the page when the panel is already comfortably on screen.
+      if (el.getBoundingClientRect().top > window.innerHeight * 0.5) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  };
+
   const handleCalendarDayKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, day: Date) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      setSelectedCalendarDate(day);
+      selectCalendarDay(day);
     }
   };
 
@@ -627,7 +652,7 @@ export function AppointmentsWeekBoard({
                 <span className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
                   {isCurrentMonth
                     ? t('reminders.board.thisMonth')
-                    : t('reminders.board.inMonth', { month: format(selectedMonthDate, 'MMMM') })}
+                    : t('reminders.board.inMonth', { month: format(selectedMonthDate, 'MMMM', { locale: dfLocale }) })}
                 </span>
                 {isCurrentMonth && pctDelta !== null && (
                   <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
@@ -761,7 +786,7 @@ export function AppointmentsWeekBoard({
                           }`}
                         >
                           <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            {format(day, "EEE")}
+                            {format(day, "EEE", { locale: dfLocale })}
                           </div>
                           <div
                             className={`mt-0.5 inline-flex h-7 min-w-[28px] items-center justify-center rounded-full px-1.5 text-sm font-semibold tabular-nums ${
@@ -815,7 +840,7 @@ export function AppointmentsWeekBoard({
                                   className={`block w-full rounded-md border-l-2 px-2 py-1.5 text-left transition-colors ${chipClass}`}
                                 >
                                   <div className="text-[11px] font-semibold tabular-nums">
-                                    {format(appointmentDate, "h:mm a")}
+                                    {format(appointmentDate, "h:mm a", { locale: dfLocale })}
                                   </div>
                                   <div className="mt-0.5 truncate text-xs font-medium">
                                     {appointment.serviceType || appointment.title}
@@ -839,7 +864,7 @@ export function AppointmentsWeekBoard({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-border">
                 <div>
                   <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {format(selectedMonthDate, "MMMM yyyy")}
+                    {format(selectedMonthDate, "MMMM yyyy", { locale: dfLocale })}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     {formatAppointmentCount(filtered.length)}
@@ -904,7 +929,7 @@ export function AppointmentsWeekBoard({
                             key={key}
                             role="button"
                             tabIndex={0}
-                            onClick={() => setSelectedCalendarDate(day)}
+                            onClick={() => selectCalendarDay(day)}
                             onKeyDown={(event) => handleCalendarDayKeyDown(event, day)}
                             className={`group min-h-[128px] border-r border-b border-slate-100 dark:border-slate-800 p-2 text-left outline-none transition-colors ${
                               outsideMonth
@@ -968,10 +993,10 @@ export function AppointmentsWeekBoard({
                                       onViewAppointment(appointment);
                                     }}
                                     className={`flex w-full items-center gap-1 rounded-md border-l-2 px-2 py-1 text-left text-[11px] leading-4 transition-colors ${chipClass}`}
-                                    aria-label={`${format(appointmentDate, "h:mm a")} ${appointment.title}`}
+                                    aria-label={`${format(appointmentDate, "h:mm a", { locale: dfLocale })} ${appointment.title}`}
                                   >
                                     <span className="shrink-0 font-semibold tabular-nums">
-                                      {format(appointmentDate, "h:mm a")}
+                                      {format(appointmentDate, "h:mm a", { locale: dfLocale })}
                                     </span>
                                     <span className="min-w-0 truncate">
                                       {appointment.serviceType || appointment.title}
@@ -992,14 +1017,14 @@ export function AppointmentsWeekBoard({
                   </div>
                 </div>
 
-                <aside className="border-t border-border">
+                <aside ref={selectedDaySectionRef} className="scroll-mt-4 border-t border-border">
                   <div className="flex items-start justify-between gap-3 p-5 border-b border-border">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
                         {t('reminders.board.calendar.selectedDay')}
                       </p>
                       <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
-                        {format(selectedCalendarDate, "EEEE, MMM d")}
+                        {format(selectedCalendarDate, "EEEE, MMM d", { locale: dfLocale })}
                       </h3>
                       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         {formatAppointmentCount(selectedDayAppointments.length)}
@@ -1065,7 +1090,7 @@ export function AppointmentsWeekBoard({
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
-                                  {format(appointmentDate, "h:mm a")}
+                                  {format(appointmentDate, "h:mm a", { locale: dfLocale })}
                                 </span>
                                 <span className={`h-2 w-2 rounded-full ${dotClass}`} />
                               </div>
@@ -1100,19 +1125,19 @@ export function AppointmentsWeekBoard({
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-200 dark:border-slate-800 hover:bg-transparent">
-                  <TableHead className="text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
+                  <TableHead className="px-4 sm:px-6 text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
                     {t('reminders.board.table.contact')}
                   </TableHead>
-                  <TableHead className="text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
+                  <TableHead className="px-4 sm:px-6 text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
                     {t('reminders.board.table.when')}
                   </TableHead>
-                  <TableHead className="text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
+                  <TableHead className="hidden md:table-cell px-4 sm:px-6 text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
                     {t('reminders.board.table.type')}
                   </TableHead>
-                  <TableHead className="text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
+                  <TableHead className="hidden lg:table-cell px-4 sm:px-6 text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
                     {t('reminders.board.table.provider')}
                   </TableHead>
-                  <TableHead className="text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
+                  <TableHead className="px-4 sm:px-6 text-[11px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 h-10">
                     {t('reminders.board.table.status')}
                   </TableHead>
                 </TableRow>
@@ -1132,10 +1157,10 @@ export function AppointmentsWeekBoard({
                       onClick={() => onViewAppointment(apt)}
                       className="cursor-pointer border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors"
                     >
-                      <TableCell className="py-4">
+                      <TableCell className="px-4 sm:px-6 py-3 sm:py-4">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold ${avatarClass}`}
+                            className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold ${avatarClass}`}
                           >
                             {initials}
                           </div>
@@ -1146,13 +1171,17 @@ export function AppointmentsWeekBoard({
                             <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
                               {apt.customer?.email || name}
                             </div>
+                            {/* On mobile the Type column is hidden, so surface it here */}
+                            <div className="md:hidden text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                              {apt.serviceType || apt.title}
+                            </div>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="py-4">
+                      <TableCell className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-slate-900 dark:text-slate-100 tabular-nums">
-                            {format(aptDate, "h:mm a")}
+                            {format(aptDate, "h:mm a", { locale: dfLocale })}
                           </span>
                           {isToday(aptDate) && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-[10px] font-medium">
@@ -1161,17 +1190,17 @@ export function AppointmentsWeekBoard({
                           )}
                         </div>
                         <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          {format(aptDate, "MMM d")}
+                          {format(aptDate, "MMM d", { locale: dfLocale })}
                         </div>
                       </TableCell>
-                      <TableCell className="py-4 text-sm text-slate-700 dark:text-slate-300">
+                      <TableCell className="hidden md:table-cell px-4 sm:px-6 py-3 sm:py-4 text-sm text-slate-700 dark:text-slate-300">
                         {apt.serviceType || apt.title}
                       </TableCell>
-                      <TableCell className="py-4">
+                      <TableCell className="hidden lg:table-cell px-4 sm:px-6 py-3 sm:py-4">
                         {apt.provider?.name || apt.provider?.email ? (
                           <div className="flex items-center gap-2 min-w-0">
                             <div
-                              className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-semibold ${
+                              className={`h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-[10px] font-semibold ${
                                 AVATAR_PALETTE[
                                   hashString(apt.provider.name || apt.provider.email || "") %
                                     AVATAR_PALETTE.length
@@ -1190,7 +1219,7 @@ export function AppointmentsWeekBoard({
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="py-4">
+                      <TableCell className="px-4 sm:px-6 py-3 sm:py-4">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${pillClass}`}
                         >
@@ -1221,7 +1250,7 @@ export function AppointmentsWeekBoard({
                   <span className="font-medium text-slate-700 dark:text-slate-300">
                     {formatAppointmentCount(filtered.length)}
                   </span>{" "}
-                  · {format(selectedMonthDate, "MMMM yyyy")}
+                  · {format(selectedMonthDate, "MMMM yyyy", { locale: dfLocale })}
                 </>
               ) : (
                 <>

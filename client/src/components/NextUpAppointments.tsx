@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, MessageSquare, Phone, Mail, Home, Check, ArrowRight, Loader2 } from "lucide-react";
 import SendEmailModal from "@/components/SendEmailModal";
 import { addHours, isWithinInterval, format, isToday, isTomorrow, isSameDay } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   Select,
   SelectContent,
@@ -62,12 +64,6 @@ function getInitials(name: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function groupLabel(date: Date) {
-  if (isToday(date)) return "Today";
-  if (isTomorrow(date)) return "Tomorrow";
-  return format(date, "EEEE");
-}
-
 function formatAddress(c: Customer) {
   const line1 = c.address?.trim();
   const cityState = [c.city, c.state].filter(Boolean).join(", ");
@@ -82,6 +78,7 @@ interface CustomerInfoDialogProps {
 }
 
 function CustomerInfoDialog({ customer, trigger }: CustomerInfoDialogProps) {
+  const { t } = useTranslation();
   const name = getCustomerNameUtils(customer);
   const initials = getInitials(name);
   const avatarClass = AVATAR_PALETTE[hashString(name) % AVATAR_PALETTE.length];
@@ -98,7 +95,7 @@ function CustomerInfoDialog({ customer, trigger }: CustomerInfoDialogProps) {
             </div>
             <div className="min-w-0">
               <DialogTitle className="text-left text-lg truncate">{name}</DialogTitle>
-              <DialogDescription className="text-left">Customer contact info</DialogDescription>
+              <DialogDescription className="text-left">{t('reminders.nextUp.customerContactInfo')}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -111,7 +108,7 @@ function CustomerInfoDialog({ customer, trigger }: CustomerInfoDialogProps) {
             >
               <Phone className="h-4 w-4 text-slate-500 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Phone</div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">{t('reminders.nextUp.phone')}</div>
                 <div className="text-sm text-slate-900 dark:text-slate-100 truncate">{customer.phoneNumber}</div>
               </div>
             </a>
@@ -119,8 +116,8 @@ function CustomerInfoDialog({ customer, trigger }: CustomerInfoDialogProps) {
             <div className="flex items-center gap-3 px-4 py-3">
               <Phone className="h-4 w-4 text-slate-400 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Phone</div>
-                <div className="text-sm text-slate-400 italic">Not provided</div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">{t('reminders.nextUp.phone')}</div>
+                <div className="text-sm text-slate-400 italic">{t('reminders.nextUp.notProvided')}</div>
               </div>
             </div>
           )}
@@ -132,7 +129,7 @@ function CustomerInfoDialog({ customer, trigger }: CustomerInfoDialogProps) {
             >
               <Mail className="h-4 w-4 text-slate-500 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Email</div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">{t('reminders.nextUp.email')}</div>
                 <div className="text-sm text-slate-900 dark:text-slate-100 truncate">{customer.email}</div>
               </div>
             </a>
@@ -140,8 +137,8 @@ function CustomerInfoDialog({ customer, trigger }: CustomerInfoDialogProps) {
             <div className="flex items-center gap-3 px-4 py-3">
               <Mail className="h-4 w-4 text-slate-400 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Email</div>
-                <div className="text-sm text-slate-400 italic">Not provided</div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">{t('reminders.nextUp.email')}</div>
+                <div className="text-sm text-slate-400 italic">{t('reminders.nextUp.notProvided')}</div>
               </div>
             </div>
           )}
@@ -149,9 +146,9 @@ function CustomerInfoDialog({ customer, trigger }: CustomerInfoDialogProps) {
           <div className="flex items-start gap-3 px-4 py-3">
             <Home className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Address</div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">{t('reminders.nextUp.address')}</div>
               {addressLines.length === 0 ? (
-                <div className="text-sm text-slate-400 italic">Not provided</div>
+                <div className="text-sm text-slate-400 italic">{t('reminders.nextUp.notProvided')}</div>
               ) : (
                 <div className="text-sm text-slate-900 dark:text-slate-100 space-y-0.5">
                   {addressLines.map((line, i) => (
@@ -175,6 +172,14 @@ export function NextUpAppointments({
   pageSubtitle,
   pageAction,
 }: NextUpAppointmentsProps) {
+  const { t, i18n } = useTranslation();
+  // date-fns formats weekday/month names in English unless given a locale.
+  const dfLocale = i18n.language?.toLowerCase().startsWith("es") ? es : undefined;
+  const groupLabel = (date: Date) => {
+    if (isToday(date)) return t('reminders.nextUp.today');
+    if (isTomorrow(date)) return t('reminders.nextUp.tomorrow');
+    return format(date, "EEEE", { locale: dfLocale });
+  };
   const [now, setNow] = useState(new Date());
   const [hoursRange, setHoursRange] = useState(48);
   const [confirmingIds, setConfirmingIds] = useState<Set<string>>(new Set());
@@ -232,50 +237,42 @@ export function NextUpAppointments({
     a => a.status !== 'confirmed' && a.status !== 'in_progress'
   ).length;
 
-  const agendaControl = (
-    <div className="flex flex-col gap-2">
-      <span className="text-[11px] font-semibold tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
-        Agenda
-      </span>
-      <Select
-        value={hoursRange.toString()}
-        onValueChange={(val) => setHoursRange(parseInt(val))}
+  // Compact range filter — reads clearly as an adjustable control, not a heading.
+  const rangeSelect = (
+    <Select
+      value={hoursRange.toString()}
+      onValueChange={(val) => setHoursRange(parseInt(val))}
+    >
+      <SelectTrigger
+        aria-label={t('reminders.nextUp.timeRange')}
+        className="h-9 w-[150px] text-sm font-medium"
       >
-        <SelectTrigger
-          aria-label="Time range"
-          className="h-auto w-auto p-0 border-0 bg-transparent shadow-none hover:bg-transparent focus:ring-0 focus:ring-offset-0 text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 gap-2 [&>svg]:h-5 [&>svg]:w-5 [&>svg]:text-slate-400"
-        >
-          <span>Next {hoursRange} hours</span>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="12">Next 12 hours</SelectItem>
-          <SelectItem value="24">Next 24 hours</SelectItem>
-          <SelectItem value="36">Next 36 hours</SelectItem>
-          <SelectItem value="48">Next 48 hours</SelectItem>
-          <SelectItem value="64">Next 64 hours</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="12">{t('reminders.nextUp.next12Hours')}</SelectItem>
+        <SelectItem value="24">{t('reminders.nextUp.next24Hours')}</SelectItem>
+        <SelectItem value="36">{t('reminders.nextUp.next36Hours')}</SelectItem>
+        <SelectItem value="48">{t('reminders.nextUp.next48Hours')}</SelectItem>
+        <SelectItem value="64">{t('reminders.nextUp.next64Hours')}</SelectItem>
+      </SelectContent>
+    </Select>
   );
 
-  const appointmentCounts = (
-    <div className="flex items-start gap-8 pb-1">
-      <div className="flex flex-col items-center">
-        <span className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums leading-none">
-          {nextUp.length}
+  // At-a-glance counts as quiet chips; unconfirmed only surfaces when it matters.
+  const summaryChips = (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+        <span className="tabular-nums">{nextUp.length}</span>
+        <span className="text-slate-500 dark:text-slate-400">{t('reminders.nextUp.scheduled')}</span>
+      </span>
+      {unconfirmedCount > 0 && (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+          <span className="tabular-nums">{unconfirmedCount}</span>
+          <span>{t('reminders.nextUp.unconfirmed')}</span>
         </span>
-        <span className="mt-2 text-[11px] font-medium tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
-          Total
-        </span>
-      </div>
-      <div className="flex flex-col items-center">
-        <span className="text-3xl sm:text-4xl font-semibold tracking-tight text-amber-600 dark:text-amber-500 tabular-nums leading-none">
-          {unconfirmedCount}
-        </span>
-        <span className="mt-2 text-[11px] font-medium tracking-[0.15em] uppercase text-slate-500 dark:text-slate-400">
-          Unconfirmed
-        </span>
-      </div>
+      )}
     </div>
   );
 
@@ -285,40 +282,40 @@ export function NextUpAppointments({
     <Card className="shadow-sm">
       <CardHeader className="pb-6">
         {hasPageHeader ? (
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center lg:gap-8">
-            <div className="min-w-0 space-y-1">
-              {pageTitle && (
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                  {pageTitle}
-                </h1>
-              )}
-              {pageSubtitle && (
-                <p className="text-gray-600 dark:text-gray-400">
-                  {pageSubtitle}
-                </p>
-              )}
+          <div className="space-y-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                {pageTitle && (
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
+                    {pageTitle}
+                  </h1>
+                )}
+                {pageSubtitle && (
+                  <p className="text-gray-600 dark:text-gray-400">
+                    {pageSubtitle}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                {rangeSelect}
+                {pageAction}
+              </div>
             </div>
 
-            <div className="min-w-0 lg:border-l lg:border-slate-200 lg:pl-8 dark:lg:border-slate-800">
-              {agendaControl}
-            </div>
-
-            <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center lg:justify-end">
-              {appointmentCounts}
-              {pageAction && <div className="shrink-0">{pageAction}</div>}
-            </div>
+            {summaryChips}
           </div>
         ) : (
-          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
-            {agendaControl}
-            {appointmentCounts}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {rangeSelect}
+            {summaryChips}
           </div>
         )}
       </CardHeader>
       <CardContent>
         {nextUp.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">
-            No upcoming appointments in the next {hoursRange} hours.
+            {t('reminders.nextUp.noUpcoming', { hours: hoursRange })}
           </p>
         ) : (
           <div className="space-y-8">
@@ -330,12 +327,15 @@ export function NextUpAppointments({
                       {groupLabel(group.date)}
                     </span>
                     <span className="text-sm text-slate-500 dark:text-slate-400">
-                      {format(group.date, "MMM d")}
+                      {format(group.date, "MMM d", { locale: dfLocale })}
                     </span>
                   </div>
                   <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
                   <span className="text-xs font-medium tracking-wider text-slate-500 dark:text-slate-400">
-                    {group.items.length} {group.items.length === 1 ? "APPT" : "APPTS"}
+                    {group.items.length}{" "}
+                    {group.items.length === 1
+                      ? t('reminders.nextUp.appointmentCountAbbr')
+                      : t('reminders.nextUp.appointmentCountAbbrPlural')}
                   </span>
                 </div>
 
@@ -356,20 +356,20 @@ export function NextUpAppointments({
                         ? "bg-emerald-500"
                         : "bg-amber-500";
                       const statusLabel = isInProgress
-                        ? "In progress"
+                        ? t('reminders.nextUp.statusInProgress')
                         : isConfirmed
-                          ? "Confirmed"
-                          : "Needs confirmation";
+                          ? t('reminders.nextUp.statusConfirmed')
+                          : t('reminders.nextUp.statusNeedsConfirmation');
 
                       return (
                         <li key={apt.id} className="flex items-stretch gap-4">
                           <div className="w-[56px] shrink-0 flex flex-col items-end pt-4">
                             <div className="flex items-baseline gap-0.5 text-slate-900 dark:text-slate-100">
                               <span className="text-xl font-semibold tracking-tight tabular-nums">
-                                {format(aptDate, "h:mm")}
+                                {format(aptDate, "h:mm", { locale: dfLocale })}
                               </span>
                               <span className="text-[10px] font-medium uppercase text-slate-500 dark:text-slate-400">
-                                {format(aptDate, "a")}
+                                {format(aptDate, "a", { locale: dfLocale })}
                               </span>
                             </div>
                             <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -406,18 +406,18 @@ export function NextUpAppointments({
                                   type="button"
                                   onClick={() => onViewDetails(apt)}
                                   className="max-w-full truncate text-left text-sm font-semibold text-slate-900 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-100 dark:focus-visible:ring-offset-slate-900"
-                                  aria-label={`View appointment details for ${customerName}`}
+                                  aria-label={t('reminders.nextUp.viewDetailsFor', { name: customerName })}
                                 >
                                   {customerName}
                                 </button>
                                 {!isConfirmed && !isInProgress && (
                                   <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-200 text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-md border-0">
-                                    Needs Confirm
+                                    {t('reminders.nextUp.badgeNeedsConfirm')}
                                   </Badge>
                                 )}
                                 {isInProgress && (
                                   <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-200 text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-md border-0">
-                                    In Progress
+                                    {t('reminders.nextUp.badgeInProgress')}
                                   </Badge>
                                 )}
                               </div>
@@ -426,7 +426,7 @@ export function NextUpAppointments({
                                   type="button"
                                   onClick={() => onViewDetails(apt)}
                                   className="truncate text-left underline-offset-4 hover:text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:hover:text-slate-200 dark:focus-visible:ring-offset-slate-900"
-                                  aria-label={`View details for ${apt.title}`}
+                                  aria-label={t('reminders.nextUp.viewDetailsForTitle', { title: apt.title })}
                                 >
                                   {apt.title}
                                 </button>
@@ -452,8 +452,8 @@ export function NextUpAppointments({
                                     <button
                                       type="button"
                                       className="h-8 w-8 rounded-md flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition-colors"
-                                      aria-label={`Send email to ${customerName}`}
-                                      title="Send email"
+                                      aria-label={t('reminders.nextUp.sendEmailTo', { name: customerName })}
+                                      title={t('reminders.nextUp.sendEmail')}
                                     >
                                       <MessageSquare className="h-4 w-4" />
                                     </button>
@@ -464,8 +464,8 @@ export function NextUpAppointments({
                                   type="button"
                                   disabled
                                   className="h-8 w-8 rounded-md flex items-center justify-center text-slate-300 dark:text-slate-600 cursor-not-allowed"
-                                  aria-label="No email on file"
-                                  title="No email on file"
+                                  aria-label={t('reminders.nextUp.noEmailOnFile')}
+                                  title={t('reminders.nextUp.noEmailOnFile')}
                                 >
                                   <MessageSquare className="h-4 w-4" />
                                 </button>
@@ -477,8 +477,8 @@ export function NextUpAppointments({
                                     <button
                                       type="button"
                                       className="h-8 w-8 rounded-md flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition-colors"
-                                      aria-label={`View contact info for ${customerName}`}
-                                      title="Contact info"
+                                      aria-label={t('reminders.nextUp.viewContactInfoFor', { name: customerName })}
+                                      title={t('reminders.nextUp.contactInfo')}
                                     >
                                       <Phone className="h-4 w-4" />
                                     </button>
@@ -489,8 +489,8 @@ export function NextUpAppointments({
                                   type="button"
                                   disabled
                                   className="h-8 w-8 rounded-md flex items-center justify-center text-slate-300 dark:text-slate-600 cursor-not-allowed"
-                                  aria-label="No customer info"
-                                  title="No customer info"
+                                  aria-label={t('reminders.nextUp.noCustomerInfo')}
+                                  title={t('reminders.nextUp.noCustomerInfo')}
                                 >
                                   <Phone className="h-4 w-4" />
                                 </button>
@@ -502,7 +502,7 @@ export function NextUpAppointments({
                                   className="ml-1 h-9 px-3 rounded-lg border-slate-300 dark:border-slate-700 font-medium"
                                   onClick={() => onViewDetails(apt)}
                                 >
-                                  {isStartable || isInProgress ? "Start" : "Details"}
+                                  {isStartable || isInProgress ? t('reminders.nextUp.start') : t('reminders.nextUp.details')}
                                   <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                                 </Button>
                               ) : (
@@ -523,7 +523,7 @@ export function NextUpAppointments({
                                   ) : (
                                     <Check className="h-3.5 w-3.5 mr-1.5" />
                                   )}
-                                  {confirmingIds.has(apt.id) ? "Confirming..." : "Confirm"}
+                                  {confirmingIds.has(apt.id) ? t('reminders.nextUp.confirming') : t('reminders.nextUp.confirm')}
                                 </Button>
                               )}
                             </div>

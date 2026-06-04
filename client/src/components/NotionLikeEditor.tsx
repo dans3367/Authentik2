@@ -78,6 +78,7 @@ import {
     ArrowUpAZ,
     Eraser,
     Paintbrush,
+    Square,
 } from "lucide-react";
 import { improveText, emojifyText, expandText, shortenText, makeMoreCasualText, makeMoreFormalText, translateText, generateNewsletter, transformNewsletter, type NewsletterTransformAction } from "@/lib/aiApi";
 import { aiHtmlToInlineHtml, hasTopLevelAiBlocks, mergeAiBlocksWithSurroundingText, normalizeAiHtml } from "@/lib/aiHtmlNormalization";
@@ -1873,6 +1874,72 @@ function colorRow(editor: any, color: string) {
     editor.view.dispatch(tr);
 }
 
+const TABLE_BORDER_COLORS = [
+    { label: 'Default', value: '' },
+    { label: 'Gray', value: '#9ca3af' },
+    { label: 'Dark', value: '#374151' },
+    { label: 'Blue', value: '#3b82f6' },
+    { label: 'Green', value: '#22c55e' },
+    { label: 'Yellow', value: '#eab308' },
+    { label: 'Orange', value: '#f97316' },
+    { label: 'Red', value: '#ef4444' },
+    { label: 'Purple', value: '#a855f7' },
+    { label: 'Pink', value: '#ec4899' },
+] as const;
+
+/** Replace (or remove) the border-color declaration in a cell's inline style. */
+function getStyleWithBorderColor(currentStyle: string | null | undefined, color: string) {
+    const remainingStyles = (currentStyle || "")
+        .split(";")
+        .map((part) => part.trim())
+        .filter((part) => part && !/^border-color\s*:/i.test(part));
+
+    if (color) {
+        remainingStyles.unshift(`border-color: ${color}`);
+    }
+
+    return remainingStyles.join("; ") || null;
+}
+
+/** Read the border-color from a cell style string (for showing the active swatch). */
+function readBorderColor(style: string | null | undefined): string {
+    const match = /border-color\s*:\s*([^;]+)/i.exec(style || "");
+    return match ? match[1].trim() : "";
+}
+
+/** Rebuild the table, transforming every cell's inline style. */
+function mapTableCellStyles(editor: any, transform: (style: string | null | undefined) => string | null) {
+    const found = findTableAround(editor);
+    if (!found) return;
+    const { tableNode, tablePos } = found;
+    const { tr } = editor.state;
+    const newRows: any[] = [];
+    for (let r = 0; r < tableNode.childCount; r++) {
+        const row = tableNode.child(r);
+        const cells: any[] = [];
+        for (let c = 0; c < row.childCount; c++) {
+            const cell = row.child(c);
+            cells.push(cell.type.create({ ...cell.attrs, style: transform(cell.attrs.style) }, cell.content));
+        }
+        newRows.push(row.type.create(row.attrs, cells));
+    }
+    const newTable = tableNode.type.create(tableNode.attrs, newRows);
+    tr.replaceWith(tablePos, tablePos + tableNode.nodeSize, newTable);
+    editor.view.dispatch(tr);
+}
+
+/** Set the border color on every cell in the table (drives the whole grid). */
+function setTableBorderColor(editor: any, color: string) {
+    mapTableCellStyles(editor, (style) => getStyleWithBorderColor(style, color));
+}
+
+/** Strip all background + border colors from every cell, resetting the table. */
+function clearTableColors(editor: any) {
+    mapTableCellStyles(editor, (style) =>
+        getStyleWithBorderColor(getStyleWithBackgroundColor(style, ""), "")
+    );
+}
+
 /** Set text-align on all paragraph/heading children in every cell of the column. */
 function alignColumn(editor: any, alignment: 'left' | 'center' | 'right') {
     const found = findTableAround(editor);
@@ -2010,6 +2077,9 @@ function TableFloatingControls({ editor }: { editor: any }) {
     // Submenu state for color/align pickers inside dropdowns
     const [colSubmenu, setColSubmenu] = useState<'color' | 'align' | null>(null);
     const [rowSubmenu, setRowSubmenu] = useState<'color' | 'align' | null>(null);
+    // Table-level border color picker (popover near the bottom toolbar)
+    const [borderMenuOpen, setBorderMenuOpen] = useState(false);
+    const [currentBorderColor, setCurrentBorderColor] = useState<string>('');
     const menuRef = useRef<HTMLDivElement>(null);
     // The scrollable, position:relative editor area. Controls are rendered as its
     // absolutely-positioned children so they co-scroll with the table natively
@@ -2225,6 +2295,8 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 return;
             }
             setIsStructureLocked(isLockedProductTableNode(activeTable.tableNode));
+            const firstCell = activeTable.tableNode.firstChild?.firstChild;
+            setCurrentBorderColor(readBorderColor(firstCell?.attrs?.style));
 
             const { state } = editor;
             const { $from } = state.selection;
@@ -2324,16 +2396,17 @@ function TableFloatingControls({ editor }: { editor: any }) {
 
     // Close menus on outside click
     useEffect(() => {
-        if (openColMenu === null && openRowMenu === null) return;
+        if (openColMenu === null && openRowMenu === null && !borderMenuOpen) return;
         const handleClickOutside = (e: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
                 setOpenColMenu(null);
                 setOpenRowMenu(null);
+                setBorderMenuOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [openColMenu, openRowMenu]);
+    }, [openColMenu, openRowMenu, borderMenuOpen]);
 
     // Focus cursor into a specific cell before running column/row commands
     const focusCellInColumn = (colIndex: number) => {
@@ -2473,6 +2546,20 @@ function TableFloatingControls({ editor }: { editor: any }) {
         setRowSubmenu(null);
         focusCellInRow(rowIndex);
         setTimeout(() => alignRow(editor, alignment), 10);
+    };
+
+    const handleTableBorderColor = (color: string) => {
+        setBorderMenuOpen(false);
+        setCurrentBorderColor(color);
+        editor.chain().focus().run();
+        setTimeout(() => setTableBorderColor(editor, color), 10);
+    };
+
+    const handleClearTableColors = () => {
+        setBorderMenuOpen(false);
+        setCurrentBorderColor('');
+        editor.chain().focus().run();
+        setTimeout(() => clearTableColors(editor), 10);
     };
 
     if (!isInTable || columns.length === 0 || !portalTarget) return null;
@@ -2957,18 +3044,68 @@ function TableFloatingControls({ editor }: { editor: any }) {
                 </>
             )}
 
-            {/* ── Delete table button ─ below the add-row button ──────────── */}
+            {/* ── Table toolbar ─ border color + delete, below the add-row button ── */}
             <div
                 style={{
                     position: 'absolute',
                     display: 'flex',
                     justifyContent: 'center',
+                    gap: '6px',
                     top: tablePos.bottom + 36,
                     left: tablePos.left,
                     width: tablePos.width,
-                    zIndex: 9999,
+                    zIndex: borderMenuOpen ? 10002 : 9999,
                 }}
             >
+                {/* Border color picker */}
+                <div className="relative">
+                    <button
+                        className="table-border-btn"
+                        onClick={() => setBorderMenuOpen((o) => !o)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        title={t('notionEditor.table.borderColor')}
+                    >
+                        <Square
+                            className="w-3.5 h-3.5"
+                            style={{ color: currentBorderColor || '#9ca3af' }}
+                        />
+                        <span>{t('notionEditor.table.borderColor')}</span>
+                    </button>
+                    {borderMenuOpen && (
+                        <div className="table-border-popover">
+                            {TABLE_BORDER_COLORS.map((c) => (
+                                <button
+                                    key={c.label}
+                                    className="table-dropdown-item"
+                                    onClick={() => handleTableBorderColor(c.value)}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                >
+                                    <span
+                                        className={`table-color-swatch${c.value ? '' : ' table-color-swatch-none'}`}
+                                        style={c.value
+                                            ? { background: c.value, border: '1px solid rgba(0,0,0,0.1)' }
+                                            : undefined}
+                                    />
+                                    <span>{c.label}</span>
+                                    {currentBorderColor === c.value && (
+                                        <Check className="w-3.5 h-3.5 ml-auto opacity-70" />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <button
+                    className="table-border-btn"
+                    onClick={handleClearTableColors}
+                    onMouseDown={(e) => e.preventDefault()}
+                    title={t('notionEditor.table.clearColors')}
+                >
+                    <Eraser className="w-3.5 h-3.5" />
+                    <span>{t('notionEditor.table.clearColors')}</span>
+                </button>
+
                 <button
                     className="table-delete-btn"
                     onClick={() => editor.chain().focus().deleteTable().run()}

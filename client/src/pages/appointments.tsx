@@ -1050,6 +1050,7 @@ export default function RemindersPage() {
           }}
           defaults={newAppointmentDefaults}
           seedCustomer={newAppointmentSeedCustomer}
+          onCreated={() => { refetchAppointments(); }}
           hideTrigger
         />
 

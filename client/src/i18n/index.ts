@@ -7,8 +7,10 @@ import HttpBackend from 'i18next-http-backend';
 // untranslated keys — English is available synchronously on first render.
 // Every other language is fetched on demand via i18next-http-backend and
 // cached by the browser (Cache-Control / 304).
-// All translation files live in client/public/locales/{lng}/translation.json.
-// English is also statically imported here so it's bundled for instant fallback.
+// English is the source of truth and is bundled from client/src/locales/en (the
+// static import below) — it is NOT served from /locales/en. Every OTHER language
+// lives in client/public/locales/{lng}/translation.json and is fetched on demand.
+// Make English edits in src/locales/en, not public/locales.
 import enTranslations from '../locales/en/translation.json';
 
 i18n

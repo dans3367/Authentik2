@@ -194,17 +194,19 @@ function styleTablesForEmail(html: string): string {
         if (/style\s*=\s*"/i.test(fullTag)) {
           return fullTag.replace(
             /style="([^"]*)"/i,
-            (_: string, s: string) => `style="border-collapse: collapse; width: 100%; ${s}"`
+            (_: string, s: string) => `style="border-collapse: collapse; width: 100%; border-radius: 0; ${s}"`
           );
         }
-        return fullTag.replace(/<table/i, '<table style="border-collapse: collapse; width: 100%;"');
+        return fullTag.replace(/<table/i, '<table style="border-collapse: collapse; width: 100%; border-radius: 0;"');
       }
 
       if (presDepth > 0) return fullTag;
 
+      // Border defaults to transparent (untouched tables read as "no border");
+      // a per-cell `border-color` chosen in the editor is appended after and wins.
       if (dataDepth > 0) {
         if (tagLower.startsWith('<th')) {
-          const thStyle = 'border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top;';
+          const thStyle = 'border: 1px solid transparent; padding: 8px 12px; text-align: left; background-color: #f3f4f6; font-weight: 600; font-size: 14px; line-height: 1.5; vertical-align: top;';
           if (/style\s*=\s*"/i.test(fullTag)) {
             return fullTag.replace(
               /style="([^"]*)"/i,
@@ -214,7 +216,7 @@ function styleTablesForEmail(html: string): string {
           return fullTag.replace(/<th/i, `<th style="${thStyle}"`);
         }
         if (tagLower.startsWith('<td')) {
-          const tdStyle = 'border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top;';
+          const tdStyle = 'border: 1px solid transparent; padding: 8px 12px; font-size: 14px; line-height: 1.5; vertical-align: top;';
           if (/style\s*=\s*"/i.test(fullTag)) {
             return fullTag.replace(
               /style="([^"]*)"/i,
