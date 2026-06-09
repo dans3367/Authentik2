@@ -1170,16 +1170,24 @@ export function AppointmentsWeekBoard({
                       {group.items.map(apt => {
                         const name = getCustomerName(apt.customer);
                         const initials = getInitials(name);
-                        const avatarClass = AVATAR_PALETTE[hashString(name) % AVATAR_PALETTE.length];
                         const aptDate = new Date(apt.appointmentDate);
-                        const dotClass = STATUS_DOT[apt.status] || "bg-slate-400";
-                        const pillClass = STATUS_PILL[apt.status] || "bg-slate-100 text-slate-600";
+                        // Past appointments read as muted grey so the eye lands on what's still upcoming.
+                        const isPast = aptDate.getTime() < now.getTime();
+                        const avatarClass = isPast
+                          ? "bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
+                          : AVATAR_PALETTE[hashString(name) % AVATAR_PALETTE.length];
+                        const dotClass = isPast
+                          ? "bg-slate-300 dark:bg-slate-600"
+                          : STATUS_DOT[apt.status] || "bg-slate-400";
+                        const pillClass = isPast
+                          ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                          : STATUS_PILL[apt.status] || "bg-slate-100 text-slate-600";
                         const providerName = apt.provider?.name || apt.provider?.email;
 
                         return (
                           <li key={apt.id} className="flex items-stretch gap-4">
                             <div className="w-[56px] shrink-0 flex flex-col items-end pt-4">
-                              <div className="flex items-baseline gap-0.5 text-slate-900 dark:text-slate-100">
+                              <div className={`flex items-baseline gap-0.5 ${isPast ? "text-slate-400 dark:text-slate-500" : "text-slate-900 dark:text-slate-100"}`}>
                                 <span className="text-xl font-semibold tracking-tight tabular-nums">
                                   {format(aptDate, "h:mm", { locale: dfLocale })}
                                 </span>
@@ -1209,7 +1217,7 @@ export function AppointmentsWeekBoard({
                               </div>
 
                               <div className="flex-1 min-w-0">
-                                <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                <div className={`truncate text-sm font-semibold ${isPast ? "text-slate-500 dark:text-slate-500" : "text-slate-900 dark:text-slate-100"}`}>
                                   {name}
                                 </div>
                                 <div className="mt-0.5 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 min-w-0">
